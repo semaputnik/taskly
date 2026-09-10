@@ -1,4 +1,4 @@
-# FastAPI Project - Development
+# Taskly - Development
 
 ## Local Development
 
@@ -99,7 +99,15 @@ docker compose watch
 
 ## The `.env` File
 
-The tracked `.env` file contains local development defaults, passwords, and other configuration. Its hostnames use `localhost` for processes running on your machine. Docker Compose overrides hostnames such as the database and SMTP server with their Compose service names.
+The `.env` file contains local development settings and generated secrets. It is **not tracked**: create it from the tracked template and replace every `changethis`:
+
+```bash
+cp .env.example .env
+```
+
+CI copies `.env.example` verbatim, so keep it free of real secrets and add new settings to both files. Hostnames use `localhost` for processes running on your machine. Docker Compose overrides hostnames such as the database and SMTP server with their Compose service names.
+
+Backend tests run against a separate `app_test` database (`TEST_DB_NAME`), which `backend/scripts/test.sh` creates and migrates automatically, so running them does not touch development data.
 
 Do not store deployment secrets in `.env`. Configure them as described in the [FastAPI Cloud deployment guide](./deployment.md) or the [Docker Compose deployment guide](./deployment-docker-compose.md).
 

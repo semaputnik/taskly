@@ -1,5 +1,5 @@
 {
-  "name": "fastapi-full-stack-template",
+  "name": "taskly",
   "private": true,
   "workspaces": [
     "frontend",

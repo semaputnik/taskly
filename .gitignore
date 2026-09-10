@@ -1,5 +1,6 @@
-.vscode/*
-!.vscode/extensions.json
+# Local secrets; .env.example is the tracked template. Anchored so frontend/.env stays tracked.
+/.env
+.vscode/
 node_modules/
 backend/app/frontend/
 /test-results/

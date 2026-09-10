@@ -29,6 +29,8 @@ class Settings(BaseSettings):
     PROJECT_NAME: str
     SENTRY_DSN: HttpUrl | None = None
     DATABASE_URL: PostgresDsn
+    # Database used by backend/scripts/test.sh, on the same server as DATABASE_URL
+    TEST_DB_NAME: str = "app_test"
 
     @field_validator("DATABASE_URL", mode="before")
     @classmethod

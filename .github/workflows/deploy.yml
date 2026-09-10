@@ -1,11 +1,11 @@
 name: Deploy
 
 on:
-  push:
-    branches:
-      - master
-    paths-ignore:
-      - release-notes.md
+  # Manual only until FastAPI Cloud secrets are configured (see deployment.md).
+  # To deploy on every push, add back:
+  #   push:
+  #     branches:
+  #       - master
   workflow_dispatch:
 
 permissions:

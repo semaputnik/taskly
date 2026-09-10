@@ -1,88 +1,91 @@
-# Full Stack FastAPI Template
+# Taskly
 
-[![Test Docker Compose](../../actions/workflows/test-docker-compose.yml/badge.svg)](../../actions/workflows/test-docker-compose.yml)
 [![Test Backend](../../actions/workflows/test-backend.yml/badge.svg)](../../actions/workflows/test-backend.yml)
+[![Test Docker Compose](../../actions/workflows/test-docker-compose.yml/badge.svg)](../../actions/workflows/test-docker-compose.yml)
 
-## Technology Stack and Features
+Веб-сервис на FastAPI. Основан на [full-stack-fastapi-template](https://github.com/fastapi/full-stack-fastapi-template) (0.12.0+).
 
-- ⚡ [**FastAPI**](https://fastapi.tiangolo.com) for the Python backend API.
-  - 🧰 [SQLModel](https://sqlmodel.tiangolo.com) for the Python SQL database interactions (ORM).
-  - 🔍 [Pydantic](https://docs.pydantic.dev), used by FastAPI, for the data validation and settings management.
-  - 💾 [PostgreSQL](https://www.postgresql.org) as the SQL database.
-- 🚀 [React](https://react.dev) for the frontend.
-  - 🧩 Built into the backend application and served by FastAPI on the same domain as the API.
-  - 💃 Using TypeScript, hooks, [Vite](https://vitejs.dev), and other parts of a modern frontend stack.
-  - 🎨 [Tailwind CSS](https://tailwindcss.com) and [shadcn/ui](https://ui.shadcn.com) for the frontend components.
-  - 🤖 An automatically generated frontend client.
-  - 🧪 [Playwright](https://playwright.dev) for end-to-end testing.
-  - 🦇 Dark mode support.
-- ☁️ [FastAPI Cloud](https://fastapicloud.com) for deployment.
-- 🐋 [Docker Compose](https://www.docker.com) for local services and self-hosted deployment.
-  - 📞 [Traefik](https://traefik.io) as a reverse proxy with automatic HTTPS.
-- 🔒 Secure password hashing by default.
-- 🔑 JWT (JSON Web Token) authentication.
-- 📫 Email-based password recovery.
-- ✉️ [React Email](https://react.email) for email templates.
-- 📬 [Mailpit](https://mailpit.axllent.org) for local email testing during development.
-- ✅ Tests with [Pytest](https://pytest.org).
-- 🏭 CI (continuous integration) and CD (continuous deployment) based on GitHub Actions.
+**Стек:** FastAPI + SQLModel + PostgreSQL на бэкенде, React 19 + TanStack Router/Query + Tailwind на фронтенде. Собранный фронтенд раздаёт сам FastAPI, отдельного фронтенд-контейнера нет. JWT-аутентификация, письма через React Email, локально их ловит Mailpit.
 
-### Dashboard Login
+## Требования
 
-![Dashboard login screenshot](img/login.png)
+| Инструмент | Версия |
+|---|---|
+| Python | 3.14+ (обязательно: код использует синтаксис 3.14) |
+| [uv](https://docs.astral.sh/uv/) | свежий |
+| [bun](https://bun.sh) | 1.3+ |
+| Docker | любой актуальный |
 
-### Dashboard - Admin
+## Первый запуск
 
-![Admin dashboard screenshot](img/dashboard.png)
+```bash
+cp .env.example .env        # затем заменить все changethis на реальные значения
+docker compose up -d db mailpit
+cd backend
+uv sync
+uv run bash scripts/prestart.sh   # миграции + создание суперпользователя
+uv run fastapi dev                # http://localhost:8000
+```
 
-### Dashboard - Items
+В другом терминале, из корня:
 
-![Items dashboard screenshot](img/dashboard-items.png)
+```bash
+bun install
+bun run dev                       # http://localhost:5173, с hot reload
+```
 
-### Dashboard - Dark Mode
+Логин и пароль суперпользователя — `FIRST_SUPERUSER` и `FIRST_SUPERUSER_PASSWORD` в `.env`.
 
-![Dark mode dashboard screenshot](img/dashboard-dark.png)
+## Адреса
 
-### React Email Templates
+| Что | URL |
+|---|---|
+| Приложение и API | <http://localhost:8000> |
+| Swagger | <http://localhost:8000/docs> |
+| Vite dev server | <http://localhost:5173> |
+| Mailpit | <http://localhost:8025> |
+| Adminer (только в полном compose-стеке) | <http://localhost:8080> |
 
-![Email templates screenshot](img/react-email.png)
+## Команды на каждый день
 
-### Mailpit - Local Email Testing
+```bash
+# из backend/
+uv run bash scripts/test.sh                                  # тесты + покрытие (в отдельной БД app_test)
+uv run bash scripts/lint.sh                                  # mypy, ty, ruff
+uv run alembic revision --autogenerate -m "описание"         # новая миграция
+uv run alembic upgrade head                                  # применить миграции
 
-![Mailpit screenshot](img/mailpit.png)
+# из корня
+bash scripts/generate-client.sh     # перегенерировать TS-клиент после изменений API
+uv run prek run --all-files         # все pre-commit проверки
+bun run lint                        # biome для фронтенда
+```
 
-### Interactive API Documentation
+Тесты бэкенда используют отдельную базу `app_test` и не трогают данные разработки. Playwright-тесты (`bunx playwright test`) такой изоляции не имеют и пишут в основную базу.
 
-![API docs](img/docs.png)
+## Конфигурация и секреты
 
-## How to Use It
+- `.env` — локальные настройки и сгенерированные секреты, **в git не хранится**.
+- `.env.example` — шаблон с плейсхолдерами; CI копирует его как `.env`, поэтому реальных секретов в нём быть не должно. Новые переменные добавляйте в оба файла.
+- `frontend/.env` — только URL бэкенда и Mailpit для Vite, хранится в git.
 
-Click the **Use this template** button at the top of this page to create a new repository.
+## Документация
 
-## Backend Development
+- [development.md](./development.md) — локальная разработка, Docker Compose, pre-commit
+- [backend/README.md](./backend/README.md) — бэкенд, тесты, миграции, шаблоны писем
+- [frontend/README.md](./frontend/README.md) — фронтенд, генерация клиента, Playwright
+- [deployment.md](./deployment.md) — деплой в FastAPI Cloud (workflow пока запускается только вручную)
+- [deployment-docker-compose.md](./deployment-docker-compose.md) — деплой на свой сервер
 
-Backend docs: [backend/README.md](./backend/README.md).
+## Обновления из шаблона
 
-## Frontend Development
+Remote `upstream` указывает на шаблон и доступен только для чтения:
 
-Frontend docs: [frontend/README.md](./frontend/README.md).
+```bash
+git fetch upstream
+git merge upstream/master
+```
 
-## Deployment
+## Лицензия
 
-FastAPI Cloud deployment: [deployment.md](./deployment.md).
-
-Self-hosted deployment with Docker Compose: [deployment-docker-compose.md](./deployment-docker-compose.md).
-
-## Development
-
-General development docs: [development.md](./development.md).
-
-This includes the local FastAPI and Vite workflow, Docker Compose services, `.env` configuration, and more.
-
-## Release Notes
-
-Check the file [release-notes.md](./release-notes.md).
-
-## License
-
-The Full Stack FastAPI Template is licensed under the terms of the MIT license.
+MIT, унаследована от шаблона — см. [LICENSE](./LICENSE).

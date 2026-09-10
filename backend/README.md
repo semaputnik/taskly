@@ -1,4 +1,4 @@
-# FastAPI Project - Backend
+# Taskly - Backend
 
 ## Requirements
 
@@ -31,12 +31,6 @@ Run backend commands from `./backend/` with `uv run`. Make sure your editor uses
 
 Modify or add SQLModel models for data and SQL tables in `./backend/app/models.py`, API endpoints in `./backend/app/api/`, CRUD (Create, Read, Update, Delete) utils in `./backend/app/crud.py`.
 
-## VS Code
-
-There are already configurations in place to run the backend through the VS Code debugger, so that you can use breakpoints, pause and explore variables, etc.
-
-The setup is also already configured so you can run the tests through the VS Code Python tests tab.
-
 ## Full Stack with Docker Compose
 
 To run the backend and built frontend in Docker Compose:
@@ -67,6 +61,8 @@ $ uv run bash scripts/test.sh
 ```
 
 The tests run with Pytest. Modify existing tests or add new ones in `./backend/tests/`.
+
+The script points the tests at a separate database named by `TEST_DB_NAME` (default `app_test`) on the same server, creating and migrating it as needed. The test session deletes all users and items when it finishes, so never point it at the development database.
 
 If you use GitHub Actions, the tests will run automatically.
 
