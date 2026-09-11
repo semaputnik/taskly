@@ -62,7 +62,7 @@ $ uv run bash scripts/test.sh
 
 The tests run with Pytest. Modify existing tests or add new ones in `./backend/tests/`.
 
-The script points the tests at a separate database named by `TEST_DB_NAME` (default `app_test`) on the same server, creating and migrating it as needed. The test session deletes all users and items when it finishes, so never point it at the development database.
+The script points the tests at a separate database named by `TEST_DB_NAME` (default `app_test`) on the same server, creating and migrating it as needed. The test session deletes all users when it finishes, so never point it at the development database.
 
 If you use GitHub Actions, the tests will run automatically.
 
