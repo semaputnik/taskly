@@ -3,8 +3,8 @@
 set -e
 set -x
 
-# Run against a separate test database: the test session deletes all users and items
-# when it finishes. Environment variables take priority over .env in pydantic-settings,
+# Run against a separate test database: the test session deletes all users when it
+# finishes. Environment variables take priority over .env in pydantic-settings,
 # so exporting DATABASE_URL redirects the app engine and Alembic together.
 DATABASE_URL="$(FASTAPI_ENV=development python -c '
 from sqlalchemy.engine import make_url
