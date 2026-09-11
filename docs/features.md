@@ -1,7 +1,7 @@
 # Taskly — Feature Requirements
 
 **Status:** Draft
-**Last updated:** 2026-09-10
+**Last updated:** 2026-09-11
 
 This document lists the features Taskly must provide. It records confirmed
 requirements only. Anything not yet decided is listed under
@@ -30,8 +30,9 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
 | **Token** | The credential a bot user uses to authenticate to the REST API. A bot user has one token. |
 | **Task** | The main entity: a unit of work that is either completed or not completed. |
 | **Subtask** | A task that is a child of another task. A subtask is a full task. |
-| **Project** | A container that groups tasks. Every task belongs to a project. |
-| **Inbox** | The default project every user has. Tasks go there unless another project is chosen. |
+| **Project** | A container that groups tasks. Every task belongs to a project. Projects are flat: there is no nesting. |
+| **Inbox** | The default project every user has. Tasks go there unless another project is chosen. Cannot be renamed or deleted. |
+| **Archived project** | A project a user has hidden from daily use without deleting it. Read-only; hidden from default views; no bot access. Distinct from a *deleted* project — see [F-05](#f-05-projects). |
 | **Tag** | A label attached to a task. |
 | **Comment** | A text note attached to a task. |
 | **Attachment** | A file attached to a task. |
@@ -54,16 +55,25 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
 - **FR-01.2** A task has the following fields:
   - title
   - description
-  - due date
+  - due date (date only, no time of day)
   - priority
   - assignee
   - tags
 - **FR-01.3** Priority takes one of four values: `P1`, `P2`, `P3`, `P4`.
+  `P1` is the highest priority, `P4` the lowest. Priority is optional; a task
+  with no priority set behaves as `P4`.
 - **FR-01.4** A task has exactly two states: **completed** and **not completed**.
   There are no other workflow statuses (Todoist-style).
 - **FR-01.5** A user can mark a task as completed and return it to not completed.
 - **FR-01.6** A task has at most one assignee. A task can have no assignee.
 - **FR-01.7** The assignee is either the user or one of the user's bot users.
+
+#### Tags
+
+- **FR-01.20** A tag is free text, created on the fly when applied to a task —
+  there is no separate screen for managing tags.
+- **FR-01.21** Tags belong to the user, not to a project: a user's tags are
+  shared across all of their projects.
 
 #### Deletion
 
@@ -71,8 +81,40 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
   marked as deleted and no longer appears in the task list.
 - **FR-01.9** The deletion is recorded in the activity log.
 - **FR-01.10** A user can restore a deleted task from the activity log.
+  Restoring a task also restores its subtasks, except any subtask that was
+  already deleted independently before the parent was deleted — that subtask
+  stays deleted.
 - **FR-01.11** Deleting a task also deletes all its subtasks. Before deleting a
   task that has subtasks, Taskly shows the user a warning.
+- **FR-01.12** The REST API rejects a request to delete a task that has
+  subtasks with an error, unless the request explicitly confirms cascading
+  deletion. This mirrors the completion behavior (FR-02.6, FR-02.7).
+
+#### Recurrence
+
+- **FR-01.13** A task can be marked as recurring, with a fixed-interval rule:
+  daily, weekly, monthly, or every N days.
+- **FR-01.14** Completing a recurring task creates its next occurrence as a
+  new task. The new task copies the completed one's fields (title,
+  description, priority, assignee, tags) and its subtask tree, with the
+  subtasks not completed. Comments and attachments are not copied — they
+  belong to the occurrence that was completed.
+- **FR-01.15** The next occurrence's due date is the completed occurrence's
+  due date plus the recurrence interval — a fixed schedule, independent of
+  when the occurrence was actually completed.
+- **FR-01.16** Only one open (not completed) occurrence of a recurring task
+  exists at a time. The next occurrence is not created until the current one
+  is completed, even if its due date has already passed.
+- **FR-01.17** A user can change the due date of the open occurrence of a
+  recurring task, like on any task. Taskly asks whether the change applies
+  only to this occurrence or to this and all following occurrences.
+- **FR-01.18** "Only this occurrence": changes this task's due date. The next
+  occurrence's due date is still computed from the original, un-edited
+  schedule (FR-01.15) — the edit does not shift the series.
+- **FR-01.19** "This and all following occurrences": changes this task's due
+  date and shifts the series — the next occurrence's due date is computed
+  from the new due date plus the recurrence interval (FR-01.15), instead of
+  from the original.
 
 ### F-02. Subtasks
 
@@ -95,10 +137,23 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
 ### F-03. Comments
 
 - **FR-03.1** A task can have comments.
+- **FR-03.2** A human user can edit or delete their own comments. This does
+  not apply to bot users, whose comments are append-only (FR-08.10).
+- **FR-03.3** A comment cannot have its own attachments; attachments stay at
+  the task level (see [F-04](#f-04-attachments)).
 
 ### F-04. Attachments
 
 - **FR-04.1** A task can have file attachments.
+- **FR-04.2** There is a limit on attachment file size. There is no limit on
+  file type or on the number of attachments per task. (The exact size limit
+  is a configuration detail, not fixed here.)
+- **FR-04.3** Attachments are stored internally by Taskly by default. The
+  storage is a swappable backend (see
+  [ADR-0002](./adr/0002-attachment-storage-backend.md)) so that an external
+  store, such as a per-user Paperless-ngx instance (see
+  [Future ideas](#5-future-ideas)), can be added later without changing how
+  attachments work for users.
 
 ### F-05. Projects
 
@@ -107,6 +162,32 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
 - **FR-05.3** Every user has a default project called **Inbox**. It exists from
   the moment the account is created.
 - **FR-05.4** A task created without a project goes to Inbox (as in Todoist).
+- **FR-05.5** Projects are flat. A project cannot contain another project.
+- **FR-05.6** The Inbox project cannot be renamed or deleted.
+- **FR-05.7** A project has a name and an optional description.
+
+#### Deletion
+
+- **FR-05.8** Deleting a project marks it as deleted, the same way as a task
+  (see [FR-01.8](#f-01-tasks)). It is not removed from the system.
+- **FR-05.9** Deleting a project also deletes all its tasks. Restoring the
+  project from the activity log restores its tasks with it.
+
+#### Archiving
+
+- **FR-05.10** A user can archive a project and unarchive it again. This is a
+  direct, immediately-reversible action — it does not go through the activity
+  log or the deletion/restore flow.
+- **FR-05.11** Archiving a project archives all its tasks with it. Unarchiving
+  reverses this for all of them.
+- **FR-05.12** An archived project and its tasks are read-only for the human
+  user: nothing in it can be created, edited, or deleted while archived.
+- **FR-05.13** A bot user has no access — read or write — to an archived
+  project or its tasks, regardless of what its scope otherwise grants
+  (see [FR-08.6](#f-08-bot-users)).
+- **FR-05.14** An archived project and its tasks are hidden from the default
+  task list and from filters (see [F-06](#f-06-task-list-and-filtering))
+  unless the user explicitly asks to see the archive.
 
 ### F-06. Task list and filtering
 
@@ -116,10 +197,21 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
   - assignee
   - tag
   - priority
+  - completion state
+  - due date
+- **FR-06.3** Filters can be combined; a task must match all active filters.
+- **FR-06.4** The task list can be sorted, at minimum by due date and by
+  priority.
 
 ### F-07. REST API
 
 - **FR-07.1** Taskly exposes a REST API.
+- **FR-07.2** Everything a bot user needs to do its own work — tasks,
+  comments, attachments, within its scope (see [F-08](#f-08-bot-users)) —
+  is available through the REST API.
+- **FR-07.3** Creating, scoping, and issuing tokens for bot users is a human
+  action available only in the web UI, not through the REST API. A bot cannot
+  create or configure itself or another bot.
 
 ### F-08. Bot users
 
@@ -184,6 +276,10 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
 - **FR-09.1** The system has exactly one superuser.
 - **FR-09.2** The superuser can view the list of registered users.
 - **FR-09.3** The superuser has no other administrative functions for now.
+- **FR-09.4** A person can register their own account; account creation does
+  not require an invitation or the superuser's action.
+- **FR-09.5** The superuser also uses Taskly as a regular user, with their own
+  tasks and projects.
 
 ### F-10. Activity log (event feed)
 
@@ -211,9 +307,12 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
     - a project is created
     - a project is changed
     - a project is deleted
-- **FR-10.4** A deleted task can be restored from the log (see FR-01.10).
+- **FR-10.4** A deleted task or project can be restored from the log
+  (see FR-01.10, FR-05.8).
 - **FR-10.5** Log entries are kept indefinitely.
 - **FR-10.6** Bot users cannot read the activity log.
+- **FR-10.7** A user sees only their own activity log. The superuser is not an
+  exception: they see only their own log, not other users'.
 
 ### F-11. Webhooks — *Deferred*
 
@@ -231,6 +330,11 @@ Not requirements yet. Recorded so they are not lost.
 
 - **Restore a deleted bot user.** Bring a deleted bot user back and issue it a
   new token.
+- **Paperless-ngx as an attachment storage backend.** Let a user optionally
+  connect their own Paperless-ngx instance so their task attachments are
+  stored and processed (OCR, classification) there instead of internally,
+  with the Paperless document linked back to its Taskly task. Internal
+  storage (FR-04.3) stays the default for users who don't connect one.
 
 ## 6. Out of scope
 
@@ -243,23 +347,10 @@ Not requirements yet. Recorded so they are not lost.
 - More than one token per bot user.
 - Bot users reading the activity log.
 - Bot users editing or deleting comments.
+- Nested projects (projects are flat — see FR-05.5).
+- Text search over tasks.
 
 ## 7. Open questions
 
-| ID | Area | Question |
-|---|---|---|
-| Q-01 | Subtasks | When a deleted task is restored, are its subtasks restored with it? |
-| Q-02 | Subtasks | FR-01.11 shows a warning in the UI. What happens when a task with subtasks is deleted through the REST API, for example by a bot? Proposal: the same approach as for completion (FR-02.6, FR-02.7) — the API returns an error unless the request explicitly confirms that subtasks are deleted too. |
-| Q-03 | Activity log | Can the superuser see users' activity logs, or does each user see only their own? |
-| Q-04 | Deletion | What happens to a project's tasks when the project is deleted? Is a project deleted the same way as a task (marked as deleted, restorable)? |
-| Q-05 | Projects | Can Inbox be renamed or deleted? |
-| Q-06 | Projects | Can projects be nested? Which fields does a project have besides a name? |
-| Q-07 | Due date | Date only, or date and time? Are recurring tasks needed? |
-| Q-08 | Priority | Is `P1` the highest priority? Is priority required, or does it have a default? |
-| Q-09 | Tags | Are tags free text created on the fly, or managed as a separate list? Are they per user? |
-| Q-10 | Comments | Can users edit or delete comments? Can comments have attachments? |
-| Q-11 | Attachments | Are there limits on file size, file type, or number of files? |
-| Q-12 | Filtering | Can filters be combined? Is filtering by completion state or due date needed? Sorting? Text search? |
-| Q-13 | Accounts | Can people sign up on their own, or does the superuser create accounts? |
-| Q-14 | Superuser | Does the superuser also use Taskly as a regular user, with their own tasks and projects? |
-| Q-15 | UI vs API | Must every feature be available in both the web UI and the REST API? For example, is bot user management UI-only? |
+None. All questions raised while drafting this document (Q-01 through Q-15)
+have been resolved into the requirements above.
