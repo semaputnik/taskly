@@ -43,6 +43,11 @@ updates:
     labels: [dependencies, internal]
     ignore:
       - dependency-name: "@hey-api/openapi-ts"
+      # TypeScript 7 crashes the pinned client generator: openapi-ts reads
+      # ts.NewLineKind.LineFeed, which TypeScript 7 removed. Still broken on
+      # openapi-ts 0.99.0, so the two have to be unpinned together.
+      - dependency-name: "typescript"
+        update-types: [version-update:semver-major]
     groups:
       npm-packages:
         patterns:
