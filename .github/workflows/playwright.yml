@@ -19,6 +19,10 @@ jobs:
   changes:
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: read
+      # paths-filter lists PR files through the API, which needs this in a private repo
+      pull-requests: read
     # Set job outputs to values from filter step
     outputs:
       changed: ${{ steps.filter.outputs.changed }}
