@@ -1,7 +1,9 @@
 import uuid
 from collections.abc import Sequence
+from datetime import date
 from typing import Any
 
+from sqlalchemy import case, nullslast, or_
 from sqlalchemy.orm import aliased
 from sqlmodel import Session, col, func, select
 
@@ -11,9 +13,13 @@ from app.models import (
     Project,
     ProjectCreate,
     ProjectUpdate,
+    SortOrder,
     Tag,
     Task,
     TaskCreate,
+    TaskPriority,
+    TaskQuery,
+    TaskSort,
     TaskTag,
     TaskUpdate,
     User,
@@ -127,6 +133,106 @@ def update_task(*, session: Session, db_task: Task, task_in: TaskUpdate) -> Task
     session.commit()
     session.refresh(db_task)
     return db_task
+
+
+def get_tasks(
+    *, session: Session, owner_id: uuid.UUID, query: TaskQuery
+) -> tuple[Sequence[Task], int]:
+    """
+    A page of the user's tasks, narrowed and ordered by `query`, with the
+    number of tasks the filters match in full.
+    """
+    conditions = _task_filters(owner_id=owner_id, query=query)
+
+    count = session.exec(
+        select(func.count()).select_from(Task).where(*conditions)
+    ).one()
+    statement = (
+        select(Task)
+        .where(*conditions)
+        .order_by(*_task_ordering(query))
+        .offset(query.skip)
+        .limit(query.limit)
+    )
+    return session.exec(statement).all(), count
+
+
+# Unset priority sorts as P4 (lowest) without being reported as P4.
+_PRIORITY_RANK = case(
+    (Task.priority == TaskPriority.P1, 1),  # type: ignore[arg-type] # ty: ignore[invalid-argument-type]
+    (Task.priority == TaskPriority.P2, 2),  # type: ignore[arg-type] # ty: ignore[invalid-argument-type]
+    (Task.priority == TaskPriority.P3, 3),  # type: ignore[arg-type] # ty: ignore[invalid-argument-type]
+    else_=4,
+)
+
+
+def _task_filters(*, owner_id: uuid.UUID, query: TaskQuery) -> list[Any]:
+    """
+    What a task has to satisfy to be listed: the user's own tasks that are not
+    deleted, plus every filter that is set (FR-06.2, FR-06.3).
+    """
+    conditions: list[Any] = [Task.owner_id == owner_id, not_deleted(Task)]
+
+    if query.project_id is not None:
+        conditions.append(col(Task.id).in_(project_task_ids(query.project_id)))
+
+    if query.unassigned:
+        conditions.append(col(Task.assignee_id).is_(None))
+    elif query.assignee_id is not None:
+        conditions.append(Task.assignee_id == query.assignee_id)
+
+    if query.tag is not None:
+        tagged = (
+            select(TaskTag.task_id)
+            .join(Tag, col(Tag.id) == TaskTag.tag_id)
+            .where(Tag.owner_id == owner_id, Tag.name == query.tag)
+        )
+        conditions.append(col(Task.id).in_(tagged))
+
+    if query.priority is not None:
+        if query.priority is TaskPriority.P4:
+            # A task with no priority behaves as P4 (FR-01.3), so it answers to
+            # a P4 filter too.
+            conditions.append(
+                or_(
+                    col(Task.priority) == TaskPriority.P4,
+                    col(Task.priority).is_(None),
+                )
+            )
+        else:
+            conditions.append(Task.priority == query.priority)
+
+    if query.completed is not None:
+        conditions.append(Task.completed == query.completed)
+
+    if query.due_from is not None:
+        conditions.append(col(Task.due_date) >= query.due_from)
+    if query.due_to is not None:
+        conditions.append(col(Task.due_date) <= query.due_to)
+    if query.overdue:
+        conditions.append(col(Task.due_date) < date.today())
+
+    return conditions
+
+
+def _task_ordering(query: TaskQuery) -> list[Any]:
+    """
+    How the list is ordered. Without a sort it stays as it was: the most
+    pressing work first, oldest first within a priority.
+    """
+    if query.sort is None:
+        return [_PRIORITY_RANK, Task.created_at]
+
+    descending = query.order is SortOrder.DESC
+    if query.sort is TaskSort.DUE_DATE:
+        due_date = col(Task.due_date)
+        # A task with no due date is not early or late, so it goes last either
+        # way rather than leading one of the two orders.
+        ordering = nullslast(due_date.desc() if descending else due_date.asc())
+    else:
+        ordering = _PRIORITY_RANK.desc() if descending else _PRIORITY_RANK.asc()
+
+    return [ordering, Task.created_at]
 
 
 def get_tags(
@@ -384,19 +490,21 @@ def delete_project(*, session: Session, project: Project) -> None:
     session.add(deletion)
     session.flush()
 
-    project_tasks = _project_tasks_cte(project.id)
     _mark_deleted(
-        session=session, task_ids=select(project_tasks.c.id), deletion=deletion
+        session=session, task_ids=project_task_ids(project.id), deletion=deletion
     )
     project.deletion_id = deletion.id
     session.add(project)
     session.commit()
 
 
-def _project_tasks_cte(project_id: uuid.UUID) -> Any:
+def project_task_ids(project_id: uuid.UUID) -> Any:
     """
-    Every task of a project that is not deleted: its root tasks and everything
-    under them.
+    Selects the ids of every task of a project that is not deleted: its root
+    tasks and everything under them.
+
+    Subtasks hold no project of their own, so a project's tasks are only
+    reachable by walking down from its root tasks.
     """
     tasks = (
         select(Task.id)
@@ -404,11 +512,12 @@ def _project_tasks_cte(project_id: uuid.UUID) -> Any:
         .cte("project_tasks", recursive=True)
     )
     child = aliased(Task)
-    return tasks.union_all(
+    tasks = tasks.union_all(
         select(child.id)
         .join(tasks, col(child.parent_id) == tasks.c.id)
         .where(not_deleted(child))
     )
+    return select(tasks.c.id)
 
 
 def _mark_deleted(*, session: Session, task_ids: Any, deletion: Deletion) -> None:

@@ -159,6 +159,11 @@ export type ProjectsPublic = {
 };
 
 /**
+ * SortOrder
+ */
+export type SortOrder = 'asc' | 'desc';
+
+/**
  * SubtaskCompletion
  *
  * What a completion request says about the task's uncompleted subtasks.
@@ -283,6 +288,11 @@ export type TaskPublic = {
      */
     created_at?: string | null;
 };
+
+/**
+ * TaskSort
+ */
+export type TaskSort = 'due_date' | 'priority';
 
 /**
  * TaskUpdate
@@ -1023,6 +1033,47 @@ export type tasksReadTasksData = {
     body?: never;
     path?: never;
     query?: {
+        /**
+         * Project Id
+         */
+        project_id?: string | null;
+        /**
+         * Assignee Id
+         */
+        assignee_id?: string | null;
+        /**
+         * Unassigned
+         */
+        unassigned?: boolean;
+        /**
+         * Tag
+         */
+        tag?: string | null;
+        /**
+         * Priority
+         */
+        priority?: TaskPriority | null;
+        /**
+         * Completed
+         */
+        completed?: boolean | null;
+        /**
+         * Due From
+         */
+        due_from?: string | null;
+        /**
+         * Due To
+         */
+        due_to?: string | null;
+        /**
+         * Overdue
+         */
+        overdue?: boolean;
+        /**
+         * Sort
+         */
+        sort?: TaskSort | null;
+        order?: SortOrder;
         /**
          * Skip
          */
