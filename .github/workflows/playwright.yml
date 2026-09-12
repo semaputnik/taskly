@@ -15,6 +15,14 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  # A newer push to the same pull request makes the run in flight pointless, so
+  # it is cancelled rather than left to finish and be thrown away. Four shards
+  # make this the most worthwhile workflow to cancel. Pushes to master are left
+  # alone: every commit there is checked on its own.
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   changes:
     runs-on: ubuntu-latest

@@ -1,13 +1,26 @@
 name: Zizmor
 
+# Zizmor audits the workflows themselves and reads nothing else, so it runs
+# when a workflow changes rather than on every push.
 on:
   push:
     branches:
       - master
+    paths:
+      - .github/workflows/**
   pull_request:
+    paths:
+      - .github/workflows/**
   workflow_dispatch:
 
 permissions: {}
+
+concurrency:
+  # A newer push to the same pull request makes the run in flight pointless, so
+  # it is cancelled rather than left to finish and be thrown away. Pushes to
+  # master are left alone: every commit there is checked on its own.
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   zizmor:
