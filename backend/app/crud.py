@@ -1,8 +1,9 @@
 import uuid
+from collections.abc import Sequence
 from typing import Any
 
 from sqlalchemy.orm import aliased
-from sqlmodel import Session, col, select
+from sqlmodel import Session, col, func, select
 
 from app.core.security import get_password_hash, verify_password
 from app.models import (
@@ -10,8 +11,10 @@ from app.models import (
     Project,
     ProjectCreate,
     ProjectUpdate,
+    Tag,
     Task,
     TaskCreate,
+    TaskTag,
     TaskUpdate,
     User,
     UserCreate,
@@ -95,6 +98,7 @@ def create_task(
     task_create: TaskCreate,
     project_id: uuid.UUID | None,
     owner_id: uuid.UUID,
+    tag_names: Sequence[str] = (),
 ) -> Task:
     """
     Create a task. `project_id` is set on root tasks and None on subtasks,
@@ -104,6 +108,11 @@ def create_task(
         task_create, update={"project_id": project_id, "owner_id": owner_id}
     )
     session.add(db_obj)
+    # Flush so the task row exists before the tag links that point at it, while
+    # keeping the whole creation in one transaction: a task never lands without
+    # the tags it was typed with.
+    session.flush()
+    _stage_task_tags(session=session, task=db_obj, names=tag_names)
     session.commit()
     session.refresh(db_obj)
     return db_obj
@@ -112,12 +121,133 @@ def create_task(
 def update_task(*, session: Session, db_task: Task, task_in: TaskUpdate) -> Task:
     # `subtasks` directs what happens to the subtree (handled by the caller)
     # rather than naming a column, so it never reaches the row.
-    task_data = task_in.model_dump(exclude_unset=True, exclude={"subtasks"})
+    task_data = task_in.model_dump(exclude_unset=True, exclude={"subtasks", "tags"})
     db_task.sqlmodel_update(task_data)
     session.add(db_task)
     session.commit()
     session.refresh(db_task)
     return db_task
+
+
+def get_tags(
+    *,
+    session: Session,
+    owner_id: uuid.UUID,
+    q: str | None = None,
+    skip: int = 0,
+    limit: int = 100,
+) -> tuple[Sequence[Tag], int]:
+    """
+    The tags a user has used, for autocomplete. `q` matches from the start of
+    the name, ignoring case, so what they type narrows to what they typed
+    before rather than to every tag with those letters somewhere inside.
+    """
+    where: list[Any] = [Tag.owner_id == owner_id]
+    if q:
+        where.append(col(Tag.name).ilike(f"{q}%"))
+
+    count = session.exec(select(func.count()).select_from(Tag).where(*where)).one()
+    statement = (
+        select(Tag)
+        .where(*where)
+        # Case-insensitive, so "Reading" and "running" sit where the user looks
+        # for them rather than in two alphabets.
+        .order_by(func.lower(Tag.name))
+        .offset(skip)
+        .limit(limit)
+    )
+    return session.exec(statement).all(), count
+
+
+def get_task_tags(
+    *, session: Session, task_ids: Sequence[uuid.UUID]
+) -> dict[uuid.UUID, list[str]]:
+    """The tag names on each of the given tasks, keyed by task id."""
+    if not task_ids:
+        return {}
+
+    statement = (
+        select(TaskTag.task_id, Tag.name)
+        .join(Tag, col(Tag.id) == TaskTag.tag_id)
+        .where(col(TaskTag.task_id).in_(task_ids))
+    )
+    tags: dict[uuid.UUID, list[str]] = {task_id: [] for task_id in task_ids}
+    for task_id, name in session.exec(statement).all():
+        tags[task_id].append(name)
+    return {task_id: sorted(names, key=str.lower) for task_id, names in tags.items()}
+
+
+def set_task_tags(*, session: Session, task: Task, names: Sequence[str]) -> None:
+    """
+    Replace a task's tags with `names`, creating the ones the user has not used
+    before (FR-01.20) and dropping any tag left on no task at all.
+    """
+    _stage_task_tags(session=session, task=task, names=names)
+    session.commit()
+
+
+def _stage_task_tags(*, session: Session, task: Task, names: Sequence[str]) -> None:
+    """The tag work itself, staged but not committed, so a caller can put it in
+    the same transaction as whatever else it is writing."""
+    links = session.exec(select(TaskTag).where(TaskTag.task_id == task.id)).all()
+    linked = {link.tag_id: link for link in links}
+
+    tags = _tags_for_names(session=session, owner_id=task.owner_id, names=names)
+    wanted = {tag.id for tag in tags}
+
+    for tag_id, link in linked.items():
+        if tag_id not in wanted:
+            session.delete(link)
+    for tag in tags:
+        if tag.id not in linked:
+            session.add(TaskTag(task_id=task.id, tag_id=tag.id))
+
+    session.flush()
+    _drop_unused_tags(session=session, tag_ids=set(linked) - wanted)
+
+
+def _tags_for_names(
+    *, session: Session, owner_id: uuid.UUID, names: Sequence[str]
+) -> list[Tag]:
+    """The user's tags with these names, creating any that are new to them."""
+    if not names:
+        return []
+
+    statement = select(Tag).where(Tag.owner_id == owner_id, col(Tag.name).in_(names))
+    existing = {tag.name: tag for tag in session.exec(statement).all()}
+
+    tags = []
+    for name in names:
+        tag = existing.get(name)
+        if tag is None:
+            tag = Tag(name=name, owner_id=owner_id)
+            session.add(tag)
+        tags.append(tag)
+    session.flush()
+    return tags
+
+
+def _drop_unused_tags(*, session: Session, tag_ids: set[uuid.UUID]) -> None:
+    """
+    Remove tags nothing carries any more.
+
+    Applying and removing tags is the whole of tag management (FR-01.20), so a
+    tag no task holds has no way back out of autocomplete unless it goes here.
+    A soft-deleted task keeps its links, and with them its tags, so restoring
+    it brings them back.
+    """
+    if not tag_ids:
+        return
+
+    still_used = set(
+        session.exec(
+            select(TaskTag.tag_id).where(col(TaskTag.tag_id).in_(tag_ids))
+        ).all()
+    )
+    for tag_id in tag_ids - still_used:
+        tag = session.get(Tag, tag_id)
+        if tag is not None:
+            session.delete(tag)
 
 
 def not_deleted(model: type[Task] | type[Project]) -> Any:

@@ -170,6 +170,34 @@ export type ProjectsPublic = {
 export type SubtaskCompletion = 'leave_uncompleted' | 'complete';
 
 /**
+ * TagPublic
+ */
+export type TagPublic = {
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Id
+     */
+    id: string;
+};
+
+/**
+ * TagsPublic
+ */
+export type TagsPublic = {
+    /**
+     * Data
+     */
+    data: Array<TagPublic>;
+    /**
+     * Count
+     */
+    count: number;
+};
+
+/**
  * TaskCreate
  */
 export type TaskCreate = {
@@ -186,6 +214,10 @@ export type TaskCreate = {
      */
     due_date?: string | null;
     priority?: TaskPriority | null;
+    /**
+     * Tags
+     */
+    tags?: Array<string>;
     /**
      * Project Id
      */
@@ -239,6 +271,10 @@ export type TaskPublic = {
      */
     parent_id?: string | null;
     /**
+     * Tags
+     */
+    tags?: Array<string>;
+    /**
      * Assignee Id
      */
     assignee_id?: string | null;
@@ -277,6 +313,10 @@ export type TaskUpdate = {
      * Completed
      */
     completed?: boolean | null;
+    /**
+     * Tags
+     */
+    tags?: Array<string> | null;
     subtasks?: SubtaskCompletion | null;
 };
 
@@ -1132,6 +1172,44 @@ export type tasksUpdateTaskResponses = {
 };
 
 export type tasksUpdateTaskResponse = tasksUpdateTaskResponses[keyof tasksUpdateTaskResponses];
+
+export type tagsReadTagsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Q
+         */
+        q?: string | null;
+        /**
+         * Skip
+         */
+        skip?: number;
+        /**
+         * Limit
+         */
+        limit?: number;
+    };
+    url: '/api/v1/tags/';
+};
+
+export type tagsReadTagsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type tagsReadTagsError = tagsReadTagsErrors[keyof tagsReadTagsErrors];
+
+export type tagsReadTagsResponses = {
+    /**
+     * Successful Response
+     */
+    200: TagsPublic;
+};
+
+export type tagsReadTagsResponse = tagsReadTagsResponses[keyof tagsReadTagsResponses];
 
 export type utilsTestEmailData = {
     body?: never;

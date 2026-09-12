@@ -2,7 +2,7 @@
 
 import { type Client, type Options as Options2, type TDataShape, urlSearchParamsBodySerializer } from './client';
 import { client } from './client.gen';
-import type { loginLoginAccessTokenData, loginLoginAccessTokenErrors, loginLoginAccessTokenResponses, loginRecoverPasswordData, loginRecoverPasswordErrors, loginRecoverPasswordHtmlContentData, loginRecoverPasswordHtmlContentErrors, loginRecoverPasswordHtmlContentResponses, loginRecoverPasswordResponses, loginResetPasswordData, loginResetPasswordErrors, loginResetPasswordResponses, loginTestTokenData, loginTestTokenResponses, privateCreateUserData, privateCreateUserErrors, privateCreateUserResponses, projectsCreateProjectData, projectsCreateProjectErrors, projectsCreateProjectResponses, projectsDeleteProjectData, projectsDeleteProjectErrors, projectsDeleteProjectResponses, projectsReadProjectsData, projectsReadProjectsErrors, projectsReadProjectsResponses, projectsUpdateProjectData, projectsUpdateProjectErrors, projectsUpdateProjectResponses, tasksCreateTaskData, tasksCreateTaskErrors, tasksCreateTaskResponses, tasksDeleteTaskData, tasksDeleteTaskErrors, tasksDeleteTaskResponses, tasksReadTaskData, tasksReadTaskErrors, tasksReadTaskResponses, tasksReadTasksData, tasksReadTasksErrors, tasksReadTasksResponses, tasksUpdateTaskData, tasksUpdateTaskErrors, tasksUpdateTaskResponses, usersCreateUserData, usersCreateUserErrors, usersCreateUserResponses, usersDeleteUserData, usersDeleteUserErrors, usersDeleteUserMeData, usersDeleteUserMeResponses, usersDeleteUserResponses, usersReadUserByIdData, usersReadUserByIdErrors, usersReadUserByIdResponses, usersReadUserMeData, usersReadUserMeResponses, usersReadUsersData, usersReadUsersErrors, usersReadUsersResponses, usersRegisterUserData, usersRegisterUserErrors, usersRegisterUserResponses, usersUpdatePasswordMeData, usersUpdatePasswordMeErrors, usersUpdatePasswordMeResponses, usersUpdateUserData, usersUpdateUserErrors, usersUpdateUserMeData, usersUpdateUserMeErrors, usersUpdateUserMeResponses, usersUpdateUserResponses, utilsHealthCheckData, utilsHealthCheckResponses, utilsTestEmailData, utilsTestEmailErrors, utilsTestEmailResponses } from './types.gen';
+import type { loginLoginAccessTokenData, loginLoginAccessTokenErrors, loginLoginAccessTokenResponses, loginRecoverPasswordData, loginRecoverPasswordErrors, loginRecoverPasswordHtmlContentData, loginRecoverPasswordHtmlContentErrors, loginRecoverPasswordHtmlContentResponses, loginRecoverPasswordResponses, loginResetPasswordData, loginResetPasswordErrors, loginResetPasswordResponses, loginTestTokenData, loginTestTokenResponses, privateCreateUserData, privateCreateUserErrors, privateCreateUserResponses, projectsCreateProjectData, projectsCreateProjectErrors, projectsCreateProjectResponses, projectsDeleteProjectData, projectsDeleteProjectErrors, projectsDeleteProjectResponses, projectsReadProjectsData, projectsReadProjectsErrors, projectsReadProjectsResponses, projectsUpdateProjectData, projectsUpdateProjectErrors, projectsUpdateProjectResponses, tagsReadTagsData, tagsReadTagsErrors, tagsReadTagsResponses, tasksCreateTaskData, tasksCreateTaskErrors, tasksCreateTaskResponses, tasksDeleteTaskData, tasksDeleteTaskErrors, tasksDeleteTaskResponses, tasksReadTaskData, tasksReadTaskErrors, tasksReadTaskResponses, tasksReadTasksData, tasksReadTasksErrors, tasksReadTasksResponses, tasksUpdateTaskData, tasksUpdateTaskErrors, tasksUpdateTaskResponses, usersCreateUserData, usersCreateUserErrors, usersCreateUserResponses, usersDeleteUserData, usersDeleteUserErrors, usersDeleteUserMeData, usersDeleteUserMeResponses, usersDeleteUserResponses, usersReadUserByIdData, usersReadUserByIdErrors, usersReadUserByIdResponses, usersReadUserMeData, usersReadUserMeResponses, usersReadUsersData, usersReadUsersErrors, usersReadUsersResponses, usersRegisterUserData, usersRegisterUserErrors, usersRegisterUserResponses, usersUpdatePasswordMeData, usersUpdatePasswordMeErrors, usersUpdatePasswordMeResponses, usersUpdateUserData, usersUpdateUserErrors, usersUpdateUserMeData, usersUpdateUserMeErrors, usersUpdateUserMeResponses, usersUpdateUserResponses, utilsHealthCheckData, utilsHealthCheckResponses, utilsTestEmailData, utilsTestEmailErrors, utilsTestEmailResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -411,6 +411,25 @@ export class TasksService {
                 'Content-Type': 'application/json',
                 ...options.headers
             }
+        });
+    }
+}
+
+export class TagsService {
+    /**
+     * Read Tags
+     *
+     * Retrieve the tags the current user has used, for autocomplete.
+     *
+     * Tags are applied and removed on tasks themselves (FR-01.20), so this is the
+     * only tag endpoint there is: a list to offer while the user types.
+     */
+    public static readTags<ThrowOnError extends boolean = true>(options?: Options<tagsReadTagsData, ThrowOnError>) {
+        return (options?.client ?? client).get<tagsReadTagsResponses, tagsReadTagsErrors, ThrowOnError>({
+            responseType: 'json',
+            security: [{ scheme: 'bearer', type: 'http' }],
+            url: '/api/v1/tags/',
+            ...options
         });
     }
 }

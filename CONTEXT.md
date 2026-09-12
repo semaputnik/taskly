@@ -56,3 +56,12 @@ rows. A subtask deleted on its own earlier belongs to its own event and stays
 deleted when its parent is restored.
 _Avoid_: reading a row's deleted state as a bare flag — it is always tied to
 the event that caused it.
+
+**Tag**:
+A free-text label a user puts on a task. A tag comes into being by being
+typed onto a task and belongs to the **user**, not to a project, so it means
+the same thing across their whole account and can gather work that crosses
+projects. Applying, removing and autocompleting is all the management there
+is: a tag no task carries any more simply stops existing.
+_Avoid_: treating tags as a taxonomy to be set up in advance, or as something
+scoped to a project.

@@ -43,6 +43,7 @@ import {
 import useAuth from "@/hooks/useAuth"
 import useCustomToast from "@/hooks/useCustomToast"
 import { handleError } from "@/utils"
+import { TagsField } from "./TagsField"
 
 const NO_PRIORITY = "none"
 const UNASSIGNED = "unassigned"
@@ -55,6 +56,7 @@ const formSchema = z.object({
   due_date: z.string().optional(),
   priority: z.string().optional(),
   assignee: z.string().optional(),
+  tags: z.array(z.string()),
 })
 
 type FormData = z.infer<typeof formSchema>
@@ -91,6 +93,7 @@ const AddTask = ({ parent, onSuccess }: AddTaskProps = {}) => {
       due_date: "",
       priority: NO_PRIORITY,
       assignee: UNASSIGNED,
+      tags: [],
     },
   })
 
@@ -107,6 +110,9 @@ const AddTask = ({ parent, onSuccess }: AddTaskProps = {}) => {
     onError: handleError.bind(showErrorToast),
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["tasks"] })
+      // A tag typed here is new to the account, and one dropped off the last
+      // task carrying it is gone: autocomplete has to catch up either way.
+      queryClient.invalidateQueries({ queryKey: ["tags"] })
     },
   })
 
@@ -124,6 +130,7 @@ const AddTask = ({ parent, onSuccess }: AddTaskProps = {}) => {
           : undefined,
       assignee_id:
         data.assignee === ASSIGNED_TO_ME ? currentUser?.id : undefined,
+      tags: data.tags,
     })
   }
 
@@ -251,6 +258,23 @@ const AddTask = ({ parent, onSuccess }: AddTaskProps = {}) => {
                         <SelectItem value="P4">P4</SelectItem>
                       </SelectContent>
                     </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="tags"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Tags</FormLabel>
+                    <FormControl>
+                      <TagsField
+                        value={field.value}
+                        onChange={field.onChange}
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
