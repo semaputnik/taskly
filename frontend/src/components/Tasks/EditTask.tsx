@@ -50,7 +50,7 @@ const ASSIGNED_TO_ME = "me"
 const formSchema = z.object({
   title: z.string().min(1, { message: "Title is required" }),
   description: z.string().optional(),
-  project_id: z.string(),
+  project_id: z.string().optional(),
   due_date: z.string().optional(),
   priority: z.string().optional(),
   assignee: z.string().optional(),
@@ -69,11 +69,16 @@ const EditTask = ({ task, onSuccess }: EditTaskProps) => {
   const { showSuccessToast, showErrorToast } = useCustomToast()
   const { user: currentUser } = useAuth()
 
+  // A subtask has no project of its own: it follows the task at the top of
+  // its tree, which is the one that can be moved (FR-02.4).
+  const isSubtask = task.parent_id !== null && task.parent_id !== undefined
+
   const { data: projects } = useQuery({
     queryKey: ["projects"],
     queryFn: async () =>
       (await ProjectsService.readProjects({ query: { skip: 0, limit: 100 } }))
         .data,
+    enabled: !isSubtask,
   })
 
   const form = useForm<FormData>({
@@ -110,7 +115,7 @@ const EditTask = ({ task, onSuccess }: EditTaskProps) => {
     mutation.mutate({
       title: data.title,
       description: data.description || null,
-      project_id: data.project_id,
+      project_id: isSubtask ? undefined : data.project_id,
       due_date: data.due_date || null,
       priority:
         data.priority && data.priority !== NO_PRIORITY
@@ -169,30 +174,35 @@ const EditTask = ({ task, onSuccess }: EditTaskProps) => {
                 )}
               />
 
-              <FormField
-                control={form.control}
-                name="project_id"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Project</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger className="w-full">
-                          <SelectValue />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {projects?.data.map((project) => (
-                          <SelectItem key={project.id} value={project.id}>
-                            {project.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              {!isSubtask && (
+                <FormField
+                  control={form.control}
+                  name="project_id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Project</FormLabel>
+                      <Select
+                        onValueChange={field.onChange}
+                        value={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger className="w-full">
+                            <SelectValue />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {projects?.data.map((project) => (
+                            <SelectItem key={project.id} value={project.id}>
+                              {project.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
 
               <FormField
                 control={form.control}

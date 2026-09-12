@@ -33,3 +33,17 @@ not; completing it produces a new task.
 The record of every change in Taskly. Each user sees only their own log —
 including the superuser, who has no visibility into other users' logs.
 _Avoid_: "audit log" (implies cross-user oversight, which does not exist here).
+
+**Subtask**:
+A task that is a child of another task, nestable to any depth. A subtask is
+a full task — every field, and everything a task supports — never a reduced
+checklist item. It holds no project of its own: it belongs to the project of
+its **root task**, so a subtask can never sit in a different project from
+its parent, and moving the root moves the whole tree.
+_Avoid_: "checklist item", or treating a subtask as a lesser kind of task.
+
+**Root task**:
+The task at the top of a tree — the one with no parent. The only task in a
+tree that records a project; every subtask below it derives that project.
+_Avoid_: "parent task" for this — any task with subtasks is a parent, but
+only the topmost one is the root.

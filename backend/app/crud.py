@@ -1,7 +1,8 @@
 import uuid
 from typing import Any
 
-from sqlmodel import Session, select
+from sqlalchemy.orm import aliased
+from sqlmodel import Session, col, select
 
 from app.core.security import get_password_hash, verify_password
 from app.models import (
@@ -90,9 +91,13 @@ def create_task(
     *,
     session: Session,
     task_create: TaskCreate,
-    project_id: uuid.UUID,
+    project_id: uuid.UUID | None,
     owner_id: uuid.UUID,
 ) -> Task:
+    """
+    Create a task. `project_id` is set on root tasks and None on subtasks,
+    which derive their project from their root ancestor.
+    """
     db_obj = Task.model_validate(
         task_create, update={"project_id": project_id, "owner_id": owner_id}
     )
@@ -103,12 +108,102 @@ def create_task(
 
 
 def update_task(*, session: Session, db_task: Task, task_in: TaskUpdate) -> Task:
-    task_data = task_in.model_dump(exclude_unset=True)
+    # `subtasks` directs what happens to the subtree (handled by the caller)
+    # rather than naming a column, so it never reaches the row.
+    task_data = task_in.model_dump(exclude_unset=True, exclude={"subtasks"})
     db_task.sqlmodel_update(task_data)
     session.add(db_task)
     session.commit()
     session.refresh(db_task)
     return db_task
+
+
+def _subtree_cte(root_id: uuid.UUID) -> Any:
+    """
+    Every descendant of `root_id`, to any depth, as (id, completed) rows.
+    """
+    subtree = (
+        select(Task.id, Task.completed)
+        .where(Task.parent_id == root_id)
+        .cte("subtree", recursive=True)
+    )
+    child = aliased(Task)
+    return subtree.union_all(
+        select(child.id, child.completed).join(
+            subtree, col(child.parent_id) == subtree.c.id
+        )
+    )
+
+
+def get_task_project_id(*, session: Session, task: Task) -> uuid.UUID:
+    """
+    Resolve the project a task belongs to: its own if it is a root task, its
+    root ancestor's if it is a subtask (FR-02.4).
+    """
+    if task.project_id is not None:
+        return task.project_id
+
+    ancestors = (
+        select(Task.id, Task.parent_id, Task.project_id)
+        .where(Task.id == task.parent_id)
+        .cte("ancestors", recursive=True)
+    )
+    parent = aliased(Task)
+    ancestors = ancestors.union_all(
+        select(parent.id, parent.parent_id, parent.project_id).join(
+            ancestors, ancestors.c.parent_id == parent.id
+        )
+    )
+    statement = select(ancestors.c.project_id).where(
+        ancestors.c.project_id.is_not(None)
+    )
+    project_id: uuid.UUID = session.exec(statement).one()
+    return project_id
+
+
+def get_task_project_ids(
+    *, session: Session, owner_id: uuid.UUID
+) -> dict[uuid.UUID, uuid.UUID]:
+    """
+    The project every one of a user's tasks belongs to, keyed by task id.
+
+    One walk down from the root tasks resolves whole trees at once, so listing
+    tasks does not cost a query per subtask.
+    """
+    tree = (
+        select(Task.id, Task.project_id)
+        .where(Task.owner_id == owner_id, col(Task.parent_id).is_(None))
+        .cte("task_projects", recursive=True)
+    )
+    child = aliased(Task)
+    tree = tree.union_all(
+        select(child.id, tree.c.project_id).join(
+            tree, col(child.parent_id) == tree.c.id
+        )
+    )
+    rows = session.exec(select(tree.c.id, tree.c.project_id)).all()
+    return dict(rows)
+
+
+def has_uncompleted_subtasks(*, session: Session, task: Task) -> bool:
+    """
+    Whether anything under the task, at any depth, is still not completed.
+    """
+    subtree = _subtree_cte(task.id)
+    statement = select(subtree.c.id).where(subtree.c.completed.is_(False)).limit(1)
+    return session.exec(statement).first() is not None
+
+
+def complete_subtasks(*, session: Session, task: Task) -> None:
+    """
+    Mark the task's whole subtree completed, leaving the task itself to the
+    caller. Staged, not committed: the caller's update commits both together.
+    """
+    subtree = _subtree_cte(task.id)
+    statement = select(Task).where(col(Task.id).in_(select(subtree.c.id)))
+    for subtask in session.exec(statement):
+        subtask.completed = True
+        session.add(subtask)
 
 
 # Dummy hash to use for timing attack prevention when user is not found

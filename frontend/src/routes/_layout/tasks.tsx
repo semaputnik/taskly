@@ -7,6 +7,7 @@ import { DataTable } from "@/components/Common/DataTable"
 import PendingTasks from "@/components/Pending/PendingTasks"
 import AddTask from "@/components/Tasks/AddTask"
 import { getColumns } from "@/components/Tasks/columns"
+import { buildTaskTree } from "@/components/Tasks/tree"
 
 function getTasksQueryOptions() {
   return {
@@ -43,8 +44,9 @@ function TasksTableContent() {
   const projectNames = Object.fromEntries(
     projects.data.map((project) => [project.id, project.name]),
   )
+  const { tasks: ordered, depths } = buildTaskTree(tasks.data)
 
-  return <DataTable columns={getColumns(projectNames)} data={tasks.data} />
+  return <DataTable columns={getColumns(projectNames, depths)} data={ordered} />
 }
 
 function TasksTable() {

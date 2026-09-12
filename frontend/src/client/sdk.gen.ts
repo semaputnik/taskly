@@ -341,7 +341,8 @@ export class TasksService {
     /**
      * Create Task
      *
-     * Create a task. A task created without a project lands in the Inbox.
+     * Create a task, or a subtask of one. A task created without a project lands
+     * in the Inbox; a subtask follows its parent's project instead.
      */
     public static createTask<ThrowOnError extends boolean = true>(options: Options<tasksCreateTaskData, ThrowOnError>) {
         return (options.client ?? client).post<tasksCreateTaskResponses, tasksCreateTaskErrors, ThrowOnError>({
@@ -374,6 +375,9 @@ export class TasksService {
      * Update Task
      *
      * Update a task: its fields, completion state, assignee, or project.
+     *
+     * Completing a task that still has uncompleted subtasks is refused unless the
+     * request says what happens to them, through `subtasks`.
      */
     public static updateTask<ThrowOnError extends boolean = true>(options: Options<tasksUpdateTaskData, ThrowOnError>) {
         return (options.client ?? client).patch<tasksUpdateTaskResponses, tasksUpdateTaskErrors, ThrowOnError>({

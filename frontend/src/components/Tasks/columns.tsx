@@ -1,50 +1,24 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query"
 import type { ColumnDef } from "@tanstack/react-table"
 
-import { type TaskPublic, TasksService } from "@/client"
+import type { TaskPublic } from "@/client"
 import type { DataTableFeatures } from "@/components/Common/DataTable"
 import { Badge } from "@/components/ui/badge"
-import { Checkbox } from "@/components/ui/checkbox"
-import useCustomToast from "@/hooks/useCustomToast"
 import { cn } from "@/lib/utils"
-import { handleError } from "@/utils"
+import { CompleteTask } from "./CompleteTask"
 import { TaskActionsMenu } from "./TaskActionsMenu"
 
-function CompletedCell({ task }: { task: TaskPublic }) {
-  const queryClient = useQueryClient()
-  const { showErrorToast } = useCustomToast()
-
-  const mutation = useMutation({
-    mutationFn: (completed: boolean) =>
-      TasksService.updateTask({
-        path: { task_id: task.id },
-        body: { completed },
-      }),
-    onError: handleError.bind(showErrorToast),
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["tasks"] })
-    },
-  })
-
-  return (
-    <Checkbox
-      checked={task.completed}
-      onCheckedChange={(checked) => mutation.mutate(checked === true)}
-      aria-label={
-        task.completed ? "Mark as not completed" : "Mark as completed"
-      }
-    />
-  )
-}
+// Each level of nesting shifts a subtask's title right by this much.
+const INDENT_PER_LEVEL_REM = 1.25
 
 export function getColumns(
   projectNames: Record<string, string>,
+  depths: Record<string, number>,
 ): ColumnDef<DataTableFeatures, TaskPublic>[] {
   return [
     {
       id: "completed",
       header: () => <span className="sr-only">Completed</span>,
-      cell: ({ row }) => <CompletedCell task={row.original} />,
+      cell: ({ row }) => <CompleteTask task={row.original} />,
     },
     {
       accessorKey: "title",
@@ -55,6 +29,9 @@ export function getColumns(
             "font-medium",
             row.original.completed && "line-through text-muted-foreground",
           )}
+          style={{
+            paddingLeft: `${(depths[row.original.id] ?? 0) * INDENT_PER_LEVEL_REM}rem`,
+          }}
         >
           {row.original.title}
         </span>
