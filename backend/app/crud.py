@@ -1,9 +1,17 @@
+import uuid
 from typing import Any
 
 from sqlmodel import Session, select
 
 from app.core.security import get_password_hash, verify_password
-from app.models import User, UserCreate, UserUpdate
+from app.models import (
+    Project,
+    ProjectCreate,
+    ProjectUpdate,
+    User,
+    UserCreate,
+    UserUpdate,
+)
 
 
 def create_user(*, session: Session, user_create: UserCreate) -> User:
@@ -11,6 +19,10 @@ def create_user(*, session: Session, user_create: UserCreate) -> User:
         user_create, update={"hashed_password": get_password_hash(user_create.password)}
     )
     session.add(db_obj)
+    # Flush so the user row exists before the FK-dependent Inbox insert, while
+    # keeping both inserts in the same transaction as the eventual commit.
+    session.flush()
+    session.add(Project(name="Inbox", is_inbox=True, owner_id=db_obj.id))
     session.commit()
     session.refresh(db_obj)
     return db_obj
@@ -34,6 +46,33 @@ def get_user_by_email(*, session: Session, email: str) -> User | None:
     statement = select(User).where(User.email == email)
     session_user = session.exec(statement).first()
     return session_user
+
+
+def create_project(
+    *,
+    session: Session,
+    project_create: ProjectCreate,
+    owner_id: uuid.UUID,
+    is_inbox: bool = False,
+) -> Project:
+    db_obj = Project.model_validate(
+        project_create, update={"owner_id": owner_id, "is_inbox": is_inbox}
+    )
+    session.add(db_obj)
+    session.commit()
+    session.refresh(db_obj)
+    return db_obj
+
+
+def update_project(
+    *, session: Session, db_project: Project, project_in: ProjectUpdate
+) -> Project:
+    project_data = project_in.model_dump(exclude_unset=True)
+    db_project.sqlmodel_update(project_data)
+    session.add(db_project)
+    session.commit()
+    session.refresh(db_project)
+    return db_project
 
 
 # Dummy hash to use for timing attack prevention when user is not found

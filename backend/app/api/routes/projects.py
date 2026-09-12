@@ -1,0 +1,103 @@
+import uuid
+from typing import Any
+
+from fastapi import APIRouter, HTTPException
+from sqlmodel import func, select
+
+from app import crud
+from app.api.deps import CurrentUser, SessionDep
+from app.models import (
+    Message,
+    Project,
+    ProjectCreate,
+    ProjectPublic,
+    ProjectsPublic,
+    ProjectUpdate,
+)
+
+router = APIRouter(prefix="/projects", tags=["projects"])
+
+
+def _get_owned_project(
+    session: SessionDep, current_user: CurrentUser, project_id: uuid.UUID
+) -> Project:
+    project = session.get(Project, project_id)
+    if not project or project.owner_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Project not found")
+    return project
+
+
+@router.get("/", response_model=ProjectsPublic)
+def read_projects(
+    session: SessionDep, current_user: CurrentUser, skip: int = 0, limit: int = 100
+) -> Any:
+    """
+    Retrieve the current user's projects.
+    """
+    count_statement = (
+        select(func.count())
+        .select_from(Project)
+        .where(Project.owner_id == current_user.id)
+    )
+    count = session.exec(count_statement).one()
+
+    statement = (
+        select(Project)
+        .where(Project.owner_id == current_user.id)
+        .offset(skip)
+        .limit(limit)
+    )
+    projects = session.exec(statement).all()
+    return ProjectsPublic(data=projects, count=count)
+
+
+@router.post("/", response_model=ProjectPublic)
+def create_project(
+    *, session: SessionDep, current_user: CurrentUser, project_in: ProjectCreate
+) -> Any:
+    """
+    Create a new project.
+    """
+    return crud.create_project(
+        session=session, project_create=project_in, owner_id=current_user.id
+    )
+
+
+@router.patch("/{project_id}", response_model=ProjectPublic)
+def update_project(
+    *,
+    session: SessionDep,
+    current_user: CurrentUser,
+    project_id: uuid.UUID,
+    project_in: ProjectUpdate,
+) -> Any:
+    """
+    Update a project's name and/or description.
+    """
+    project = _get_owned_project(session, current_user, project_id)
+    if project.is_inbox and "name" in project_in.model_fields_set:
+        raise HTTPException(
+            status_code=400, detail="The Inbox project cannot be renamed"
+        )
+    return crud.update_project(
+        session=session, db_project=project, project_in=project_in
+    )
+
+
+@router.delete("/{project_id}")
+def delete_project(
+    *, session: SessionDep, current_user: CurrentUser, project_id: uuid.UUID
+) -> Message:
+    """
+    Delete a project.
+    """
+    # Hard delete for now: soft-delete/restore via the activity log (FR-05.8,
+    # FR-05.9) depends on the activity log feature, which doesn't exist yet.
+    project = _get_owned_project(session, current_user, project_id)
+    if project.is_inbox:
+        raise HTTPException(
+            status_code=400, detail="The Inbox project cannot be deleted"
+        )
+    session.delete(project)
+    session.commit()
+    return Message(message="Project deleted successfully")
