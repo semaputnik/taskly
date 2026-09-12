@@ -9,6 +9,9 @@ from sqlmodel import Session, col, func, select
 
 from app.core.security import get_password_hash, verify_password
 from app.models import (
+    Comment,
+    CommentCreate,
+    CommentUpdate,
     Deletion,
     Project,
     ProjectCreate,
@@ -537,6 +540,54 @@ def complete_subtasks(*, session: Session, task: Task) -> None:
     for subtask in session.exec(statement):
         subtask.completed = True
         session.add(subtask)
+
+
+def create_comment(
+    *,
+    session: Session,
+    comment_create: CommentCreate,
+    task_id: uuid.UUID,
+    owner_id: uuid.UUID,
+) -> Comment:
+    db_obj = Comment.model_validate(
+        comment_create, update={"task_id": task_id, "owner_id": owner_id}
+    )
+    session.add(db_obj)
+    session.commit()
+    session.refresh(db_obj)
+    return db_obj
+
+
+def get_comments(
+    *, session: Session, task_id: uuid.UUID
+) -> tuple[Sequence[Comment], int]:
+    """
+    A task's comments, oldest first, so the thread reads as a narrative
+    (FR-03.1) rather than a feed.
+    """
+    statement = (
+        select(Comment)
+        .where(Comment.task_id == task_id)
+        .order_by(col(Comment.created_at))
+    )
+    comments = session.exec(statement).all()
+    return comments, len(comments)
+
+
+def update_comment(
+    *, session: Session, db_comment: Comment, comment_in: CommentUpdate
+) -> Comment:
+    comment_data = comment_in.model_dump(exclude_unset=True)
+    db_comment.sqlmodel_update(comment_data)
+    session.add(db_comment)
+    session.commit()
+    session.refresh(db_comment)
+    return db_comment
+
+
+def delete_comment(*, session: Session, comment: Comment) -> None:
+    session.delete(comment)
+    session.commit()
 
 
 # Dummy hash to use for timing attack prevention when user is not found

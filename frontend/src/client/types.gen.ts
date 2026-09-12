@@ -35,6 +35,62 @@ export type Body_login_login_access_token = {
 };
 
 /**
+ * CommentCreate
+ */
+export type CommentCreate = {
+    /**
+     * Body
+     */
+    body: string;
+};
+
+/**
+ * CommentPublic
+ */
+export type CommentPublic = {
+    /**
+     * Body
+     */
+    body: string;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Task Id
+     */
+    task_id: string;
+    /**
+     * Created At
+     */
+    created_at?: string | null;
+};
+
+/**
+ * CommentUpdate
+ */
+export type CommentUpdate = {
+    /**
+     * Body
+     */
+    body: string;
+};
+
+/**
+ * CommentsPublic
+ */
+export type CommentsPublic = {
+    /**
+     * Data
+     */
+    data: Array<CommentPublic>;
+    /**
+     * Count
+     */
+    count: number;
+};
+
+/**
  * HTTPValidationError
  */
 export type HTTPValidationError = {
@@ -1223,6 +1279,126 @@ export type tasksUpdateTaskResponses = {
 };
 
 export type tasksUpdateTaskResponse = tasksUpdateTaskResponses[keyof tasksUpdateTaskResponses];
+
+export type commentsReadCommentsData = {
+    body?: never;
+    path: {
+        /**
+         * Task Id
+         */
+        task_id: string;
+    };
+    query?: never;
+    url: '/api/v1/tasks/{task_id}/comments/';
+};
+
+export type commentsReadCommentsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type commentsReadCommentsError = commentsReadCommentsErrors[keyof commentsReadCommentsErrors];
+
+export type commentsReadCommentsResponses = {
+    /**
+     * Successful Response
+     */
+    200: CommentsPublic;
+};
+
+export type commentsReadCommentsResponse = commentsReadCommentsResponses[keyof commentsReadCommentsResponses];
+
+export type commentsCreateCommentData = {
+    body: CommentCreate;
+    path: {
+        /**
+         * Task Id
+         */
+        task_id: string;
+    };
+    query?: never;
+    url: '/api/v1/tasks/{task_id}/comments/';
+};
+
+export type commentsCreateCommentErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type commentsCreateCommentError = commentsCreateCommentErrors[keyof commentsCreateCommentErrors];
+
+export type commentsCreateCommentResponses = {
+    /**
+     * Successful Response
+     */
+    200: CommentPublic;
+};
+
+export type commentsCreateCommentResponse = commentsCreateCommentResponses[keyof commentsCreateCommentResponses];
+
+export type commentsDeleteCommentData = {
+    body?: never;
+    path: {
+        /**
+         * Comment Id
+         */
+        comment_id: string;
+    };
+    query?: never;
+    url: '/api/v1/comments/{comment_id}';
+};
+
+export type commentsDeleteCommentErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type commentsDeleteCommentError = commentsDeleteCommentErrors[keyof commentsDeleteCommentErrors];
+
+export type commentsDeleteCommentResponses = {
+    /**
+     * Successful Response
+     */
+    200: Message;
+};
+
+export type commentsDeleteCommentResponse = commentsDeleteCommentResponses[keyof commentsDeleteCommentResponses];
+
+export type commentsUpdateCommentData = {
+    body: CommentUpdate;
+    path: {
+        /**
+         * Comment Id
+         */
+        comment_id: string;
+    };
+    query?: never;
+    url: '/api/v1/comments/{comment_id}';
+};
+
+export type commentsUpdateCommentErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type commentsUpdateCommentError = commentsUpdateCommentErrors[keyof commentsUpdateCommentErrors];
+
+export type commentsUpdateCommentResponses = {
+    /**
+     * Successful Response
+     */
+    200: CommentPublic;
+};
+
+export type commentsUpdateCommentResponse = commentsUpdateCommentResponses[keyof commentsUpdateCommentResponses];
 
 export type tagsReadTagsData = {
     body?: never;

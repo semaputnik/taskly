@@ -11,6 +11,7 @@ import {
 import AddTask from "./AddTask"
 import DeleteTask from "./DeleteTask"
 import EditTask from "./EditTask"
+import TaskComments from "./TaskComments"
 
 interface TaskActionsMenuProps {
   task: TaskPublic
@@ -29,6 +30,7 @@ export const TaskActionsMenu = ({ task }: TaskActionsMenuProps) => {
       <DropdownMenuContent align="end">
         <EditTask task={task} onSuccess={() => setOpen(false)} />
         <AddTask parent={task} onSuccess={() => setOpen(false)} />
+        <TaskComments task={task} onSuccess={() => setOpen(false)} />
         <DeleteTask task={task} onSuccess={() => setOpen(false)} />
       </DropdownMenuContent>
     </DropdownMenu>
