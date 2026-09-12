@@ -1,4 +1,4 @@
-import { Home, Users } from "lucide-react"
+import { FolderKanban, Home, Users } from "lucide-react"
 
 import { SidebarAppearance } from "@/components/Common/Appearance"
 import { Logo } from "@/components/Common/Logo"
@@ -12,7 +12,10 @@ import useAuth from "@/hooks/useAuth"
 import { Main, type NavItem } from "./Main"
 import { User } from "./User"
 
-const baseItems: NavItem[] = [{ icon: Home, title: "Dashboard", path: "/" }]
+const baseItems: NavItem[] = [
+  { icon: Home, title: "Dashboard", path: "/" },
+  { icon: FolderKanban, title: "Projects", path: "/projects" },
+]
 
 export function AppSidebar() {
   const { user: currentUser } = useAuth()
