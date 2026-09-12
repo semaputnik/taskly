@@ -159,6 +159,17 @@ export type ProjectsPublic = {
 };
 
 /**
+ * SubtaskCompletion
+ *
+ * What a completion request says about the task's uncompleted subtasks.
+ *
+ * Sending neither value is not a default: the request is refused, so a client
+ * never completes a parent without saying what happens below it (FR-02.6,
+ * FR-02.7).
+ */
+export type SubtaskCompletion = 'leave_uncompleted' | 'complete';
+
+/**
  * TaskCreate
  */
 export type TaskCreate = {
@@ -179,6 +190,10 @@ export type TaskCreate = {
      * Project Id
      */
     project_id?: string | null;
+    /**
+     * Parent Id
+     */
+    parent_id?: string | null;
     /**
      * Assignee Id
      */
@@ -220,6 +235,10 @@ export type TaskPublic = {
      */
     project_id: string;
     /**
+     * Parent Id
+     */
+    parent_id?: string | null;
+    /**
      * Assignee Id
      */
     assignee_id?: string | null;
@@ -258,6 +277,7 @@ export type TaskUpdate = {
      * Completed
      */
     completed?: boolean | null;
+    subtasks?: SubtaskCompletion | null;
 };
 
 /**

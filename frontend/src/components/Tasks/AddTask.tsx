@@ -1,11 +1,16 @@
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { Plus } from "lucide-react"
+import { ListPlus, Plus } from "lucide-react"
 import { useState } from "react"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
 
-import { ProjectsService, type TaskCreate, TasksService } from "@/client"
+import {
+  ProjectsService,
+  type TaskCreate,
+  type TaskPublic,
+  TasksService,
+} from "@/client"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -17,6 +22,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu"
 import {
   Form,
   FormControl,
@@ -53,7 +59,13 @@ const formSchema = z.object({
 
 type FormData = z.infer<typeof formSchema>
 
-const AddTask = () => {
+interface AddTaskProps {
+  /** Set to add a subtask of this task instead of a task of its own. */
+  parent?: TaskPublic
+  onSuccess?: () => void
+}
+
+const AddTask = ({ parent, onSuccess }: AddTaskProps = {}) => {
   const [isOpen, setIsOpen] = useState(false)
   const queryClient = useQueryClient()
   const { showSuccessToast, showErrorToast } = useCustomToast()
@@ -64,6 +76,8 @@ const AddTask = () => {
     queryFn: async () =>
       (await ProjectsService.readProjects({ query: { skip: 0, limit: 100 } }))
         .data,
+    // A subtask has no project of its own to pick: it follows its parent.
+    enabled: parent === undefined,
   })
 
   const form = useForm<FormData>({
@@ -83,9 +97,12 @@ const AddTask = () => {
   const mutation = useMutation({
     mutationFn: (data: TaskCreate) => TasksService.createTask({ body: data }),
     onSuccess: () => {
-      showSuccessToast("Task created successfully")
+      showSuccessToast(
+        parent ? "Subtask created successfully" : "Task created successfully",
+      )
       form.reset()
       setIsOpen(false)
+      onSuccess?.()
     },
     onError: handleError.bind(showErrorToast),
     onSettled: () => {
@@ -97,7 +114,9 @@ const AddTask = () => {
     mutation.mutate({
       title: data.title,
       description: data.description || undefined,
-      project_id: data.project_id || undefined,
+      // A subtask follows its parent's project (FR-02.4).
+      parent_id: parent?.id,
+      project_id: parent ? undefined : data.project_id || undefined,
       due_date: data.due_date || undefined,
       priority:
         data.priority && data.priority !== NO_PRIORITY
@@ -110,17 +129,29 @@ const AddTask = () => {
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger asChild>
-        <Button className="my-4">
-          <Plus className="mr-2" />
-          Add Task
-        </Button>
-      </DialogTrigger>
+      {parent ? (
+        <DropdownMenuItem
+          onSelect={(e) => e.preventDefault()}
+          onClick={() => setIsOpen(true)}
+        >
+          <ListPlus />
+          Add Subtask
+        </DropdownMenuItem>
+      ) : (
+        <DialogTrigger asChild>
+          <Button className="my-4">
+            <Plus className="mr-2" />
+            Add Task
+          </Button>
+        </DialogTrigger>
+      )}
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Add Task</DialogTitle>
+          <DialogTitle>{parent ? "Add Subtask" : "Add Task"}</DialogTitle>
           <DialogDescription>
-            Fill in the form below to add a new task.
+            {parent
+              ? `Fill in the form below to add a subtask of “${parent.title}”. It joins the project of its parent.`
+              : "Fill in the form below to add a new task."}
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -156,30 +187,35 @@ const AddTask = () => {
                 )}
               />
 
-              <FormField
-                control={form.control}
-                name="project_id"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Project</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Inbox" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {projects?.data.map((project) => (
-                          <SelectItem key={project.id} value={project.id}>
-                            {project.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              {!parent && (
+                <FormField
+                  control={form.control}
+                  name="project_id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Project</FormLabel>
+                      <Select
+                        onValueChange={field.onChange}
+                        value={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Inbox" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {projects?.data.map((project) => (
+                            <SelectItem key={project.id} value={project.id}>
+                              {project.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
 
               <FormField
                 control={form.control}

@@ -19,6 +19,18 @@ export const handleError = function (this: (msg: string) => void, err: Error) {
   this(errorMessage)
 }
 
+// The API refuses to complete a task with open subtasks and says so with this
+// code, so the refusal can be told apart from any other client error.
+const UNCOMPLETED_SUBTASKS_CODE = "task_has_uncompleted_subtasks"
+
+export function isUncompletedSubtasksError(err: Error): boolean {
+  if (!(err instanceof AxiosError)) {
+    return false
+  }
+  const detail = (err.response?.data as any)?.detail
+  return detail?.code === UNCOMPLETED_SUBTASKS_CODE
+}
+
 export const getInitials = (name: string): string => {
   return name
     .split(" ")

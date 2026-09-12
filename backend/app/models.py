@@ -3,7 +3,7 @@ from datetime import UTC, date, datetime
 from enum import StrEnum
 
 from pydantic import EmailStr
-from sqlalchemy import DateTime
+from sqlalchemy import CheckConstraint, DateTime
 from sqlmodel import Field, SQLModel
 
 
@@ -119,6 +119,19 @@ class TaskPriority(StrEnum):
     P4 = "P4"
 
 
+class SubtaskCompletion(StrEnum):
+    """
+    What a completion request says about the task's uncompleted subtasks.
+
+    Sending neither value is not a default: the request is refused, so a client
+    never completes a parent without saying what happens below it (FR-02.6,
+    FR-02.7).
+    """
+
+    LEAVE_UNCOMPLETED = "leave_uncompleted"
+    COMPLETE = "complete"
+
+
 # Shared properties
 class TaskBase(SQLModel):
     title: str = Field(max_length=255)
@@ -131,8 +144,10 @@ class TaskBase(SQLModel):
 
 # Properties to receive via API on creation
 class TaskCreate(TaskBase):
-    # None lands the task in the user's Inbox (FR-05.4).
+    # None lands the task in the user's Inbox (FR-05.4). A subtask takes its
+    # parent's project instead, so the two fields are mutually exclusive.
     project_id: uuid.UUID | None = None
+    parent_id: uuid.UUID | None = None
     # Only the task owner is a valid assignee for now; bot users become
     # assignable in semaputnik/taskly#7 without needing to reshape this field.
     assignee_id: uuid.UUID | None = None
@@ -147,14 +162,35 @@ class TaskUpdate(SQLModel):
     project_id: uuid.UUID | None = None
     assignee_id: uuid.UUID | None = None
     completed: bool | None = None
+    # A directive about the task's subtasks rather than a stored field: it is
+    # only meaningful alongside `completed: true`.
+    subtasks: SubtaskCompletion | None = None
 
 
 # Database model, database table inferred from class name
 class Task(TaskBase, table=True):
+    __table_args__ = (
+        # A task is either a root task with a project or a subtask that derives
+        # one from its root ancestor — never both, and never neither. Keeping
+        # the project off subtasks makes moving a whole tree a single write and
+        # leaves no room for a subtask to drift into another project (FR-02.4).
+        CheckConstraint(
+            "(parent_id IS NULL) <> (project_id IS NULL)",
+            name="task_root_has_project",
+        ),
+    )
+
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     completed: bool = False
-    project_id: uuid.UUID = Field(
-        foreign_key="project.id", nullable=False, ondelete="CASCADE"
+    parent_id: uuid.UUID | None = Field(
+        default=None,
+        foreign_key="task.id",
+        nullable=True,
+        ondelete="CASCADE",
+        index=True,
+    )
+    project_id: uuid.UUID | None = Field(
+        default=None, foreign_key="project.id", nullable=True, ondelete="CASCADE"
     )
     # Denormalized from the project's owner at creation time, so ownership
     # checks and per-user listings don't need a join.
@@ -174,7 +210,9 @@ class Task(TaskBase, table=True):
 class TaskPublic(TaskBase):
     id: uuid.UUID
     completed: bool
+    # Always set: a subtask reports the project of its root ancestor.
     project_id: uuid.UUID
+    parent_id: uuid.UUID | None = None
     assignee_id: uuid.UUID | None = None
     created_at: datetime | None = None
 
