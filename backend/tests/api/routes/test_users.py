@@ -1,10 +1,12 @@
 import uuid
+from datetime import timedelta
 from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
 from app import crud
+from app.core import security
 from app.core.config import settings
 from app.core.security import verify_password
 from app.models import User, UserCreate
@@ -32,6 +34,29 @@ def test_get_users_normal_user_me(
     assert current_user["is_active"] is True
     assert current_user["is_superuser"] is False
     assert current_user["email"] == settings.EMAIL_TEST_USER
+
+
+def test_a_token_outliving_its_user_is_unauthorized(
+    client: TestClient, db: Session
+) -> None:
+    """
+    A token stays valid on its own terms (signature, expiry) even after the
+    account it names is gone — recreated with a new id, or removed. That is a
+    credentials problem for the caller to fix by logging in again, not a
+    missing resource, so every endpoint behind auth refuses it the same way it
+    would refuse an invalid token: 401, not 404.
+    """
+    user = create_random_user(db)
+    token = security.create_access_token(user.id, expires_delta=timedelta(minutes=30))
+    db.delete(user)
+    db.commit()
+
+    r = client.get(
+        f"{settings.API_V1_STR}/users/me",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert r.status_code == 401
+    assert r.json()["detail"] == "User not found"
 
 
 def test_create_user_new_email(
