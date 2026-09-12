@@ -159,6 +159,122 @@ export type ProjectsPublic = {
 };
 
 /**
+ * TaskCreate
+ */
+export type TaskCreate = {
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Description
+     */
+    description?: string | null;
+    /**
+     * Due Date
+     */
+    due_date?: string | null;
+    priority?: TaskPriority | null;
+    /**
+     * Project Id
+     */
+    project_id?: string | null;
+    /**
+     * Assignee Id
+     */
+    assignee_id?: string | null;
+};
+
+/**
+ * TaskPriority
+ */
+export type TaskPriority = 'P1' | 'P2' | 'P3' | 'P4';
+
+/**
+ * TaskPublic
+ */
+export type TaskPublic = {
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Description
+     */
+    description?: string | null;
+    /**
+     * Due Date
+     */
+    due_date?: string | null;
+    priority?: TaskPriority | null;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Completed
+     */
+    completed: boolean;
+    /**
+     * Project Id
+     */
+    project_id: string;
+    /**
+     * Assignee Id
+     */
+    assignee_id?: string | null;
+    /**
+     * Created At
+     */
+    created_at?: string | null;
+};
+
+/**
+ * TaskUpdate
+ */
+export type TaskUpdate = {
+    /**
+     * Title
+     */
+    title?: string | null;
+    /**
+     * Description
+     */
+    description?: string | null;
+    /**
+     * Due Date
+     */
+    due_date?: string | null;
+    priority?: TaskPriority | null;
+    /**
+     * Project Id
+     */
+    project_id?: string | null;
+    /**
+     * Assignee Id
+     */
+    assignee_id?: string | null;
+    /**
+     * Completed
+     */
+    completed?: boolean | null;
+};
+
+/**
+ * TasksPublic
+ */
+export type TasksPublic = {
+    /**
+     * Data
+     */
+    data: Array<TaskPublic>;
+    /**
+     * Count
+     */
+    count: number;
+};
+
+/**
  * Token
  */
 export type Token = {
@@ -842,6 +958,125 @@ export type projectsUpdateProjectResponses = {
 };
 
 export type projectsUpdateProjectResponse = projectsUpdateProjectResponses[keyof projectsUpdateProjectResponses];
+
+export type tasksReadTasksData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Skip
+         */
+        skip?: number;
+        /**
+         * Limit
+         */
+        limit?: number;
+    };
+    url: '/api/v1/tasks/';
+};
+
+export type tasksReadTasksErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type tasksReadTasksError = tasksReadTasksErrors[keyof tasksReadTasksErrors];
+
+export type tasksReadTasksResponses = {
+    /**
+     * Successful Response
+     */
+    200: TasksPublic;
+};
+
+export type tasksReadTasksResponse = tasksReadTasksResponses[keyof tasksReadTasksResponses];
+
+export type tasksCreateTaskData = {
+    body: TaskCreate;
+    path?: never;
+    query?: never;
+    url: '/api/v1/tasks/';
+};
+
+export type tasksCreateTaskErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type tasksCreateTaskError = tasksCreateTaskErrors[keyof tasksCreateTaskErrors];
+
+export type tasksCreateTaskResponses = {
+    /**
+     * Successful Response
+     */
+    200: TaskPublic;
+};
+
+export type tasksCreateTaskResponse = tasksCreateTaskResponses[keyof tasksCreateTaskResponses];
+
+export type tasksReadTaskData = {
+    body?: never;
+    path: {
+        /**
+         * Task Id
+         */
+        task_id: string;
+    };
+    query?: never;
+    url: '/api/v1/tasks/{task_id}';
+};
+
+export type tasksReadTaskErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type tasksReadTaskError = tasksReadTaskErrors[keyof tasksReadTaskErrors];
+
+export type tasksReadTaskResponses = {
+    /**
+     * Successful Response
+     */
+    200: TaskPublic;
+};
+
+export type tasksReadTaskResponse = tasksReadTaskResponses[keyof tasksReadTaskResponses];
+
+export type tasksUpdateTaskData = {
+    body: TaskUpdate;
+    path: {
+        /**
+         * Task Id
+         */
+        task_id: string;
+    };
+    query?: never;
+    url: '/api/v1/tasks/{task_id}';
+};
+
+export type tasksUpdateTaskErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type tasksUpdateTaskError = tasksUpdateTaskErrors[keyof tasksUpdateTaskErrors];
+
+export type tasksUpdateTaskResponses = {
+    /**
+     * Successful Response
+     */
+    200: TaskPublic;
+};
+
+export type tasksUpdateTaskResponse = tasksUpdateTaskResponses[keyof tasksUpdateTaskResponses];
 
 export type utilsTestEmailData = {
     body?: never;

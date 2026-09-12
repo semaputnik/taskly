@@ -8,6 +8,9 @@ from app.models import (
     Project,
     ProjectCreate,
     ProjectUpdate,
+    Task,
+    TaskCreate,
+    TaskUpdate,
     User,
     UserCreate,
     UserUpdate,
@@ -73,6 +76,39 @@ def update_project(
     session.commit()
     session.refresh(db_project)
     return db_project
+
+
+def get_inbox_project(*, session: Session, owner_id: uuid.UUID) -> Project:
+    statement = select(Project).where(
+        Project.owner_id == owner_id,
+        Project.is_inbox == True,  # noqa: E712
+    )
+    return session.exec(statement).one()
+
+
+def create_task(
+    *,
+    session: Session,
+    task_create: TaskCreate,
+    project_id: uuid.UUID,
+    owner_id: uuid.UUID,
+) -> Task:
+    db_obj = Task.model_validate(
+        task_create, update={"project_id": project_id, "owner_id": owner_id}
+    )
+    session.add(db_obj)
+    session.commit()
+    session.refresh(db_obj)
+    return db_obj
+
+
+def update_task(*, session: Session, db_task: Task, task_in: TaskUpdate) -> Task:
+    task_data = task_in.model_dump(exclude_unset=True)
+    db_task.sqlmodel_update(task_data)
+    session.add(db_task)
+    session.commit()
+    session.refresh(db_task)
+    return db_task
 
 
 # Dummy hash to use for timing attack prevention when user is not found
