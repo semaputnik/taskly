@@ -330,7 +330,8 @@ export class TasksService {
     /**
      * Read Tasks
      *
-     * Retrieve the current user's tasks, across all of their projects.
+     * Retrieve the current user's tasks, across all of their projects, narrowed
+     * and ordered by the query.
      */
     public static readTasks<ThrowOnError extends boolean = true>(options?: Options<tasksReadTasksData, ThrowOnError>) {
         return (options?.client ?? client).get<tasksReadTasksResponses, tasksReadTasksErrors, ThrowOnError>({

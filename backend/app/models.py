@@ -3,7 +3,7 @@ from datetime import UTC, date, datetime
 from enum import StrEnum
 from typing import Annotated
 
-from pydantic import EmailStr, StringConstraints
+from pydantic import EmailStr, StringConstraints, model_validator
 from sqlalchemy import CheckConstraint, DateTime, UniqueConstraint
 from sqlmodel import Field, SQLModel
 
@@ -218,6 +218,54 @@ class TaskPriority(StrEnum):
     P2 = "P2"
     P3 = "P3"
     P4 = "P4"
+
+
+class TaskSort(StrEnum):
+    DUE_DATE = "due_date"
+    PRIORITY = "priority"
+
+
+class SortOrder(StrEnum):
+    ASC = "asc"
+    DESC = "desc"
+
+
+class TaskQuery(SQLModel):
+    """
+    How a task list is narrowed and ordered.
+
+    Every filter that is set has to match: a task is listed only if it
+    satisfies all of them, so adding one always narrows the result (FR-06.3).
+    """
+
+    # A subtask holds no project of its own, so this matches on the project the
+    # task resolves to, not on the column.
+    project_id: uuid.UUID | None = None
+    assignee_id: uuid.UUID | None = None
+    # The other half of the assignee filter: tasks with nobody on them.
+    unassigned: bool = False
+    tag: str | None = None
+    priority: TaskPriority | None = None
+    completed: bool | None = None
+    # An inclusive range: both ends are listed.
+    due_from: date | None = None
+    due_to: date | None = None
+    # Work whose due date has passed. Whether it is finished is the
+    # completion filter's business: every filter owns one dimension, so they
+    # can be combined without one quietly overriding another.
+    overdue: bool = False
+    sort: TaskSort | None = None
+    order: SortOrder = SortOrder.ASC
+    # Paging rides along with the rest of the query: FastAPI only unpacks a
+    # query model when it is the whole of the endpoint's query.
+    skip: int = Field(default=0, ge=0)
+    limit: int = Field(default=100, ge=1)
+
+    @model_validator(mode="after")
+    def check_assignee(self) -> TaskQuery:
+        if self.unassigned and self.assignee_id is not None:
+            raise ValueError("Ask for an assignee or for unassigned tasks, not both")
+        return self
 
 
 class SubtaskCompletion(StrEnum):

@@ -1,9 +1,7 @@
 import uuid
-from typing import Any
+from typing import Annotated, Any
 
-from fastapi import APIRouter, HTTPException
-from sqlalchemy import case
-from sqlmodel import func, select
+from fastapi import APIRouter, HTTPException, Query
 
 from app import crud
 from app.api.deps import CurrentUser, SessionDep, get_owned_project
@@ -12,8 +10,8 @@ from app.models import (
     SubtaskCompletion,
     Task,
     TaskCreate,
-    TaskPriority,
     TaskPublic,
+    TaskQuery,
     TasksPublic,
     TaskUpdate,
 )
@@ -30,14 +28,6 @@ UNCOMPLETED_SUBTASKS_CODE = "task_has_uncompleted_subtasks"
 # it: the request has to confirm the cascade before anything goes (FR-01.12).
 HAS_SUBTASKS_STATUS = 409
 HAS_SUBTASKS_CODE = "task_has_subtasks"
-
-# Unset priority sorts as P4 (lowest) without being reported as P4.
-_PRIORITY_RANK = case(
-    (Task.priority == TaskPriority.P1, 1),  # type: ignore[arg-type] # ty: ignore[invalid-argument-type]
-    (Task.priority == TaskPriority.P2, 2),  # type: ignore[arg-type] # ty: ignore[invalid-argument-type]
-    (Task.priority == TaskPriority.P3, 3),  # type: ignore[arg-type] # ty: ignore[invalid-argument-type]
-    else_=4,
-)
 
 
 def _get_owned_task(
@@ -86,26 +76,22 @@ def _read(session: SessionDep, task: Task) -> TaskPublic:
 
 @router.get("/", response_model=TasksPublic)
 def read_tasks(
-    session: SessionDep, current_user: CurrentUser, skip: int = 0, limit: int = 100
+    session: SessionDep,
+    current_user: CurrentUser,
+    query: Annotated[TaskQuery, Query()],
 ) -> Any:
     """
-    Retrieve the current user's tasks, across all of their projects.
+    Retrieve the current user's tasks, across all of their projects, narrowed
+    and ordered by the query.
     """
-    count_statement = (
-        select(func.count())
-        .select_from(Task)
-        .where(Task.owner_id == current_user.id, crud.not_deleted(Task))
-    )
-    count = session.exec(count_statement).one()
+    if query.project_id is not None:
+        # 404 rather than an empty list: a project the user cannot see is not a
+        # project with no tasks.
+        get_owned_project(session, current_user, query.project_id)
 
-    statement = (
-        select(Task)
-        .where(Task.owner_id == current_user.id, crud.not_deleted(Task))
-        .order_by(_PRIORITY_RANK, Task.created_at)  # type: ignore[arg-type] # ty: ignore[invalid-argument-type]
-        .offset(skip)
-        .limit(limit)
+    tasks, count = crud.get_tasks(
+        session=session, owner_id=current_user.id, query=query
     )
-    tasks = session.exec(statement).all()
     project_ids = crud.get_task_project_ids(session=session, owner_id=current_user.id)
     tags = crud.get_task_tags(session=session, task_ids=[task.id for task in tasks])
     return TasksPublic(

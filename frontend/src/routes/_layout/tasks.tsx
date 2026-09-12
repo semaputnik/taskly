@@ -7,13 +7,24 @@ import { DataTable } from "@/components/Common/DataTable"
 import PendingTasks from "@/components/Pending/PendingTasks"
 import AddTask from "@/components/Tasks/AddTask"
 import { getColumns } from "@/components/Tasks/columns"
+import { type TaskSearch, taskSearchSchema } from "@/components/Tasks/search"
+import { TaskFilters } from "@/components/Tasks/TaskFilters"
 import { buildTaskTree } from "@/components/Tasks/tree"
+import useAuth from "@/hooks/useAuth"
 
-function getTasksQueryOptions() {
+function getTasksQueryOptions(search: TaskSearch, currentUserId?: string) {
+  const { assignee, ...filters } = search
+  const query = {
+    ...filters,
+    // "Me" needs the id the API filters on; "unassigned" is its own flag.
+    assignee_id: assignee === "me" ? currentUserId : undefined,
+    unassigned: assignee === "unassigned" ? true : undefined,
+    skip: 0,
+    limit: 100,
+  }
   return {
-    queryFn: async () =>
-      (await TasksService.readTasks({ query: { skip: 0, limit: 100 } })).data,
-    queryKey: ["tasks"],
+    queryFn: async () => (await TasksService.readTasks({ query })).data,
+    queryKey: ["tasks", query],
   }
 }
 
@@ -28,6 +39,7 @@ function getProjectsQueryOptions() {
 
 export const Route = createFileRoute("/_layout/tasks")({
   component: Tasks,
+  validateSearch: taskSearchSchema,
   head: () => ({
     meta: [
       {
@@ -37,27 +49,51 @@ export const Route = createFileRoute("/_layout/tasks")({
   }),
 })
 
-function TasksTableContent() {
-  const { data: tasks } = useSuspenseQuery(getTasksQueryOptions())
+function TasksTableContent({
+  search,
+  currentUserId,
+}: {
+  search: TaskSearch
+  currentUserId?: string
+}) {
+  const { data: tasks } = useSuspenseQuery(
+    getTasksQueryOptions(search, currentUserId),
+  )
   const { data: projects } = useSuspenseQuery(getProjectsQueryOptions())
 
   const projectNames = Object.fromEntries(
     projects.data.map((project) => [project.id, project.name]),
   )
-  const { tasks: ordered, depths } = buildTaskTree(tasks.data)
+  // Nesting subtasks under their parents would reorder what the server just
+  // sorted, so an explicit sort gets a flat list: the user asked for that
+  // order, not for the tree.
+  const { tasks: ordered, depths } = search.sort
+    ? { tasks: tasks.data, depths: {} }
+    : buildTaskTree(tasks.data)
 
   return <DataTable columns={getColumns(projectNames, depths)} data={ordered} />
 }
 
-function TasksTable() {
+function TasksTable({ search }: { search: TaskSearch }) {
+  const { user: currentUser } = useAuth()
+
+  // Filtering by "me" needs the id to filter on: listing before it arrives
+  // would show everything, which is the opposite of what was asked for.
+  if (search.assignee === "me" && !currentUser) {
+    return <PendingTasks />
+  }
+
   return (
     <Suspense fallback={<PendingTasks />}>
-      <TasksTableContent />
+      <TasksTableContent search={search} currentUserId={currentUser?.id} />
     </Suspense>
   )
 }
 
 function Tasks() {
+  const search = Route.useSearch()
+  const navigate = Route.useNavigate()
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
@@ -69,7 +105,13 @@ function Tasks() {
         </div>
         <AddTask />
       </div>
-      <TasksTable />
+      <TaskFilters
+        search={search}
+        onChange={(next) =>
+          navigate({ search: (previous) => ({ ...previous, ...next }) })
+        }
+      />
+      <TasksTable search={search} />
     </div>
   )
 }
