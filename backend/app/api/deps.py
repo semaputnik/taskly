@@ -62,6 +62,11 @@ def get_owned_project(
     session: SessionDep, current_user: CurrentUser, project_id: uuid.UUID
 ) -> Project:
     project = session.get(Project, project_id)
-    if not project or project.owner_id != current_user.id:
+    if (
+        not project
+        or project.owner_id != current_user.id
+        # A deleted project is invisible until it is restored (FR-05.8).
+        or project.deletion_id is not None
+    ):
         raise HTTPException(status_code=404, detail="Project not found")
     return project

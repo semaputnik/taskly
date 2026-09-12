@@ -1038,6 +1038,41 @@ export type tasksCreateTaskResponses = {
 
 export type tasksCreateTaskResponse = tasksCreateTaskResponses[keyof tasksCreateTaskResponses];
 
+export type tasksDeleteTaskData = {
+    body?: never;
+    path: {
+        /**
+         * Task Id
+         */
+        task_id: string;
+    };
+    query?: {
+        /**
+         * Delete Subtasks
+         */
+        delete_subtasks?: boolean;
+    };
+    url: '/api/v1/tasks/{task_id}';
+};
+
+export type tasksDeleteTaskErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type tasksDeleteTaskError = tasksDeleteTaskErrors[keyof tasksDeleteTaskErrors];
+
+export type tasksDeleteTaskResponses = {
+    /**
+     * Successful Response
+     */
+    200: Message;
+};
+
+export type tasksDeleteTaskResponse = tasksDeleteTaskResponses[keyof tasksDeleteTaskResponses];
+
 export type tasksReadTaskData = {
     body?: never;
     path: {

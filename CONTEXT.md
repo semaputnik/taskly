@@ -47,3 +47,12 @@ The task at the top of a tree — the one with no parent. The only task in a
 tree that records a project; every subtask below it derives that project.
 _Avoid_: "parent task" for this — any task with subtasks is a parent, but
 only the topmost one is the root.
+
+**Deletion event**:
+One act of deleting, and everything it took down. Deleting cascades — a task
+takes its subtasks, a project takes its tasks — and every row that went down
+together points at the same event, so restoring brings back exactly those
+rows. A subtask deleted on its own earlier belongs to its own event and stays
+deleted when its parent is restored.
+_Avoid_: reading a row's deleted state as a bare flag — it is always tied to
+the event that caused it.

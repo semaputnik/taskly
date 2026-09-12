@@ -70,6 +70,41 @@ class UsersPublic(SQLModel):
     count: int
 
 
+class Deletion(SQLModel, table=True):
+    """
+    One deletion event: every row that went down with it points here.
+
+    Deleting is soft — nothing leaves the database — so a restore needs to know
+    which rows belong to *this* deletion. A subtask deleted on its own earlier
+    keeps its own event and is left behind when its parent is restored
+    (FR-01.10).
+    """
+
+    __table_args__ = (
+        # The event names the one thing the user pointed at; everything else
+        # went down as a cascade.
+        CheckConstraint(
+            "(task_id IS NULL) <> (project_id IS NULL)",
+            name="deletion_targets_one_thing",
+        ),
+    )
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    owner_id: uuid.UUID = Field(
+        foreign_key="user.id", nullable=False, ondelete="CASCADE"
+    )
+    task_id: uuid.UUID | None = Field(
+        default=None, foreign_key="task.id", nullable=True, ondelete="CASCADE"
+    )
+    project_id: uuid.UUID | None = Field(
+        default=None, foreign_key="project.id", nullable=True, ondelete="CASCADE"
+    )
+    created_at: datetime | None = Field(
+        default_factory=get_datetime_utc,
+        sa_type=DateTime(timezone=True),  # type: ignore
+    )
+
+
 # Shared properties
 class ProjectBase(SQLModel):
     name: str = Field(max_length=255)
@@ -93,6 +128,16 @@ class Project(ProjectBase, table=True):
     is_inbox: bool = False
     owner_id: uuid.UUID = Field(
         foreign_key="user.id", nullable=False, ondelete="CASCADE"
+    )
+    # Set once the project is deleted; None means it is live (FR-05.8).
+    deletion_id: uuid.UUID | None = Field(
+        default=None,
+        foreign_key="deletion.id",
+        nullable=True,
+        # Losing the event must not destroy what it marked: the row simply
+        # becomes live again.
+        ondelete="SET NULL",
+        index=True,
     )
     created_at: datetime | None = Field(
         default_factory=get_datetime_utc,
@@ -199,6 +244,16 @@ class Task(TaskBase, table=True):
     )
     assignee_id: uuid.UUID | None = Field(
         default=None, foreign_key="user.id", nullable=True, ondelete="SET NULL"
+    )
+    # Set once the task is deleted; None means it is live (FR-01.8).
+    deletion_id: uuid.UUID | None = Field(
+        default=None,
+        foreign_key="deletion.id",
+        nullable=True,
+        # Losing the event must not destroy what it marked: the row simply
+        # becomes live again.
+        ondelete="SET NULL",
+        index=True,
     )
     created_at: datetime | None = Field(
         default_factory=get_datetime_utc,

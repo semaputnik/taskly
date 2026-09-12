@@ -6,6 +6,7 @@ from sqlmodel import Session, col, select
 
 from app.core.security import get_password_hash, verify_password
 from app.models import (
+    Deletion,
     Project,
     ProjectCreate,
     ProjectUpdate,
@@ -83,6 +84,7 @@ def get_inbox_project(*, session: Session, owner_id: uuid.UUID) -> Project:
     statement = select(Project).where(
         Project.owner_id == owner_id,
         Project.is_inbox == True,  # noqa: E712
+        not_deleted(Project),
     )
     return session.exec(statement).one()
 
@@ -118,20 +120,34 @@ def update_task(*, session: Session, db_task: Task, task_in: TaskUpdate) -> Task
     return db_task
 
 
+def not_deleted(model: type[Task] | type[Project]) -> Any:
+    """
+    The filter every normal query needs: a deletion marks a row instead of
+    removing it, so deleted rows have to be left out explicitly (FR-01.8,
+    FR-05.8).
+    """
+    return col(model.deletion_id).is_(None)
+
+
 def _subtree_cte(root_id: uuid.UUID) -> Any:
     """
-    Every descendant of `root_id`, to any depth, as (id, completed) rows.
+    Every descendant of `root_id` that is not deleted, to any depth, as
+    (id, completed) rows.
+
+    Deleted subtasks are left out: they carry their own deletion event, and a
+    deletion always takes a whole subtree, so nothing that is still there hides
+    under a deleted one.
     """
     subtree = (
         select(Task.id, Task.completed)
-        .where(Task.parent_id == root_id)
+        .where(Task.parent_id == root_id, not_deleted(Task))
         .cte("subtree", recursive=True)
     )
     child = aliased(Task)
     return subtree.union_all(
-        select(child.id, child.completed).join(
-            subtree, col(child.parent_id) == subtree.c.id
-        )
+        select(child.id, child.completed)
+        .join(subtree, col(child.parent_id) == subtree.c.id)
+        .where(not_deleted(child))
     )
 
 
@@ -172,14 +188,18 @@ def get_task_project_ids(
     """
     tree = (
         select(Task.id, Task.project_id)
-        .where(Task.owner_id == owner_id, col(Task.parent_id).is_(None))
+        .where(
+            Task.owner_id == owner_id,
+            col(Task.parent_id).is_(None),
+            not_deleted(Task),
+        )
         .cte("task_projects", recursive=True)
     )
     child = aliased(Task)
     tree = tree.union_all(
-        select(child.id, tree.c.project_id).join(
-            tree, col(child.parent_id) == tree.c.id
-        )
+        select(child.id, tree.c.project_id)
+        .join(tree, col(child.parent_id) == tree.c.id)
+        .where(not_deleted(child))
     )
     rows = session.exec(select(tree.c.id, tree.c.project_id)).all()
     return dict(rows)
@@ -192,6 +212,80 @@ def has_uncompleted_subtasks(*, session: Session, task: Task) -> bool:
     subtree = _subtree_cte(task.id)
     statement = select(subtree.c.id).where(subtree.c.completed.is_(False)).limit(1)
     return session.exec(statement).first() is not None
+
+
+def has_subtasks(*, session: Session, task: Task) -> bool:
+    """
+    Whether the task still has subtasks that are not deleted.
+
+    Direct children are enough: deleting takes a whole subtree, so nothing is
+    left below a deleted child.
+    """
+    statement = (
+        select(Task.id).where(Task.parent_id == task.id, not_deleted(Task)).limit(1)
+    )
+    return session.exec(statement).first() is not None
+
+
+def delete_task(*, session: Session, task: Task) -> None:
+    """
+    Soft-delete a task and its subtree as a single event (FR-01.8, FR-01.11). Nothing is removed: every row keeps its data and points at the
+    event that took it down, so a later restore can bring back exactly these
+    rows — and only these.
+    """
+    deletion = Deletion(owner_id=task.owner_id, task_id=task.id)
+    session.add(deletion)
+    # The event row has to exist before anything can point at it.
+    session.flush()
+
+    subtree = _subtree_cte(task.id)
+    _mark_deleted(session=session, task_ids=select(subtree.c.id), deletion=deletion)
+    task.deletion_id = deletion.id
+    session.add(task)
+    session.commit()
+
+
+def delete_project(*, session: Session, project: Project) -> None:
+    """
+    Soft-delete a project and every task in it as a single event (FR-05.8,
+    FR-05.9).
+    """
+    deletion = Deletion(owner_id=project.owner_id, project_id=project.id)
+    session.add(deletion)
+    session.flush()
+
+    project_tasks = _project_tasks_cte(project.id)
+    _mark_deleted(
+        session=session, task_ids=select(project_tasks.c.id), deletion=deletion
+    )
+    project.deletion_id = deletion.id
+    session.add(project)
+    session.commit()
+
+
+def _project_tasks_cte(project_id: uuid.UUID) -> Any:
+    """
+    Every task of a project that is not deleted: its root tasks and everything
+    under them.
+    """
+    tasks = (
+        select(Task.id)
+        .where(Task.project_id == project_id, not_deleted(Task))
+        .cte("project_tasks", recursive=True)
+    )
+    child = aliased(Task)
+    return tasks.union_all(
+        select(child.id)
+        .join(tasks, col(child.parent_id) == tasks.c.id)
+        .where(not_deleted(child))
+    )
+
+
+def _mark_deleted(*, session: Session, task_ids: Any, deletion: Deletion) -> None:
+    statement = select(Task).where(col(Task.id).in_(task_ids))
+    for task in session.exec(statement):
+        task.deletion_id = deletion.id
+        session.add(task)
 
 
 def complete_subtasks(*, session: Session, task: Task) -> None:

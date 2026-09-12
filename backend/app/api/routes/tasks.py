@@ -8,6 +8,7 @@ from sqlmodel import func, select
 from app import crud
 from app.api.deps import CurrentUser, SessionDep, get_owned_project
 from app.models import (
+    Message,
     SubtaskCompletion,
     Task,
     TaskCreate,
@@ -25,6 +26,11 @@ router = APIRouter(prefix="/tasks", tags=["tasks"])
 UNCOMPLETED_SUBTASKS_STATUS = 409
 UNCOMPLETED_SUBTASKS_CODE = "task_has_uncompleted_subtasks"
 
+# Deleting takes the whole subtree with it, so the same shape of refusal guards
+# it: the request has to confirm the cascade before anything goes (FR-01.12).
+HAS_SUBTASKS_STATUS = 409
+HAS_SUBTASKS_CODE = "task_has_subtasks"
+
 # Unset priority sorts as P4 (lowest) without being reported as P4.
 _PRIORITY_RANK = case(
     (Task.priority == TaskPriority.P1, 1),  # type: ignore[arg-type] # ty: ignore[invalid-argument-type]
@@ -38,7 +44,7 @@ def _get_owned_task(
     session: SessionDep, current_user: CurrentUser, task_id: uuid.UUID
 ) -> Task:
     task = session.get(Task, task_id)
-    if not task or task.owner_id != current_user.id:
+    if not task or task.owner_id != current_user.id or task.deletion_id is not None:
         raise HTTPException(status_code=404, detail="Task not found")
     return task
 
@@ -65,13 +71,15 @@ def read_tasks(
     Retrieve the current user's tasks, across all of their projects.
     """
     count_statement = (
-        select(func.count()).select_from(Task).where(Task.owner_id == current_user.id)
+        select(func.count())
+        .select_from(Task)
+        .where(Task.owner_id == current_user.id, crud.not_deleted(Task))
     )
     count = session.exec(count_statement).one()
 
     statement = (
         select(Task)
-        .where(Task.owner_id == current_user.id)
+        .where(Task.owner_id == current_user.id, crud.not_deleted(Task))
         .order_by(_PRIORITY_RANK, Task.created_at)  # type: ignore[arg-type] # ty: ignore[invalid-argument-type]
         .offset(skip)
         .limit(limit)
@@ -194,3 +202,37 @@ def update_task(
 
     task = crud.update_task(session=session, db_task=task, task_in=task_in)
     return _public(task, project_id)
+
+
+@router.delete("/{task_id}")
+def delete_task(
+    *,
+    session: SessionDep,
+    current_user: CurrentUser,
+    task_id: uuid.UUID,
+    delete_subtasks: bool = False,
+) -> Message:
+    """
+    Delete a task, and its subtasks with it.
+
+    The rows are marked deleted rather than removed, so the deletion can be
+    reversed from the activity log later (FR-01.8). Because the cascade can
+    take down far more than the task named here, a task that still has subtasks
+    is only deleted when `delete_subtasks` says so (FR-01.11, FR-01.12).
+    """
+    task = _get_owned_task(session, current_user, task_id)
+
+    if not delete_subtasks and crud.has_subtasks(session=session, task=task):
+        raise HTTPException(
+            status_code=HAS_SUBTASKS_STATUS,
+            detail={
+                "code": HAS_SUBTASKS_CODE,
+                "message": (
+                    "This task has subtasks, which would be deleted with it. "
+                    "Confirm with delete_subtasks to go ahead."
+                ),
+            },
+        )
+
+    crud.delete_task(session=session, task=task)
+    return Message(message="Task deleted successfully")

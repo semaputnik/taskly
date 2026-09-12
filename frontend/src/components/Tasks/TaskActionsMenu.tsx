@@ -9,6 +9,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import AddTask from "./AddTask"
+import DeleteTask from "./DeleteTask"
 import EditTask from "./EditTask"
 
 interface TaskActionsMenuProps {
@@ -28,6 +29,7 @@ export const TaskActionsMenu = ({ task }: TaskActionsMenuProps) => {
       <DropdownMenuContent align="end">
         <EditTask task={task} onSuccess={() => setOpen(false)} />
         <AddTask parent={task} onSuccess={() => setOpen(false)} />
+        <DeleteTask task={task} onSuccess={() => setOpen(false)} />
       </DropdownMenuContent>
     </DropdownMenu>
   )
