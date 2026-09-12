@@ -28,13 +28,13 @@ def read_projects(
     count_statement = (
         select(func.count())
         .select_from(Project)
-        .where(Project.owner_id == current_user.id)
+        .where(Project.owner_id == current_user.id, crud.not_deleted(Project))
     )
     count = session.exec(count_statement).one()
 
     statement = (
         select(Project)
-        .where(Project.owner_id == current_user.id)
+        .where(Project.owner_id == current_user.id, crud.not_deleted(Project))
         .offset(skip)
         .limit(limit)
     )
@@ -80,15 +80,15 @@ def delete_project(
     *, session: SessionDep, current_user: CurrentUser, project_id: uuid.UUID
 ) -> Message:
     """
-    Delete a project.
+    Delete a project, and every task in it with it.
+
+    The project and its tasks are marked deleted rather than removed, so the
+    deletion can be reversed from the activity log later (FR-05.8, FR-05.9).
     """
-    # Hard delete for now: soft-delete/restore via the activity log (FR-05.8,
-    # FR-05.9) depends on the activity log feature, which doesn't exist yet.
     project = get_owned_project(session, current_user, project_id)
     if project.is_inbox:
         raise HTTPException(
             status_code=400, detail="The Inbox project cannot be deleted"
         )
-    session.delete(project)
-    session.commit()
+    crud.delete_project(session=session, project=project)
     return Message(message="Project deleted successfully")

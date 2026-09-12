@@ -19,16 +19,24 @@ export const handleError = function (this: (msg: string) => void, err: Error) {
   this(errorMessage)
 }
 
-// The API refuses to complete a task with open subtasks and says so with this
-// code, so the refusal can be told apart from any other client error.
-const UNCOMPLETED_SUBTASKS_CODE = "task_has_uncompleted_subtasks"
-
-export function isUncompletedSubtasksError(err: Error): boolean {
+// Refusals the client is expected to act on carry a code in the error detail,
+// so they can be told apart from any other client error.
+function hasErrorCode(err: Error, code: string): boolean {
   if (!(err instanceof AxiosError)) {
     return false
   }
   const detail = (err.response?.data as any)?.detail
-  return detail?.code === UNCOMPLETED_SUBTASKS_CODE
+  return detail?.code === code
+}
+
+/** Completing this task needs a decision about its open subtasks. */
+export function isUncompletedSubtasksError(err: Error): boolean {
+  return hasErrorCode(err, "task_has_uncompleted_subtasks")
+}
+
+/** Deleting this task would take its subtasks with it. */
+export function isSubtaskCascadeError(err: Error): boolean {
+  return hasErrorCode(err, "task_has_subtasks")
 }
 
 export const getInitials = (name: string): string => {
