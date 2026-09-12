@@ -80,7 +80,8 @@ def update_project(
 
 def get_inbox_project(*, session: Session, owner_id: uuid.UUID) -> Project:
     statement = select(Project).where(
-        Project.owner_id == owner_id, Project.is_inbox == True  # noqa: E712
+        Project.owner_id == owner_id,
+        Project.is_inbox == True,  # noqa: E712
     )
     return session.exec(statement).one()
 

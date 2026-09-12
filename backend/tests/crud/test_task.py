@@ -85,7 +85,7 @@ def test_update_task_fields(db: Session) -> None:
     assert updated.assignee_id == user.id
 
 
-def test_complete_and_uncomplete_task(db: Session) -> None:
+def test_complete_and_return_to_not_completed(db: Session) -> None:
     user_in = UserCreate(email=random_email(), password=random_lower_string())
     user = crud.create_user(session=db, user_create=user_in)
     inbox = crud.get_inbox_project(session=db, owner_id=user.id)
@@ -101,10 +101,10 @@ def test_complete_and_uncomplete_task(db: Session) -> None:
     )
     assert completed.completed is True
 
-    uncompleted = crud.update_task(
+    not_completed = crud.update_task(
         session=db, db_task=completed, task_in=TaskUpdate(completed=False)
     )
-    assert uncompleted.completed is False
+    assert not_completed.completed is False
 
 
 def test_move_task_to_another_project(db: Session) -> None:

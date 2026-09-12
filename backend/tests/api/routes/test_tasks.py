@@ -131,7 +131,7 @@ def test_priority_ordering_treats_unset_as_p4(client: TestClient, db: Session) -
     assert no_priority_task["priority"] is None
 
 
-def test_complete_and_uncomplete_task(client: TestClient, db: Session) -> None:
+def test_complete_and_return_to_not_completed(client: TestClient, db: Session) -> None:
     headers = _headers_for_new_user(client, db)
     create_r = client.post(
         f"{settings.API_V1_STR}/tasks/",

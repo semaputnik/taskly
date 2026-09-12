@@ -20,9 +20,9 @@ router = APIRouter(prefix="/tasks", tags=["tasks"])
 
 # Unset priority sorts as P4 (lowest) without being reported as P4.
 _PRIORITY_RANK = case(
-    (Task.priority == TaskPriority.P1, 1),  # type: ignore[arg-type]
-    (Task.priority == TaskPriority.P2, 2),  # type: ignore[arg-type]
-    (Task.priority == TaskPriority.P3, 3),  # type: ignore[arg-type]
+    (Task.priority == TaskPriority.P1, 1),  # type: ignore[arg-type] # ty: ignore[invalid-argument-type]
+    (Task.priority == TaskPriority.P2, 2),  # type: ignore[arg-type] # ty: ignore[invalid-argument-type]
+    (Task.priority == TaskPriority.P3, 3),  # type: ignore[arg-type] # ty: ignore[invalid-argument-type]
     else_=4,
 )
 
@@ -51,16 +51,14 @@ def read_tasks(
     Retrieve the current user's tasks, across all of their projects.
     """
     count_statement = (
-        select(func.count())
-        .select_from(Task)
-        .where(Task.owner_id == current_user.id)
+        select(func.count()).select_from(Task).where(Task.owner_id == current_user.id)
     )
     count = session.exec(count_statement).one()
 
     statement = (
         select(Task)
         .where(Task.owner_id == current_user.id)
-        .order_by(_PRIORITY_RANK, Task.created_at)  # type: ignore[arg-type]
+        .order_by(_PRIORITY_RANK, Task.created_at)  # type: ignore[arg-type] # ty: ignore[invalid-argument-type]
         .offset(skip)
         .limit(limit)
     )
