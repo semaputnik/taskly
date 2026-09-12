@@ -1,4 +1,4 @@
-import { FolderKanban, Home, Users } from "lucide-react"
+import { CheckSquare, FolderKanban, Home, Users } from "lucide-react"
 
 import { SidebarAppearance } from "@/components/Common/Appearance"
 import { Logo } from "@/components/Common/Logo"
@@ -14,6 +14,7 @@ import { User } from "./User"
 
 const baseItems: NavItem[] = [
   { icon: Home, title: "Dashboard", path: "/" },
+  { icon: CheckSquare, title: "Tasks", path: "/tasks" },
   { icon: FolderKanban, title: "Projects", path: "/projects" },
 ]
 

@@ -5,7 +5,7 @@ from fastapi import APIRouter, HTTPException
 from sqlmodel import func, select
 
 from app import crud
-from app.api.deps import CurrentUser, SessionDep
+from app.api.deps import CurrentUser, SessionDep, get_owned_project
 from app.models import (
     Message,
     Project,
@@ -16,15 +16,6 @@ from app.models import (
 )
 
 router = APIRouter(prefix="/projects", tags=["projects"])
-
-
-def _get_owned_project(
-    session: SessionDep, current_user: CurrentUser, project_id: uuid.UUID
-) -> Project:
-    project = session.get(Project, project_id)
-    if not project or project.owner_id != current_user.id:
-        raise HTTPException(status_code=404, detail="Project not found")
-    return project
 
 
 @router.get("/", response_model=ProjectsPublic)
@@ -74,7 +65,7 @@ def update_project(
     """
     Update a project's name and/or description.
     """
-    project = _get_owned_project(session, current_user, project_id)
+    project = get_owned_project(session, current_user, project_id)
     if project.is_inbox and "name" in project_in.model_fields_set:
         raise HTTPException(
             status_code=400, detail="The Inbox project cannot be renamed"
@@ -93,7 +84,7 @@ def delete_project(
     """
     # Hard delete for now: soft-delete/restore via the activity log (FR-05.8,
     # FR-05.9) depends on the activity log feature, which doesn't exist yet.
-    project = _get_owned_project(session, current_user, project_id)
+    project = get_owned_project(session, current_user, project_id)
     if project.is_inbox:
         raise HTTPException(
             status_code=400, detail="The Inbox project cannot be deleted"

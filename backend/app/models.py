@@ -1,5 +1,6 @@
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
+from enum import StrEnum
 
 from pydantic import EmailStr
 from sqlalchemy import DateTime
@@ -108,6 +109,78 @@ class ProjectPublic(ProjectBase):
 
 class ProjectsPublic(SQLModel):
     data: list[ProjectPublic]
+    count: int
+
+
+class TaskPriority(StrEnum):
+    P1 = "P1"
+    P2 = "P2"
+    P3 = "P3"
+    P4 = "P4"
+
+
+# Shared properties
+class TaskBase(SQLModel):
+    title: str = Field(max_length=255)
+    description: str | None = Field(default=None, max_length=2000)
+    # Date only, no time of day: storing a timestamp would let timezone
+    # conversion shift the date the user actually picked.
+    due_date: date | None = None
+    priority: TaskPriority | None = None
+
+
+# Properties to receive via API on creation
+class TaskCreate(TaskBase):
+    # None lands the task in the user's Inbox (FR-05.4).
+    project_id: uuid.UUID | None = None
+    # Only the task owner is a valid assignee for now; bot users become
+    # assignable in semaputnik/taskly#7 without needing to reshape this field.
+    assignee_id: uuid.UUID | None = None
+
+
+# Properties to receive via API on update, all are optional
+class TaskUpdate(SQLModel):
+    title: str | None = Field(default=None, max_length=255)
+    description: str | None = Field(default=None, max_length=2000)
+    due_date: date | None = None
+    priority: TaskPriority | None = None
+    project_id: uuid.UUID | None = None
+    assignee_id: uuid.UUID | None = None
+    completed: bool | None = None
+
+
+# Database model, database table inferred from class name
+class Task(TaskBase, table=True):
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    completed: bool = False
+    project_id: uuid.UUID = Field(
+        foreign_key="project.id", nullable=False, ondelete="CASCADE"
+    )
+    # Denormalized from the project's owner at creation time, so ownership
+    # checks and per-user listings don't need a join.
+    owner_id: uuid.UUID = Field(
+        foreign_key="user.id", nullable=False, ondelete="CASCADE"
+    )
+    assignee_id: uuid.UUID | None = Field(
+        default=None, foreign_key="user.id", nullable=True, ondelete="SET NULL"
+    )
+    created_at: datetime | None = Field(
+        default_factory=get_datetime_utc,
+        sa_type=DateTime(timezone=True),  # type: ignore
+    )
+
+
+# Properties to return via API, id is always required
+class TaskPublic(TaskBase):
+    id: uuid.UUID
+    completed: bool
+    project_id: uuid.UUID
+    assignee_id: uuid.UUID | None = None
+    created_at: datetime | None = None
+
+
+class TasksPublic(SQLModel):
+    data: list[TaskPublic]
     count: int
 
 
