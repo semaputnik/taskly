@@ -1,9 +1,10 @@
 import uuid
 from datetime import UTC, date, datetime
 from enum import StrEnum
+from typing import Annotated
 
-from pydantic import EmailStr
-from sqlalchemy import CheckConstraint, DateTime
+from pydantic import EmailStr, StringConstraints
+from sqlalchemy import CheckConstraint, DateTime, UniqueConstraint
 from sqlmodel import Field, SQLModel
 
 
@@ -157,6 +158,61 @@ class ProjectsPublic(SQLModel):
     count: int
 
 
+# A tag name as it arrives from a client: trimmed first, so a name of nothing
+# but spaces is rejected rather than stored blank.
+TagName = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=50)
+]
+
+
+class TagBase(SQLModel):
+    name: str = Field(max_length=50)
+
+
+class Tag(TagBase, table=True):
+    """
+    A free-text label a user puts on tasks.
+
+    Tags belong to the user rather than to a project, so one means the same
+    thing across their whole account and can gather work that crosses projects
+    (FR-01.21). There is no screen for managing them: a tag comes into being by
+    being typed onto a task (FR-01.20).
+    """
+
+    __table_args__ = (
+        UniqueConstraint("owner_id", "name", name="tag_owner_id_name_key"),
+    )
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    owner_id: uuid.UUID = Field(
+        foreign_key="user.id", nullable=False, ondelete="CASCADE"
+    )
+    created_at: datetime | None = Field(
+        default_factory=get_datetime_utc,
+        sa_type=DateTime(timezone=True),  # type: ignore
+    )
+
+
+class TaskTag(SQLModel, table=True):
+    """Which tags are on which tasks."""
+
+    task_id: uuid.UUID = Field(
+        foreign_key="task.id", primary_key=True, ondelete="CASCADE"
+    )
+    tag_id: uuid.UUID = Field(
+        foreign_key="tag.id", primary_key=True, ondelete="CASCADE"
+    )
+
+
+class TagPublic(TagBase):
+    id: uuid.UUID
+
+
+class TagsPublic(SQLModel):
+    data: list[TagPublic]
+    count: int
+
+
 class TaskPriority(StrEnum):
     P1 = "P1"
     P2 = "P2"
@@ -189,6 +245,8 @@ class TaskBase(SQLModel):
 
 # Properties to receive via API on creation
 class TaskCreate(TaskBase):
+    # Tag names, created on the fly if the user hasn't used them before.
+    tags: list[TagName] = []
     # None lands the task in the user's Inbox (FR-05.4). A subtask takes its
     # parent's project instead, so the two fields are mutually exclusive.
     project_id: uuid.UUID | None = None
@@ -207,6 +265,9 @@ class TaskUpdate(SQLModel):
     project_id: uuid.UUID | None = None
     assignee_id: uuid.UUID | None = None
     completed: bool | None = None
+    # The task's tags in full: what is sent replaces what it had, and omitting
+    # the field leaves them alone.
+    tags: list[TagName] | None = None
     # A directive about the task's subtasks rather than a stored field: it is
     # only meaningful alongside `completed: true`.
     subtasks: SubtaskCompletion | None = None
@@ -268,6 +329,7 @@ class TaskPublic(TaskBase):
     # Always set: a subtask reports the project of its root ancestor.
     project_id: uuid.UUID
     parent_id: uuid.UUID | None = None
+    tags: list[str] = []
     assignee_id: uuid.UUID | None = None
     created_at: datetime | None = None
 

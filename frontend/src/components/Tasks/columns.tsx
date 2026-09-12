@@ -59,6 +59,24 @@ export function getColumns(
       },
     },
     {
+      id: "tags",
+      header: "Tags",
+      cell: ({ row }) => {
+        const tags = row.original.tags ?? []
+        return tags.length ? (
+          <div className="flex flex-wrap gap-1">
+            {tags.map((tag) => (
+              <Badge key={tag} variant="secondary">
+                {tag}
+              </Badge>
+            ))}
+          </div>
+        ) : (
+          <span className="text-muted-foreground italic">No tags</span>
+        )
+      },
+    },
+    {
       accessorKey: "priority",
       header: "Priority",
       cell: ({ row }) => {

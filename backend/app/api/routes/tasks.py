@@ -49,6 +49,15 @@ def _get_owned_task(
     return task
 
 
+def _unique(names: list[str]) -> list[str]:
+    """
+    Tag names with repeats dropped, keeping the order they were sent in. They
+    arrive trimmed and non-blank from `TagName`; the same name twice is the one
+    thing left that a task cannot store.
+    """
+    return list(dict.fromkeys(names))
+
+
 def _check_assignee(current_user: CurrentUser, assignee_id: uuid.UUID | None) -> None:
     if assignee_id is not None and assignee_id != current_user.id:
         raise HTTPException(
@@ -56,11 +65,23 @@ def _check_assignee(current_user: CurrentUser, assignee_id: uuid.UUID | None) ->
         )
 
 
-def _public(task: Task, project_id: uuid.UUID) -> TaskPublic:
+def _public(task: Task, *, project_id: uuid.UUID, tags: list[str]) -> TaskPublic:
     """
-    A task as the API reports it, with the project it resolves to filled in.
+    A task as the API reports it, with the project it resolves to and its tags
+    filled in. Listings resolve both in bulk; `_read` does one task.
     """
-    return TaskPublic.model_validate(task, update={"project_id": project_id})
+    return TaskPublic.model_validate(
+        task, update={"project_id": project_id, "tags": tags}
+    )
+
+
+def _read(session: SessionDep, task: Task) -> TaskPublic:
+    """One task, with everything the API reports about it looked up."""
+    return _public(
+        task,
+        project_id=crud.get_task_project_id(session=session, task=task),
+        tags=crud.get_task_tags(session=session, task_ids=[task.id])[task.id],
+    )
 
 
 @router.get("/", response_model=TasksPublic)
@@ -86,8 +107,13 @@ def read_tasks(
     )
     tasks = session.exec(statement).all()
     project_ids = crud.get_task_project_ids(session=session, owner_id=current_user.id)
+    tags = crud.get_task_tags(session=session, task_ids=[task.id for task in tasks])
     return TasksPublic(
-        data=[_public(task, project_ids[task.id]) for task in tasks], count=count
+        data=[
+            _public(task, project_id=project_ids[task.id], tags=tags[task.id])
+            for task in tasks
+        ],
+        count=count,
     )
 
 
@@ -102,7 +128,9 @@ def create_task(
     _check_assignee(current_user, task_in.assignee_id)
 
     if task_in.parent_id is not None:
-        parent = _get_owned_task(session, current_user, task_in.parent_id)
+        # Checks the parent is the user's and still there; the subtask's own
+        # project is then derived from it.
+        _get_owned_task(session, current_user, task_in.parent_id)
         if task_in.project_id is not None:
             raise HTTPException(
                 status_code=400,
@@ -113,8 +141,9 @@ def create_task(
             task_create=task_in,
             project_id=None,
             owner_id=current_user.id,
+            tag_names=_unique(task_in.tags),
         )
-        return _public(task, crud.get_task_project_id(session=session, task=parent))
+        return _read(session, task)
 
     if task_in.project_id is not None:
         project = get_owned_project(session, current_user, task_in.project_id)
@@ -126,8 +155,9 @@ def create_task(
         task_create=task_in,
         project_id=project.id,
         owner_id=current_user.id,
+        tag_names=_unique(task_in.tags),
     )
-    return _public(task, project.id)
+    return _read(session, task)
 
 
 @router.get("/{task_id}", response_model=TaskPublic)
@@ -137,8 +167,7 @@ def read_task(
     """
     Retrieve a single task.
     """
-    task = _get_owned_task(session, current_user, task_id)
-    return _public(task, crud.get_task_project_id(session=session, task=task))
+    return _read(session, _get_owned_task(session, current_user, task_id))
 
 
 @router.patch("/{task_id}", response_model=TaskPublic)
@@ -201,7 +230,15 @@ def update_task(
             crud.complete_subtasks(session=session, task=task)
 
     task = crud.update_task(session=session, db_task=task, task_in=task_in)
-    return _public(task, project_id)
+
+    if task_in.tags is not None:
+        crud.set_task_tags(session=session, task=task, names=_unique(task_in.tags))
+
+    return _public(
+        task,
+        project_id=project_id,
+        tags=crud.get_task_tags(session=session, task_ids=[task.id])[task.id],
+    )
 
 
 @router.delete("/{task_id}")
