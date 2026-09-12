@@ -41,7 +41,14 @@ def get_current_user(session: SessionDep, token: TokenDep) -> User:
         )
     user = session.get(User, token_data.sub)
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        # A token can outlive the account it names — the user was recreated
+        # with a new id, or removed. That is a credentials problem, not a
+        # missing resource: 401 lets the frontend's existing "clear the token
+        # and go to /login" handling recover on its own, rather than getting
+        # stuck replaying a 404 against every authenticated request.
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found"
+        )
     if not user.is_active:
         raise HTTPException(status_code=400, detail="Inactive user")
     return user
