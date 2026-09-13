@@ -3,6 +3,8 @@
 .vscode/
 node_modules/
 backend/app/frontend/
+# Default local attachment storage backend (ADR-0002); relative to backend/.
+backend/data/
 /test-results/
 /playwright-report/
 /blob-report/

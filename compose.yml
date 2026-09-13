@@ -63,6 +63,9 @@ services:
       EMAILS_FROM_EMAIL: ${EMAILS_FROM_EMAIL}
       DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:?Variable not set}@db:5432/app
       SENTRY_DSN: ${SENTRY_DSN:-}
+      ATTACHMENTS_DIR: /data/attachments
+    volumes:
+      - attachments-data:/data/attachments
 
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/utils/health-check/"]
@@ -86,3 +89,4 @@ services:
 
 volumes:
   app-db-data:
+  attachments-data:

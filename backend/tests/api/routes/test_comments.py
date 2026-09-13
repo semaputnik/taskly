@@ -31,9 +31,7 @@ def _create_task(
     return r.json()
 
 
-def _add_comment(
-    client: TestClient, headers: dict[str, str], task_id: str, body: str
-):
+def _add_comment(client: TestClient, headers: dict[str, str], task_id: str, body: str):
     return client.post(
         f"{settings.API_V1_STR}/tasks/{task_id}/comments/",
         headers=headers,

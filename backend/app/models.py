@@ -4,7 +4,7 @@ from enum import StrEnum
 from typing import Annotated
 
 from pydantic import EmailStr, StringConstraints, model_validator
-from sqlalchemy import CheckConstraint, DateTime, UniqueConstraint
+from sqlalchemy import BigInteger, CheckConstraint, DateTime, UniqueConstraint
 from sqlmodel import Field, SQLModel
 
 
@@ -437,6 +437,50 @@ class CommentPublic(CommentBase):
 
 class CommentsPublic(SQLModel):
     data: list[CommentPublic]
+    count: int
+
+
+class AttachmentBase(SQLModel):
+    filename: str = Field(max_length=255)
+    content_type: str = Field(max_length=255)
+    # A plain Integer caps out at 2 GiB, well within reach once
+    # ATTACHMENT_MAX_SIZE_BYTES is raised for a deployment that wants larger
+    # files.
+    size: int = Field(sa_type=BigInteger)
+
+
+class Attachment(AttachmentBase, table=True):
+    """
+    A file attached to a task (FR-04.1). Only the metadata lives here; the
+    bytes sit behind the storage interface (ADR-0002), keyed by this row's
+    id, so nothing here assumes where or how they are actually stored.
+
+    Deleting the task this points at only soft-deletes the task (FR-01.8):
+    this row and the bytes it names are left alone, so a restored task comes
+    back with its files.
+    """
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    task_id: uuid.UUID = Field(
+        foreign_key="task.id", nullable=False, ondelete="CASCADE", index=True
+    )
+    owner_id: uuid.UUID = Field(
+        foreign_key="user.id", nullable=False, ondelete="CASCADE"
+    )
+    created_at: datetime | None = Field(
+        default_factory=get_datetime_utc,
+        sa_type=DateTime(timezone=True),  # type: ignore
+    )
+
+
+class AttachmentPublic(AttachmentBase):
+    id: uuid.UUID
+    task_id: uuid.UUID
+    created_at: datetime | None = None
+
+
+class AttachmentsPublic(SQLModel):
+    data: list[AttachmentPublic]
     count: int
 
 

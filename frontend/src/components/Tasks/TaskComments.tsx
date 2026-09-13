@@ -36,7 +36,7 @@ const TaskComments = ({ task, onSuccess }: TaskCommentsProps) => {
 
   const queryKey = ["comments", task.id]
 
-  const { data: comments } = useQuery({
+  const { data: comments, isLoading } = useQuery({
     queryKey,
     queryFn: async () =>
       (await CommentsService.readComments({ path: { task_id: task.id } })).data,
@@ -100,7 +100,9 @@ const TaskComments = ({ task, onSuccess }: TaskCommentsProps) => {
         </DialogHeader>
 
         <div className="flex max-h-80 flex-col gap-3 overflow-y-auto">
-          {comments?.data.length ? (
+          {isLoading ? (
+            <p className="text-muted-foreground text-sm italic">Loading…</p>
+          ) : comments?.data.length ? (
             comments.data.map((comment) => (
               <div key={comment.id} className="rounded-md border p-3 text-sm">
                 {editingId === comment.id ? (
