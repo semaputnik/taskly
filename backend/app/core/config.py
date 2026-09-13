@@ -32,6 +32,12 @@ class Settings(BaseSettings):
     # Database used by backend/scripts/test.sh, on the same server as DATABASE_URL
     TEST_DB_NAME: str = "app_test"
 
+    # Where the default local attachment storage backend keeps files (ADR-0002).
+    ATTACHMENTS_DIR: str = "data/attachments"
+    # Read by the upload endpoint rather than hard-coded, so the limit can be
+    # tuned per deployment without a code change (FR-04.2).
+    ATTACHMENT_MAX_SIZE_BYTES: int = 25 * 1024 * 1024
+
     @field_validator("DATABASE_URL", mode="before")
     @classmethod
     def _use_psycopg_driver(cls, value: str | PostgresDsn) -> str:

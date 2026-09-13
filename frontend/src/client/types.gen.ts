@@ -5,6 +5,60 @@ export type ClientOptions = {
 };
 
 /**
+ * AttachmentPublic
+ */
+export type AttachmentPublic = {
+    /**
+     * Filename
+     */
+    filename: string;
+    /**
+     * Content Type
+     */
+    content_type: string;
+    /**
+     * Size
+     */
+    size: number;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Task Id
+     */
+    task_id: string;
+    /**
+     * Created At
+     */
+    created_at?: string | null;
+};
+
+/**
+ * AttachmentsPublic
+ */
+export type AttachmentsPublic = {
+    /**
+     * Data
+     */
+    data: Array<AttachmentPublic>;
+    /**
+     * Count
+     */
+    count: number;
+};
+
+/**
+ * Body_attachments-upload_attachment
+ */
+export type Body_attachments_upload_attachment = {
+    /**
+     * File
+     */
+    file: Blob | File;
+};
+
+/**
  * Body_login-login_access_token
  */
 export type Body_login_login_access_token = {
@@ -1399,6 +1453,124 @@ export type commentsUpdateCommentResponses = {
 };
 
 export type commentsUpdateCommentResponse = commentsUpdateCommentResponses[keyof commentsUpdateCommentResponses];
+
+export type attachmentsReadAttachmentsData = {
+    body?: never;
+    path: {
+        /**
+         * Task Id
+         */
+        task_id: string;
+    };
+    query?: never;
+    url: '/api/v1/tasks/{task_id}/attachments/';
+};
+
+export type attachmentsReadAttachmentsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type attachmentsReadAttachmentsError = attachmentsReadAttachmentsErrors[keyof attachmentsReadAttachmentsErrors];
+
+export type attachmentsReadAttachmentsResponses = {
+    /**
+     * Successful Response
+     */
+    200: AttachmentsPublic;
+};
+
+export type attachmentsReadAttachmentsResponse = attachmentsReadAttachmentsResponses[keyof attachmentsReadAttachmentsResponses];
+
+export type attachmentsUploadAttachmentData = {
+    body: Body_attachments_upload_attachment;
+    path: {
+        /**
+         * Task Id
+         */
+        task_id: string;
+    };
+    query?: never;
+    url: '/api/v1/tasks/{task_id}/attachments/';
+};
+
+export type attachmentsUploadAttachmentErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type attachmentsUploadAttachmentError = attachmentsUploadAttachmentErrors[keyof attachmentsUploadAttachmentErrors];
+
+export type attachmentsUploadAttachmentResponses = {
+    /**
+     * Successful Response
+     */
+    200: AttachmentPublic;
+};
+
+export type attachmentsUploadAttachmentResponse = attachmentsUploadAttachmentResponses[keyof attachmentsUploadAttachmentResponses];
+
+export type attachmentsDeleteAttachmentData = {
+    body?: never;
+    path: {
+        /**
+         * Attachment Id
+         */
+        attachment_id: string;
+    };
+    query?: never;
+    url: '/api/v1/attachments/{attachment_id}';
+};
+
+export type attachmentsDeleteAttachmentErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type attachmentsDeleteAttachmentError = attachmentsDeleteAttachmentErrors[keyof attachmentsDeleteAttachmentErrors];
+
+export type attachmentsDeleteAttachmentResponses = {
+    /**
+     * Successful Response
+     */
+    200: Message;
+};
+
+export type attachmentsDeleteAttachmentResponse = attachmentsDeleteAttachmentResponses[keyof attachmentsDeleteAttachmentResponses];
+
+export type attachmentsDownloadAttachmentData = {
+    body?: never;
+    path: {
+        /**
+         * Attachment Id
+         */
+        attachment_id: string;
+    };
+    query?: never;
+    url: '/api/v1/attachments/{attachment_id}';
+};
+
+export type attachmentsDownloadAttachmentErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type attachmentsDownloadAttachmentError = attachmentsDownloadAttachmentErrors[keyof attachmentsDownloadAttachmentErrors];
+
+export type attachmentsDownloadAttachmentResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
 
 export type tagsReadTagsData = {
     body?: never;

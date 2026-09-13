@@ -1,5 +1,7 @@
 import uuid
 from collections.abc import Generator
+from functools import lru_cache
+from pathlib import Path
 from typing import Annotated
 
 import jwt
@@ -12,7 +14,8 @@ from sqlmodel import Session
 from app.core import security
 from app.core.config import settings
 from app.core.db import engine
-from app.models import Comment, Project, Task, TokenPayload, User
+from app.core.storage import AttachmentStorage, LocalAttachmentStorage
+from app.models import Attachment, Comment, Project, Task, TokenPayload, User
 
 reusable_oauth2 = OAuth2PasswordBearer(
     tokenUrl=f"{settings.API_V1_STR}/login/access-token"
@@ -88,15 +91,45 @@ def get_owned_task(
     return task
 
 
+def _require_task_visible(session: Session, task_id: uuid.UUID, detail: str) -> None:
+    """
+    A row that hangs off a task (a comment, an attachment) is only visible
+    while its task is: once the task is soft-deleted, reading the row through
+    the task is refused (`get_owned_task`), so reaching it directly has to be
+    refused the same way.
+    """
+    task = session.get(Task, task_id)
+    if not task or task.deletion_id is not None:
+        raise HTTPException(status_code=404, detail=detail)
+
+
 def get_owned_comment(
     session: SessionDep, current_user: CurrentUser, comment_id: uuid.UUID
 ) -> Comment:
     comment = session.get(Comment, comment_id)
     if not comment or comment.owner_id != current_user.id:
         raise HTTPException(status_code=404, detail="Comment not found")
-    # A comment on a task that has since been deleted is invisible along with
-    # it, the same as reading the thread through the task would be.
-    task = session.get(Task, comment.task_id)
-    if not task or task.deletion_id is not None:
-        raise HTTPException(status_code=404, detail="Comment not found")
+    _require_task_visible(session, comment.task_id, "Comment not found")
     return comment
+
+
+def get_owned_attachment(
+    session: SessionDep, current_user: CurrentUser, attachment_id: uuid.UUID
+) -> Attachment:
+    attachment = session.get(Attachment, attachment_id)
+    if not attachment or attachment.owner_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Attachment not found")
+    _require_task_visible(session, attachment.task_id, "Attachment not found")
+    return attachment
+
+
+@lru_cache
+def _local_attachment_storage() -> LocalAttachmentStorage:
+    return LocalAttachmentStorage(Path(settings.ATTACHMENTS_DIR))
+
+
+def get_attachment_storage() -> AttachmentStorage:
+    return _local_attachment_storage()
+
+
+AttachmentStorageDep = Annotated[AttachmentStorage, Depends(get_attachment_storage)]

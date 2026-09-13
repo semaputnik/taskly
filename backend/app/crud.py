@@ -9,6 +9,7 @@ from sqlmodel import Session, col, func, select
 
 from app.core.security import get_password_hash, verify_password
 from app.models import (
+    Attachment,
     Comment,
     CommentCreate,
     CommentUpdate,
@@ -587,6 +588,58 @@ def update_comment(
 
 def delete_comment(*, session: Session, comment: Comment) -> None:
     session.delete(comment)
+    session.commit()
+
+
+def create_attachment(
+    *,
+    session: Session,
+    task_id: uuid.UUID,
+    owner_id: uuid.UUID,
+    filename: str,
+    content_type: str,
+    size: int,
+) -> Attachment:
+    db_obj = Attachment(
+        task_id=task_id,
+        owner_id=owner_id,
+        filename=filename,
+        content_type=content_type,
+        size=size,
+    )
+    session.add(db_obj)
+    session.commit()
+    session.refresh(db_obj)
+    return db_obj
+
+
+def get_attachments(
+    *, session: Session, task_id: uuid.UUID
+) -> tuple[Sequence[Attachment], int]:
+    statement = (
+        select(Attachment)
+        .where(Attachment.task_id == task_id)
+        .order_by(col(Attachment.created_at))
+    )
+    attachments = session.exec(statement).all()
+    return attachments, len(attachments)
+
+
+def get_owner_attachment_ids(
+    *, session: Session, owner_id: uuid.UUID
+) -> Sequence[uuid.UUID]:
+    """
+    Every attachment id a user owns, so their bytes can be released from
+    storage before the account's rows are gone — deleting the user cascades
+    at the database level (FK `ondelete=CASCADE`), which drops these rows
+    without ever calling into the storage backend.
+    """
+    statement = select(Attachment.id).where(Attachment.owner_id == owner_id)
+    return session.exec(statement).all()
+
+
+def delete_attachment(*, session: Session, attachment: Attachment) -> None:
+    session.delete(attachment)
     session.commit()
 
 

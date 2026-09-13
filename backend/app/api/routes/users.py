@@ -6,6 +6,7 @@ from sqlmodel import col, func, select
 
 from app import crud
 from app.api.deps import (
+    AttachmentStorageDep,
     CurrentUser,
     SessionDep,
     get_current_active_superuser,
@@ -129,7 +130,9 @@ def read_user_me(current_user: CurrentUser) -> Any:
 
 
 @router.delete("/me", response_model=Message)
-def delete_user_me(session: SessionDep, current_user: CurrentUser) -> Any:
+def delete_user_me(
+    session: SessionDep, current_user: CurrentUser, storage: AttachmentStorageDep
+) -> Any:
     """
     Delete own user.
     """
@@ -137,6 +140,12 @@ def delete_user_me(session: SessionDep, current_user: CurrentUser) -> Any:
         raise HTTPException(
             status_code=403, detail="Super users are not allowed to delete themselves"
         )
+    # The user's attachment rows are gone the instant the account cascades;
+    # their bytes only go if released here first.
+    for attachment_id in crud.get_owner_attachment_ids(
+        session=session, owner_id=current_user.id
+    ):
+        storage.delete(str(attachment_id))
     session.delete(current_user)
     session.commit()
     return Message(message="User deleted successfully")
@@ -212,7 +221,10 @@ def update_user(
 
 @router.delete("/{user_id}", dependencies=[Depends(get_current_active_superuser)])
 def delete_user(
-    session: SessionDep, current_user: CurrentUser, user_id: uuid.UUID
+    session: SessionDep,
+    current_user: CurrentUser,
+    storage: AttachmentStorageDep,
+    user_id: uuid.UUID,
 ) -> Message:
     """
     Delete a user.
@@ -224,6 +236,12 @@ def delete_user(
         raise HTTPException(
             status_code=403, detail="Super users are not allowed to delete themselves"
         )
+    # The user's attachment rows are gone the instant the account cascades;
+    # their bytes only go if released here first.
+    for attachment_id in crud.get_owner_attachment_ids(
+        session=session, owner_id=user.id
+    ):
+        storage.delete(str(attachment_id))
     session.delete(user)
     session.commit()
     return Message(message="User deleted successfully")
