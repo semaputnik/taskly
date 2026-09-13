@@ -4,7 +4,7 @@ from typing import Annotated, Any
 from fastapi import APIRouter, HTTPException, Query
 
 from app import crud
-from app.api.deps import CurrentUser, SessionDep, get_owned_project
+from app.api.deps import CurrentUser, SessionDep, get_owned_project, get_owned_task
 from app.models import (
     Message,
     SubtaskCompletion,
@@ -28,15 +28,6 @@ UNCOMPLETED_SUBTASKS_CODE = "task_has_uncompleted_subtasks"
 # it: the request has to confirm the cascade before anything goes (FR-01.12).
 HAS_SUBTASKS_STATUS = 409
 HAS_SUBTASKS_CODE = "task_has_subtasks"
-
-
-def _get_owned_task(
-    session: SessionDep, current_user: CurrentUser, task_id: uuid.UUID
-) -> Task:
-    task = session.get(Task, task_id)
-    if not task or task.owner_id != current_user.id or task.deletion_id is not None:
-        raise HTTPException(status_code=404, detail="Task not found")
-    return task
 
 
 def _unique(names: list[str]) -> list[str]:
@@ -116,7 +107,7 @@ def create_task(
     if task_in.parent_id is not None:
         # Checks the parent is the user's and still there; the subtask's own
         # project is then derived from it.
-        _get_owned_task(session, current_user, task_in.parent_id)
+        get_owned_task(session, current_user, task_in.parent_id)
         if task_in.project_id is not None:
             raise HTTPException(
                 status_code=400,
@@ -153,7 +144,7 @@ def read_task(
     """
     Retrieve a single task.
     """
-    return _read(session, _get_owned_task(session, current_user, task_id))
+    return _read(session, get_owned_task(session, current_user, task_id))
 
 
 @router.patch("/{task_id}", response_model=TaskPublic)
@@ -170,7 +161,7 @@ def update_task(
     Completing a task that still has uncompleted subtasks is refused unless the
     request says what happens to them, through `subtasks`.
     """
-    task = _get_owned_task(session, current_user, task_id)
+    task = get_owned_task(session, current_user, task_id)
     project_id = crud.get_task_project_id(session=session, task=task)
 
     if "project_id" in task_in.model_fields_set:
@@ -243,7 +234,7 @@ def delete_task(
     take down far more than the task named here, a task that still has subtasks
     is only deleted when `delete_subtasks` says so (FR-01.11, FR-01.12).
     """
-    task = _get_owned_task(session, current_user, task_id)
+    task = get_owned_task(session, current_user, task_id)
 
     if not delete_subtasks and crud.has_subtasks(session=session, task=task):
         raise HTTPException(

@@ -12,7 +12,7 @@ from sqlmodel import Session
 from app.core import security
 from app.core.config import settings
 from app.core.db import engine
-from app.models import Project, TokenPayload, User
+from app.models import Comment, Project, Task, TokenPayload, User
 
 reusable_oauth2 = OAuth2PasswordBearer(
     tokenUrl=f"{settings.API_V1_STR}/login/access-token"
@@ -77,3 +77,26 @@ def get_owned_project(
     ):
         raise HTTPException(status_code=404, detail="Project not found")
     return project
+
+
+def get_owned_task(
+    session: SessionDep, current_user: CurrentUser, task_id: uuid.UUID
+) -> Task:
+    task = session.get(Task, task_id)
+    if not task or task.owner_id != current_user.id or task.deletion_id is not None:
+        raise HTTPException(status_code=404, detail="Task not found")
+    return task
+
+
+def get_owned_comment(
+    session: SessionDep, current_user: CurrentUser, comment_id: uuid.UUID
+) -> Comment:
+    comment = session.get(Comment, comment_id)
+    if not comment or comment.owner_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Comment not found")
+    # A comment on a task that has since been deleted is invisible along with
+    # it, the same as reading the thread through the task would be.
+    task = session.get(Task, comment.task_id)
+    if not task or task.deletion_id is not None:
+        raise HTTPException(status_code=404, detail="Comment not found")
+    return comment

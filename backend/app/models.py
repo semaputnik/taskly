@@ -387,6 +387,59 @@ class TasksPublic(SQLModel):
     count: int
 
 
+# A comment's text as it arrives from a client: trimmed first, and never
+# blank, so a running note always has something to say.
+CommentBody = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=10000)
+]
+
+
+class CommentBase(SQLModel):
+    body: str = Field(max_length=10000)
+
+
+class CommentCreate(SQLModel):
+    body: CommentBody
+
+
+class CommentUpdate(SQLModel):
+    body: CommentBody
+
+
+class Comment(CommentBase, table=True):
+    """
+    A note on a task's thread, read oldest-first so the history reads as a
+    narrative (FR-03.1) — also the channel a bot user will report back
+    through once it can write here (semaputnik/taskly#7).
+
+    A comment carries no attachment relation of its own (FR-03.3): the schema
+    simply offers none, rather than a validation rule turning one away.
+    """
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    task_id: uuid.UUID = Field(
+        foreign_key="task.id", nullable=False, ondelete="CASCADE", index=True
+    )
+    owner_id: uuid.UUID = Field(
+        foreign_key="user.id", nullable=False, ondelete="CASCADE"
+    )
+    created_at: datetime | None = Field(
+        default_factory=get_datetime_utc,
+        sa_type=DateTime(timezone=True),  # type: ignore
+    )
+
+
+class CommentPublic(CommentBase):
+    id: uuid.UUID
+    task_id: uuid.UUID
+    created_at: datetime | None = None
+
+
+class CommentsPublic(SQLModel):
+    data: list[CommentPublic]
+    count: int
+
+
 # Generic message
 class Message(SQLModel):
     message: str
