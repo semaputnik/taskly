@@ -16,8 +16,14 @@ from fastapi import HTTPException
 from sqlmodel import Session
 
 from app import crud
-from app.api.deps import PROJECT_ARCHIVED_CODE, Caller, get_project_of, get_task_of
-from app.models import BotUser, Project, Task
+from app.api.deps import (
+    PROJECT_ARCHIVED_CODE,
+    Caller,
+    get_project_of,
+    get_task_of,
+    require_task_visible,
+)
+from app.models import Attachment, Project, Task
 
 # A bot refused by its scope gets a client error of its own, distinct from the
 # 404 for something that does not exist, so whoever wrote the integration can
@@ -34,16 +40,20 @@ class TaskAction(StrEnum):
     READ = "read"
     UPDATE = "update"
     DELETE = "delete"
+    # Its own permission rather than a kind of update, so a bot can report on
+    # a task without being able to change it (FR-08.10).
+    COMMENT = "comment"
 
 
-def _granted(bot: BotUser, action: TaskAction) -> bool:
-    grants = {
-        TaskAction.CREATE: bot.create_tasks,
-        TaskAction.READ: bot.read_tasks,
-        TaskAction.UPDATE: bot.update_tasks,
-        TaskAction.DELETE: bot.delete_tasks,
-    }
-    return grants[action]
+# The permission each action needs, as `BotPermissions` names it, and how a
+# refusal says what was not allowed.
+_PERMISSIONS = {
+    TaskAction.CREATE: ("create_tasks", "create tasks"),
+    TaskAction.READ: ("read_tasks", "read tasks"),
+    TaskAction.UPDATE: ("update_tasks", "update tasks"),
+    TaskAction.DELETE: ("delete_tasks", "delete tasks"),
+    TaskAction.COMMENT: ("add_comments", "add comments"),
+}
 
 
 def _refuse(code: str, message: str, **extra: Any) -> HTTPException:
@@ -91,11 +101,12 @@ def authorize_tasks(
                 f"The project “{project.name}” is not in this bot user's scope.",
                 project_id=str(project.id),
             )
-    if not _granted(bot, action):
+    permission, doing = _PERMISSIONS[action]
+    if not getattr(bot, permission):
         raise _refuse(
             PERMISSION_NOT_GRANTED_CODE,
-            f"This bot user is not allowed to {action} tasks.",
-            permission=f"{action}_tasks",
+            f"This bot user is not allowed to {doing}.",
+            permission=permission,
         )
 
 
@@ -143,3 +154,19 @@ def get_task(
     )
     authorize_tasks(caller, action, project)
     return task
+
+
+def get_attachment(
+    session: Session, caller: Caller, attachment_id: uuid.UUID, action: TaskAction
+) -> Attachment:
+    """
+    An attachment of the caller's, for `action` on the task it is on: a bot
+    downloads what it can read and adds or removes what it can update
+    (FR-08.11).
+    """
+    attachment = session.get(Attachment, attachment_id)
+    if not attachment or attachment.owner_id != caller.owner_id:
+        raise HTTPException(status_code=404, detail="Attachment not found")
+    require_task_visible(session, attachment.task_id, "Attachment not found")
+    get_task(session, caller, attachment.task_id, action)
+    return attachment

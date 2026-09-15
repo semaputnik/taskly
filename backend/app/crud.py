@@ -1,6 +1,6 @@
 import calendar
 import uuid
-from collections.abc import Collection, Sequence
+from collections.abc import Collection, Iterable, Sequence
 from datetime import UTC, date, datetime, timedelta
 from typing import Any, NamedTuple
 
@@ -15,11 +15,11 @@ from app.core.security import (
     verify_password,
 )
 from app.models import (
-    AssigneeBotUser,
     Attachment,
     BotUser,
     BotUserCreate,
     BotUserProject,
+    BotUserRef,
     Comment,
     CommentCreate,
     CommentUpdate,
@@ -964,9 +964,15 @@ def create_comment(
     comment_create: CommentCreate,
     task_id: uuid.UUID,
     owner_id: uuid.UUID,
+    author_bot_user_id: uuid.UUID | None = None,
 ) -> Comment:
     db_obj = Comment.model_validate(
-        comment_create, update={"task_id": task_id, "owner_id": owner_id}
+        comment_create,
+        update={
+            "task_id": task_id,
+            "owner_id": owner_id,
+            "author_bot_user_id": author_bot_user_id,
+        },
     )
     session.add(db_obj)
     session.commit()
@@ -1128,17 +1134,15 @@ def issue_bot_token(*, session: Session, bot: BotUser) -> str:
     return token
 
 
-def get_assignee_bot_users(
-    *, session: Session, tasks: Sequence[Task]
-) -> dict[uuid.UUID, AssigneeBotUser]:
-    """The bot users the tasks are assigned to, deleted ones included, by id."""
-    bot_ids = {task.assignee_bot_user_id for task in tasks if task.assignee_bot_user_id}
-    if not bot_ids:
+def get_bot_user_refs(
+    *, session: Session, bot_user_ids: Iterable[uuid.UUID | None]
+) -> dict[uuid.UUID, BotUserRef]:
+    """Bot users as tasks and comments name them, deleted ones included, by id."""
+    ids = {bot_user_id for bot_user_id in bot_user_ids if bot_user_id}
+    if not ids:
         return {}
-    bots = session.exec(select(BotUser).where(col(BotUser.id).in_(bot_ids))).all()
+    bots = session.exec(select(BotUser).where(col(BotUser.id).in_(ids))).all()
     return {
-        bot.id: AssigneeBotUser(
-            id=bot.id, name=bot.name, deleted=bot.deleted_at is not None
-        )
+        bot.id: BotUserRef(id=bot.id, name=bot.name, deleted=bot.deleted_at is not None)
         for bot in bots
     }

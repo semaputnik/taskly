@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query"
 import { Bot } from "lucide-react"
 
-import { type AssigneeBotUser, BotsService, type TaskPublic } from "@/client"
+import { BotsService, type BotUserRef, type TaskPublic } from "@/client"
 import {
   Select,
   SelectContent,
@@ -46,7 +46,7 @@ interface AssigneeSelectProps {
    * tasks (FR-08.21) but is no longer among the bot users to pick, so it is
    * offered here, marked deleted, only to keep what the task has.
    */
-  current?: AssigneeBotUser | null
+  current?: BotUserRef | null
 }
 
 /** Who a task can be assigned to: the user or one of their bot users. */

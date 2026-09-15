@@ -513,10 +513,11 @@ class Task(TaskBase, table=True):
     )
 
 
-class AssigneeBotUser(SQLModel):
+class BotUserRef(SQLModel):
     """
-    The bot user a task is assigned to, as a task reports it. A deleted bot
-    user stays the assignee of what it was given (FR-08.21), marked deleted.
+    A bot user as a task or comment names it: the one it is assigned to, or
+    the one that wrote it. A deleted bot user stays on what it was given and
+    what it wrote (FR-08.19, FR-08.21), marked deleted.
     """
 
     id: uuid.UUID
@@ -535,7 +536,7 @@ class TaskPublic(TaskBase):
     # Whoever the task is assigned to: the owner, or a bot user. When it is a
     # bot user, `assignee_bot_user` says which, and whether it is deleted.
     assignee_id: uuid.UUID | None = None
-    assignee_bot_user: AssigneeBotUser | None = None
+    assignee_bot_user: BotUserRef | None = None
     recurrence: Recurrence | None = None
     created_at: datetime | None = None
 
@@ -567,8 +568,7 @@ class CommentUpdate(SQLModel):
 class Comment(CommentBase, table=True):
     """
     A note on a task's thread, read oldest-first so the history reads as a
-    narrative (FR-03.1) — also the channel a bot user will report back
-    through once it can write here (semaputnik/taskly#7).
+    narrative (FR-03.1) — also the channel a bot user reports back through.
 
     A comment carries no attachment relation of its own (FR-03.3): the schema
     simply offers none, rather than a validation rule turning one away.
@@ -578,8 +578,13 @@ class Comment(CommentBase, table=True):
     task_id: uuid.UUID = Field(
         foreign_key="task.id", nullable=False, ondelete="CASCADE", index=True
     )
+    # The user whose task this is. A comment written by one of their bot users
+    # still belongs to them; `author_bot_user_id` then says which bot wrote it.
     owner_id: uuid.UUID = Field(
         foreign_key="user.id", nullable=False, ondelete="CASCADE"
+    )
+    author_bot_user_id: uuid.UUID | None = Field(
+        default=None, foreign_key="botuser.id", nullable=True, ondelete="CASCADE"
     )
     created_at: datetime | None = Field(
         default_factory=get_datetime_utc,
@@ -590,6 +595,8 @@ class Comment(CommentBase, table=True):
 class CommentPublic(CommentBase):
     id: uuid.UUID
     task_id: uuid.UUID
+    # Set when a bot user wrote the comment; None means the user did.
+    author_bot_user: BotUserRef | None = None
     created_at: datetime | None = None
 
 

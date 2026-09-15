@@ -85,27 +85,6 @@ export type ActivityEntryPublic = {
 };
 
 /**
- * AssigneeBotUser
- *
- * The bot user a task is assigned to, as a task reports it. A deleted bot
- * user stays the assignee of what it was given (FR-08.21), marked deleted.
- */
-export type AssigneeBotUser = {
-    /**
-     * Id
-     */
-    id: string;
-    /**
-     * Name
-     */
-    name: string;
-    /**
-     * Deleted
-     */
-    deleted: boolean;
-};
-
-/**
  * AttachmentPublic
  */
 export type AttachmentPublic = {
@@ -296,6 +275,28 @@ export type BotUserPublic = {
 };
 
 /**
+ * BotUserRef
+ *
+ * A bot user as a task or comment names it: the one it is assigned to, or
+ * the one that wrote it. A deleted bot user stays on what it was given and
+ * what it wrote (FR-08.19, FR-08.21), marked deleted.
+ */
+export type BotUserRef = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Deleted
+     */
+    deleted: boolean;
+};
+
+/**
  * BotUsersPublic
  */
 export type BotUsersPublic = {
@@ -335,6 +336,7 @@ export type CommentPublic = {
      * Task Id
      */
     task_id: string;
+    author_bot_user?: BotUserRef | null;
     /**
      * Created At
      */
@@ -649,7 +651,7 @@ export type TaskPublic = {
      * Assignee Id
      */
     assignee_id?: string | null;
-    assignee_bot_user?: AssigneeBotUser | null;
+    assignee_bot_user?: BotUserRef | null;
     recurrence?: Recurrence | null;
     /**
      * Created At

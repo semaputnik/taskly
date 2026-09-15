@@ -161,6 +161,12 @@ BOT_REACHABLE = {
     f"PATCH {API}/tasks/{{task_id}}",
     f"DELETE {API}/tasks/{{task_id}}",
     f"GET {API}/projects/",
+    f"GET {API}/tasks/{{task_id}}/comments/",
+    f"POST {API}/tasks/{{task_id}}/comments/",
+    f"GET {API}/tasks/{{task_id}}/attachments/",
+    f"POST {API}/tasks/{{task_id}}/attachments/",
+    f"GET {API}/attachments/{{attachment_id}}",
+    f"DELETE {API}/attachments/{{attachment_id}}",
 }
 
 

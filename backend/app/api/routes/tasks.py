@@ -15,8 +15,8 @@ from app.api.deps import (
     require_task_writable,
 )
 from app.models import (
-    AssigneeBotUser,
     BotUser,
+    BotUserRef,
     Message,
     Recurrence,
     SubtaskCompletion,
@@ -118,7 +118,7 @@ def _public(
     project_id: uuid.UUID,
     tags: list[str],
     recurrence: Recurrence | None,
-    bot_users: dict[uuid.UUID, AssigneeBotUser],
+    bot_users: dict[uuid.UUID, BotUserRef],
 ) -> TaskPublic:
     """
     A task as the API reports it, with the project it resolves to, its tags,
@@ -146,7 +146,9 @@ def _read(session: SessionDep, task: Task) -> TaskPublic:
         project_id=crud.get_task_project_id(session=session, task=task),
         tags=crud.get_task_tags(session=session, task_ids=[task.id])[task.id],
         recurrence=crud.get_recurrences(session=session, tasks=[task])[task.id],
-        bot_users=crud.get_assignee_bot_users(session=session, tasks=[task]),
+        bot_users=crud.get_bot_user_refs(
+            session=session, bot_user_ids=[task.assignee_bot_user_id]
+        ),
     )
 
 
@@ -181,7 +183,9 @@ def read_tasks(
     project_ids = crud.get_task_project_ids(session=session, owner_id=caller.owner_id)
     tags = crud.get_task_tags(session=session, task_ids=[task.id for task in tasks])
     recurrences = crud.get_recurrences(session=session, tasks=tasks)
-    bot_users = crud.get_assignee_bot_users(session=session, tasks=tasks)
+    bot_users = crud.get_bot_user_refs(
+        session=session, bot_user_ids=[task.assignee_bot_user_id for task in tasks]
+    )
     return TasksPublic(
         data=[
             _public(
@@ -359,7 +363,9 @@ def update_task(
         project_id=project_id,
         tags=crud.get_task_tags(session=session, task_ids=[task.id])[task.id],
         recurrence=crud.get_recurrences(session=session, tasks=[task])[task.id],
-        bot_users=crud.get_assignee_bot_users(session=session, tasks=[task]),
+        bot_users=crud.get_bot_user_refs(
+            session=session, bot_user_ids=[task.assignee_bot_user_id]
+        ),
     )
 
 

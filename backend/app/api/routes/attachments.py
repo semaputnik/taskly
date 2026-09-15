@@ -6,12 +6,12 @@ from fastapi import APIRouter, HTTPException, UploadFile
 from fastapi.responses import Response
 
 from app import crud
+from app.api import authorization
+from app.api.authorization import TaskAction
 from app.api.deps import (
     AttachmentStorageDep,
-    CurrentUser,
+    CallerDep,
     SessionDep,
-    get_owned_attachment,
-    get_owned_task,
     require_task_writable,
 )
 from app.core.config import settings
@@ -80,12 +80,13 @@ def _safe_media_type(content_type: str) -> str:
 
 @router.get("/tasks/{task_id}/attachments/", response_model=AttachmentsPublic)
 def read_attachments(
-    *, session: SessionDep, current_user: CurrentUser, task_id: uuid.UUID
+    *, session: SessionDep, caller: CallerDep, task_id: uuid.UUID
 ) -> Any:
     """
-    Retrieve a task's attachments (FR-04.1).
+    Retrieve a task's attachments (FR-04.1). A bot user lists them wherever it
+    can read the task (FR-08.11).
     """
-    get_owned_task(session, current_user, task_id)
+    authorization.get_task(session, caller, task_id, TaskAction.READ)
     attachments, count = crud.get_attachments(session=session, task_id=task_id)
     return AttachmentsPublic(data=attachments, count=count)
 
@@ -94,7 +95,7 @@ def read_attachments(
 def upload_attachment(
     *,
     session: SessionDep,
-    current_user: CurrentUser,
+    caller: CallerDep,
     storage: AttachmentStorageDep,
     task_id: uuid.UUID,
     file: UploadFile,
@@ -103,8 +104,10 @@ def upload_attachment(
     Attach a file to a task, including a subtask (FR-04.1). No file type is
     turned away and a task can carry any number of attachments — only the
     configured size limit is enforced (FR-04.2).
+
+    A bot user adds attachments wherever it can update the task (FR-08.11).
     """
-    get_owned_task(session, current_user, task_id)
+    authorization.get_task(session, caller, task_id, TaskAction.UPDATE)
     require_task_writable(session, task_id)
 
     # Checked against Starlette's own accounting first so an oversized upload
@@ -116,7 +119,7 @@ def upload_attachment(
     attachment = crud.create_attachment(
         session=session,
         task_id=task_id,
-        owner_id=current_user.id,
+        owner_id=caller.owner_id,
         filename=(file.filename or "unnamed")[:255],
         content_type=(file.content_type or "application/octet-stream")[:255],
         size=len(data),
@@ -132,14 +135,17 @@ def upload_attachment(
 def download_attachment(
     *,
     session: SessionDep,
-    current_user: CurrentUser,
+    caller: CallerDep,
     storage: AttachmentStorageDep,
     attachment_id: uuid.UUID,
 ) -> Response:
     """
-    Download an attachment's exact bytes.
+    Download an attachment's exact bytes. A bot user downloads wherever it can
+    read the task (FR-08.11).
     """
-    attachment = get_owned_attachment(session, current_user, attachment_id)
+    attachment = authorization.get_attachment(
+        session, caller, attachment_id, TaskAction.READ
+    )
     try:
         data = storage.get(str(attachment.id))
     except FileNotFoundError:
@@ -158,14 +164,17 @@ def download_attachment(
 def delete_attachment(
     *,
     session: SessionDep,
-    current_user: CurrentUser,
+    caller: CallerDep,
     storage: AttachmentStorageDep,
     attachment_id: uuid.UUID,
 ) -> Message:
     """
-    Delete an attachment and release its bytes from storage.
+    Delete an attachment and release its bytes from storage. A bot user
+    deletes wherever it can update the task (FR-08.11).
     """
-    attachment = get_owned_attachment(session, current_user, attachment_id)
+    attachment = authorization.get_attachment(
+        session, caller, attachment_id, TaskAction.UPDATE
+    )
     require_task_writable(session, attachment.task_id)
     # The bytes go first: if that fails, the row is still there to retry
     # against. The other way round, a failure after the row is gone would
