@@ -784,6 +784,51 @@ def delete_project(*, session: Session, project: Project) -> None:
     session.commit()
 
 
+def get_deletion_rows(*, session: Session, deletion_id: uuid.UUID) -> Sequence[Task]:
+    """The tasks a deletion event took down that are still deleted by it."""
+    return session.exec(select(Task).where(Task.deletion_id == deletion_id)).all()
+
+
+def restoring_reopens_a_series(*, session: Session, tasks: Sequence[Task]) -> bool:
+    """
+    Whether bringing these tasks back would leave a recurring series with two
+    open occurrences (FR-01.16): one of them is open, and its series already
+    has another open occurrence that is not deleted.
+    """
+    restoring = [task.id for task in tasks]
+    for task in tasks:
+        if task.series_id is None or task.completed:
+            continue
+        statement = (
+            select(Task.id)
+            .where(
+                Task.series_id == task.series_id,
+                Task.completed == False,  # noqa: E712
+                not_deleted(Task),
+                col(Task.id).not_in(restoring),
+            )
+            .limit(1)
+        )
+        if session.exec(statement).first() is not None:
+            return True
+    return False
+
+
+def restore_deletion(*, session: Session, tasks: Sequence[Task]) -> None:
+    """
+    Bring back the rows of one deletion event (FR-10.4, FR-01.10).
+
+    Clearing the marker is the whole restore: nothing is re-created, so each
+    task comes back as itself, with its comments, attachments, tags and
+    history. Only the rows still marked by this event come back, which is what
+    leaves a subtask deleted on its own beforehand deleted.
+    """
+    for task in tasks:
+        task.deletion_id = None
+        session.add(task)
+    session.commit()
+
+
 def project_task_ids(project_id: uuid.UUID) -> Any:
     """
     Selects the ids of every task of a project that is not deleted: its root

@@ -86,6 +86,16 @@ export function ActivityDescription({
         </>
       )
     }
+    case "task_restored": {
+      const subtasks = detail<number>(entry, "subtask_count") ?? 0
+      return (
+        <>
+          Restored {task}
+          {subtasks > 0 &&
+            ` and ${subtasks} ${subtasks === 1 ? "subtask" : "subtasks"}`}
+        </>
+      )
+    }
     case "task_moved":
       return (
         <>

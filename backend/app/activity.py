@@ -119,10 +119,13 @@ def _collect(session: Session, _flush_context: Any, _instances: Any) -> None:
 
 @event.listens_for(Session, "before_commit")
 def _write(session: Session) -> None:
+    # Commit flushes only after this hook has run, too late for what it writes
+    # to be seen here, so anything still waiting is flushed first: a change
+    # committed without a flush of its own is logged like any other.
+    if session.new or session.dirty or session.deleted:
+        session.flush()
     if _PENDING_KEY not in session.info:
         return
-    # Whatever is still waiting to be flushed is part of what gets logged.
-    session.flush()
     pending: _Pending = session.info.pop(_PENDING_KEY)
 
     after = _load_states(session, list(pending.before))
@@ -131,6 +134,9 @@ def _write(session: Session) -> None:
     # attribute them to than the account they belong to.
     actor_id: uuid.UUID | None = session.info.get(_ACTOR_KEY)
     entries: list[ActivityEntry] = []
+    # Deletion events this transaction brought rows back from, each with how
+    # many of its rows came back.
+    restored: dict[uuid.UUID, int] = {}
 
     for task_id, before in pending.before.items():
         state = after.get(task_id)
@@ -138,12 +144,18 @@ def _write(session: Session) -> None:
         # event, rather than for each row the cascade took down.
         if state is None or state.deletion_id is not None:
             continue
+        # Restoring is logged the same way: once for the event, not per row.
+        if before is not None and before.deletion_id is not None:
+            restored[before.deletion_id] = restored.get(before.deletion_id, 0) + 1
         entries.extend(
             _task_entries(task_id, before, state, actor_id or state.owner_id, projects)
         )
 
     for deletion_id in pending.deletions:
         entries.append(_deletion_entry(session, deletion_id, actor_id, projects))
+
+    for deletion_id, count in restored.items():
+        entries.append(_restore_entry(session, deletion_id, count, actor_id, projects))
 
     session.add_all(entries)
 
@@ -270,6 +282,35 @@ def _deletion_entry(
                 "parent_id": task.parent_id,
                 # What a restore of this event would bring back along with it.
                 "subtask_count": len(went_down) - 1,
+            }
+        ),
+    )
+
+
+def _restore_entry(
+    session: Session,
+    deletion_id: uuid.UUID,
+    count: int,
+    actor_id: uuid.UUID | None,
+    projects: _ProjectRefs,
+) -> ActivityEntry:
+    deletion = session.get_one(Deletion, deletion_id)
+    assert deletion.task_id is not None
+    task = session.get_one(Task, deletion.task_id)
+    return ActivityEntry(
+        owner_id=deletion.owner_id,
+        actor_id=actor_id or deletion.owner_id,
+        action=ActivityAction.TASK_RESTORED,
+        entity_type=ActivityEntityType.TASK,
+        entity_id=task.id,
+        # The event it undid, so the log reads which deletion came back.
+        deletion_id=deletion.id,
+        details=to_jsonable_python(
+            {
+                "title": task.title,
+                "project": projects(task.project_id),
+                "parent_id": task.parent_id,
+                "subtask_count": count - 1,
             }
         ),
     )

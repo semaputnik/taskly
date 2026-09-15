@@ -626,6 +626,7 @@ class ActivityAction(StrEnum):
     TASK_COMPLETED = "task_completed"
     TASK_REOPENED = "task_reopened"
     TASK_DELETED = "task_deleted"
+    TASK_RESTORED = "task_restored"
     TASK_MOVED = "task_moved"
     TASK_ASSIGNED = "task_assigned"
     TASK_UNASSIGNED = "task_unassigned"
@@ -694,6 +695,9 @@ class ActivityEntryPublic(SQLModel):
     # a deleted task has nowhere to link to.
     entity_exists: bool
     entity_project_id: uuid.UUID | None = None
+    # Set on a deletion entry whose rows are still deleted: the entry a
+    # restore can be started from.
+    restorable: bool = False
 
 
 class ActivityEntriesPublic(SQLModel):

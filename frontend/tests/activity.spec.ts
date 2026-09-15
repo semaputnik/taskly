@@ -43,3 +43,47 @@ test("A user's own changes appear on the Activity page, newest first", async ({
     page.getByRole("row", { name: /Renew the passport/ }),
   ).toBeVisible()
 })
+
+test("A deleted task can be restored from the Activity page", async ({
+  page,
+}) => {
+  const email = randomEmail()
+  const password = randomPassword()
+  await createUser({ email, password })
+  await logInUser(page, email, password)
+
+  await page.goto("/tasks")
+  await page.getByRole("button", { name: "Add Task" }).click()
+  await page.getByPlaceholder("Task title").fill("Cancel the gym")
+  await page.getByRole("button", { name: "Save" }).click()
+  await expect(page.getByText("Task created successfully")).toBeVisible()
+
+  const taskRow = page.getByRole("row", { name: /Cancel the gym/ })
+  await taskRow.getByRole("button").last().click()
+  await page.getByRole("menuitem", { name: "Delete Task" }).click()
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "Delete", exact: true })
+    .click()
+  await expect(page.getByText("Task deleted successfully")).toBeVisible()
+  await expect(taskRow).toHaveCount(0)
+
+  await page.goto("/activity")
+  const deletion = page
+    .getByRole("row")
+    .filter({ hasText: "Deleted Cancel the gym" })
+  await deletion.getByRole("button", { name: "Restore" }).click()
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "Restore", exact: true })
+    .click()
+  await expect(page.getByText("“Cancel the gym” restored")).toBeVisible()
+  await expect(
+    page.getByRole("row").filter({ hasText: "Restored Cancel the gym" }),
+  ).toBeVisible()
+  // Its rows are back, so the deletion offers nothing more to restore.
+  await expect(deletion.getByRole("button", { name: "Restore" })).toHaveCount(0)
+
+  await page.goto("/tasks")
+  await expect(page.getByRole("row", { name: /Cancel the gym/ })).toBeVisible()
+})

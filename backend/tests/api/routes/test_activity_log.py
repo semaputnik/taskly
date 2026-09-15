@@ -1,6 +1,6 @@
 import pytest
 from fastapi.testclient import TestClient
-from sqlmodel import Session, select
+from sqlmodel import Session, col, select
 
 from app import activity, crud
 from app.core.config import settings
@@ -464,3 +464,32 @@ def test_a_change_made_outside_a_request_is_attributed_to_the_owner(
     ).all()
     assert entry.action == "task_created"
     assert entry.actor_id == user.id
+
+
+def test_a_change_committed_without_a_flush_of_its_own_is_logged(
+    db: Session,
+) -> None:
+    user = crud.create_user(
+        session=db,
+        user_create=UserCreate(email=random_email(), password=random_lower_string()),
+    )
+    inbox = crud.get_inbox_project(session=db, owner_id=user.id)
+    task = crud.create_task(
+        session=db,
+        task_create=TaskCreate(title="Before"),
+        project_id=inbox.id,
+        owner_id=user.id,
+    )
+
+    # Nothing flushes between the change and the commit.
+    task.title = "After"
+    db.add(task)
+    db.commit()
+
+    entries = db.exec(
+        select(ActivityEntry)
+        .where(ActivityEntry.owner_id == user.id)
+        .order_by(col(ActivityEntry.position))
+    ).all()
+    assert [entry.action for entry in entries] == ["task_created", "task_changed"]
+    assert entries[1].details["changes"] == {"title": {"from": "Before", "to": "After"}}
