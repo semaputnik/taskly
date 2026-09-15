@@ -5,7 +5,10 @@ from typing import Annotated, Any
 from fastapi import APIRouter, HTTPException, Query
 
 from app import crud
+from app.api import authorization
+from app.api.authorization import TaskAction
 from app.api.deps import (
+    CallerDep,
     CurrentUser,
     SessionDep,
     get_owned_project,
@@ -115,22 +118,32 @@ def _read(session: SessionDep, task: Task) -> TaskPublic:
 @router.get("/", response_model=TasksPublic)
 def read_tasks(
     session: SessionDep,
-    current_user: CurrentUser,
+    caller: CallerDep,
     query: Annotated[TaskQuery, Query()],
 ) -> Any:
     """
     Retrieve the current user's tasks, across all of their projects, narrowed
     and ordered by the query.
+
+    A bot user gets only the tasks of the projects in its scope, and never the
+    archive.
     """
+    if query.archived:
+        authorization.refuse_archived_for_bot(caller)
     if query.project_id is not None:
         # 404 rather than an empty list: a project the user cannot see is not a
         # project with no tasks.
-        get_owned_project(session, current_user, query.project_id)
+        authorization.get_project(session, caller, query.project_id)
+    else:
+        authorization.authorize_tasks(caller, TaskAction.READ)
 
     tasks, count = crud.get_tasks(
-        session=session, owner_id=current_user.id, query=query
+        session=session,
+        owner_id=caller.owner_id,
+        query=query,
+        project_ids=caller.project_ids if caller.bot else None,
     )
-    project_ids = crud.get_task_project_ids(session=session, owner_id=current_user.id)
+    project_ids = crud.get_task_project_ids(session=session, owner_id=caller.owner_id)
     tags = crud.get_task_tags(session=session, task_ids=[task.id for task in tasks])
     recurrences = crud.get_recurrences(session=session, tasks=tasks)
     return TasksPublic(
@@ -200,13 +213,12 @@ def create_task(
 
 
 @router.get("/{task_id}", response_model=TaskPublic)
-def read_task(
-    *, session: SessionDep, current_user: CurrentUser, task_id: uuid.UUID
-) -> Any:
+def read_task(*, session: SessionDep, caller: CallerDep, task_id: uuid.UUID) -> Any:
     """
     Retrieve a single task.
     """
-    return _read(session, get_owned_task(session, current_user, task_id))
+    task = authorization.get_task(session, caller, task_id, TaskAction.READ)
+    return _read(session, task)
 
 
 @router.patch("/{task_id}", response_model=TaskPublic)

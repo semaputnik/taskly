@@ -1,16 +1,24 @@
 import calendar
 import uuid
-from collections.abc import Sequence
-from datetime import date, timedelta
+from collections.abc import Collection, Sequence
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import case, nullslast, or_
 from sqlalchemy.orm import aliased
 from sqlmodel import Session, col, func, select
 
-from app.core.security import get_password_hash, verify_password
+from app.core.security import (
+    generate_bot_token,
+    get_password_hash,
+    hash_bot_token,
+    verify_password,
+)
 from app.models import (
     Attachment,
+    BotUser,
+    BotUserCreate,
+    BotUserProject,
     Comment,
     CommentCreate,
     CommentUpdate,
@@ -420,13 +428,26 @@ def _stage_subtree_copy(
 
 
 def get_tasks(
-    *, session: Session, owner_id: uuid.UUID, query: TaskQuery
+    *,
+    session: Session,
+    owner_id: uuid.UUID,
+    query: TaskQuery,
+    project_ids: Collection[uuid.UUID] | None = None,
 ) -> tuple[Sequence[Task], int]:
     """
     A page of the user's tasks, narrowed and ordered by `query`, with the
     number of tasks the filters match in full.
+
+    `project_ids`, when given, keeps to the tasks of those projects, as a bot
+    user's scope does; the query's filters narrow within them.
     """
     conditions = _task_filters(owner_id=owner_id, query=query)
+    if project_ids is not None:
+        conditions.append(
+            col(Task.id).in_(
+                _task_trees(col(Task.project_id).in_(project_ids), name="scope_tasks")
+            )
+        )
 
     count = session.exec(
         select(func.count()).select_from(Task).where(*conditions)
@@ -1025,3 +1046,50 @@ def authenticate(*, session: Session, email: str, password: str) -> User | None:
         session.commit()
         session.refresh(db_user)
     return db_user
+
+
+def create_bot_user(
+    *, session: Session, bot_user_create: BotUserCreate, owner_id: uuid.UUID
+) -> BotUser:
+    permissions = bot_user_create.scope.permissions
+    bot = BotUser(
+        owner_id=owner_id,
+        name=bot_user_create.name,
+        **permissions.model_dump(),
+    )
+    session.add(bot)
+    session.flush()
+    for project_id in dict.fromkeys(bot_user_create.scope.project_ids):
+        session.add(BotUserProject(bot_user_id=bot.id, project_id=project_id))
+    session.commit()
+    session.refresh(bot)
+    return bot
+
+
+def get_bot_user_project_ids(
+    *, session: Session, bot_ids: Sequence[uuid.UUID]
+) -> dict[uuid.UUID, list[uuid.UUID]]:
+    """The projects in each bot user's scope, keyed by bot user id."""
+    project_ids: dict[uuid.UUID, list[uuid.UUID]] = {bot_id: [] for bot_id in bot_ids}
+    rows = session.exec(
+        select(BotUserProject.bot_user_id, BotUserProject.project_id).where(
+            col(BotUserProject.bot_user_id).in_(bot_ids)
+        )
+    ).all()
+    for bot_id, project_id in rows:
+        project_ids[bot_id].append(project_id)
+    return project_ids
+
+
+def issue_bot_token(*, session: Session, bot: BotUser) -> str:
+    """
+    Issue a token for a bot user and return it. Only its digest is kept, so
+    the caller's response is the one place the token is ever seen (FR-08.13).
+    """
+    token = generate_bot_token()
+    bot.token_hash = hash_bot_token(token)
+    bot.token_issued_at = datetime.now(UTC)
+    session.add(bot)
+    session.commit()
+    session.refresh(bot)
+    return token

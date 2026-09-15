@@ -47,6 +47,13 @@ NOT_LOGGED = {
     f"PATCH {API}/users/me": ACCOUNT,
     f"PATCH {API}/users/me/password": ACCOUNT,
     f"DELETE {API}/users/me": ACCOUNT,
+    f"POST {API}/bot-users/": (
+        "Bot user management is not among the changes FR-10.3 covers; what a bot "
+        "user does is logged, as its own actor"
+    ),
+    f"POST {API}/bot-users/{{bot_user_id}}/token": (
+        "Issuing a token is a credential, not a change to tasks or projects"
+    ),
     f"POST {API}/utils/test-email/": "Sends an email; changes nothing",
     f"POST {API}/private/users/": "Local development helper for test accounts",
 }

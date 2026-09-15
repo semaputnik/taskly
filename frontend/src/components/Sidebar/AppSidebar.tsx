@@ -1,5 +1,6 @@
 import {
   Archive,
+  Bot,
   CheckSquare,
   FolderKanban,
   History,
@@ -25,6 +26,7 @@ const baseItems: NavItem[] = [
   { icon: FolderKanban, title: "Projects", path: "/projects" },
   { icon: Archive, title: "Archive", path: "/archive" },
   { icon: History, title: "Activity", path: "/activity" },
+  { icon: Bot, title: "Bots", path: "/bots" },
 ]
 
 export function AppSidebar() {

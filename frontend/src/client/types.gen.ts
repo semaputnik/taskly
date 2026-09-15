@@ -161,6 +161,126 @@ export type Body_login_login_access_token = {
 };
 
 /**
+ * BotPermissions
+ *
+ * What a bot user may do inside the projects of its scope (FR-08.9,
+ * FR-08.10).
+ *
+ * Only what can be granted is here. What a bot can never do — anything on
+ * projects, editing or deleting comments — has no field to set to false:
+ * the endpoints for it take a human caller, so a bot cannot reach them at
+ * all. Tags have no field yet either, because what a tag permission would
+ * mean is still an open question (Q-16); a bot changes no tags meanwhile.
+ */
+export type BotPermissions = {
+    /**
+     * Create Tasks
+     */
+    create_tasks?: boolean;
+    /**
+     * Read Tasks
+     */
+    read_tasks?: boolean;
+    /**
+     * Update Tasks
+     */
+    update_tasks?: boolean;
+    /**
+     * Delete Tasks
+     */
+    delete_tasks?: boolean;
+    /**
+     * Add Comments
+     */
+    add_comments?: boolean;
+};
+
+/**
+ * BotScope
+ *
+ * Where a bot user may act and what it may do there.
+ *
+ * The projects are always named one by one: there is no value meaning "all
+ * projects" (FR-08.6), so a project created tomorrow is never in the scope
+ * of a bot set up today.
+ */
+export type BotScope = {
+    /**
+     * Project Ids
+     */
+    project_ids: Array<string>;
+    permissions: BotPermissions;
+};
+
+/**
+ * BotTokenIssued
+ *
+ * The one response that carries a bot user's token (FR-08.13).
+ */
+export type BotTokenIssued = {
+    /**
+     * Bot User Id
+     */
+    bot_user_id: string;
+    /**
+     * Token
+     */
+    token: string;
+};
+
+/**
+ * BotUserCreate
+ */
+export type BotUserCreate = {
+    /**
+     * Name
+     */
+    name: string;
+    scope: BotScope;
+};
+
+/**
+ * BotUserPublic
+ */
+export type BotUserPublic = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Name
+     */
+    name: string;
+    scope: BotScope;
+    /**
+     * Has Token
+     */
+    has_token: boolean;
+    /**
+     * Token Issued At
+     */
+    token_issued_at?: string | null;
+    /**
+     * Created At
+     */
+    created_at?: string | null;
+};
+
+/**
+ * BotUsersPublic
+ */
+export type BotUsersPublic = {
+    /**
+     * Data
+     */
+    data: Array<BotUserPublic>;
+    /**
+     * Count
+     */
+    count: number;
+};
+
+/**
  * CommentCreate
  */
 export type CommentCreate = {
@@ -1684,6 +1804,95 @@ export type activityRestoreFromActivityEntryResponses = {
 };
 
 export type activityRestoreFromActivityEntryResponse = activityRestoreFromActivityEntryResponses[keyof activityRestoreFromActivityEntryResponses];
+
+export type botsReadBotUsersData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Skip
+         */
+        skip?: number;
+        /**
+         * Limit
+         */
+        limit?: number;
+    };
+    url: '/api/v1/bot-users/';
+};
+
+export type botsReadBotUsersErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type botsReadBotUsersError = botsReadBotUsersErrors[keyof botsReadBotUsersErrors];
+
+export type botsReadBotUsersResponses = {
+    /**
+     * Successful Response
+     */
+    200: BotUsersPublic;
+};
+
+export type botsReadBotUsersResponse = botsReadBotUsersResponses[keyof botsReadBotUsersResponses];
+
+export type botsCreateBotUserData = {
+    body: BotUserCreate;
+    path?: never;
+    query?: never;
+    url: '/api/v1/bot-users/';
+};
+
+export type botsCreateBotUserErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type botsCreateBotUserError = botsCreateBotUserErrors[keyof botsCreateBotUserErrors];
+
+export type botsCreateBotUserResponses = {
+    /**
+     * Successful Response
+     */
+    200: BotUserPublic;
+};
+
+export type botsCreateBotUserResponse = botsCreateBotUserResponses[keyof botsCreateBotUserResponses];
+
+export type botsIssueBotUserTokenData = {
+    body?: never;
+    path: {
+        /**
+         * Bot User Id
+         */
+        bot_user_id: string;
+    };
+    query?: never;
+    url: '/api/v1/bot-users/{bot_user_id}/token';
+};
+
+export type botsIssueBotUserTokenErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type botsIssueBotUserTokenError = botsIssueBotUserTokenErrors[keyof botsIssueBotUserTokenErrors];
+
+export type botsIssueBotUserTokenResponses = {
+    /**
+     * Successful Response
+     */
+    200: BotTokenIssued;
+};
+
+export type botsIssueBotUserTokenResponse = botsIssueBotUserTokenResponses[keyof botsIssueBotUserTokenResponses];
 
 export type utilsTestEmailData = {
     body?: never;

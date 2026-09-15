@@ -75,3 +75,37 @@ projects. Applying, removing and autocompleting is all the management there
 is: a tag no task carries any more simply stops existing.
 _Avoid_: treating tags as a taxonomy to be set up in advance, or as something
 scoped to a project.
+
+**Bot user**:
+An identity a user creates for an AI agent or other integration, deliberately
+far weaker than a human user. It works only through the REST API with its
+**token**, and only inside its **scope**. It is not a kind of user account: it
+has no email or password, cannot log in, register or reset a password, and
+does not appear among the accounts the superuser can list. Creating and
+configuring bot users is a human action in the web UI — a bot user can never
+create or configure another bot user, or itself.
+_Avoid_: "service account", "API key", "integration user".
+
+**Owner** (of a bot user):
+The one user who created a bot user. A bot user reaches only its owner's data,
+and never more of it than its scope allows; there is no way for it to reach
+another user's.
+_Avoid_: using "owner" for who can see a task or project — for those, the user
+they belong to is simply the user.
+
+**Scope**:
+What a bot user may reach and do: an explicit list of the owner's projects,
+each named one by one with no "all projects" value, and the permissions it
+holds there — create, read, update and delete on tasks, and adding comments.
+Anything a bot user can never do has no permission to grant at all. An
+archived project is out of reach whatever the scope says, and a subtask is in
+scope exactly when its root task's project is.
+_Avoid_: "role" — a scope is set per bot user, not picked from shared roles.
+
+**Token** (of a bot user):
+The bearer credential a bot user sends with every request. A bot user holds at
+most one. It is shown once, when it is issued, and stored only as a digest, so
+it can never be shown again. Not interchangeable with a human's session: a
+human session is not a bot token, and a bot token opens no endpoint that only a
+human may call.
+_Avoid_: "password", "session" for a bot user's credential.

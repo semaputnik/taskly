@@ -18,6 +18,7 @@ import { Route as LayoutIndexRouteImport } from './routes/_layout/index'
 import { Route as LayoutActivityRouteImport } from './routes/_layout/activity'
 import { Route as LayoutAdminRouteImport } from './routes/_layout/admin'
 import { Route as LayoutArchiveRouteImport } from './routes/_layout/archive'
+import { Route as LayoutBotsRouteImport } from './routes/_layout/bots'
 import { Route as LayoutProjectsRouteImport } from './routes/_layout/projects'
 import { Route as LayoutSettingsRouteImport } from './routes/_layout/settings'
 import { Route as LayoutTasksRouteImport } from './routes/_layout/tasks'
@@ -66,6 +67,11 @@ const LayoutArchiveRoute = LayoutArchiveRouteImport.update({
   path: '/archive',
   getParentRoute: () => LayoutRoute,
 } as any)
+const LayoutBotsRoute = LayoutBotsRouteImport.update({
+  id: '/bots',
+  path: '/bots',
+  getParentRoute: () => LayoutRoute,
+} as any)
 const LayoutProjectsRoute = LayoutProjectsRouteImport.update({
   id: '/projects',
   path: '/projects',
@@ -91,6 +97,7 @@ export interface FileRoutesByFullPath {
   '/activity': typeof LayoutActivityRoute
   '/admin': typeof LayoutAdminRoute
   '/archive': typeof LayoutArchiveRoute
+  '/bots': typeof LayoutBotsRoute
   '/projects': typeof LayoutProjectsRoute
   '/settings': typeof LayoutSettingsRoute
   '/tasks': typeof LayoutTasksRoute
@@ -103,6 +110,7 @@ export interface FileRoutesByTo {
   '/activity': typeof LayoutActivityRoute
   '/admin': typeof LayoutAdminRoute
   '/archive': typeof LayoutArchiveRoute
+  '/bots': typeof LayoutBotsRoute
   '/projects': typeof LayoutProjectsRoute
   '/settings': typeof LayoutSettingsRoute
   '/tasks': typeof LayoutTasksRoute
@@ -118,6 +126,7 @@ export interface FileRoutesById {
   '/_layout/activity': typeof LayoutActivityRoute
   '/_layout/admin': typeof LayoutAdminRoute
   '/_layout/archive': typeof LayoutArchiveRoute
+  '/_layout/bots': typeof LayoutBotsRoute
   '/_layout/projects': typeof LayoutProjectsRoute
   '/_layout/settings': typeof LayoutSettingsRoute
   '/_layout/tasks': typeof LayoutTasksRoute
@@ -134,6 +143,7 @@ export interface FileRouteTypes {
     | '/activity'
     | '/admin'
     | '/archive'
+    | '/bots'
     | '/projects'
     | '/settings'
     | '/tasks'
@@ -146,6 +156,7 @@ export interface FileRouteTypes {
     | '/activity'
     | '/admin'
     | '/archive'
+    | '/bots'
     | '/projects'
     | '/settings'
     | '/tasks'
@@ -160,6 +171,7 @@ export interface FileRouteTypes {
     | '/_layout/activity'
     | '/_layout/admin'
     | '/_layout/archive'
+    | '/_layout/bots'
     | '/_layout/projects'
     | '/_layout/settings'
     | '/_layout/tasks'
@@ -239,6 +251,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutArchiveRouteImport
       parentRoute: typeof LayoutRoute
     }
+    '/_layout/bots': {
+      id: '/_layout/bots'
+      path: '/bots'
+      fullPath: '/bots'
+      preLoaderRoute: typeof LayoutBotsRouteImport
+      parentRoute: typeof LayoutRoute
+    }
     '/_layout/projects': {
       id: '/_layout/projects'
       path: '/projects'
@@ -267,6 +286,7 @@ interface LayoutRouteChildren {
   LayoutActivityRoute: typeof LayoutActivityRoute
   LayoutAdminRoute: typeof LayoutAdminRoute
   LayoutArchiveRoute: typeof LayoutArchiveRoute
+  LayoutBotsRoute: typeof LayoutBotsRoute
   LayoutProjectsRoute: typeof LayoutProjectsRoute
   LayoutSettingsRoute: typeof LayoutSettingsRoute
   LayoutTasksRoute: typeof LayoutTasksRoute
@@ -277,6 +297,7 @@ const LayoutRouteChildren: LayoutRouteChildren = {
   LayoutActivityRoute: LayoutActivityRoute,
   LayoutAdminRoute: LayoutAdminRoute,
   LayoutArchiveRoute: LayoutArchiveRoute,
+  LayoutBotsRoute: LayoutBotsRoute,
   LayoutProjectsRoute: LayoutProjectsRoute,
   LayoutSettingsRoute: LayoutSettingsRoute,
   LayoutTasksRoute: LayoutTasksRoute,
