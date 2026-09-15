@@ -242,6 +242,10 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
   | Tag | configurable | configurable | configurable | configurable |
   | Project | never | only projects in scope | never | never |
 
+  The Tag row is an open question (see [Q-16](#7-open-questions)). Until it
+  is settled, a bot user cannot change tags: it sees the tags on tasks it can
+  read, and nothing more.
+
 - **FR-08.10** Comments:
   - Adding comments to tasks is a separate permission.
   - A bot user can read a task's comments if it can read the task.
@@ -352,5 +356,15 @@ Not requirements yet. Recorded so they are not lost.
 
 ## 7. Open questions
 
-None. All questions raised while drafting this document (Q-01 through Q-15)
-have been resolved into the requirements above.
+Q-01 through Q-15, raised while drafting this document, have been resolved
+into the requirements above.
+
+- **Q-16** What do the four tag permissions in FR-08.9 mean? Tags have no
+  endpoints of their own: a tag comes into being by being typed onto a task and
+  stops existing when no task carries it (FR-01.20). Create, read, update and
+  delete on tags therefore have no direct operations to govern. Candidate
+  readings: map them onto what a bot does to tags through tasks (typing a new
+  tag, seeing tags, applying an existing tag, removing one), or keep only
+  create and read and fold applying and removing into updating the task.
+  Raised while splitting semaputnik/taskly#7; bot users cannot change tags
+  until it is answered.
