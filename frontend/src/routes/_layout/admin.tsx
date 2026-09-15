@@ -1,10 +1,12 @@
 import { useSuspenseQuery } from "@tanstack/react-query"
 import { createFileRoute, redirect } from "@tanstack/react-router"
+import { Users } from "lucide-react"
 import { Suspense } from "react"
 
 import { type UserPublic, UsersService } from "@/client"
 import { columns, type UserTableData } from "@/components/Admin/columns"
 import { DataTable } from "@/components/Common/DataTable"
+import { EmptyState } from "@/components/Common/EmptyState"
 import PendingUsers from "@/components/Pending/PendingUsers"
 import useAuth from "@/hooks/useAuth"
 
@@ -44,7 +46,19 @@ function UsersTableContent() {
     isCurrentUser: currentUser?.id === user.id,
   }))
 
-  return <DataTable columns={columns} data={tableData} />
+  return (
+    <DataTable
+      columns={columns}
+      data={tableData}
+      empty={
+        <EmptyState
+          icon={Users}
+          title="No accounts"
+          description="Every registered account shows up here. Your own is always among them, so an empty list means something went wrong."
+        />
+      }
+    />
+  )
 }
 
 function UsersTable() {

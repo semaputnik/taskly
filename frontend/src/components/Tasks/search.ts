@@ -6,7 +6,22 @@ import { z } from "zod"
  * `.catch(undefined)` on every field keeps a hand-edited or stale URL from
  * breaking the page: an unusable value simply drops its filter.
  */
+/**
+ * The task whose detail panel is open.
+ *
+ * It lives in the URL so the panel can be linked to and so Back closes it, and
+ * every screen that lists tasks carries it — a reader who opens a task from
+ * the dashboard or the activity log stays where they were, rather than being
+ * moved to the task list to read one record.
+ */
+export const openTaskSchema = {
+  task: z.string().uuid().optional().catch(undefined),
+}
+
+export type OpenTaskSearch = { task?: string }
+
 export const taskSearchSchema = z.object({
+  ...openTaskSchema,
   project_id: z.string().optional().catch(undefined),
   // "me", "unassigned", or the id of one of the user's bot users.
   assignee: z

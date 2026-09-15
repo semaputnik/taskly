@@ -22,3 +22,9 @@ backend/data/
 /.claude/skills/impeccable/scripts/live-browser.js
 # Personal Claude Code settings.
 /.claude/settings.local.json
+
+# macOS folder metadata.
+.DS_Store
+# Design references gathered while working: third-party mockups and personal
+# screenshots that do not belong in a public history.
+/docs/reference/

@@ -1,17 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { Bot, MessageSquare, Pencil, Trash2 } from "lucide-react"
+import { Bot, Pencil, Trash2 } from "lucide-react"
 import { useState } from "react"
 
 import { CommentsService, type TaskPublic } from "@/client"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import { DropdownMenuItem } from "@/components/ui/dropdown-menu"
 import { LoadingButton } from "@/components/ui/loading-button"
 import { Textarea } from "@/components/ui/textarea"
 import useCustomToast from "@/hooks/useCustomToast"
@@ -19,7 +12,8 @@ import { handleError } from "@/utils"
 
 interface TaskCommentsProps {
   task: TaskPublic
-  onSuccess: () => void
+  /** Hold the request back until the panel is the one on screen. */
+  enabled?: boolean
 }
 
 /**
@@ -27,8 +21,7 @@ interface TaskCommentsProps {
  * replies and an AI agent's status reports read back as one narrative
  * (FR-03.1). A comment a bot user wrote names it.
  */
-const TaskComments = ({ task, onSuccess }: TaskCommentsProps) => {
-  const [isOpen, setIsOpen] = useState(false)
+export const TaskComments = ({ task, enabled = true }: TaskCommentsProps) => {
   const [draft, setDraft] = useState("")
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editDraft, setEditDraft] = useState("")
@@ -41,7 +34,7 @@ const TaskComments = ({ task, onSuccess }: TaskCommentsProps) => {
     queryKey,
     queryFn: async () =>
       (await CommentsService.readComments({ path: { task_id: task.id } })).data,
-    enabled: isOpen,
+    enabled,
   })
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey })
@@ -81,137 +74,116 @@ const TaskComments = ({ task, onSuccess }: TaskCommentsProps) => {
   }
 
   return (
-    <Dialog
-      open={isOpen}
-      onOpenChange={(open) => {
-        setIsOpen(open)
-        if (!open) onSuccess()
-      }}
-    >
-      <DropdownMenuItem
-        onSelect={(e) => e.preventDefault()}
-        onClick={() => setIsOpen(true)}
-      >
-        <MessageSquare />
-        Comments
-      </DropdownMenuItem>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Comments</DialogTitle>
-        </DialogHeader>
-
-        <div className="flex max-h-80 flex-col gap-3 overflow-y-auto">
-          {isLoading ? (
-            <p className="text-muted-foreground text-sm italic">Loading…</p>
-          ) : comments?.data.length ? (
-            comments.data.map((comment) => (
-              <div key={comment.id} className="rounded-md border p-3 text-sm">
-                {editingId === comment.id ? (
-                  <div className="flex flex-col gap-2">
-                    <Textarea
-                      value={editDraft}
-                      onChange={(e) => setEditDraft(e.target.value)}
-                      autoFocus
-                    />
-                    <div className="flex justify-end gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setEditingId(null)}
-                      >
-                        Cancel
-                      </Button>
-                      <LoadingButton
-                        size="sm"
-                        loading={editMutation.isPending}
-                        disabled={!editDraft.trim()}
-                        onClick={() =>
-                          editMutation.mutate({
-                            id: comment.id,
-                            body: editDraft.trim(),
-                          })
-                        }
-                      >
-                        Save
-                      </LoadingButton>
-                    </div>
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-3">
+        {isLoading ? (
+          <p className="text-muted-foreground text-sm italic">Loading…</p>
+        ) : comments?.data.length ? (
+          comments.data.map((comment) => (
+            <div key={comment.id} className="rounded-md border p-3 text-sm">
+              {editingId === comment.id ? (
+                <div className="flex flex-col gap-2">
+                  <Textarea
+                    value={editDraft}
+                    onChange={(e) => setEditDraft(e.target.value)}
+                    autoFocus
+                  />
+                  <div className="flex justify-end gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setEditingId(null)}
+                    >
+                      Cancel
+                    </Button>
+                    <LoadingButton
+                      size="sm"
+                      loading={editMutation.isPending}
+                      disabled={!editDraft.trim()}
+                      onClick={() =>
+                        editMutation.mutate({
+                          id: comment.id,
+                          body: editDraft.trim(),
+                        })
+                      }
+                    >
+                      Save
+                    </LoadingButton>
                   </div>
-                ) : (
-                  <>
-                    {comment.author_bot_user && (
-                      <p className="mb-1 flex items-center gap-1.5 font-medium">
-                        <Bot
-                          className="size-3.5 text-muted-foreground"
-                          aria-hidden
-                        />
-                        {comment.author_bot_user.name}
-                        <Badge variant="outline" className="text-xs">
-                          {comment.author_bot_user.deleted
-                            ? "Deleted bot"
-                            : "Bot"}
-                        </Badge>
-                      </p>
-                    )}
-                    <p className="whitespace-pre-wrap">{comment.body}</p>
-                    <div className="mt-2 flex items-center justify-between">
-                      <span className="text-muted-foreground text-xs">
-                        {comment.created_at &&
-                          new Date(comment.created_at).toLocaleString()}
-                      </span>
-                      {/* A bot user's comments are append-only, for everyone
+                </div>
+              ) : (
+                <>
+                  {comment.author_bot_user && (
+                    <p className="mb-1 flex items-center gap-1.5 font-medium">
+                      <Bot
+                        className="size-3.5 text-muted-foreground"
+                        aria-hidden
+                      />
+                      {comment.author_bot_user.name}
+                      <Badge variant="outline" className="text-xs">
+                        {comment.author_bot_user.deleted
+                          ? "Deleted bot"
+                          : "Bot"}
+                      </Badge>
+                    </p>
+                  )}
+                  <p className="whitespace-pre-wrap">{comment.body}</p>
+                  <div className="mt-2 flex items-center justify-between">
+                    <span className="text-muted-foreground text-xs">
+                      {comment.created_at &&
+                        new Date(comment.created_at).toLocaleString()}
+                    </span>
+                    {/* A bot user's comments are append-only, for everyone
                           (FR-03.2, FR-08.10). */}
-                      {!comment.author_bot_user && (
-                        <div className="flex gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            aria-label="Edit comment"
-                            onClick={() =>
-                              startEditing(comment.id, comment.body)
-                            }
-                          >
-                            <Pencil className="size-3.5" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            aria-label="Delete comment"
-                            onClick={() => deleteMutation.mutate(comment.id)}
-                          >
-                            <Trash2 className="size-3.5" />
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  </>
-                )}
-              </div>
-            ))
-          ) : (
-            <p className="text-muted-foreground text-sm italic">
-              No comments yet.
-            </p>
-          )}
-        </div>
+                    {!comment.author_bot_user && (
+                      <div className="flex gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          aria-label="Edit comment"
+                          onClick={() => startEditing(comment.id, comment.body)}
+                        >
+                          <Pencil className="size-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          aria-label="Delete comment"
+                          onClick={() => deleteMutation.mutate(comment.id)}
+                        >
+                          <Trash2 className="size-3.5" />
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          ))
+        ) : (
+          <p className="text-muted-foreground text-sm italic">
+            No comments yet.
+          </p>
+        )}
+      </div>
 
-        <div className="flex flex-col gap-2">
-          <Textarea
-            placeholder="Add a comment"
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-          />
-          <div className="flex justify-end">
-            <LoadingButton
-              loading={addMutation.isPending}
-              disabled={!draft.trim()}
-              onClick={() => addMutation.mutate(draft.trim())}
-            >
-              Comment
-            </LoadingButton>
-          </div>
+      <div className="flex flex-col gap-2">
+        <Textarea
+          placeholder="Add a comment"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+        />
+        <div className="flex justify-end">
+          <LoadingButton
+            loading={addMutation.isPending}
+            disabled={!draft.trim()}
+            onClick={() => addMutation.mutate(draft.trim())}
+          >
+            Comment
+          </LoadingButton>
         </div>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </div>
   )
 }
 

@@ -56,7 +56,9 @@ test.describe("Edit user profile", () => {
   }) => {
     await page.getByRole("button", { name: "Edit" }).click()
     await page.getByLabel("Email").fill("")
-    await page.locator("body").click()
+    // Validation runs on blur. Leave the field directly rather than clicking
+    // the middle of the page for it: where that lands depends on the layout.
+    await page.getByLabel("Email").blur()
 
     await expect(page.getByText("Invalid email address")).toBeVisible()
   })

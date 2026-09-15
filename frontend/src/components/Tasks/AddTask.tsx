@@ -22,7 +22,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { DropdownMenuItem } from "@/components/ui/dropdown-menu"
 import {
   Form,
   FormControl,
@@ -40,6 +39,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import useAuth from "@/hooks/useAuth"
 import useCustomToast from "@/hooks/useCustomToast"
 import { handleError } from "@/utils"
@@ -73,10 +77,19 @@ type FormData = z.infer<typeof formSchema>
 interface AddTaskProps {
   /** Set to add a subtask of this task instead of a task of its own. */
   parent?: TaskPublic
+  /**
+   * `sidebar` is the app-wide action at the top of the sidebar: full width,
+   * and collapsing to a square with the label as its tooltip.
+   */
+  trigger?: "default" | "sidebar"
   onSuccess?: () => void
 }
 
-const AddTask = ({ parent, onSuccess }: AddTaskProps = {}) => {
+const AddTask = ({
+  parent,
+  trigger = "default",
+  onSuccess,
+}: AddTaskProps = {}) => {
   const [isOpen, setIsOpen] = useState(false)
   const queryClient = useQueryClient()
   const { showSuccessToast, showErrorToast } = useCustomToast()
@@ -148,17 +161,37 @@ const AddTask = ({ parent, onSuccess }: AddTaskProps = {}) => {
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       {parent ? (
-        <DropdownMenuItem
-          onSelect={(e) => e.preventDefault()}
-          onClick={() => setIsOpen(true)}
-        >
-          <ListPlus />
-          Add Subtask
-        </DropdownMenuItem>
+        <DialogTrigger asChild>
+          <Button variant="outline" size="sm">
+            <ListPlus />
+            Add subtask
+          </Button>
+        </DialogTrigger>
+      ) : trigger === "sidebar" ? (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <DialogTrigger asChild>
+              <Button
+                aria-label="Add Task"
+                // px-2 lines the plus up with the navigation icons below, so
+                // collapsing the sidebar leaves the column where it was.
+                className="w-full justify-start px-2! group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0!"
+              >
+                <Plus />
+                <span className="group-data-[collapsible=icon]:hidden">
+                  Add Task
+                </span>
+              </Button>
+            </DialogTrigger>
+          </TooltipTrigger>
+          <TooltipContent side="right" align="center">
+            Add Task
+          </TooltipContent>
+        </Tooltip>
       ) : (
         <DialogTrigger asChild>
-          <Button className="my-4">
-            <Plus className="mr-2" />
+          <Button>
+            <Plus />
             Add Task
           </Button>
         </DialogTrigger>

@@ -1,9 +1,11 @@
 import { useSuspenseQuery } from "@tanstack/react-query"
 import { createFileRoute } from "@tanstack/react-router"
+import { FolderKanban } from "lucide-react"
 import { Suspense } from "react"
 
 import { ProjectsService } from "@/client"
 import { DataTable } from "@/components/Common/DataTable"
+import { EmptyState } from "@/components/Common/EmptyState"
 import PendingProjects from "@/components/Pending/PendingProjects"
 import AddProject from "@/components/Projects/AddProject"
 import { columns } from "@/components/Projects/columns"
@@ -31,7 +33,19 @@ export const Route = createFileRoute("/_layout/projects")({
 function ProjectsTableContent() {
   const { data: projects } = useSuspenseQuery(getProjectsQueryOptions())
 
-  return <DataTable columns={columns} data={projects.data} />
+  return (
+    <DataTable
+      columns={columns}
+      data={projects.data}
+      empty={
+        <EmptyState
+          icon={FolderKanban}
+          title="No projects yet"
+          description="A project groups tasks that belong together. Until you make one, every task lands in Inbox."
+        />
+      }
+    />
+  )
 }
 
 function ProjectsTable() {

@@ -1,12 +1,13 @@
 import { useQuery } from "@tanstack/react-query"
 import { createFileRoute } from "@tanstack/react-router"
-import { Bot } from "lucide-react"
 import { z } from "zod"
 
 import { type ActivityEntryPublic, ActivityService } from "@/client"
 import { ActivityDescription } from "@/components/Activity/ActivityDescription"
+import { ActorLabel } from "@/components/Activity/ActorLabel"
 import { RestoreDeletion } from "@/components/Activity/RestoreDeletion"
-import { Badge } from "@/components/ui/badge"
+import { openTaskSchema } from "@/components/Tasks/search"
+import { TaskDetail } from "@/components/Tasks/TaskDetail"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
@@ -23,6 +24,8 @@ const PAGE_SIZE = 50
 
 const activitySearchSchema = z.object({
   page: z.number().int().min(1).optional().catch(undefined),
+  // The log opens a task in place, so paging state survives reading one.
+  ...openTaskSchema,
 })
 
 export const Route = createFileRoute("/_layout/activity")({
@@ -36,30 +39,6 @@ export const Route = createFileRoute("/_layout/activity")({
     ],
   }),
 })
-
-/**
- * Who made the change: you, or one of your bot users by name (FR-10.2).
- */
-function ActorLabel({
-  entry,
-  currentUserId,
-}: {
-  entry: ActivityEntryPublic
-  currentUserId?: string
-}) {
-  if (entry.actor_bot_user_id) {
-    return (
-      <span className="inline-flex items-center gap-1.5">
-        <Bot className="size-4 text-muted-foreground" aria-hidden />
-        {entry.actor_bot_user_name ?? "A bot user"}
-        <Badge variant="outline" className="text-xs">
-          Bot
-        </Badge>
-      </span>
-    )
-  }
-  return entry.actor_id === currentUserId ? "You" : "Someone else"
-}
 
 function ActivityRows({
   entries,
@@ -120,8 +99,10 @@ function PendingRows() {
  * entries: the API offers no way to ask for anyone else's (FR-10.7).
  */
 function Activity() {
-  const { page = 1 } = Route.useSearch()
+  const { page = 1, task } = Route.useSearch()
   const navigate = Route.useNavigate()
+  const openTask = (next: string | undefined) =>
+    navigate({ search: (previous) => ({ ...previous, task: next }) })
   const { user: currentUser } = useAuth()
 
   const query = { skip: (page - 1) * PAGE_SIZE, limit: PAGE_SIZE }
@@ -134,10 +115,20 @@ function Activity() {
   const count = data?.count ?? 0
   const lastPage = Math.max(1, Math.ceil(count / PAGE_SIZE))
   const goTo = (next: number) =>
-    navigate({ search: { page: next === 1 ? undefined : next } })
+    navigate({
+      search: (previous) => ({
+        ...previous,
+        page: next === 1 ? undefined : next,
+      }),
+    })
 
   return (
     <div className="flex flex-col gap-6">
+      <TaskDetail
+        taskId={task ?? null}
+        onClose={() => openTask(undefined)}
+        onOpenTask={openTask}
+      />
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Activity</h1>
         <p className="text-muted-foreground">

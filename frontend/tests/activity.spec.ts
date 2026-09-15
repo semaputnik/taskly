@@ -36,11 +36,12 @@ test("A user's own changes appear on the Activity page, newest first", async ({
   await expect(rows.nth(1)).toContainText("Created Renew the passport in Inbox")
   await expect(rows.nth(0)).toContainText("You")
 
-  // The task still exists, so its entry links to it.
+  // The task still exists, so its entry opens it — here, over the log, rather
+  // than dropping the reader on the task list.
   await rows.nth(1).getByRole("link", { name: "Renew the passport" }).click()
-  await expect(page).toHaveURL(/\/tasks\?project_id=/)
+  await expect(page).toHaveURL(/\/activity\?task=/)
   await expect(
-    page.getByRole("row", { name: /Renew the passport/ }),
+    page.getByRole("dialog", { name: /Renew the passport/ }),
   ).toBeVisible()
 })
 
@@ -59,8 +60,8 @@ test("A deleted task can be restored from the Activity page", async ({
   await expect(page.getByText("Task created successfully")).toBeVisible()
 
   const taskRow = page.getByRole("row", { name: /Cancel the gym/ })
-  await taskRow.getByRole("button").last().click()
-  await page.getByRole("menuitem", { name: "Delete Task" }).click()
+  await taskRow.getByText("Cancel the gym").click()
+  await page.getByRole("button", { name: "Delete task" }).click()
   await page
     .getByRole("dialog")
     .getByRole("button", { name: "Delete", exact: true })

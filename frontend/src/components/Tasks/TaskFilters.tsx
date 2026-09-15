@@ -1,7 +1,14 @@
 import { useQuery } from "@tanstack/react-query"
-import { ArrowDownWideNarrow, ArrowUpNarrowWide, X } from "lucide-react"
+import {
+  ArrowDownWideNarrow,
+  ArrowUpNarrowWide,
+  SlidersHorizontal,
+  X,
+} from "lucide-react"
+import { useState } from "react"
 
 import { ProjectsService, TagsService } from "@/client"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -30,30 +37,27 @@ interface Option {
   label: string
 }
 
-/** A labelled select whose first entry means "don't filter on this". */
 function FilterSelect({
   label,
   anyLabel,
   value,
   options,
-  width,
   onChange,
 }: {
   label: string
   anyLabel: string
   value: string | undefined
   options: Option[]
-  width: string
   onChange: (value: string | undefined) => void
 }) {
   return (
-    <div className="flex flex-col gap-1">
-      <Label className="text-xs text-muted-foreground">{label}</Label>
+    <div className="flex flex-col gap-1.5">
+      <Label className="text-muted-foreground text-xs">{label}</Label>
       <Select
         value={value ?? ANY}
         onValueChange={(next) => onChange(next === ANY ? undefined : next)}
       >
-        <SelectTrigger className={width} aria-label={label}>
+        <SelectTrigger className="w-full" aria-label={label}>
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -79,15 +83,37 @@ function DateFilter({
   onChange: (value: string | undefined) => void
 }) {
   return (
-    <div className="flex flex-col gap-1">
-      <Label className="text-xs text-muted-foreground">{label}</Label>
+    <div className="flex flex-col gap-1.5">
+      <Label className="text-muted-foreground text-xs">{label}</Label>
       <Input
         type="date"
-        className="w-40"
         value={value ?? ""}
         onChange={(e) => onChange(e.target.value || undefined)}
       />
     </div>
+  )
+}
+
+/** One active filter, named in the reader's words, with the way to drop it. */
+function ActiveChip({
+  label,
+  onRemove,
+}: {
+  label: string
+  onRemove: () => void
+}) {
+  return (
+    <Badge variant="secondary" className="gap-1 py-1 pr-1 pl-2.5">
+      {label}
+      <button
+        type="button"
+        aria-label={`Remove filter: ${label}`}
+        onClick={onRemove}
+        className="hover:bg-foreground/10 rounded-full p-0.5 transition-colors"
+      >
+        <X className="size-3" />
+      </button>
+    </Badge>
   )
 }
 
@@ -97,8 +123,14 @@ function DateFilter({
  * Every filter that is set narrows the list further — they combine with AND,
  * never OR (FR-06.3) — and each one lives in the URL, so a view can be shared
  * or reloaded.
+ *
+ * All eight filters at once is a wall of controls that mostly say "any", so
+ * the panel is closed by default. What is closed is never hidden, though: an
+ * active filter is always named on a chip that can drop it, because a list
+ * silently narrowed by a control you cannot see is the worst outcome here.
  */
 export function TaskFilters({ search, onChange }: TaskFiltersProps) {
+  const [isOpen, setIsOpen] = useState(false)
   const { data: bots } = useBotUsers()
   const { data: projects } = useQuery({
     queryKey: ["projects"],
@@ -121,146 +153,246 @@ export function TaskFilters({ search, onChange }: TaskFiltersProps) {
   const selectedTagId = tagOptions.find(
     (option) => option.label === search.tag,
   )?.value
+  const projectName = (id: string) =>
+    projects?.data.find((project) => project.id === id)?.name ?? "Unknown"
+  const assigneeName = (value: string) => {
+    if (value === "me") return "Me"
+    if (value === "unassigned") return "Unassigned"
+    return bots?.data.find((bot) => bot.id === value)?.name ?? "A bot user"
+  }
+
+  /** Each active filter as a label plus the change that removes it. */
+  const chips: { key: string; label: string; clear: Partial<TaskSearch> }[] = []
+  if (search.project_id)
+    chips.push({
+      key: "project_id",
+      label: `Project: ${projectName(search.project_id)}`,
+      clear: { project_id: undefined },
+    })
+  if (search.assignee)
+    chips.push({
+      key: "assignee",
+      label: `Assignee: ${assigneeName(search.assignee)}`,
+      clear: { assignee: undefined },
+    })
+  if (search.tag)
+    chips.push({
+      key: "tag",
+      label: `Tag: ${search.tag}`,
+      clear: { tag: undefined },
+    })
+  if (search.priority)
+    chips.push({
+      key: "priority",
+      label: `Priority: ${search.priority}`,
+      clear: { priority: undefined },
+    })
+  if (search.completed !== undefined)
+    chips.push({
+      key: "completed",
+      label: search.completed ? "Completed" : "Not completed",
+      clear: { completed: undefined },
+    })
+  if (search.overdue)
+    chips.push({
+      key: "overdue",
+      label: "Overdue",
+      // Overdue turned completion off with it, so dropping it puts both back.
+      clear: { overdue: undefined, completed: undefined },
+    })
+  if (search.due_from)
+    chips.push({
+      key: "due_from",
+      label: `Due from ${search.due_from}`,
+      clear: { due_from: undefined },
+    })
+  if (search.due_to)
+    chips.push({
+      key: "due_to",
+      label: `Due to ${search.due_to}`,
+      clear: { due_to: undefined },
+    })
+
+  // Counted from the chips rather than from the schema keys, so the badge can
+  // never claim a filter the reader has no chip for — an empty value in a
+  // hand-edited URL is set but filters nothing.
+  const activeCount = chips.length
 
   return (
-    <div className="flex flex-wrap items-end gap-3 rounded-md border p-3">
-      <FilterSelect
-        label="Project"
-        anyLabel="Any project"
-        width="w-40"
-        value={search.project_id}
-        options={(projects?.data ?? []).map((project) => ({
-          value: project.id,
-          label: project.name,
-        }))}
-        onChange={(project_id) => onChange({ project_id })}
-      />
-
-      <FilterSelect
-        label="Assignee"
-        anyLabel="Anyone"
-        width="w-36"
-        value={search.assignee}
-        options={[
-          { value: "me", label: "Me" },
-          { value: "unassigned", label: "Unassigned" },
-          ...(bots?.data ?? []).map((bot) => ({
-            value: bot.id,
-            label: bot.name,
-          })),
-        ]}
-        onChange={(value) =>
-          onChange({ assignee: value as TaskSearch["assignee"] })
-        }
-      />
-
-      <FilterSelect
-        label="Tag"
-        anyLabel="Any tag"
-        width="w-36"
-        value={selectedTagId}
-        options={tagOptions}
-        onChange={(id) =>
-          onChange({
-            tag: tagOptions.find((option) => option.value === id)?.label,
-          })
-        }
-      />
-
-      <FilterSelect
-        label="Priority"
-        anyLabel="Any priority"
-        width="w-32"
-        value={search.priority}
-        options={["P1", "P2", "P3", "P4"].map((priority) => ({
-          value: priority,
-          label: priority,
-        }))}
-        onChange={(value) =>
-          onChange({ priority: value as TaskSearch["priority"] })
-        }
-      />
-
-      <FilterSelect
-        label="Status"
-        anyLabel="Any status"
-        width="w-36"
-        value={
-          search.completed === undefined ? undefined : String(search.completed)
-        }
-        options={[
-          { value: "false", label: "Not completed" },
-          { value: "true", label: "Completed" },
-        ]}
-        onChange={(value) =>
-          onChange({
-            completed: value === undefined ? undefined : value === "true",
-          })
-        }
-      />
-
-      <DateFilter
-        label="Due from"
-        value={search.due_from}
-        onChange={(due_from) => onChange({ due_from })}
-      />
-      <DateFilter
-        label="Due to"
-        value={search.due_to}
-        onChange={(due_to) => onChange({ due_to })}
-      />
-
-      <Button
-        variant={search.overdue ? "default" : "outline"}
-        onClick={() =>
-          // Late work people still care about is late work still open, so the
-          // button asks for both — visibly, in the URL, rather than by having
-          // one filter decide another.
-          onChange(
-            search.overdue
-              ? { overdue: undefined, completed: undefined }
-              : { overdue: true, completed: false },
-          )
-        }
-      >
-        Overdue
-      </Button>
-
-      <FilterSelect
-        label="Sort by"
-        anyLabel="Default"
-        width="w-36"
-        value={search.sort}
-        options={[
-          { value: "due_date", label: "Due date" },
-          { value: "priority", label: "Priority" },
-        ]}
-        onChange={(value) => onChange({ sort: value as TaskSearch["sort"] })}
-      />
-
-      <Button
-        variant="outline"
-        size="icon"
-        disabled={!search.sort}
-        aria-label={
-          search.order === "desc" ? "Sort ascending" : "Sort descending"
-        }
-        onClick={() =>
-          onChange({ order: search.order === "desc" ? undefined : "desc" })
-        }
-      >
-        {search.order === "desc" ? (
-          <ArrowDownWideNarrow />
-        ) : (
-          <ArrowUpNarrowWide />
-        )}
-      </Button>
-
-      {hasActiveFilters(search) && (
-        <Button variant="ghost" onClick={() => onChange(clearedFilters())}>
-          <X />
-          Clear filters
+    <div className="bg-card flex flex-col rounded-md border">
+      <div className="flex flex-wrap items-center gap-2 p-3">
+        <Button
+          variant="outline"
+          aria-expanded={isOpen}
+          onClick={() => setIsOpen((open) => !open)}
+        >
+          <SlidersHorizontal />
+          Filters
+          {activeCount > 0 && (
+            <Badge variant="secondary" className="ml-0.5 tabular-nums">
+              {activeCount}
+            </Badge>
+          )}
         </Button>
+
+        {/* Late work people still care about is late work still open, so the
+            button asks for both — visibly, in the URL, rather than by having
+            one filter decide another. */}
+        <Button
+          variant={search.overdue ? "default" : "outline"}
+          onClick={() =>
+            onChange(
+              search.overdue
+                ? { overdue: undefined, completed: undefined }
+                : { overdue: true, completed: false },
+            )
+          }
+        >
+          Overdue
+        </Button>
+
+        <div className="ml-auto flex items-center gap-2">
+          <Label className="text-muted-foreground text-xs" htmlFor="task-sort">
+            Sort
+          </Label>
+          <Select
+            value={search.sort ?? ANY}
+            onValueChange={(value) =>
+              onChange({
+                sort: value === ANY ? undefined : (value as TaskSearch["sort"]),
+              })
+            }
+          >
+            <SelectTrigger id="task-sort" className="w-36" aria-label="Sort by">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ANY}>Default</SelectItem>
+              <SelectItem value="due_date">Due date</SelectItem>
+              <SelectItem value="priority">Priority</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button
+            variant="outline"
+            size="icon"
+            disabled={!search.sort}
+            aria-label={
+              search.order === "desc" ? "Sort ascending" : "Sort descending"
+            }
+            onClick={() =>
+              onChange({ order: search.order === "desc" ? undefined : "desc" })
+            }
+          >
+            {search.order === "desc" ? (
+              <ArrowDownWideNarrow />
+            ) : (
+              <ArrowUpNarrowWide />
+            )}
+          </Button>
+        </div>
+      </div>
+
+      {isOpen && (
+        <div className="grid gap-3 border-t p-3 sm:grid-cols-2 lg:grid-cols-4">
+          <FilterSelect
+            label="Project"
+            anyLabel="Any project"
+            value={search.project_id}
+            options={(projects?.data ?? []).map((project) => ({
+              value: project.id,
+              label: project.name,
+            }))}
+            onChange={(project_id) => onChange({ project_id })}
+          />
+          <FilterSelect
+            label="Assignee"
+            anyLabel="Anyone"
+            value={search.assignee}
+            options={[
+              { value: "me", label: "Me" },
+              { value: "unassigned", label: "Unassigned" },
+              ...(bots?.data ?? []).map((bot) => ({
+                value: bot.id,
+                label: bot.name,
+              })),
+            ]}
+            onChange={(value) =>
+              onChange({ assignee: value as TaskSearch["assignee"] })
+            }
+          />
+          <FilterSelect
+            label="Tag"
+            anyLabel="Any tag"
+            value={selectedTagId}
+            options={tagOptions}
+            onChange={(id) =>
+              onChange({
+                tag: tagOptions.find((option) => option.value === id)?.label,
+              })
+            }
+          />
+          <FilterSelect
+            label="Priority"
+            anyLabel="Any priority"
+            value={search.priority}
+            options={["P1", "P2", "P3", "P4"].map((priority) => ({
+              value: priority,
+              label: priority,
+            }))}
+            onChange={(value) =>
+              onChange({ priority: value as TaskSearch["priority"] })
+            }
+          />
+          <FilterSelect
+            label="Status"
+            anyLabel="Any status"
+            value={
+              search.completed === undefined
+                ? undefined
+                : String(search.completed)
+            }
+            options={[
+              { value: "false", label: "Not completed" },
+              { value: "true", label: "Completed" },
+            ]}
+            onChange={(value) =>
+              onChange({
+                completed: value === undefined ? undefined : value === "true",
+              })
+            }
+          />
+          <DateFilter
+            label="Due from"
+            value={search.due_from}
+            onChange={(due_from) => onChange({ due_from })}
+          />
+          <DateFilter
+            label="Due to"
+            value={search.due_to}
+            onChange={(due_to) => onChange({ due_to })}
+          />
+        </div>
+      )}
+
+      {chips.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 border-t p-3">
+          {chips.map((chip) => (
+            <ActiveChip
+              key={chip.key}
+              label={chip.label}
+              onRemove={() => onChange(chip.clear)}
+            />
+          ))}
+          {hasActiveFilters(search) && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onChange(clearedFilters())}
+            >
+              Clear all
+            </Button>
+          )}
+        </div>
       )}
     </div>
   )
