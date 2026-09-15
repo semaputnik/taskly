@@ -2,7 +2,7 @@
 target: frontend app (src/routes/_layout)
 total_score: 22
 max_score: 40
-na_heuristics: 
+na_heuristics:
 p0_count: 2
 p1_count: 3
 target_identity: "file:/Users/semaputnikov/Documents/Projects/taskly/frontend/src/routes/_layout"
@@ -61,7 +61,7 @@ At a 666px viewport the dialog measures 756-784px. The title "Add Task" sits at 
 
 ### [P0] Deleting a comment or an attachment takes one click, with no confirmation and no undo
 `TaskComments.tsx:146-155` and `TaskAttachments.tsx:120-129` fire `deleteMutation.mutate(...)` straight from a ghost Trash2 icon.
-**Why it matters:** these are the two data types in Taskly with no soft-delete and no restore path. The delete icon sits 4px from Download on attachment rows; at 390px those are two 36px targets a mis-tap apart. The product confirms revoking a token, which is recoverable, and does not confirm this, which is not.
+**Why it matters:** these are the two data types in Taskly with no soft-delete and no restore path. The delete icon sits 4px from Download on attachment rows; at 390px those are two 36px targets one careless tap apart. The product confirms revoking a token, which is recoverable, and does not confirm this, which is not.
 **Fix:** for attachments, the same Dialog used by DeleteTag/DeleteBotUser, naming the filename. For comments, optimistic removal plus a 6-second sonner toast with Undo. Separate Download from Delete.
 **Command:** `/impeccable harden`
 
