@@ -57,12 +57,11 @@ test("A bot user's comment names the bot and offers no edit or delete", async ({
   await page.goto(`/tasks?project_id=${project.id}`)
   await page
     .getByRole("row", { name: /Ship 1\.2/ })
-    .getByRole("button")
-    .last()
+    .getByText("Ship 1.2")
     .click()
-  await page.getByRole("menuitem", { name: "Comments" }).click()
 
-  const dialog = page.getByRole("dialog", { name: "Comments" })
+  // Comments are the panel's first tab.
+  const dialog = page.getByRole("dialog", { name: /Ship 1\.2/ })
   const botComment = dialog
     .locator("div.rounded-md")
     .filter({ hasText: "Deployed to staging" })

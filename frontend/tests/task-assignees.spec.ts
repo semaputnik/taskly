@@ -47,6 +47,7 @@ test("A task is assigned to a bot user from the task form and found by it", asyn
   await expect(page.getByText("Task created successfully").last()).toBeVisible()
   await expect(page.getByRole("row", { name: /Call the bank/ })).toBeVisible()
 
+  await page.getByRole("button", { name: "Filters" }).click()
   await page.getByRole("combobox", { name: "Assignee" }).click()
   await page.getByRole("option", { name: "Triage bot" }).click()
   await expect(page).toHaveURL(/assignee=/)
