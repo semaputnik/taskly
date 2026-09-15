@@ -111,15 +111,15 @@ def test_a_tag_crosses_projects(client: TestClient, db: Session) -> None:
     work_id = _create_project(client, headers, "Work")
     home_id = _create_project(client, headers, "Home")
 
-    _create_task(client, headers, "At work", project_id=work_id, tags=["urgent"])
+    # A name no other test uses: the count below is across every user.
+    name = random_lower_string()
+    _create_task(client, headers, "At work", project_id=work_id, tags=[name])
     # The tag is offered everywhere, and applying it in another project reuses it.
-    assert _listed_tags(client, headers) == ["urgent"]
-    other = _create_task(
-        client, headers, "At home", project_id=home_id, tags=["urgent"]
-    )
+    assert _listed_tags(client, headers) == [name]
+    other = _create_task(client, headers, "At home", project_id=home_id, tags=[name])
 
-    assert other["tags"] == ["urgent"]
-    assert _stored_tag_count(db, "urgent") == 1
+    assert other["tags"] == [name]
+    assert _stored_tag_count(db, name) == 1
 
 
 def test_removing_a_tag_leaves_other_tasks_alone(
@@ -139,19 +139,17 @@ def test_removing_a_tag_leaves_other_tasks_alone(
     assert _stored_tag_count(db, name) == 1
 
 
-def test_a_tag_left_on_no_task_stops_being_offered(
-    client: TestClient, db: Session
-) -> None:
+def test_a_tag_left_on_no_task_stays(client: TestClient, db: Session) -> None:
     headers = _headers_for_new_user(client, db)
     name = random_lower_string()
     task = _create_task(client, headers, "Only task", tags=[name])
 
     _set_tags(client, headers, task["id"], [])
 
-    # There is no tag-management screen, so a tag nothing carries any more has
-    # to drop out of autocomplete by itself.
-    assert _listed_tags(client, headers) == []
-    assert _stored_tag_count(db, name) == 0
+    # A tag lives until it is deleted, whether or not a task carries it
+    # (FR-01.23).
+    assert _listed_tags(client, headers) == [name]
+    assert _stored_tag_count(db, name) == 1
 
 
 def test_tags_survive_a_deleted_task(client: TestClient, db: Session) -> None:

@@ -109,6 +109,9 @@ class _Pending:
     # Each comment touched, with its body before — None for a new one.
     comments: dict[uuid.UUID, str | None] = field(default_factory=dict)
     attachments_added: list[uuid.UUID] = field(default_factory=list)
+    tags_created: list[uuid.UUID] = field(default_factory=list)
+    # Each tag renamed, with its name before.
+    tag_names: dict[uuid.UUID, str] = field(default_factory=dict)
     # Rows removed outright are gone by commit, so what an entry needs to say
     # about them is taken while they are still in the session.
     removed: list[ActivityEntry] = field(default_factory=list)
@@ -123,10 +126,11 @@ def _collect(session: Session, _flush_context: Any, _instances: Any) -> None:
         touched: list[uuid.UUID] = []
         touched_projects: list[uuid.UUID] = []
         touched_comments: list[uuid.UUID] = []
+        touched_tags: list[uuid.UUID] = []
 
         for obj in session.new:
             found = found or isinstance(
-                obj, Task | Deletion | TaskTag | Project | Comment | Attachment
+                obj, Task | Deletion | TaskTag | Project | Comment | Attachment | Tag
             )
             if isinstance(obj, Task):
                 pending.before.setdefault(obj.id, None)
@@ -144,6 +148,8 @@ def _collect(session: Session, _flush_context: Any, _instances: Any) -> None:
                 pending.comments.setdefault(obj.id, None)
             elif isinstance(obj, Attachment):
                 pending.attachments_added.append(obj.id)
+            elif isinstance(obj, Tag):
+                pending.tags_created.append(obj.id)
 
         for obj in session.deleted:
             if isinstance(obj, TaskTag):
@@ -155,6 +161,9 @@ def _collect(session: Session, _flush_context: Any, _instances: Any) -> None:
             elif isinstance(obj, Attachment):
                 found = True
                 pending.removed.append(_attachment_deleted_entry(session, obj))
+            elif isinstance(obj, Tag):
+                found = True
+                pending.removed.append(_tag_deleted_entry(session, obj))
 
         for obj in session.dirty:
             if not session.is_modified(obj):
@@ -167,8 +176,12 @@ def _collect(session: Session, _flush_context: Any, _instances: Any) -> None:
                 touched_projects.append(obj.id)
             elif isinstance(obj, Comment):
                 touched_comments.append(obj.id)
+            elif isinstance(obj, Tag):
+                touched_tags.append(obj.id)
 
-        if not (found or touched or touched_projects or touched_comments):
+        if not (
+            found or touched or touched_projects or touched_comments or touched_tags
+        ):
             return
         session.info[_PENDING_KEY] = pending
 
@@ -190,6 +203,12 @@ def _collect(session: Session, _flush_context: Any, _instances: Any) -> None:
             if comment_id in bodies:
                 pending.comments[comment_id] = bodies[comment_id]
 
+        unseen = [tid for tid in touched_tags if tid not in pending.tag_names]
+        names = _load_tag_names(session, unseen)
+        for tag_id in unseen:
+            if tag_id in names:
+                pending.tag_names[tag_id] = names[tag_id]
+
 
 @event.listens_for(Session, "before_commit")
 def _write(session: Session) -> None:
@@ -204,7 +223,9 @@ def _write(session: Session) -> None:
 
     after = _load_states(session, list(pending.before))
     refs = _Refs(session)
-    entries: list[ActivityEntry] = []
+    # Tags first: a tag typed onto a task comes into being before the task
+    # carries it, and the log reads in that order.
+    entries: list[ActivityEntry] = _tag_entries(session, pending)
     # Deletion events this transaction brought rows back from, each with how
     # many of its rows came back.
     restored: dict[uuid.UUID, int] = {}
@@ -725,3 +746,69 @@ def _load_comment_bodies(
         )
     ).all()
     return {row.id: row.body for row in rows}
+
+
+def _tag_entries(session: Session, pending: _Pending) -> list[ActivityEntry]:
+    entries = []
+    for tag_id in pending.tags_created:
+        tag = session.get(Tag, tag_id)
+        if tag is not None:
+            entries.append(
+                _entry(
+                    tag.owner_id,
+                    ActivityAction.TAG_CREATED,
+                    ActivityEntityType.TAG,
+                    tag_id,
+                    name=tag.name,
+                )
+            )
+    after = _load_tag_names(session, list(pending.tag_names))
+    for tag_id, before in pending.tag_names.items():
+        # A tag created in this transaction is logged once, as created.
+        if tag_id in pending.tags_created or tag_id not in after:
+            continue
+        if after[tag_id] != before:
+            tag = session.get_one(Tag, tag_id)
+            entries.append(
+                _entry(
+                    tag.owner_id,
+                    ActivityAction.TAG_RENAMED,
+                    ActivityEntityType.TAG,
+                    tag_id,
+                    name=after[tag_id],
+                    changes={"name": {"from": before, "to": after[tag_id]}},
+                )
+            )
+    return entries
+
+
+def _tag_deleted_entry(session: Session, tag: Tag) -> ActivityEntry:
+    """
+    A tag deletion, written while the tag's links are still there to count:
+    the database takes them away with the tag.
+    """
+    rows = session.execute(
+        select(col(TaskTag.task_id)).where(
+            TaskTag.tag_id == tag.id,
+            TaskTag.task_id == Task.id,
+            col(Task.deletion_id).is_(None),
+        )
+    ).all()
+    return _entry(
+        tag.owner_id,
+        ActivityAction.TAG_DELETED,
+        ActivityEntityType.TAG,
+        tag.id,
+        # A deleted tag is gone for good, so its name is kept here.
+        name=tag.name,
+        task_count=len(rows),
+    )
+
+
+def _load_tag_names(session: Session, tag_ids: list[uuid.UUID]) -> dict[uuid.UUID, str]:
+    if not tag_ids:
+        return {}
+    rows = session.execute(
+        select(col(Tag.id), col(Tag.name)).where(col(Tag.id).in_(tag_ids))
+    ).all()
+    return {row.id: row.name for row in rows}

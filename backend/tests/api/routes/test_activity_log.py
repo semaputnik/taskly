@@ -121,7 +121,11 @@ def test_changing_a_task_is_logged_with_what_changed(
         tags=["home", "plumbing"],
     )
 
-    [entry] = _log_after(client, headers, seen)
+    # "plumbing" is a tag the user did not have: typing it creates it, and that
+    # is logged first, as its own entry (FR-10.3).
+    created, entry = _log_after(client, headers, seen)
+    assert created["action"] == "tag_created"
+    assert created["details"] == {"name": "plumbing"}
     assert entry["action"] == "task_changed"
     assert entry["details"]["title"] == "Fix the kitchen tap"
     assert entry["details"]["changes"] == {

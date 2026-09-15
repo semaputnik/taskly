@@ -53,9 +53,12 @@ interface ActivityDescriptionProps {
   currentUserId?: string
 }
 
-/** What an entry names: the task, project, or task a comment or file is on. */
+/**
+ * What an entry names: the task, project, tag, or task a comment or file is
+ * on.
+ */
 function subjectName(entry: ActivityEntryPublic): string {
-  if (entry.entity_type === "project") {
+  if (entry.entity_type === "project" || entry.entity_type === "tag") {
     return detail<string>(entry, "name") ?? "Untitled project"
   }
   if (entry.entity_type === "comment" || entry.entity_type === "attachment") {
@@ -206,5 +209,25 @@ export function ActivityDescription({
           Removed “{detail<string>(entry, "filename")}” from {subject}
         </>
       )
+    case "tag_created":
+      return <>Created the tag {subject}</>
+    case "tag_renamed": {
+      const change = detail<{ name?: { from: string } }>(entry, "changes")
+      return (
+        <>
+          Renamed the tag “{change?.name?.from}” to {subject}
+        </>
+      )
+    }
+    case "tag_deleted": {
+      const tasks = detail<number>(entry, "task_count") ?? 0
+      return (
+        <>
+          Deleted the tag {subject}
+          {tasks > 0 &&
+            `, taking it off ${tasks} ${tasks === 1 ? "task" : "tasks"}`}
+        </>
+      )
+    }
   }
 }

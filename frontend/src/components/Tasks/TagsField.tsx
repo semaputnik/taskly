@@ -15,9 +15,9 @@ interface TagsFieldProps
 /**
  * Tagging a task: type a name to add it, click a tag to drop it.
  *
- * Tags the user has already used are offered while they type, which is what
- * keeps one tag set from splintering into near-duplicates — there is no screen
- * for managing tags beyond this (FR-01.20).
+ * The user's tags are offered while they type, which is what keeps one tag set
+ * from splintering into near-duplicates. A name that is not a tag yet becomes
+ * one (FR-01.20); renaming and deleting tags is on the Tags page.
  */
 export function TagsField({ value, onChange, ...props }: TagsFieldProps) {
   const [draft, setDraft] = useState("")

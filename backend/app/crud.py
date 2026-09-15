@@ -34,6 +34,7 @@ from app.models import (
     Series,
     SortOrder,
     Tag,
+    TagPublic,
     Task,
     TaskCreate,
     TaskPriority,
@@ -588,11 +589,12 @@ def get_tags(
     q: str | None = None,
     skip: int = 0,
     limit: int = 100,
-) -> tuple[Sequence[Tag], int]:
+) -> tuple[list[TagPublic], int]:
     """
-    The tags a user has used, for autocomplete. `q` matches from the start of
-    the name, ignoring case, so what they type narrows to what they typed
-    before rather than to every tag with those letters somewhere inside.
+    The user's tags, each with the number of tasks carrying it. `q` matches
+    from the start of the name, ignoring case, so what they type narrows to
+    what they typed before rather than to every tag with those letters
+    somewhere inside.
     """
     where: list[Any] = [Tag.owner_id == owner_id]
     if q:
@@ -608,7 +610,71 @@ def get_tags(
         .offset(skip)
         .limit(limit)
     )
-    return session.exec(statement).all(), count
+    tags = session.exec(statement).all()
+    task_counts = get_tag_task_counts(session=session, tag_ids=[tag.id for tag in tags])
+    return [tag_public(tag, task_counts.get(tag.id, 0)) for tag in tags], count
+
+
+def tag_public(tag: Tag, task_count: int = 0) -> TagPublic:
+    return TagPublic(id=tag.id, name=tag.name, task_count=task_count)
+
+
+def get_tag_task_counts(
+    *, session: Session, tag_ids: Sequence[uuid.UUID]
+) -> dict[uuid.UUID, int]:
+    """
+    How many tasks carry each tag, keyed by tag id. A deleted task is not
+    counted: the user cannot see it, though deleting the tag takes it off that
+    task too.
+    """
+    if not tag_ids:
+        return {}
+    rows = session.exec(
+        select(TaskTag.tag_id, func.count())
+        .where(
+            col(TaskTag.tag_id).in_(tag_ids),
+            TaskTag.task_id == Task.id,
+            not_deleted(Task),
+        )
+        .group_by(col(TaskTag.tag_id))
+    ).all()
+    return dict(rows)
+
+
+def get_tag_by_name(*, session: Session, owner_id: uuid.UUID, name: str) -> Tag | None:
+    return session.exec(
+        select(Tag).where(Tag.owner_id == owner_id, Tag.name == name)
+    ).first()
+
+
+def create_tag(*, session: Session, owner_id: uuid.UUID, name: str) -> Tag:
+    tag = Tag(name=name, owner_id=owner_id)
+    session.add(tag)
+    session.commit()
+    session.refresh(tag)
+    return tag
+
+
+def rename_tag(*, session: Session, tag: Tag, name: str) -> Tag:
+    """
+    Rename a tag. Tasks point at it by key, so every task carrying it shows
+    the new name at once (FR-01.24).
+    """
+    tag.name = name
+    session.add(tag)
+    session.commit()
+    session.refresh(tag)
+    return tag
+
+
+def delete_tag(*, session: Session, tag: Tag) -> None:
+    """
+    Delete a tag for good (FR-01.25). The database takes it off every task
+    carrying it, deleted tasks included, so a task restored later comes back
+    without it.
+    """
+    session.delete(tag)
+    session.commit()
 
 
 def get_task_tags(
@@ -631,10 +697,10 @@ def get_task_tags(
 
 def _stage_task_tags(*, session: Session, task: Task, names: Sequence[str]) -> None:
     """
-    Replace a task's tags with `names`, creating the ones the user has not used
-    before (FR-01.20) and dropping any tag left on no task at all. Staged but
-    not committed, so a caller can put it in the same transaction as whatever
-    else it is writing.
+    Replace a task's tags with `names`, creating the ones the user does not
+    have yet (FR-01.20). A tag taken off its last task stays (FR-01.23). Staged
+    but not committed, so a caller can put it in the same transaction as
+    whatever else it is writing.
     """
     links = session.exec(select(TaskTag).where(TaskTag.task_id == task.id)).all()
     linked = {link.tag_id: link for link in links}
@@ -650,7 +716,6 @@ def _stage_task_tags(*, session: Session, task: Task, names: Sequence[str]) -> N
             session.add(TaskTag(task_id=task.id, tag_id=tag.id))
 
     session.flush()
-    _drop_unused_tags(session=session, tag_ids=set(linked) - wanted)
 
 
 def _tags_for_names(
@@ -672,29 +737,6 @@ def _tags_for_names(
         tags.append(tag)
     session.flush()
     return tags
-
-
-def _drop_unused_tags(*, session: Session, tag_ids: set[uuid.UUID]) -> None:
-    """
-    Remove tags nothing carries any more.
-
-    Applying and removing tags is the whole of tag management (FR-01.20), so a
-    tag no task holds has no way back out of autocomplete unless it goes here.
-    A soft-deleted task keeps its links, and with them its tags, so restoring
-    it brings them back.
-    """
-    if not tag_ids:
-        return
-
-    still_used = set(
-        session.exec(
-            select(TaskTag.tag_id).where(col(TaskTag.tag_id).in_(tag_ids))
-        ).all()
-    )
-    for tag_id in tag_ids - still_used:
-        tag = session.get(Tag, tag_id)
-        if tag is not None:
-            session.delete(tag)
 
 
 def not_deleted(model: type[Task] | type[Project]) -> Any:

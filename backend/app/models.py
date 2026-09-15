@@ -189,12 +189,14 @@ class TagBase(SQLModel):
 
 class Tag(TagBase, table=True):
     """
-    A free-text label a user puts on tasks.
+    A named label a user puts on tasks.
 
     Tags belong to the user rather than to a project, so one means the same
     thing across their whole account and can gather work that crosses projects
-    (FR-01.21). There is no screen for managing them: a tag comes into being by
-    being typed onto a task (FR-01.20).
+    (FR-01.21). A tag is created on its own or by typing a new name onto a task
+    (FR-01.20), and stays until it is deleted, whether or not any task carries
+    it (FR-01.23). Tasks point at it by key, so renaming it renames it on every
+    task, and deleting it takes it off every task (FR-01.24, FR-01.25).
     """
 
     __table_args__ = (
@@ -222,8 +224,19 @@ class TaskTag(SQLModel, table=True):
     )
 
 
+class TagCreate(SQLModel):
+    name: TagName
+
+
+class TagUpdate(SQLModel):
+    name: TagName
+
+
 class TagPublic(TagBase):
     id: uuid.UUID
+    # The tasks carrying it that are not deleted: what the user can see, and
+    # what deleting the tag takes it off (FR-01.26).
+    task_count: int = 0
 
 
 class TagsPublic(SQLModel):
@@ -670,6 +683,9 @@ class ActivityAction(StrEnum):
     COMMENT_DELETED = "comment_deleted"
     ATTACHMENT_ADDED = "attachment_added"
     ATTACHMENT_DELETED = "attachment_deleted"
+    TAG_CREATED = "tag_created"
+    TAG_RENAMED = "tag_renamed"
+    TAG_DELETED = "tag_deleted"
 
 
 class ActivityEntityType(StrEnum):
@@ -677,6 +693,7 @@ class ActivityEntityType(StrEnum):
     PROJECT = "project"
     COMMENT = "comment"
     ATTACHMENT = "attachment"
+    TAG = "tag"
 
 
 class ActivityEntry(SQLModel, table=True):
