@@ -9,7 +9,7 @@ export type ClientOptions = {
  *
  * Everything the activity log records (FR-10.3).
  */
-export type ActivityAction = 'task_created' | 'task_changed' | 'task_completed' | 'task_reopened' | 'task_deleted' | 'task_restored' | 'task_moved' | 'task_assigned' | 'task_unassigned' | 'project_created' | 'project_changed' | 'project_deleted' | 'comment_added' | 'comment_edited' | 'comment_deleted' | 'attachment_added' | 'attachment_deleted';
+export type ActivityAction = 'task_created' | 'task_changed' | 'task_completed' | 'task_reopened' | 'task_deleted' | 'task_restored' | 'task_moved' | 'task_assigned' | 'task_unassigned' | 'project_created' | 'project_changed' | 'project_deleted' | 'project_restored' | 'comment_added' | 'comment_edited' | 'comment_deleted' | 'attachment_added' | 'attachment_deleted';
 
 /**
  * ActivityEntityType

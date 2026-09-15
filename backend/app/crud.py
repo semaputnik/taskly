@@ -814,18 +814,25 @@ def restoring_reopens_a_series(*, session: Session, tasks: Sequence[Task]) -> bo
     return False
 
 
-def restore_deletion(*, session: Session, tasks: Sequence[Task]) -> None:
+def restore_deletion(
+    *, session: Session, tasks: Sequence[Task], project: Project | None = None
+) -> None:
     """
-    Bring back the rows of one deletion event (FR-10.4, FR-01.10).
+    Bring back the rows of one deletion event (FR-10.4, FR-01.10, FR-05.9).
 
-    Clearing the marker is the whole restore: nothing is re-created, so each
-    task comes back as itself, with its comments, attachments, tags and
-    history. Only the rows still marked by this event come back, which is what
-    leaves a subtask deleted on its own beforehand deleted.
+    Clearing the marker is the whole restore, for a task and its subtasks and
+    for a project and its tasks alike: nothing is re-created, so each row comes
+    back as itself, with its comments, attachments, tags and history. Only the
+    rows still marked by this event come back, which is what leaves anything
+    deleted on its own beforehand deleted. Archiving is a separate state and is
+    left as it was.
     """
     for task in tasks:
         task.deletion_id = None
         session.add(task)
+    if project is not None:
+        project.deletion_id = None
+        session.add(project)
     session.commit()
 
 

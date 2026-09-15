@@ -23,6 +23,9 @@ from app.models import (
 
 router = APIRouter(prefix="/activity-log", tags=["activity"])
 
+# The entries a restore can start from.
+_DELETIONS = (ActivityAction.TASK_DELETED, ActivityAction.PROJECT_DELETED)
+
 # A restore that cannot go ahead is a state the user can resolve, not a
 # malformed request: each cause has its own code so the client can say which
 # thing is in the way (semaputnik/taskly#8, story 27).
@@ -71,17 +74,18 @@ def read_activity_log(
     deletion_ids = {
         entry.deletion_id
         for entry in entries
-        if entry.action == ActivityAction.TASK_DELETED and entry.deletion_id
+        if entry.action in _DELETIONS and entry.deletion_id
     }
-    still_deleted = (
-        set(
-            session.exec(
-                select(Task.deletion_id).where(col(Task.deletion_id).in_(deletion_ids))
-            ).all()
-        )
-        if deletion_ids
-        else set()
-    )
+    still_deleted: set[uuid.UUID | None] = set()
+    if deletion_ids:
+        for model in (Task, Project):
+            still_deleted.update(
+                session.exec(
+                    select(model.deletion_id).where(
+                        col(model.deletion_id).in_(deletion_ids)
+                    )
+                ).all()
+            )
 
     return ActivityEntriesPublic(
         data=[
@@ -90,7 +94,7 @@ def read_activity_log(
                 update={
                     "entity_exists": entry.entity_id in locations,
                     "entity_project_id": locations.get(entry.entity_id),
-                    "restorable": entry.action == ActivityAction.TASK_DELETED
+                    "restorable": entry.action in _DELETIONS
                     and entry.deletion_id in still_deleted,
                 },
             )
@@ -150,25 +154,32 @@ def restore_from_activity_entry(
     """
     Restore what a deletion entry records as deleted (FR-10.4).
 
-    The deletion entry is the handle: there is no trash to restore from. The
-    task comes back with exactly the subtasks that went down in the same
-    deletion, so a subtask deleted on its own before stays deleted (FR-01.10).
-    A restore is refused, with a code naming the cause, when the task would
-    have nowhere to come back to. Restoring what is already back changes
-    nothing.
+    The deletion entry is the handle: there is no trash to restore from. What
+    comes back is exactly what went down in that deletion — a task with its
+    subtasks (FR-01.10), or a project with its tasks (FR-05.9) — so anything
+    deleted on its own before stays deleted. A restore is refused, with a code
+    naming the cause, when it has nowhere to come back to. Restoring what is
+    already back changes nothing.
     """
     entry = session.get(ActivityEntry, entry_id)
     if not entry or entry.owner_id != current_user.id:
         raise HTTPException(status_code=404, detail="Activity entry not found")
-    if entry.action != ActivityAction.TASK_DELETED or entry.deletion_id is None:
+    if entry.action not in _DELETIONS or entry.deletion_id is None:
         raise HTTPException(status_code=400, detail="Only a deletion can be restored")
 
     deletion = session.get_one(Deletion, entry.deletion_id)
+    tasks = crud.get_deletion_rows(session=session, deletion_id=deletion.id)
+    if deletion.project_id is not None:
+        project = session.get_one(Project, deletion.project_id)
+        if project.deletion_id is None:
+            return Message(message="Already restored")
+        _check_project_restore(session, deletion, project, tasks)
+        crud.restore_deletion(session=session, tasks=tasks, project=project)
+        return Message(message="Project restored")
+
     assert deletion.task_id is not None
     task = session.get_one(Task, deletion.task_id)
-    rows = crud.get_deletion_rows(session=session, deletion_id=deletion.id)
-
-    if not rows:
+    if not tasks:
         if task.deletion_id is None:
             return Message(message="Already restored")
         raise _refuse(
@@ -176,7 +187,13 @@ def restore_from_activity_entry(
             "This task was restored and then deleted again. Restore it from "
             "the later deletion instead.",
         )
+    _check_task_restore(session, task, tasks)
+    crud.restore_deletion(session=session, tasks=tasks)
+    return Message(message="Task restored")
 
+
+def _check_task_restore(session: SessionDep, task: Task, tasks: Sequence[Task]) -> None:
+    """Refuse a task restore that has nowhere to come back to."""
     if task.parent_id is not None:
         parent = session.get_one(Task, task.parent_id)
         if parent.deletion_id is not None:
@@ -199,12 +216,34 @@ def restore_from_activity_entry(
     # same way it refuses any other change.
     require_project_writable(project)
 
-    if crud.restoring_reopens_a_series(session=session, tasks=rows):
+    if crud.restoring_reopens_a_series(session=session, tasks=tasks):
         raise _refuse(
             SERIES_HAS_OPEN_OCCURRENCE_CODE,
             f"“{task.title}” repeats, and another occurrence of it is already "
             "open. Complete or delete that one first.",
         )
 
-    crud.restore_deletion(session=session, tasks=rows)
-    return Message(message="Task restored")
+
+def _check_project_restore(
+    session: SessionDep, deletion: Deletion, project: Project, tasks: Sequence[Task]
+) -> None:
+    """
+    Refuse a project restore that cannot be done whole.
+
+    A project comes back archived if it was archived when deleted: the two
+    states are independent (FR-05.10), so that is no reason to refuse.
+    """
+    if project.deletion_id != deletion.id:
+        raise _refuse(
+            DELETED_AGAIN_CODE,
+            "This project was restored and then deleted again. Restore it "
+            "from the later deletion instead.",
+        )
+    if crud.restoring_reopens_a_series(session=session, tasks=tasks):
+        # Refused as a whole: bringing the project back without one of its
+        # tasks would be a restore nobody asked for.
+        raise _refuse(
+            SERIES_HAS_OPEN_OCCURRENCE_CODE,
+            f"A repeating task in “{project.name}” has another occurrence "
+            "already open. Complete or delete that one first.",
+        )
