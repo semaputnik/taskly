@@ -1,0 +1,37 @@
+import { Bot } from "lucide-react"
+
+import type { ActivityEntryPublic } from "@/client"
+import { Badge } from "@/components/ui/badge"
+
+interface ActorLabelProps {
+  entry: ActivityEntryPublic
+  currentUserId?: string
+  /** Drop the "Bot" badge where the surrounding copy already says so. */
+  showBadge?: boolean
+}
+
+/**
+ * Who made the change: you, or one of your bot users by name (FR-10.2). A bot
+ * is named as it was called at the time, so the line still reads after it is
+ * renamed or deleted.
+ */
+export function ActorLabel({
+  entry,
+  currentUserId,
+  showBadge = true,
+}: ActorLabelProps) {
+  if (entry.actor_bot_user_id) {
+    return (
+      <span className="inline-flex items-center gap-1.5">
+        <Bot className="text-muted-foreground size-4" aria-hidden />
+        {entry.actor_bot_user_name ?? "A bot user"}
+        {showBadge && (
+          <Badge variant="outline" className="text-xs">
+            Bot
+          </Badge>
+        )}
+      </span>
+    )
+  }
+  return <>{entry.actor_id === currentUserId ? "You" : "Someone else"}</>
+}
