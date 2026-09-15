@@ -54,6 +54,9 @@ NOT_LOGGED = {
     f"POST {API}/bot-users/{{bot_user_id}}/token": (
         "Issuing a token is a credential, not a change to tasks or projects"
     ),
+    f"DELETE {API}/bot-users/{{bot_user_id}}/token": (
+        "Revoking a token is a credential, not a change to tasks or projects"
+    ),
     f"POST {API}/utils/test-email/": "Sends an email; changes nothing",
     f"POST {API}/private/users/": "Local development helper for test accounts",
 }

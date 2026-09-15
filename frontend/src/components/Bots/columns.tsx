@@ -5,6 +5,8 @@ import type { DataTableFeatures } from "@/components/Common/DataTable"
 import { Badge } from "@/components/ui/badge"
 import IssueToken from "./IssueToken"
 import { PERMISSIONS } from "./permissions"
+import RevokeToken from "./RevokeToken"
+import { formatDate, formatDateTime, tokenStatus } from "./tokens"
 
 export function getColumns(
   projectNames: Record<string, string>,
@@ -61,20 +63,46 @@ export function getColumns(
     {
       id: "token",
       header: "Token",
-      cell: ({ row }) => {
-        const bot = row.original
-        if (!bot.has_token) {
-          return <IssueToken bot={bot} />
-        }
-        return (
-          <span className="text-muted-foreground">
-            Issued{" "}
-            {bot.token_issued_at
-              ? new Date(bot.token_issued_at).toLocaleDateString()
-              : ""}
-          </span>
-        )
-      },
+      cell: ({ row }) => <TokenCell bot={row.original} />,
     },
   ]
+}
+
+function TokenCell({ bot }: { bot: BotUserPublic }) {
+  const status = tokenStatus(bot)
+
+  if (status === "none" || status === "revoked") {
+    return (
+      <div className="flex flex-col items-start gap-1.5">
+        {status === "revoked" && (
+          <span className="text-muted-foreground text-xs">
+            Revoked {formatDate(bot.token_revoked_at)}
+          </span>
+        )}
+        <IssueToken bot={bot} />
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex flex-col items-start gap-1.5 text-xs">
+      {status === "expired" ? (
+        <Badge variant="destructive">
+          Expired {formatDate(bot.token_expires_at)}
+        </Badge>
+      ) : (
+        <span>
+          {bot.token_expires_at
+            ? `Expires ${formatDate(bot.token_expires_at)}`
+            : "Never expires"}
+        </span>
+      )}
+      <span className="text-muted-foreground">
+        {bot.token_last_used_at
+          ? `Last used ${formatDateTime(bot.token_last_used_at)}`
+          : "Never used"}
+      </span>
+      <RevokeToken bot={bot} />
+    </div>
+  )
 }

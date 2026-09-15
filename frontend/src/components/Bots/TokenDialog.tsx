@@ -12,10 +12,12 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { useCopyToClipboard } from "@/hooks/useCopyToClipboard"
+import { formatDateTime } from "./tokens"
 
 interface TokenDialogProps {
   botName: string
   token: string | null
+  expiresAt?: string | null
   onClose: () => void
 }
 
@@ -23,7 +25,12 @@ interface TokenDialogProps {
  * The one time a bot user's token is on screen. Only its digest is stored, so
  * once this closes nothing can show it again (FR-08.13).
  */
-const TokenDialog = ({ botName, token, onClose }: TokenDialogProps) => {
+const TokenDialog = ({
+  botName,
+  token,
+  expiresAt,
+  onClose,
+}: TokenDialogProps) => {
   const [copiedText, copy] = useCopyToClipboard()
   const copied = token !== null && copiedText === token
 
@@ -67,6 +74,12 @@ const TokenDialog = ({ botName, token, onClose }: TokenDialogProps) => {
             {copied ? "Copied" : "Copy"}
           </Button>
         </div>
+
+        <p className="text-muted-foreground text-sm">
+          {expiresAt
+            ? `It expires ${formatDateTime(expiresAt)}.`
+            : "It works until you revoke it."}
+        </p>
 
         <DialogFooter>
           <Button type="button" onClick={onClose}>
