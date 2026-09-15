@@ -1,6 +1,7 @@
+import calendar
 import uuid
 from collections.abc import Sequence
-from datetime import date
+from datetime import date, timedelta
 from typing import Any
 
 from sqlalchemy import case, nullslast, or_
@@ -14,9 +15,13 @@ from app.models import (
     CommentCreate,
     CommentUpdate,
     Deletion,
+    DueDateScope,
     Project,
     ProjectCreate,
     ProjectUpdate,
+    Recurrence,
+    RecurrenceFrequency,
+    Series,
     SortOrder,
     Tag,
     Task,
@@ -131,7 +136,9 @@ def create_task(
 ) -> Task:
     """
     Create a task. `project_id` is set on root tasks and None on subtasks,
-    which derive their project from their root ancestor.
+    which derive their project from their root ancestor. A task created with a
+    recurrence is the first occurrence of a new series, which the caller has
+    checked it can be: a root task with a due date.
     """
     db_obj = Task.model_validate(
         task_create, update={"project_id": project_id, "owner_id": owner_id}
@@ -142,20 +149,274 @@ def create_task(
     # the tags it was typed with.
     session.flush()
     _stage_task_tags(session=session, task=db_obj, names=tag_names)
+    if task_create.recurrence is not None:
+        _stage_recurrence(
+            session=session, task=db_obj, recurrence=task_create.recurrence
+        )
     session.commit()
     session.refresh(db_obj)
     return db_obj
 
 
-def update_task(*, session: Session, db_task: Task, task_in: TaskUpdate) -> Task:
-    # `subtasks` directs what happens to the subtree (handled by the caller)
-    # rather than naming a column, so it never reaches the row.
-    task_data = task_in.model_dump(exclude_unset=True, exclude={"subtasks", "tags"})
+def update_task(
+    *,
+    session: Session,
+    db_task: Task,
+    task_in: TaskUpdate,
+    tag_names: Sequence[str] | None = None,
+) -> Task:
+    """
+    Apply an update to a task, including what it means for the task's series,
+    and commit it as one transaction.
+
+    Completing an occurrence of a recurring task creates the next one here, in
+    the same commit as the completion (FR-01.14): there is never a moment with
+    the series left with no open occurrence, or with two.
+    """
+    # The directives steer what happens around the row (the subtree, the
+    # series) rather than naming columns of it, so they never reach it as such.
+    task_data = task_in.model_dump(
+        exclude_unset=True,
+        exclude={"subtasks", "tags", "recurrence", "due_date_scope"},
+    )
+    fields_set = task_in.model_fields_set
+    was_completed = db_task.completed
+
     db_task.sqlmodel_update(task_data)
     session.add(db_task)
+
+    if "recurrence" in fields_set:
+        _stage_recurrence(session=session, task=db_task, recurrence=task_in.recurrence)
+    # Not an alternative to the above: a client resending the rule the task
+    # already has is still asking for the series to move.
+    if (
+        task_in.due_date_scope is DueDateScope.THIS_AND_FOLLOWING
+        and db_task.series_id is not None
+    ):
+        _stage_reanchor(session=session, task=db_task)
+
+    # The completion has to reach the database before the next occurrence
+    # does: only one open occurrence per series is ever allowed to exist.
+    session.flush()
+
+    if tag_names is not None:
+        _stage_task_tags(session=session, task=db_task, names=tag_names)
+
+    if db_task.completed and not was_completed and db_task.series_id is not None:
+        _stage_next_occurrence(session=session, task=db_task)
+
     session.commit()
     session.refresh(db_task)
     return db_task
+
+
+def get_recurrences(
+    *, session: Session, tasks: Sequence[Task]
+) -> dict[uuid.UUID, Recurrence | None]:
+    """The recurrence of each of the given tasks, keyed by task id."""
+    series_ids = {task.series_id for task in tasks if task.series_id is not None}
+    series: dict[uuid.UUID, Series] = {}
+    if series_ids:
+        statement = select(Series).where(col(Series.id).in_(series_ids))
+        series = {row.id: row for row in session.exec(statement).all()}
+    return {
+        task.id: _recurrence_of(series[task.series_id])
+        if task.series_id is not None
+        else None
+        for task in tasks
+    }
+
+
+def _recurrence_of(series: Series) -> Recurrence:
+    return Recurrence(frequency=series.frequency, interval_days=series.interval_days)
+
+
+def shift_date(start: date, recurrence: Recurrence, intervals: int) -> date:
+    """
+    The date a whole number of recurrence intervals away from `start`.
+
+    Months are counted on the calendar, keeping the day of the month and
+    landing on the month's last day when it is shorter: from January 31st,
+    one month is February's last day and two months is March 31st.
+    """
+    if recurrence.frequency is RecurrenceFrequency.MONTHLY:
+        months = start.month - 1 + intervals
+        year = start.year + months // 12
+        month = months % 12 + 1
+        day = min(start.day, calendar.monthrange(year, month)[1])
+        return date(year, month, day)
+
+    if recurrence.frequency is RecurrenceFrequency.DAILY:
+        days = 1
+    elif recurrence.frequency is RecurrenceFrequency.WEEKLY:
+        days = 7
+    else:
+        assert recurrence.interval_days is not None
+        days = recurrence.interval_days
+    return start + timedelta(days=days * intervals)
+
+
+def is_superseded(*, session: Session, task: Task) -> bool:
+    """
+    Whether a later occurrence of the task's series already exists. Only the
+    latest occurrence can be open, so only it can be returned to not completed.
+    """
+    if task.series_id is None or task.series_step is None:
+        return False
+    statement = (
+        select(Task.id)
+        .where(
+            Task.series_id == task.series_id,
+            col(Task.series_step) > task.series_step,
+            not_deleted(Task),
+        )
+        .limit(1)
+    )
+    return session.exec(statement).first() is not None
+
+
+def _stage_recurrence(
+    *, session: Session, task: Task, recurrence: Recurrence | None
+) -> None:
+    """
+    Give the task the recurrence it asks for.
+
+    `None` takes the task out of its series, so completing it creates nothing.
+    A task that did not recur starts a series with itself as the first
+    occurrence. A task whose rule changes keeps its series and restarts the
+    schedule from its own due date: a new rhythm has no older date to keep to.
+    """
+    if recurrence is None:
+        task.series_id = None
+        task.series_step = None
+        session.add(task)
+        return
+
+    assert task.due_date is not None, "a recurring task needs a due date"
+
+    if task.series_id is None:
+        series = Series(
+            owner_id=task.owner_id,
+            frequency=recurrence.frequency,
+            interval_days=recurrence.interval_days,
+            anchor_date=task.due_date,
+            anchor_step=0,
+        )
+        session.add(series)
+        session.flush()
+        task.series_id = series.id
+        task.series_step = 0
+        session.add(task)
+        return
+
+    series = session.get_one(Series, task.series_id)
+    if _recurrence_of(series) == recurrence:
+        return
+    series.frequency = recurrence.frequency
+    series.interval_days = recurrence.interval_days
+    session.add(series)
+    _stage_reanchor(session=session, task=task)
+
+
+def _stage_reanchor(*, session: Session, task: Task) -> None:
+    """
+    Move the series' schedule onto this occurrence's due date, so every later
+    occurrence is counted from it (FR-01.19).
+    """
+    assert task.due_date is not None and task.series_step is not None
+    series = session.get_one(Series, task.series_id)
+    series.anchor_date = task.due_date
+    series.anchor_step = task.series_step
+    session.add(series)
+
+
+def _stage_next_occurrence(*, session: Session, task: Task) -> Task:
+    """
+    Create the occurrence that follows `task` in its series (FR-01.14).
+
+    Its due date comes from the series' schedule, not from `task`'s own date,
+    so an occurrence moved on its own leaves the rest where they were
+    (FR-01.15, FR-01.18). The subtask tree comes along with every subtask not
+    completed; comments and attachments stay with the occurrence they were
+    about.
+    """
+    assert task.due_date is not None and task.series_step is not None
+    series = session.get_one(Series, task.series_id)
+    step = task.series_step + 1
+    due_date = shift_date(
+        series.anchor_date, _recurrence_of(series), step - series.anchor_step
+    )
+
+    successor = _stage_copy(
+        session=session,
+        source=task,
+        parent_id=None,
+        project_id=task.project_id,
+        due_date=due_date,
+    )
+    successor.series_id = series.id
+    successor.series_step = step
+    session.add(successor)
+
+    _stage_subtree_copy(
+        session=session,
+        source_id=task.id,
+        target_id=successor.id,
+        # Subtasks keep their distance from the task at the top: a checklist
+        # item due the day before the occurrence is due the day before the
+        # next one too.
+        offset=due_date - task.due_date,
+    )
+    return successor
+
+
+def _stage_copy(
+    *,
+    session: Session,
+    source: Task,
+    parent_id: uuid.UUID | None,
+    project_id: uuid.UUID | None,
+    due_date: date | None,
+) -> Task:
+    """A not-completed copy of `source`'s own fields and tags, and nothing else."""
+    copy = Task(
+        title=source.title,
+        description=source.description,
+        priority=source.priority,
+        assignee_id=source.assignee_id,
+        due_date=due_date,
+        parent_id=parent_id,
+        project_id=project_id,
+        owner_id=source.owner_id,
+    )
+    session.add(copy)
+    session.flush()
+    names = get_task_tags(session=session, task_ids=[source.id])[source.id]
+    _stage_task_tags(session=session, task=copy, names=names)
+    return copy
+
+
+def _stage_subtree_copy(
+    *, session: Session, source_id: uuid.UUID, target_id: uuid.UUID, offset: timedelta
+) -> None:
+    """Copy every subtask under `source_id` that is not deleted to under
+    `target_id`, keeping the tree's shape and its siblings' order."""
+    children = session.exec(
+        select(Task)
+        .where(Task.parent_id == source_id, not_deleted(Task))
+        .order_by(col(Task.created_at))
+    ).all()
+    for child in children:
+        copy = _stage_copy(
+            session=session,
+            source=child,
+            parent_id=target_id,
+            project_id=None,
+            due_date=child.due_date + offset if child.due_date else None,
+        )
+        _stage_subtree_copy(
+            session=session, source_id=child.id, target_id=copy.id, offset=offset
+        )
 
 
 def get_tasks(
@@ -313,18 +574,13 @@ def get_task_tags(
     return {task_id: sorted(names, key=str.lower) for task_id, names in tags.items()}
 
 
-def set_task_tags(*, session: Session, task: Task, names: Sequence[str]) -> None:
+def _stage_task_tags(*, session: Session, task: Task, names: Sequence[str]) -> None:
     """
     Replace a task's tags with `names`, creating the ones the user has not used
-    before (FR-01.20) and dropping any tag left on no task at all.
+    before (FR-01.20) and dropping any tag left on no task at all. Staged but
+    not committed, so a caller can put it in the same transaction as whatever
+    else it is writing.
     """
-    _stage_task_tags(session=session, task=task, names=names)
-    session.commit()
-
-
-def _stage_task_tags(*, session: Session, task: Task, names: Sequence[str]) -> None:
-    """The tag work itself, staged but not committed, so a caller can put it in
-    the same transaction as whatever else it is writing."""
     links = session.exec(select(TaskTag).where(TaskTag.task_id == task.id)).all()
     linked = {link.tag_id: link for link in links}
 

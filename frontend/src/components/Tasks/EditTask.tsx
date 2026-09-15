@@ -6,6 +6,7 @@ import { useForm } from "react-hook-form"
 import { z } from "zod"
 
 import {
+  type DueDateScope,
   ProjectsService,
   type TaskPublic,
   TasksService,
@@ -42,21 +43,33 @@ import {
 import useAuth from "@/hooks/useAuth"
 import useCustomToast from "@/hooks/useCustomToast"
 import { handleError } from "@/utils"
+import {
+  checkRecurrence,
+  DueDateScopeDialog,
+  RecurrenceFields,
+  recurrenceFormValues,
+  recurrenceShape,
+  sameRecurrence,
+  toRecurrence,
+} from "./recurrence"
 import { TagsField } from "./TagsField"
 
 const NO_PRIORITY = "none"
 const UNASSIGNED = "unassigned"
 const ASSIGNED_TO_ME = "me"
 
-const formSchema = z.object({
-  title: z.string().min(1, { message: "Title is required" }),
-  description: z.string().optional(),
-  project_id: z.string().optional(),
-  due_date: z.string().optional(),
-  priority: z.string().optional(),
-  assignee: z.string().optional(),
-  tags: z.array(z.string()),
-})
+const formSchema = z
+  .object({
+    title: z.string().min(1, { message: "Title is required" }),
+    description: z.string().optional(),
+    project_id: z.string().optional(),
+    due_date: z.string().optional(),
+    priority: z.string().optional(),
+    assignee: z.string().optional(),
+    tags: z.array(z.string()),
+    ...recurrenceShape,
+  })
+  .superRefine(checkRecurrence)
 
 type FormData = z.infer<typeof formSchema>
 
@@ -67,6 +80,8 @@ interface EditTaskProps {
 
 const EditTask = ({ task, onSuccess }: EditTaskProps) => {
   const [isOpen, setIsOpen] = useState(false)
+  // An update held back until the user says how far a new due date reaches.
+  const [awaitingScope, setAwaitingScope] = useState<TaskUpdate | null>(null)
   const queryClient = useQueryClient()
   const { showSuccessToast, showErrorToast } = useCustomToast()
   const { user: currentUser } = useAuth()
@@ -95,6 +110,7 @@ const EditTask = ({ task, onSuccess }: EditTaskProps) => {
       priority: task.priority ?? NO_PRIORITY,
       assignee: task.assignee_id ? ASSIGNED_TO_ME : UNASSIGNED,
       tags: task.tags ?? [],
+      ...recurrenceFormValues(task.recurrence),
     },
   })
 
@@ -103,10 +119,14 @@ const EditTask = ({ task, onSuccess }: EditTaskProps) => {
       TasksService.updateTask({ path: { task_id: task.id }, body: data }),
     onSuccess: () => {
       showSuccessToast("Task updated successfully")
+      setAwaitingScope(null)
       setIsOpen(false)
       onSuccess()
     },
-    onError: handleError.bind(showErrorToast),
+    onError: (error: Error) => {
+      setAwaitingScope(null)
+      handleError.call(showErrorToast, error)
+    },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["tasks"] })
       // A tag typed here is new to the account, and one dropped off the last
@@ -116,20 +136,42 @@ const EditTask = ({ task, onSuccess }: EditTaskProps) => {
   })
 
   const onSubmit = (data: FormData) => {
+    const recurrence = toRecurrence(data)
+    const dueDate = data.due_date || null
     // Editing an existing task: an omitted key means "leave unchanged", so a
     // cleared field must be sent as `null`, not dropped as `undefined`.
-    mutation.mutate({
+    const body: TaskUpdate = {
       title: data.title,
       description: data.description || null,
       project_id: isSubtask ? undefined : data.project_id,
-      due_date: data.due_date || null,
+      due_date: dueDate,
       priority:
         data.priority && data.priority !== NO_PRIORITY
           ? (data.priority as TaskUpdate["priority"])
           : null,
       assignee_id: data.assignee === ASSIGNED_TO_ME ? currentUser?.id : null,
       tags: data.tags,
-    })
+      recurrence: isSubtask ? undefined : recurrence,
+    }
+
+    // Moving an open occurrence on its own schedule has to say whether the
+    // routine moves with it; a changed rule restarts the schedule anyway.
+    const reschedules =
+      task.recurrence &&
+      !task.completed &&
+      dueDate !== (task.due_date ?? null) &&
+      sameRecurrence(recurrence, task.recurrence)
+    if (reschedules) {
+      setAwaitingScope(body)
+      return
+    }
+    mutation.mutate(body)
+  }
+
+  const onScopeChosen = (scope: DueDateScope) => {
+    if (awaitingScope) {
+      mutation.mutate({ ...awaitingScope, due_date_scope: scope })
+    }
   }
 
   return (
@@ -225,6 +267,13 @@ const EditTask = ({ task, onSuccess }: EditTaskProps) => {
                 )}
               />
 
+              {!isSubtask && (
+                <RecurrenceFields
+                  control={form.control}
+                  disabled={task.completed}
+                />
+              )}
+
               <FormField
                 control={form.control}
                 name="priority"
@@ -305,6 +354,12 @@ const EditTask = ({ task, onSuccess }: EditTaskProps) => {
           </form>
         </Form>
       </DialogContent>
+      <DueDateScopeDialog
+        open={awaitingScope !== null}
+        onOpenChange={(open) => !open && setAwaitingScope(null)}
+        onChoose={onScopeChosen}
+        pending={mutation.isPending}
+      />
     </Dialog>
   )
 }
