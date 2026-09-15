@@ -3,11 +3,22 @@ from fastapi.testclient import TestClient
 from sqlmodel import Session, col, select
 
 from app import activity, crud
+from app.api.deps import get_attachment_storage
 from app.core.config import settings
+from app.main import app
 from app.models import ActivityEntry, TaskCreate, UserCreate
+from tests.api.routes.test_attachments import InMemoryAttachmentStorage
 from tests.utils.utils import random_email, random_lower_string
 
 API = settings.API_V1_STR
+
+
+@pytest.fixture(autouse=True)
+def storage():
+    fake_storage = InMemoryAttachmentStorage()
+    app.dependency_overrides[get_attachment_storage] = lambda: fake_storage
+    yield fake_storage
+    del app.dependency_overrides[get_attachment_storage]
 
 
 def _headers_for_new_user(client: TestClient, db: Session) -> dict[str, str]:
@@ -78,7 +89,7 @@ def test_creating_a_task_is_logged(client: TestClient, db: Session) -> None:
         tags=["plumbing"],
     )
 
-    [entry] = _log(client, headers)
+    [entry] = [e for e in _log(client, headers) if e["entity_type"] == "task"]
     assert entry["action"] == "task_created"
     assert entry["entity_type"] == "task"
     assert entry["entity_id"] == task["id"]
@@ -212,6 +223,187 @@ def test_deleting_a_task_is_one_entry_for_the_whole_deletion(
     assert entry["details"]["title"] == "Move house"
     assert entry["details"]["project"] == {"id": project["id"], "name": "Home"}
     assert entry["details"]["subtask_count"] == 2
+
+
+# --- Projects, comments and attachments ---------------------------------------
+
+
+def test_a_new_account_starts_with_an_empty_log(
+    client: TestClient, db: Session
+) -> None:
+    headers = _headers_for_new_user(client, db)
+
+    # The Inbox comes with the account; nobody made it.
+    assert _log(client, headers) == []
+
+
+def test_creating_a_project_is_logged(client: TestClient, db: Session) -> None:
+    headers = _headers_for_new_user(client, db)
+
+    r = client.post(
+        f"{API}/projects/",
+        headers=headers,
+        json={"name": "Home", "description": "Around the flat"},
+    )
+    project = r.json()
+
+    [entry] = _log(client, headers)
+    assert entry["action"] == "project_created"
+    assert entry["entity_type"] == "project"
+    assert entry["entity_id"] == project["id"]
+    assert entry["actor_id"] == _me(client, headers)
+    assert entry["details"] == {"name": "Home", "description": "Around the flat"}
+    assert entry["entity_exists"] is True
+    assert entry["entity_project_id"] == project["id"]
+
+
+def test_changing_a_project_is_logged_with_what_changed(
+    client: TestClient, db: Session
+) -> None:
+    headers = _headers_for_new_user(client, db)
+    project = _create_project(client, headers, "Home")
+    seen = _log(client, headers)
+
+    r = client.patch(
+        f"{API}/projects/{project['id']}",
+        headers=headers,
+        json={"name": "Flat", "description": "Second floor"},
+    )
+    assert r.status_code == 200
+
+    [entry] = _log_after(client, headers, seen)
+    assert entry["action"] == "project_changed"
+    assert entry["details"]["name"] == "Flat"
+    assert entry["details"]["changes"] == {
+        "name": {"from": "Home", "to": "Flat"},
+        "description": {"from": None, "to": "Second floor"},
+    }
+
+
+def test_deleting_a_project_is_one_entry_for_the_whole_deletion(
+    client: TestClient, db: Session
+) -> None:
+    headers = _headers_for_new_user(client, db)
+    project = _create_project(client, headers, "Someday")
+    root = _create_task(client, headers, "Learn the cello", project_id=project["id"])
+    _create_task(client, headers, "Find a teacher", parent_id=root["id"])
+    _create_task(client, headers, "Read more", project_id=project["id"])
+    seen = _log(client, headers)
+
+    r = client.delete(f"{API}/projects/{project['id']}", headers=headers)
+    assert r.status_code == 200
+
+    [entry] = _log_after(client, headers, seen)
+    assert entry["action"] == "project_deleted"
+    assert entry["entity_id"] == project["id"]
+    assert entry["deletion_id"] is not None
+    assert entry["details"] == {"name": "Someday", "task_count": 3}
+    assert entry["entity_exists"] is False
+
+
+def test_adding_editing_and_deleting_a_comment_are_logged(
+    client: TestClient, db: Session
+) -> None:
+    headers = _headers_for_new_user(client, db)
+    project = _create_project(client, headers, "Home")
+    task = _create_task(client, headers, "Fix the tap", project_id=project["id"])
+    seen = _log(client, headers)
+
+    r = client.post(
+        f"{API}/tasks/{task['id']}/comments/", headers=headers, json={"body": "Drips"}
+    )
+    comment = r.json()
+    r = client.patch(
+        f"{API}/comments/{comment['id']}", headers=headers, json={"body": "Pours"}
+    )
+    assert r.status_code == 200
+    r = client.delete(f"{API}/comments/{comment['id']}", headers=headers)
+    assert r.status_code == 200
+
+    added, edited, deleted = _log_after(client, headers, seen)
+    task_ref = {"id": task["id"], "title": "Fix the tap"}
+    assert added["action"] == "comment_added"
+    assert added["entity_type"] == "comment"
+    assert added["entity_id"] == comment["id"]
+    assert added["details"] == {"task": task_ref, "body": "Drips"}
+    assert edited["action"] == "comment_edited"
+    assert edited["details"] == {
+        "task": task_ref,
+        "changes": {"body": {"from": "Drips", "to": "Pours"}},
+    }
+    assert deleted["action"] == "comment_deleted"
+    assert deleted["details"] == {"task": task_ref, "body": "Pours"}
+    # The comment is gone, so none of its entries link anywhere.
+    assert all(e["entity_exists"] is False for e in (added, edited, deleted))
+
+
+def test_a_comment_entry_links_to_its_task_while_both_exist(
+    client: TestClient, db: Session
+) -> None:
+    headers = _headers_for_new_user(client, db)
+    project = _create_project(client, headers, "Home")
+    task = _create_task(client, headers, "Fix the tap", project_id=project["id"])
+    client.post(
+        f"{API}/tasks/{task['id']}/comments/", headers=headers, json={"body": "Drips"}
+    )
+
+    [entry] = [e for e in _log(client, headers) if e["entity_type"] == "comment"]
+    assert entry["entity_exists"] is True
+    assert entry["entity_project_id"] == project["id"]
+
+    r = client.delete(f"{API}/tasks/{task['id']}", headers=headers)
+    assert r.status_code == 200
+    [entry] = [e for e in _log(client, headers) if e["entity_type"] == "comment"]
+    assert entry["entity_exists"] is False
+
+
+def test_adding_and_deleting_an_attachment_are_logged(
+    client: TestClient, db: Session
+) -> None:
+    headers = _headers_for_new_user(client, db)
+    task = _create_task(client, headers, "Fix the tap")
+    seen = _log(client, headers)
+
+    r = client.post(
+        f"{API}/tasks/{task['id']}/attachments/",
+        headers=headers,
+        files={"file": ("quote.pdf", b"%PDF-1.7", "application/pdf")},
+    )
+    attachment = r.json()
+    r = client.delete(f"{API}/attachments/{attachment['id']}", headers=headers)
+    assert r.status_code == 200
+
+    added, deleted = _log_after(client, headers, seen)
+    details = {
+        "task": {"id": task["id"], "title": "Fix the tap"},
+        "filename": "quote.pdf",
+        "content_type": "application/pdf",
+        "size": 8,
+    }
+    assert added["action"] == "attachment_added"
+    assert added["entity_type"] == "attachment"
+    assert added["entity_id"] == attachment["id"]
+    assert added["details"] == details
+    assert deleted["action"] == "attachment_deleted"
+    assert deleted["details"] == details
+
+
+def test_a_refused_upload_writes_nothing(
+    client: TestClient, db: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    headers = _headers_for_new_user(client, db)
+    task = _create_task(client, headers, "Fix the tap")
+    seen = _log(client, headers)
+    monkeypatch.setattr(settings, "ATTACHMENT_MAX_SIZE_BYTES", 4)
+
+    r = client.post(
+        f"{API}/tasks/{task['id']}/attachments/",
+        headers=headers,
+        files={"file": ("big.bin", b"too large", "application/octet-stream")},
+    )
+    assert r.status_code == 413
+
+    assert _log_after(client, headers, seen) == []
 
 
 # --- How requests map to entries ----------------------------------------------

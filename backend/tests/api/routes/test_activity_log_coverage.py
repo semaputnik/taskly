@@ -18,20 +18,20 @@ LOGGED = {
     f"PATCH {API}/tasks/{{task_id}}",
     f"DELETE {API}/tasks/{{task_id}}",
     f"POST {API}/activity-log/{{entry_id}}/restore",
+    f"POST {API}/projects/",
+    f"PATCH {API}/projects/{{project_id}}",
+    f"DELETE {API}/projects/{{project_id}}",
+    f"POST {API}/tasks/{{task_id}}/comments/",
+    f"PATCH {API}/comments/{{comment_id}}",
+    # Not in FR-10.3's list, but the list is of examples and the rule is every
+    # change: a deleted comment is otherwise gone without a trace.
+    f"DELETE {API}/comments/{{comment_id}}",
+    f"POST {API}/tasks/{{task_id}}/attachments/",
+    f"DELETE {API}/attachments/{{attachment_id}}",
 }
-
-LATER = "Logged once semaputnik/taskly#36 records projects, comments and attachments"
 ACCOUNT = "Account and sign-in, not a change to the tasks and projects the log covers"
 
 NOT_LOGGED = {
-    f"POST {API}/projects/": LATER,
-    f"PATCH {API}/projects/{{project_id}}": LATER,
-    f"DELETE {API}/projects/{{project_id}}": LATER,
-    f"POST {API}/tasks/{{task_id}}/comments/": LATER,
-    f"PATCH {API}/comments/{{comment_id}}": LATER,
-    f"DELETE {API}/comments/{{comment_id}}": LATER,
-    f"POST {API}/tasks/{{task_id}}/attachments/": LATER,
-    f"DELETE {API}/attachments/{{attachment_id}}": LATER,
     f"POST {API}/projects/{{project_id}}/archive": (
         "Archiving is a toggle outside the log and the restore flow (FR-05.10)"
     ),

@@ -1,4 +1,5 @@
 import uuid
+from collections.abc import Sequence
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
@@ -8,9 +9,12 @@ from app import crud
 from app.api.deps import CurrentUser, SessionDep, require_project_writable
 from app.models import (
     ActivityAction,
+    ActivityEntityType,
     ActivityEntriesPublic,
     ActivityEntry,
     ActivityEntryPublic,
+    Attachment,
+    Comment,
     Deletion,
     Message,
     Project,
@@ -62,9 +66,7 @@ def read_activity_log(
         .limit(limit)
     ).all()
 
-    # The tasks that can still be opened, and where: deleted ones are left out
-    # of this map, so their entries carry no link.
-    task_projects = crud.get_task_project_ids(session=session, owner_id=current_user.id)
+    locations = _locate(session, current_user.id, entries)
     # The deletion events on this page that still have rows to bring back.
     deletion_ids = {
         entry.deletion_id
@@ -86,8 +88,8 @@ def read_activity_log(
             ActivityEntryPublic.model_validate(
                 entry,
                 update={
-                    "entity_exists": entry.entity_id in task_projects,
-                    "entity_project_id": task_projects.get(entry.entity_id),
+                    "entity_exists": entry.entity_id in locations,
+                    "entity_project_id": locations.get(entry.entity_id),
                     "restorable": entry.action == ActivityAction.TASK_DELETED
                     and entry.deletion_id in still_deleted,
                 },
@@ -96,6 +98,49 @@ def read_activity_log(
         ],
         count=count,
     )
+
+
+def _locate(
+    session: SessionDep, owner_id: uuid.UUID, entries: Sequence[ActivityEntry]
+) -> dict[uuid.UUID, uuid.UUID]:
+    """
+    Where each entry's entity can still be opened: the project to open it in,
+    keyed by entity id. An entity that is gone, or hangs off a task that is,
+    has no entry here, so its log entry carries no link.
+    """
+    task_projects = crud.get_task_project_ids(session=session, owner_id=owner_id)
+    by_type: dict[str, set[uuid.UUID]] = {}
+    for entry in entries:
+        by_type.setdefault(entry.entity_type, set()).add(entry.entity_id)
+
+    locations = {
+        task_id: task_projects[task_id]
+        for task_id in by_type.get(ActivityEntityType.TASK, set())
+        if task_id in task_projects
+    }
+    if project_ids := by_type.get(ActivityEntityType.PROJECT):
+        live = session.exec(
+            select(Project.id).where(
+                col(Project.id).in_(project_ids), crud.not_deleted(Project)
+            )
+        ).all()
+        locations.update({project_id: project_id for project_id in live})
+    for model, entity_type in (
+        (Comment, ActivityEntityType.COMMENT),
+        (Attachment, ActivityEntityType.ATTACHMENT),
+    ):
+        if ids := by_type.get(entity_type):
+            rows = session.exec(
+                select(model.id, model.task_id).where(col(model.id).in_(ids))
+            ).all()
+            locations.update(
+                {
+                    row_id: task_projects[task_id]
+                    for row_id, task_id in rows
+                    if task_id in task_projects
+                }
+            )
+    return locations
 
 
 @router.post("/{entry_id}/restore", response_model=Message)
