@@ -127,6 +127,12 @@ class ProjectUpdate(SQLModel):
 class Project(ProjectBase, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     is_inbox: bool = False
+    # Hidden from daily use and read-only, together with every task in it
+    # (FR-05.10–FR-05.12). Tasks carry no flag of their own: a task is archived
+    # exactly when the project it resolves to is, so archiving and unarchiving
+    # are one write each way and nothing below the project can drift out of
+    # step. Independent of deletion — an archived project can still be deleted.
+    is_archived: bool = False
     owner_id: uuid.UUID = Field(
         foreign_key="user.id", nullable=False, ondelete="CASCADE"
     )
@@ -150,6 +156,7 @@ class Project(ProjectBase, table=True):
 class ProjectPublic(ProjectBase):
     id: uuid.UUID
     is_inbox: bool
+    is_archived: bool
     created_at: datetime | None = None
 
 
@@ -254,6 +261,11 @@ class TaskQuery(SQLModel):
     # completion filter's business: every filter owns one dimension, so they
     # can be combined without one quietly overriding another.
     overdue: bool = False
+    # Which side of the archive to list: live work by default, or only the
+    # tasks of archived projects when the archive is asked for explicitly
+    # (FR-05.14). Never both at once, so an archived task cannot slip into an
+    # ordinary view through some other filter.
+    archived: bool = False
     sort: TaskSort | None = None
     order: SortOrder = SortOrder.ASC
     # Paging rides along with the rest of the query: FastAPI only unpacks a

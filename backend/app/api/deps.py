@@ -11,6 +11,7 @@ from jwt.exceptions import InvalidTokenError
 from pydantic import ValidationError
 from sqlmodel import Session
 
+from app import crud
 from app.core import security
 from app.core.config import settings
 from app.core.db import engine
@@ -89,6 +90,46 @@ def get_owned_task(
     if not task or task.owner_id != current_user.id or task.deletion_id is not None:
         raise HTTPException(status_code=404, detail="Task not found")
     return task
+
+
+# Writing into an archived project is refused with its own status and code
+# rather than a generic permission error, so a client can tell the user why
+# and what would undo it (FR-05.12).
+PROJECT_ARCHIVED_STATUS = 409
+PROJECT_ARCHIVED_CODE = "project_archived"
+
+
+def require_project_writable(project: Project) -> None:
+    """
+    Refuse any change to an archived project or to anything in it: archiving
+    freezes the project whole until it is unarchived (FR-05.12).
+    """
+    if project.is_archived:
+        raise HTTPException(
+            status_code=PROJECT_ARCHIVED_STATUS,
+            detail={
+                "code": PROJECT_ARCHIVED_CODE,
+                "message": (
+                    f"The project “{project.name}” is archived, so it and its "
+                    "tasks are read-only. Unarchive it to make changes."
+                ),
+                "project_id": str(project.id),
+            },
+        )
+
+
+def require_task_writable(session: Session, task_id: uuid.UUID) -> None:
+    """
+    Refuse any change to a task, or to a comment or attachment on it, while the
+    project it resolves to is archived. A subtask holds no project of its own,
+    so the check follows the tree up to the project that decides.
+    """
+    task = session.get(Task, task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    project = session.get(Project, crud.get_task_project_id(session=session, task=task))
+    if project:
+        require_project_writable(project)
 
 
 def _require_task_visible(session: Session, task_id: uuid.UUID, detail: str) -> None:

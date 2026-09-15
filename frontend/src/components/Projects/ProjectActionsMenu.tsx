@@ -8,6 +8,7 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import ArchiveProject from "./ArchiveProject"
 import EditProject from "./EditProject"
 
 interface ProjectActionsMenuProps {
@@ -26,6 +27,11 @@ export const ProjectActionsMenu = ({ project }: ProjectActionsMenuProps) => {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <EditProject project={project} onSuccess={() => setOpen(false)} />
+        {/* The Inbox takes every task created without a project, so it has to
+            stay writable. */}
+        {!project.is_inbox && (
+          <ArchiveProject project={project} onSuccess={() => setOpen(false)} />
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   )

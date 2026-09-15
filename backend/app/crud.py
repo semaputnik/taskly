@@ -93,6 +93,25 @@ def update_project(
     return db_project
 
 
+def set_project_archived(
+    *, session: Session, project: Project, archived: bool
+) -> Project:
+    """
+    Archive or unarchive a project, and with it every task in it (FR-05.10,
+    FR-05.11).
+
+    One write to the project is the whole of it: its tasks follow because their
+    archived state is derived, which is also what makes unarchiving put back
+    exactly what was there. Nothing here touches deletion — archiving is not an
+    event to be restored from.
+    """
+    project.is_archived = archived
+    session.add(project)
+    session.commit()
+    session.refresh(project)
+    return project
+
+
 def get_inbox_project(*, session: Session, owner_id: uuid.UUID) -> Project:
     statement = select(Project).where(
         Project.owner_id == owner_id,
@@ -173,9 +192,16 @@ _PRIORITY_RANK = case(
 def _task_filters(*, owner_id: uuid.UUID, query: TaskQuery) -> list[Any]:
     """
     What a task has to satisfy to be listed: the user's own tasks that are not
-    deleted, plus every filter that is set (FR-06.2, FR-06.3).
+    deleted, on the side of the archive that was asked for, plus every filter
+    that is set (FR-06.2, FR-06.3).
     """
     conditions: list[Any] = [Task.owner_id == owner_id, not_deleted(Task)]
+
+    # Archived work is its own view rather than one more thing to filter in:
+    # the default list is live work only, and asking for the archive lists
+    # nothing else (FR-05.14).
+    archived = col(Task.id).in_(archived_task_ids(owner_id))
+    conditions.append(archived if query.archived else ~archived)
 
     if query.project_id is not None:
         conditions.append(col(Task.id).in_(project_task_ids(query.project_id)))
@@ -506,14 +532,41 @@ def project_task_ids(project_id: uuid.UUID) -> Any:
     """
     Selects the ids of every task of a project that is not deleted: its root
     tasks and everything under them.
+    """
+    return _task_trees(Task.project_id == project_id, name="project_tasks")
 
-    Subtasks hold no project of their own, so a project's tasks are only
-    reachable by walking down from its root tasks.
+
+def archived_task_ids(owner_id: uuid.UUID) -> Any:
+    """
+    Selects the ids of every task of a user's archived projects that is not
+    deleted.
+
+    Nothing on a task says it is archived: it is archived because the project it
+    resolves to is (FR-05.11), so this is found the same way a project's tasks
+    are.
+    """
+    archived_projects = select(Project.id).where(
+        Project.owner_id == owner_id,
+        Project.is_archived == True,  # noqa: E712
+    )
+    return _task_trees(
+        col(Task.project_id).in_(archived_projects), name="archived_tasks"
+    )
+
+
+def _task_trees(root_condition: Any, *, name: str) -> Any:
+    """
+    Selects the ids of the root tasks matching `root_condition` and of every
+    task under them, leaving deleted ones out.
+
+    Subtasks hold no project of their own, so the tasks of a project are only
+    reachable by walking down from its root tasks. `name` names the CTE, which
+    has to be unique among the ones a single statement uses.
     """
     tasks = (
         select(Task.id)
-        .where(Task.project_id == project_id, not_deleted(Task))
-        .cte("project_tasks", recursive=True)
+        .where(root_condition, not_deleted(Task))
+        .cte(name, recursive=True)
     )
     child = aliased(Task)
     tasks = tasks.union_all(

@@ -1,4 +1,4 @@
-import { CheckSquare, FolderKanban, Home, Users } from "lucide-react"
+import { Archive, CheckSquare, FolderKanban, Home, Users } from "lucide-react"
 
 import { SidebarAppearance } from "@/components/Common/Appearance"
 import { Logo } from "@/components/Common/Logo"
@@ -16,6 +16,7 @@ const baseItems: NavItem[] = [
   { icon: Home, title: "Dashboard", path: "/" },
   { icon: CheckSquare, title: "Tasks", path: "/tasks" },
   { icon: FolderKanban, title: "Projects", path: "/projects" },
+  { icon: Archive, title: "Archive", path: "/archive" },
 ]
 
 export function AppSidebar() {
