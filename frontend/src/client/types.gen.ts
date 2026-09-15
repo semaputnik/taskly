@@ -5,6 +5,74 @@ export type ClientOptions = {
 };
 
 /**
+ * ActivityAction
+ *
+ * Everything the activity log records (FR-10.3).
+ */
+export type ActivityAction = 'task_created' | 'task_changed' | 'task_completed' | 'task_reopened' | 'task_deleted' | 'task_moved' | 'task_assigned' | 'task_unassigned';
+
+/**
+ * ActivityEntityType
+ */
+export type ActivityEntityType = 'task';
+
+/**
+ * ActivityEntriesPublic
+ */
+export type ActivityEntriesPublic = {
+    /**
+     * Data
+     */
+    data: Array<ActivityEntryPublic>;
+    /**
+     * Count
+     */
+    count: number;
+};
+
+/**
+ * ActivityEntryPublic
+ */
+export type ActivityEntryPublic = {
+    /**
+     * Id
+     */
+    id: string;
+    action: ActivityAction;
+    entity_type: ActivityEntityType;
+    /**
+     * Entity Id
+     */
+    entity_id: string;
+    /**
+     * Actor Id
+     */
+    actor_id: string;
+    /**
+     * Deletion Id
+     */
+    deletion_id?: string | null;
+    /**
+     * Details
+     */
+    details: {
+        [key: string]: unknown;
+    };
+    /**
+     * Created At
+     */
+    created_at?: string | null;
+    /**
+     * Entity Exists
+     */
+    entity_exists: boolean;
+    /**
+     * Entity Project Id
+     */
+    entity_project_id?: string | null;
+};
+
+/**
  * AttachmentPublic
  */
 export type AttachmentPublic = {
@@ -1715,6 +1783,40 @@ export type tagsReadTagsResponses = {
 };
 
 export type tagsReadTagsResponse = tagsReadTagsResponses[keyof tagsReadTagsResponses];
+
+export type activityReadActivityLogData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Skip
+         */
+        skip?: number;
+        /**
+         * Limit
+         */
+        limit?: number;
+    };
+    url: '/api/v1/activity-log/';
+};
+
+export type activityReadActivityLogErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type activityReadActivityLogError = activityReadActivityLogErrors[keyof activityReadActivityLogErrors];
+
+export type activityReadActivityLogResponses = {
+    /**
+     * Successful Response
+     */
+    200: ActivityEntriesPublic;
+};
+
+export type activityReadActivityLogResponse = activityReadActivityLogResponses[keyof activityReadActivityLogResponses];
 
 export type utilsTestEmailData = {
     body?: never;

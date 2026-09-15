@@ -1,18 +1,21 @@
 import uuid
 from datetime import UTC, date, datetime
 from enum import StrEnum
-from typing import Annotated
+from typing import Annotated, Any
 
 from pydantic import EmailStr, StringConstraints, model_validator
 from sqlalchemy import (
     BigInteger,
     CheckConstraint,
+    Column,
     DateTime,
+    Identity,
     Index,
     UniqueConstraint,
     text,
 )
 from sqlalchemy import Enum as SAEnum
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Field, SQLModel
 
 
@@ -612,6 +615,89 @@ class AttachmentPublic(AttachmentBase):
 
 class AttachmentsPublic(SQLModel):
     data: list[AttachmentPublic]
+    count: int
+
+
+class ActivityAction(StrEnum):
+    """Everything the activity log records (FR-10.3)."""
+
+    TASK_CREATED = "task_created"
+    TASK_CHANGED = "task_changed"
+    TASK_COMPLETED = "task_completed"
+    TASK_REOPENED = "task_reopened"
+    TASK_DELETED = "task_deleted"
+    TASK_MOVED = "task_moved"
+    TASK_ASSIGNED = "task_assigned"
+    TASK_UNASSIGNED = "task_unassigned"
+
+
+class ActivityEntityType(StrEnum):
+    TASK = "task"
+
+
+class ActivityEntry(SQLModel, table=True):
+    """
+    One change in a user's account, and who made it (FR-10.1, FR-10.2).
+
+    Append-only and kept indefinitely (FR-10.5). An entry describes its change
+    in full in `details`, so it still reads after the entity is gone: nothing
+    here points at the entity with a foreign key, only names it.
+    """
+
+    __table_args__ = (
+        # A user's log, newest first, is the only way entries are read.
+        Index("ix_activityentry_owner_id_position", "owner_id", "position"),
+    )
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    # Orders entries exactly, including the several one request can write
+    # within the same instant.
+    position: int | None = Field(
+        default=None,
+        sa_column=Column(BigInteger, Identity(always=True), nullable=False),
+    )
+    owner_id: uuid.UUID = Field(
+        foreign_key="user.id", nullable=False, ondelete="CASCADE"
+    )
+    # Who made the change. The owner themselves for now; a bot user acting for
+    # them once bot users exist (semaputnik/taskly#7), which is why the two are
+    # kept apart from the start.
+    actor_id: uuid.UUID = Field(
+        foreign_key="user.id", nullable=False, ondelete="CASCADE"
+    )
+    # Plain strings rather than a database enum, so a new kind of entry is a
+    # code change and not a migration.
+    action: str = Field(max_length=50)
+    entity_type: str = Field(max_length=50)
+    entity_id: uuid.UUID
+    # Set on the entry for a deletion: the event a restore brings back.
+    deletion_id: uuid.UUID | None = Field(
+        default=None, foreign_key="deletion.id", nullable=True, ondelete="SET NULL"
+    )
+    details: dict[str, Any] = Field(default_factory=dict, sa_type=JSONB)
+    created_at: datetime | None = Field(
+        default_factory=get_datetime_utc,
+        sa_type=DateTime(timezone=True),  # type: ignore
+    )
+
+
+class ActivityEntryPublic(SQLModel):
+    id: uuid.UUID
+    action: ActivityAction
+    entity_type: ActivityEntityType
+    entity_id: uuid.UUID
+    actor_id: uuid.UUID
+    deletion_id: uuid.UUID | None = None
+    details: dict[str, Any]
+    created_at: datetime | None = None
+    # Whether the entity can still be opened, and the project to open it in:
+    # a deleted task has nowhere to link to.
+    entity_exists: bool
+    entity_project_id: uuid.UUID | None = None
+
+
+class ActivityEntriesPublic(SQLModel):
+    data: list[ActivityEntryPublic]
     count: int
 
 
