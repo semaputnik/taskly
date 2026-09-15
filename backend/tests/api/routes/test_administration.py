@@ -4,6 +4,7 @@ from sqlmodel import Session
 
 from app import crud
 from app.core.config import settings
+from app.main import app
 from app.models import User, UserCreate
 from tests.utils.utils import random_email, random_lower_string
 
@@ -67,38 +68,34 @@ def test_the_account_list_carries_account_fields_only(
 
 
 @pytest.mark.parametrize(
-    ("method", "path", "body"),
+    ("method", "path"),
     [
-        ("POST", "/users/", {"email": "new@example.com", "password": "password123"}),
-        ("GET", "/users/{user_id}", None),
-        ("PATCH", "/users/{user_id}", {"full_name": "Renamed by admin"}),
-        ("PATCH", "/users/{user_id}", {"is_superuser": True}),
-        ("DELETE", "/users/{user_id}", None),
+        ("post", "/users/"),
+        ("get", "/users/{user_id}"),
+        ("patch", "/users/{user_id}"),
+        ("delete", "/users/{user_id}"),
     ],
-    ids=["create", "read", "update", "promote", "delete"],
+    ids=["create", "read", "update", "delete"],
 )
-def test_the_superuser_cannot_manage_other_accounts(
-    client: TestClient,
-    db: Session,
-    superuser_token_headers: dict[str, str],
-    method: str,
-    path: str,
-    body: dict | None,
+def test_the_api_offers_no_way_to_manage_other_accounts(method: str, path: str) -> None:
+    # Read from the schema rather than by calling the paths: a request no
+    # route matches falls through to the static frontend, which a backend-only
+    # test run has not built.
+    operations = app.openapi()["paths"].get(f"{API}{path}", {})
+    assert method not in operations
+
+
+def test_creating_an_account_as_the_superuser_is_refused(
+    client: TestClient, db: Session, superuser_token_headers: dict[str, str]
 ) -> None:
-    user, _ = _new_user(client, db)
-
-    r = client.request(
-        method,
-        f"{API}{path.format(user_id=user.id)}",
+    email = random_email()
+    r = client.post(
+        f"{API}/users/",
         headers=superuser_token_headers,
-        json=body,
+        json={"email": email, "password": random_lower_string()},
     )
-    assert r.status_code in (404, 405), r.text
-
-    db.refresh(user)
-    assert user.full_name is None
-    assert user.is_superuser is False
-    assert crud.get_user_by_email(session=db, email="new@example.com") is None
+    assert r.status_code == 405
+    assert crud.get_user_by_email(session=db, email=email) is None
 
 
 def test_updating_your_own_profile_cannot_make_you_a_superuser(
