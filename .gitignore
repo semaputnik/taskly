@@ -9,3 +9,16 @@ backend/data/
 /playwright-report/
 /blob-report/
 /playwright/.cache/
+
+# Impeccable skill: only the Claude Code copy is tracked, without its heavy
+# generated files (the platform binary, the font index, the bundled browser
+# script). The copies for other tools stay local.
+/.agents/
+/.github/agents/
+/.github/hooks/
+/.github/skills/
+/.claude/skills/impeccable/scripts/bin/
+/.claude/skills/impeccable/scripts/data/font-index.json
+/.claude/skills/impeccable/scripts/live-browser.js
+# Personal Claude Code settings.
+/.claude/settings.local.json

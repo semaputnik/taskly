@@ -16,6 +16,8 @@ extend-exclude = [
     "backend/app/frontend/",
     "frontend/dist/",
     "frontend/public/assets/images/",
+    # Vendored skill, kept as its authors ship it.
+    ".claude/skills/impeccable/",
 ]
 
 [tool.typos.default]

@@ -13,10 +13,11 @@ repos:
         exclude: |
             (?x)^(
                 frontend/src/client/.*|
-                backend/app/email-templates/.*
+                backend/app/email-templates/.*|
+                \.claude/skills/impeccable/.*
             )$
       - id: trailing-whitespace
-        exclude: ^frontend/src/client/.*
+        exclude: ^(frontend/src/client/|\.claude/skills/impeccable/).*
   - repo: https://github.com/crate-ci/typos
     rev: 8a48f81b6c64dcfea44b3633223084c4be58ac5f # frozen: v1.49.0
     hooks:
