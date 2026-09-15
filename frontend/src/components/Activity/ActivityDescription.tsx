@@ -31,26 +31,37 @@ interface ActivityDescriptionProps {
   currentUserId?: string
 }
 
+/** What an entry names: the task, project, or task a comment or file is on. */
+function subjectName(entry: ActivityEntryPublic): string {
+  if (entry.entity_type === "project") {
+    return detail<string>(entry, "name") ?? "Untitled project"
+  }
+  if (entry.entity_type === "comment" || entry.entity_type === "attachment") {
+    return detail<{ title: string }>(entry, "task")?.title ?? "a task"
+  }
+  return detail<string>(entry, "title") ?? "Untitled task"
+}
+
 /**
  * One entry as a sentence. It is built from what the entry recorded at the
  * time, so it reads the same after the task is renamed, moved or deleted;
- * only the link to the task depends on the task still being there.
+ * only the link depends on the thing still being there.
  */
 export function ActivityDescription({
   entry,
   currentUserId,
 }: ActivityDescriptionProps) {
-  const title = detail<string>(entry, "title") ?? "Untitled task"
-  const task: ReactNode = entry.entity_exists ? (
+  const name = subjectName(entry)
+  const subject: ReactNode = entry.entity_exists ? (
     <Link
       to="/tasks"
       search={{ project_id: entry.entity_project_id ?? undefined }}
       className="font-medium underline-offset-4 hover:underline"
     >
-      {title}
+      {name}
     </Link>
   ) : (
-    <span className="font-medium">{title}</span>
+    <span className="font-medium">{name}</span>
   )
 
   switch (entry.action) {
@@ -58,7 +69,7 @@ export function ActivityDescription({
       const snapshot = detail<{ project: ProjectRef | null }>(entry, "task")
       return (
         <>
-          Created {task}
+          Created {subject}
           {snapshot?.project && <> in {projectName(snapshot.project)}</>}
         </>
       )
@@ -68,19 +79,19 @@ export function ActivityDescription({
       const fields = Object.keys(changes).map((key) => FIELD_LABELS[key] ?? key)
       return (
         <>
-          Changed the {fields.join(", ")} of {task}
+          Changed the {fields.join(", ")} of {subject}
         </>
       )
     }
     case "task_completed":
-      return <>Completed {task}</>
+      return <>Completed {subject}</>
     case "task_reopened":
-      return <>Marked {task} as not completed</>
+      return <>Marked {subject} as not completed</>
     case "task_deleted": {
       const subtasks = detail<number>(entry, "subtask_count") ?? 0
       return (
         <>
-          Deleted {task}
+          Deleted {subject}
           {subtasks > 0 &&
             ` and ${subtasks} ${subtasks === 1 ? "subtask" : "subtasks"}`}
         </>
@@ -90,7 +101,7 @@ export function ActivityDescription({
       const subtasks = detail<number>(entry, "subtask_count") ?? 0
       return (
         <>
-          Restored {task}
+          Restored {subject}
           {subtasks > 0 &&
             ` and ${subtasks} ${subtasks === 1 ? "subtask" : "subtasks"}`}
         </>
@@ -99,7 +110,7 @@ export function ActivityDescription({
     case "task_moved":
       return (
         <>
-          Moved {task} from{" "}
+          Moved {subject} from{" "}
           {projectName(detail<ProjectRef>(entry, "from_project"))} to{" "}
           {projectName(detail<ProjectRef>(entry, "to_project"))}
         </>
@@ -108,11 +119,48 @@ export function ActivityDescription({
       const assignee = detail<string>(entry, "assignee_id")
       return (
         <>
-          Assigned {task} to {assignee === currentUserId ? "you" : "someone"}
+          Assigned {subject} to {assignee === currentUserId ? "you" : "someone"}
         </>
       )
     }
     case "task_unassigned":
-      return <>Removed the assignee from {task}</>
+      return <>Removed the assignee from {subject}</>
+    case "project_created":
+      return <>Created the project {subject}</>
+    case "project_changed": {
+      const changes = detail<Record<string, unknown>>(entry, "changes") ?? {}
+      return (
+        <>
+          Changed the {Object.keys(changes).join(", ")} of the project {subject}
+        </>
+      )
+    }
+    case "project_deleted": {
+      const tasks = detail<number>(entry, "task_count") ?? 0
+      return (
+        <>
+          Deleted the project {subject}
+          {tasks > 0 && ` and ${tasks} ${tasks === 1 ? "task" : "tasks"}`}
+        </>
+      )
+    }
+    case "comment_added":
+      return <>Commented on {subject}</>
+    case "comment_edited":
+      return <>Edited a comment on {subject}</>
+    case "comment_deleted":
+      return <>Deleted a comment on {subject}</>
+    case "attachment_added":
+      return (
+        <>
+          Attached “{detail<string>(entry, "filename")}” to {subject}
+        </>
+      )
+    case "attachment_deleted":
+      return (
+        <>
+          Removed “{detail<string>(entry, "filename")}” from {subject}
+        </>
+      )
   }
 }

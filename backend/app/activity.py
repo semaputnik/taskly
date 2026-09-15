@@ -32,6 +32,8 @@ from app.models import (
     ActivityAction,
     ActivityEntityType,
     ActivityEntry,
+    Attachment,
+    Comment,
     Deletion,
     Project,
     Series,
@@ -69,6 +71,14 @@ class _TaskState:
     recurrence: dict[str, Any] | None
 
 
+@dataclass(frozen=True)
+class _ProjectState:
+    owner_id: uuid.UUID
+    name: str
+    description: str | None
+    deletion_id: uuid.UUID | None
+
+
 @dataclass
 class _Pending:
     # Each task this transaction touched, with its state before it did — None
@@ -77,23 +87,59 @@ class _Pending:
     before: dict[uuid.UUID, _TaskState | None] = field(default_factory=dict)
     # Deletion events aimed at a task, in the order they were made.
     deletions: list[uuid.UUID] = field(default_factory=list)
+    # The same for projects: state before, or None for one created here.
+    projects: dict[uuid.UUID, _ProjectState | None] = field(default_factory=dict)
+    project_deletions: list[uuid.UUID] = field(default_factory=list)
+    # Each comment touched, with its body before — None for a new one.
+    comments: dict[uuid.UUID, str | None] = field(default_factory=dict)
+    attachments_added: list[uuid.UUID] = field(default_factory=list)
+    # Rows removed outright are gone by commit, so what an entry needs to say
+    # about them is taken while they are still in the session.
+    removed: list[ActivityEntry] = field(default_factory=list)
 
 
 @event.listens_for(Session, "before_flush")
 def _collect(session: Session, _flush_context: Any, _instances: Any) -> None:
     with session.no_autoflush:
-        touched: list[uuid.UUID] = []
-        pending = session.info.get(_PENDING_KEY)
+        pending = session.info.get(_PENDING_KEY) or _Pending()
+        found = False
 
-        created = [obj.id for obj in session.new if isinstance(obj, Task)]
-        deletions = [
-            obj.id
-            for obj in session.new
-            if isinstance(obj, Deletion) and obj.task_id is not None
-        ]
-        for obj in session.new | session.deleted:
-            if isinstance(obj, TaskTag):
+        touched: list[uuid.UUID] = []
+        touched_projects: list[uuid.UUID] = []
+        touched_comments: list[uuid.UUID] = []
+
+        for obj in session.new:
+            found = found or isinstance(
+                obj, Task | Deletion | TaskTag | Project | Comment | Attachment
+            )
+            if isinstance(obj, Task):
+                pending.before.setdefault(obj.id, None)
+            elif isinstance(obj, Deletion) and obj.task_id is not None:
+                pending.deletions.append(obj.id)
+            elif isinstance(obj, Deletion) and obj.project_id is not None:
+                pending.project_deletions.append(obj.id)
+            elif isinstance(obj, TaskTag):
                 touched.append(obj.task_id)
+            # The Inbox comes with the account rather than being made by
+            # anyone, so it is not a change the user made.
+            elif isinstance(obj, Project) and not obj.is_inbox:
+                pending.projects.setdefault(obj.id, None)
+            elif isinstance(obj, Comment):
+                pending.comments.setdefault(obj.id, None)
+            elif isinstance(obj, Attachment):
+                pending.attachments_added.append(obj.id)
+
+        for obj in session.deleted:
+            if isinstance(obj, TaskTag):
+                found = True
+                touched.append(obj.task_id)
+            elif isinstance(obj, Comment):
+                found = True
+                pending.removed.append(_comment_deleted_entry(session, obj))
+            elif isinstance(obj, Attachment):
+                found = True
+                pending.removed.append(_attachment_deleted_entry(session, obj))
+
         for obj in session.dirty:
             if not session.is_modified(obj):
                 continue
@@ -101,20 +147,32 @@ def _collect(session: Session, _flush_context: Any, _instances: Any) -> None:
                 touched.append(obj.id)
             elif isinstance(obj, Series):
                 touched.extend(_open_occurrences(session, obj.id))
+            elif isinstance(obj, Project):
+                touched_projects.append(obj.id)
+            elif isinstance(obj, Comment):
+                touched_comments.append(obj.id)
 
-        if not (created or deletions or touched):
+        if not (found or touched or touched_projects or touched_comments):
             return
-        if pending is None:
-            pending = session.info[_PENDING_KEY] = _Pending()
+        session.info[_PENDING_KEY] = pending
 
-        for task_id in created:
-            pending.before.setdefault(task_id, None)
-        pending.deletions.extend(deletions)
         unseen = [task_id for task_id in touched if task_id not in pending.before]
         states = _load_states(session, unseen)
         for task_id in unseen:
             if task_id in states:
                 pending.before[task_id] = states[task_id]
+
+        unseen = [pid for pid in touched_projects if pid not in pending.projects]
+        project_states = _load_project_states(session, unseen)
+        for project_id in unseen:
+            if project_id in project_states:
+                pending.projects[project_id] = project_states[project_id]
+
+        unseen = [cid for cid in touched_comments if cid not in pending.comments]
+        bodies = _load_comment_bodies(session, unseen)
+        for comment_id in unseen:
+            if comment_id in bodies:
+                pending.comments[comment_id] = bodies[comment_id]
 
 
 @event.listens_for(Session, "before_commit")
@@ -157,6 +215,18 @@ def _write(session: Session) -> None:
     for deletion_id, count in restored.items():
         entries.append(_restore_entry(session, deletion_id, count, actor_id, projects))
 
+    entries.extend(_project_entries(session, pending))
+    entries.extend(_comment_entries(session, pending))
+    for attachment_id in pending.attachments_added:
+        attachment = session.get(Attachment, attachment_id)
+        if attachment is not None:
+            entries.append(_attachment_added_entry(session, attachment))
+    entries.extend(pending.removed)
+
+    for entry in entries:
+        # Changes made outside a request, such as a script, have no one else
+        # to attribute them to than the account they belong to.
+        entry.actor_id = actor_id or entry.owner_id
     session.add_all(entries)
 
 
@@ -401,3 +471,191 @@ def _load_states(
         )
         for row in rows
     }
+
+
+def _task_ref(session: Session, task_id: uuid.UUID) -> dict[str, Any]:
+    """A task as a comment or attachment entry names it."""
+    task = session.get_one(Task, task_id)
+    return {"id": task.id, "title": task.title}
+
+
+def _entry(
+    owner_id: uuid.UUID,
+    action: ActivityAction,
+    entity_type: ActivityEntityType,
+    entity_id: uuid.UUID,
+    **details: Any,
+) -> ActivityEntry:
+    return ActivityEntry(
+        owner_id=owner_id,
+        # Replaced with the transaction's actor when the entry is written.
+        actor_id=owner_id,
+        action=action,
+        entity_type=entity_type,
+        entity_id=entity_id,
+        details=to_jsonable_python(details),
+    )
+
+
+def _project_entries(session: Session, pending: _Pending) -> list[ActivityEntry]:
+    entries = []
+    after = _load_project_states(session, list(pending.projects))
+    for project_id, before in pending.projects.items():
+        state = after.get(project_id)
+        # Deleting is logged by its deletion event below.
+        if state is None or state.deletion_id is not None:
+            continue
+        if before is None:
+            entries.append(
+                _entry(
+                    state.owner_id,
+                    ActivityAction.PROJECT_CREATED,
+                    ActivityEntityType.PROJECT,
+                    project_id,
+                    name=state.name,
+                    description=state.description,
+                )
+            )
+            continue
+        # Archiving is deliberately not a change the log records (FR-05.10),
+        # so only the fields a user edits are compared.
+        changes = {
+            name: {"from": getattr(before, name), "to": getattr(state, name)}
+            for name in ("name", "description")
+            if getattr(before, name) != getattr(state, name)
+        }
+        if changes:
+            entries.append(
+                _entry(
+                    state.owner_id,
+                    ActivityAction.PROJECT_CHANGED,
+                    ActivityEntityType.PROJECT,
+                    project_id,
+                    name=state.name,
+                    changes=changes,
+                )
+            )
+
+    for deletion_id in pending.project_deletions:
+        deletion = session.get_one(Deletion, deletion_id)
+        assert deletion.project_id is not None
+        project = session.get_one(Project, deletion.project_id)
+        went_down = session.execute(
+            select(col(Task.id)).where(Task.deletion_id == deletion_id)
+        ).all()
+        entry = _entry(
+            deletion.owner_id,
+            ActivityAction.PROJECT_DELETED,
+            ActivityEntityType.PROJECT,
+            project.id,
+            name=project.name,
+            # What a restore of this event would bring back along with it.
+            task_count=len(went_down),
+        )
+        entry.deletion_id = deletion.id
+        entries.append(entry)
+    return entries
+
+
+def _comment_entries(session: Session, pending: _Pending) -> list[ActivityEntry]:
+    entries = []
+    bodies = _load_comment_bodies(session, list(pending.comments))
+    for comment_id, before in pending.comments.items():
+        comment = session.get(Comment, comment_id)
+        if comment is None or comment_id not in bodies:
+            continue
+        if before is None:
+            entries.append(
+                _entry(
+                    comment.owner_id,
+                    ActivityAction.COMMENT_ADDED,
+                    ActivityEntityType.COMMENT,
+                    comment_id,
+                    task=_task_ref(session, comment.task_id),
+                    body=bodies[comment_id],
+                )
+            )
+        elif before != bodies[comment_id]:
+            entries.append(
+                _entry(
+                    comment.owner_id,
+                    ActivityAction.COMMENT_EDITED,
+                    ActivityEntityType.COMMENT,
+                    comment_id,
+                    task=_task_ref(session, comment.task_id),
+                    changes={"body": {"from": before, "to": bodies[comment_id]}},
+                )
+            )
+    return entries
+
+
+def _comment_deleted_entry(session: Session, comment: Comment) -> ActivityEntry:
+    return _entry(
+        comment.owner_id,
+        ActivityAction.COMMENT_DELETED,
+        ActivityEntityType.COMMENT,
+        comment.id,
+        task=_task_ref(session, comment.task_id),
+        # A deleted comment is gone for good, so its words are kept here.
+        body=comment.body,
+    )
+
+
+def _attachment_added_entry(session: Session, attachment: Attachment) -> ActivityEntry:
+    return _entry(
+        attachment.owner_id,
+        ActivityAction.ATTACHMENT_ADDED,
+        ActivityEntityType.ATTACHMENT,
+        attachment.id,
+        task=_task_ref(session, attachment.task_id),
+        filename=attachment.filename,
+        content_type=attachment.content_type,
+        size=attachment.size,
+    )
+
+
+def _attachment_deleted_entry(
+    session: Session, attachment: Attachment
+) -> ActivityEntry:
+    entry = _attachment_added_entry(session, attachment)
+    entry.action = ActivityAction.ATTACHMENT_DELETED
+    return entry
+
+
+def _load_project_states(
+    session: Session, project_ids: list[uuid.UUID]
+) -> dict[uuid.UUID, _ProjectState]:
+    if not project_ids:
+        return {}
+    rows = session.execute(
+        select(
+            col(Project.id),
+            col(Project.owner_id),
+            col(Project.name),
+            col(Project.description),
+        )
+        .add_columns(col(Project.deletion_id))
+        .where(col(Project.id).in_(project_ids))
+    ).all()
+    return {
+        row.id: _ProjectState(
+            owner_id=row.owner_id,
+            name=row.name,
+            description=row.description,
+            deletion_id=row.deletion_id,
+        )
+        for row in rows
+    }
+
+
+def _load_comment_bodies(
+    session: Session, comment_ids: list[uuid.UUID]
+) -> dict[uuid.UUID, str]:
+    if not comment_ids:
+        return {}
+    rows = session.execute(
+        select(col(Comment.id), col(Comment.body)).where(
+            col(Comment.id).in_(comment_ids)
+        )
+    ).all()
+    return {row.id: row.body for row in rows}

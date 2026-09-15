@@ -630,10 +630,21 @@ class ActivityAction(StrEnum):
     TASK_MOVED = "task_moved"
     TASK_ASSIGNED = "task_assigned"
     TASK_UNASSIGNED = "task_unassigned"
+    PROJECT_CREATED = "project_created"
+    PROJECT_CHANGED = "project_changed"
+    PROJECT_DELETED = "project_deleted"
+    COMMENT_ADDED = "comment_added"
+    COMMENT_EDITED = "comment_edited"
+    COMMENT_DELETED = "comment_deleted"
+    ATTACHMENT_ADDED = "attachment_added"
+    ATTACHMENT_DELETED = "attachment_deleted"
 
 
 class ActivityEntityType(StrEnum):
     TASK = "task"
+    PROJECT = "project"
+    COMMENT = "comment"
+    ATTACHMENT = "attachment"
 
 
 class ActivityEntry(SQLModel, table=True):
