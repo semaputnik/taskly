@@ -87,3 +87,55 @@ test("A deleted task can be restored from the Activity page", async ({
   await page.goto("/tasks")
   await expect(page.getByRole("row", { name: /Cancel the gym/ })).toBeVisible()
 })
+
+test("A bot user's changes appear on the Activity page under its name", async ({
+  page,
+  request,
+}) => {
+  const email = randomEmail()
+  const password = randomPassword()
+  await createUser({ email, password })
+  await logInUser(page, email, password)
+
+  // The bot user is set up over the API: its management page has its own
+  // test, and what matters here is how its changes are shown.
+  const api = `${process.env.VITE_API_URL}/api/v1`
+  const userToken = await page.evaluate(() =>
+    localStorage.getItem("access_token"),
+  )
+  const asUser = { Authorization: `Bearer ${userToken}` }
+  const project = await (
+    await request.post(`${api}/projects/`, {
+      headers: asUser,
+      data: { name: "Releases" },
+    })
+  ).json()
+  const bot = await (
+    await request.post(`${api}/bot-users/`, {
+      headers: asUser,
+      data: {
+        name: "Release bot",
+        scope: {
+          project_ids: [project.id],
+          permissions: { create_tasks: true },
+        },
+      },
+    })
+  ).json()
+  const { token } = await (
+    await request.post(`${api}/bot-users/${bot.id}/token`, { headers: asUser })
+  ).json()
+
+  const created = await request.post(`${api}/tasks/`, {
+    headers: { Authorization: `Bearer ${token}` },
+    data: { title: "Tag the release", project_id: project.id },
+  })
+  expect(created.ok()).toBe(true)
+
+  await page.goto("/activity")
+  const row = page.getByRole("row").filter({ hasText: "Tag the release" })
+  await expect(row).toContainText("Created Tag the release in Releases")
+  await expect(row).toContainText("Release bot")
+  await expect(row).toContainText("Bot")
+  await expect(row).not.toContainText("You")
+})

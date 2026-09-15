@@ -660,6 +660,11 @@ class ActivityEntry(SQLModel, table=True):
     __table_args__ = (
         # A user's log, newest first, is the only way entries are read.
         Index("ix_activityentry_owner_id_position", "owner_id", "position"),
+        # A change is made by exactly one actor: a user, or a bot user.
+        CheckConstraint(
+            "(actor_id IS NULL) <> (actor_bot_user_id IS NULL)",
+            name="activityentry_one_actor",
+        ),
     )
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
@@ -672,11 +677,14 @@ class ActivityEntry(SQLModel, table=True):
     owner_id: uuid.UUID = Field(
         foreign_key="user.id", nullable=False, ondelete="CASCADE"
     )
-    # Who made the change. The owner themselves for now; a bot user acting for
-    # them once bot users exist (semaputnik/taskly#7), which is why the two are
-    # kept apart from the start.
-    actor_id: uuid.UUID = Field(
-        foreign_key="user.id", nullable=False, ondelete="CASCADE"
+    # Who made the change (FR-10.2): the user it was made by, or the bot user.
+    # Exactly one is set, so a bot's change is never attributed to its owner,
+    # and an entry naming a user means what it always has.
+    actor_id: uuid.UUID | None = Field(
+        default=None, foreign_key="user.id", nullable=True, ondelete="CASCADE"
+    )
+    actor_bot_user_id: uuid.UUID | None = Field(
+        default=None, foreign_key="botuser.id", nullable=True, ondelete="CASCADE"
     )
     # Plain strings rather than a database enum, so a new kind of entry is a
     # code change and not a migration.
@@ -699,7 +707,11 @@ class ActivityEntryPublic(SQLModel):
     action: ActivityAction
     entity_type: ActivityEntityType
     entity_id: uuid.UUID
-    actor_id: uuid.UUID
+    # Exactly one of the two is set. A bot user's name comes along, since the
+    # log is where its owner finds out which integration did what.
+    actor_id: uuid.UUID | None = None
+    actor_bot_user_id: uuid.UUID | None = None
+    actor_bot_user_name: str | None = None
     deletion_id: uuid.UUID | None = None
     details: dict[str, Any]
     created_at: datetime | None = None

@@ -8,11 +8,9 @@ from app import crud
 from app.api import authorization
 from app.api.authorization import TaskAction
 from app.api.deps import (
+    Caller,
     CallerDep,
-    CurrentUser,
     SessionDep,
-    get_owned_project,
-    get_owned_task,
     require_project_writable,
     require_task_writable,
 )
@@ -62,8 +60,8 @@ def _unique(names: list[str]) -> list[str]:
     return list(dict.fromkeys(names))
 
 
-def _check_assignee(current_user: CurrentUser, assignee_id: uuid.UUID | None) -> None:
-    if assignee_id is not None and assignee_id != current_user.id:
+def _check_assignee(caller: Caller, assignee_id: uuid.UUID | None) -> None:
+    if assignee_id is not None and assignee_id != caller.owner_id:
         raise HTTPException(
             status_code=400, detail="A task can only be assigned to yourself"
         )
@@ -161,52 +159,57 @@ def read_tasks(
 
 
 @router.post("/", response_model=TaskPublic)
-def create_task(
-    *, session: SessionDep, current_user: CurrentUser, task_in: TaskCreate
-) -> Any:
+def create_task(*, session: SessionDep, caller: CallerDep, task_in: TaskCreate) -> Any:
     """
     Create a task, or a subtask of one. A task created without a project lands
     in the Inbox; a subtask follows its parent's project instead.
 
     A task created with a recurrence is the first occurrence of its series.
+
+    A bot user creates only where its scope reaches — the Inbox included, which
+    has to be in its scope like any other project — and sets no tags.
     """
-    _check_assignee(current_user, task_in.assignee_id)
+    # Where the task goes is settled first, so a bot user is refused by its
+    # scope before anything about the request itself is looked at.
+    parent: Task | None = None
+    if task_in.parent_id is not None:
+        parent = authorization.get_task(
+            session, caller, task_in.parent_id, TaskAction.CREATE
+        )
+    elif task_in.project_id is not None:
+        project = authorization.get_project(
+            session, caller, task_in.project_id, TaskAction.CREATE
+        )
+    else:
+        project = crud.get_inbox_project(session=session, owner_id=caller.owner_id)
+        authorization.authorize_tasks(caller, TaskAction.CREATE, project)
+    authorization.refuse_tag_changes_for_bot(caller, task_in.model_fields_set)
+
+    _check_assignee(caller, task_in.assignee_id)
     _check_recurrence(
         parent_id=task_in.parent_id,
         recurrence=task_in.recurrence,
         due_date=task_in.due_date,
     )
 
-    if task_in.parent_id is not None:
-        # Checks the parent is the user's and still there; the subtask's own
-        # project is then derived from it.
-        get_owned_task(session, current_user, task_in.parent_id)
-        require_task_writable(session, task_in.parent_id)
+    if parent is not None:
+        require_task_writable(session, parent.id)
         if task_in.project_id is not None:
             raise HTTPException(
                 status_code=400,
                 detail="A subtask belongs to the project of its parent",
             )
-        task = crud.create_task(
-            session=session,
-            task_create=task_in,
-            project_id=None,
-            owner_id=current_user.id,
-            tag_names=_unique(task_in.tags),
-        )
-        return _read(session, task)
-
-    if task_in.project_id is not None:
-        project = get_owned_project(session, current_user, task_in.project_id)
+        # The subtask's own project is derived from its parent's tree.
+        project_id = None
     else:
-        project = crud.get_inbox_project(session=session, owner_id=current_user.id)
-    require_project_writable(project)
+        require_project_writable(project)
+        project_id = project.id
 
     task = crud.create_task(
         session=session,
         task_create=task_in,
-        project_id=project.id,
-        owner_id=current_user.id,
+        project_id=project_id,
+        owner_id=caller.owner_id,
         tag_names=_unique(task_in.tags),
     )
     return _read(session, task)
@@ -225,7 +228,7 @@ def read_task(*, session: SessionDep, caller: CallerDep, task_id: uuid.UUID) -> 
 def update_task(
     *,
     session: SessionDep,
-    current_user: CurrentUser,
+    caller: CallerDep,
     task_id: uuid.UUID,
     task_in: TaskUpdate,
 ) -> Any:
@@ -238,8 +241,12 @@ def update_task(
     Completing an occurrence of a recurring task creates the next one. Moving
     the due date of an open occurrence needs `due_date_scope` to say whether
     the rest of the series moves with it.
+
+    A bot user needs the task in its scope and, to move it, the destination
+    too (FR-08.8); it sets no tags.
     """
-    task = get_owned_task(session, current_user, task_id)
+    task = authorization.get_task(session, caller, task_id, TaskAction.UPDATE)
+    authorization.refuse_tag_changes_for_bot(caller, task_in.model_fields_set)
     require_task_writable(session, task.id)
     project_id = crud.get_task_project_id(session=session, task=task)
     _check_recurrence_update(session=session, task=task, task_in=task_in)
@@ -258,14 +265,17 @@ def update_task(
                 ),
             )
         # Moving a task in is as much a change to the destination as creating
-        # one there.
+        # one there. For a bot the source was checked with the task, so work
+        # can neither leave its scope nor enter from outside it.
         require_project_writable(
-            get_owned_project(session, current_user, task_in.project_id)
+            authorization.get_project(
+                session, caller, task_in.project_id, TaskAction.UPDATE
+            )
         )
         project_id = task_in.project_id
 
     if "assignee_id" in task_in.model_fields_set:
-        _check_assignee(current_user, task_in.assignee_id)
+        _check_assignee(caller, task_in.assignee_id)
 
     if task_in.subtasks is not None and task_in.completed is not True:
         raise HTTPException(
@@ -378,7 +388,7 @@ def _check_recurrence_update(
 def delete_task(
     *,
     session: SessionDep,
-    current_user: CurrentUser,
+    caller: CallerDep,
     task_id: uuid.UUID,
     delete_subtasks: bool = False,
 ) -> Message:
@@ -390,7 +400,7 @@ def delete_task(
     take down far more than the task named here, a task that still has subtasks
     is only deleted when `delete_subtasks` says so (FR-01.11, FR-01.12).
     """
-    task = get_owned_task(session, current_user, task_id)
+    task = authorization.get_task(session, caller, task_id, TaskAction.DELETE)
     require_task_writable(session, task.id)
 
     if not delete_subtasks and crud.has_subtasks(session=session, task=task):

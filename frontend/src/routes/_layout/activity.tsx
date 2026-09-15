@@ -1,10 +1,12 @@
 import { useQuery } from "@tanstack/react-query"
 import { createFileRoute } from "@tanstack/react-router"
+import { Bot } from "lucide-react"
 import { z } from "zod"
 
 import { type ActivityEntryPublic, ActivityService } from "@/client"
 import { ActivityDescription } from "@/components/Activity/ActivityDescription"
 import { RestoreDeletion } from "@/components/Activity/RestoreDeletion"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
@@ -35,7 +37,27 @@ export const Route = createFileRoute("/_layout/activity")({
   }),
 })
 
-function actorLabel(entry: ActivityEntryPublic, currentUserId?: string) {
+/**
+ * Who made the change: you, or one of your bot users by name (FR-10.2).
+ */
+function ActorLabel({
+  entry,
+  currentUserId,
+}: {
+  entry: ActivityEntryPublic
+  currentUserId?: string
+}) {
+  if (entry.actor_bot_user_id) {
+    return (
+      <span className="inline-flex items-center gap-1.5">
+        <Bot className="size-4 text-muted-foreground" aria-hidden />
+        {entry.actor_bot_user_name ?? "A bot user"}
+        <Badge variant="outline" className="text-xs">
+          Bot
+        </Badge>
+      </span>
+    )
+  }
   return entry.actor_id === currentUserId ? "You" : "Someone else"
 }
 
@@ -64,7 +86,7 @@ function ActivityRows({
         {entry.created_at ? new Date(entry.created_at).toLocaleString() : ""}
       </TableCell>
       <TableCell className="whitespace-nowrap">
-        {actorLabel(entry, currentUserId)}
+        <ActorLabel entry={entry} currentUserId={currentUserId} />
       </TableCell>
       <TableCell>
         <ActivityDescription entry={entry} currentUserId={currentUserId} />

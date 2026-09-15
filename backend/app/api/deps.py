@@ -130,6 +130,9 @@ def get_caller(session: SessionDep, token: TokenDep) -> Caller:
         return Caller(owner_id=get_current_user(session, token).id)
 
     bot = _authenticate_bot(session, token)
+    # Whatever a bot's request changes is logged as the bot's doing, never as
+    # its owner's (FR-10.2).
+    activity.set_bot_actor(session, bot.id)
     project_ids = session.exec(
         select(BotUserProject.project_id).where(BotUserProject.bot_user_id == bot.id)
     ).all()

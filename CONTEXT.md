@@ -40,7 +40,9 @@ _Avoid_: "template" or "parent" for the series — no occurrence is special, and
 none of them is the pattern the others are stamped from.
 
 **Activity log**:
-The record of every change in Taskly. Each user sees only their own log —
+The record of every change in Taskly. Each entry names who made the change:
+the user, or the one of their **bot users** that made it — a bot user's change
+is never recorded as its owner's. Each user sees only their own log —
 including the superuser, who has no visibility into other users' logs.
 _Avoid_: "audit log" (implies cross-user oversight, which does not exist here).
 

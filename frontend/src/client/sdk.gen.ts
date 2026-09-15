@@ -335,6 +335,9 @@ export class TasksService {
      * in the Inbox; a subtask follows its parent's project instead.
      *
      * A task created with a recurrence is the first occurrence of its series.
+     *
+     * A bot user creates only where its scope reaches — the Inbox included, which
+     * has to be in its scope like any other project — and sets no tags.
      */
     public static createTask<ThrowOnError extends boolean = true>(options: Options<tasksCreateTaskData, ThrowOnError>) {
         return (options.client ?? client).post<tasksCreateTaskResponses, tasksCreateTaskErrors, ThrowOnError>({
@@ -393,6 +396,9 @@ export class TasksService {
      * Completing an occurrence of a recurring task creates the next one. Moving
      * the due date of an open occurrence needs `due_date_scope` to say whether
      * the rest of the series moves with it.
+     *
+     * A bot user needs the task in its scope and, to move it, the destination
+     * too (FR-08.8); it sets no tags.
      */
     public static updateTask<ThrowOnError extends boolean = true>(options: Options<tasksUpdateTaskData, ThrowOnError>) {
         return (options.client ?? client).patch<tasksUpdateTaskResponses, tasksUpdateTaskErrors, ThrowOnError>({
