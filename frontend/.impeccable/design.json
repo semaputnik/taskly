@@ -399,7 +399,7 @@
       },
       {
         "name": "No overflow menu",
-        "body": "There is no `\u22ee` anywhere on a record. A menu is what a surface reaches for when it has not decided where its actions belong, and every action here has a home: a field is changed in the field, a subtask is added from the Subtasks tab beneath the subtasks, and delete \u2014 the one act with no field and no undo \u2014 is a single destructive icon in the panel's corner, with no neighbours to mis-hit and no menu to open first.",
+        "body": "There is no `\u22ee` anywhere on a record. A menu is what a surface reaches for when it has not decided where its actions belong, and every action here has a home: a field is changed in the field, a subtask is added from the Subtasks tab beneath the subtasks, and delete \u2014 the one act with no field and no undo \u2014 is a single destructive icon in the panel's corner, with no neighbours to catch a stray click and no menu to open first.",
         "section": "components"
       },
       {

@@ -582,7 +582,7 @@ surface reaches for when it has not decided where its actions belong, and every
 action here has a home: a field is changed in the field, a subtask is added
 from the Subtasks tab beneath the subtasks, and delete — the one act with no
 field and no undo — is a single destructive icon in the panel's corner, with no
-neighbours to mis-hit and no menu to open first.
+neighbours to catch a stray click and no menu to open first.
 
 **Edit in place, save per field.** Every property is its own control, and each
 one saves alone: a select the moment it changes, text when focus leaves it. The

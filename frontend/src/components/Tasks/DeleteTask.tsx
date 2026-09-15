@@ -70,7 +70,7 @@ const DeleteTask = ({ task, onSuccess }: DeleteTaskProps) => {
   return (
     <Dialog open={isOpen} onOpenChange={openDialog}>
       {/* The one thing that cannot be undone gets the one control in the
-          panel's corner: no menu to open first, and no neighbours to mis-hit. */}
+          panel's corner: no menu to open first, and no neighbours to catch a stray click. */}
       <Button
         variant="ghost"
         size="icon"
