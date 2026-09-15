@@ -28,6 +28,9 @@ LOGGED = {
     f"DELETE {API}/comments/{{comment_id}}",
     f"POST {API}/tasks/{{task_id}}/attachments/",
     f"DELETE {API}/attachments/{{attachment_id}}",
+    f"POST {API}/tags/",
+    f"PATCH {API}/tags/{{tag_id}}",
+    f"DELETE {API}/tags/{{tag_id}}",
 }
 ACCOUNT = "Account and sign-in, not a change to the tasks and projects the log covers"
 

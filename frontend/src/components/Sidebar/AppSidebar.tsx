@@ -5,6 +5,7 @@ import {
   FolderKanban,
   History,
   Home,
+  Tag,
   Users,
 } from "lucide-react"
 
@@ -24,6 +25,7 @@ const baseItems: NavItem[] = [
   { icon: Home, title: "Dashboard", path: "/" },
   { icon: CheckSquare, title: "Tasks", path: "/tasks" },
   { icon: FolderKanban, title: "Projects", path: "/projects" },
+  { icon: Tag, title: "Tags", path: "/tags" },
   { icon: Archive, title: "Archive", path: "/archive" },
   { icon: History, title: "Activity", path: "/activity" },
   { icon: Bot, title: "Bots", path: "/bots" },

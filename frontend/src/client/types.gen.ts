@@ -9,12 +9,12 @@ export type ClientOptions = {
  *
  * Everything the activity log records (FR-10.3).
  */
-export type ActivityAction = 'task_created' | 'task_changed' | 'task_completed' | 'task_reopened' | 'task_deleted' | 'task_restored' | 'task_moved' | 'task_assigned' | 'task_unassigned' | 'project_created' | 'project_changed' | 'project_deleted' | 'project_restored' | 'comment_added' | 'comment_edited' | 'comment_deleted' | 'attachment_added' | 'attachment_deleted';
+export type ActivityAction = 'task_created' | 'task_changed' | 'task_completed' | 'task_reopened' | 'task_deleted' | 'task_restored' | 'task_moved' | 'task_assigned' | 'task_unassigned' | 'project_created' | 'project_changed' | 'project_deleted' | 'project_restored' | 'comment_added' | 'comment_edited' | 'comment_deleted' | 'attachment_added' | 'attachment_deleted' | 'tag_created' | 'tag_renamed' | 'tag_deleted';
 
 /**
  * ActivityEntityType
  */
-export type ActivityEntityType = 'task' | 'project' | 'comment' | 'attachment';
+export type ActivityEntityType = 'task' | 'project' | 'comment' | 'attachment' | 'tag';
 
 /**
  * ActivityEntriesPublic
@@ -585,6 +585,16 @@ export type SortOrder = 'asc' | 'desc';
 export type SubtaskCompletion = 'leave_uncompleted' | 'complete';
 
 /**
+ * TagCreate
+ */
+export type TagCreate = {
+    /**
+     * Name
+     */
+    name: string;
+};
+
+/**
  * TagPublic
  */
 export type TagPublic = {
@@ -596,6 +606,20 @@ export type TagPublic = {
      * Id
      */
     id: string;
+    /**
+     * Task Count
+     */
+    task_count?: number;
+};
+
+/**
+ * TagUpdate
+ */
+export type TagUpdate = {
+    /**
+     * Name
+     */
+    name: string;
 };
 
 /**
@@ -1815,6 +1839,91 @@ export type tagsReadTagsResponses = {
 };
 
 export type tagsReadTagsResponse = tagsReadTagsResponses[keyof tagsReadTagsResponses];
+
+export type tagsCreateTagData = {
+    body: TagCreate;
+    path?: never;
+    query?: never;
+    url: '/api/v1/tags/';
+};
+
+export type tagsCreateTagErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type tagsCreateTagError = tagsCreateTagErrors[keyof tagsCreateTagErrors];
+
+export type tagsCreateTagResponses = {
+    /**
+     * Successful Response
+     */
+    200: TagPublic;
+};
+
+export type tagsCreateTagResponse = tagsCreateTagResponses[keyof tagsCreateTagResponses];
+
+export type tagsDeleteTagData = {
+    body?: never;
+    path: {
+        /**
+         * Tag Id
+         */
+        tag_id: string;
+    };
+    query?: never;
+    url: '/api/v1/tags/{tag_id}';
+};
+
+export type tagsDeleteTagErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type tagsDeleteTagError = tagsDeleteTagErrors[keyof tagsDeleteTagErrors];
+
+export type tagsDeleteTagResponses = {
+    /**
+     * Successful Response
+     */
+    200: Message;
+};
+
+export type tagsDeleteTagResponse = tagsDeleteTagResponses[keyof tagsDeleteTagResponses];
+
+export type tagsRenameTagData = {
+    body: TagUpdate;
+    path: {
+        /**
+         * Tag Id
+         */
+        tag_id: string;
+    };
+    query?: never;
+    url: '/api/v1/tags/{tag_id}';
+};
+
+export type tagsRenameTagErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type tagsRenameTagError = tagsRenameTagErrors[keyof tagsRenameTagErrors];
+
+export type tagsRenameTagResponses = {
+    /**
+     * Successful Response
+     */
+    200: TagPublic;
+};
+
+export type tagsRenameTagResponse = tagsRenameTagResponses[keyof tagsRenameTagResponses];
 
 export type activityReadActivityLogData = {
     body?: never;
