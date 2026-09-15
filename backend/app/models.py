@@ -717,6 +717,120 @@ class ActivityEntriesPublic(SQLModel):
     count: int
 
 
+BotUserName = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=255)
+]
+
+
+class BotPermissions(SQLModel):
+    """
+    What a bot user may do inside the projects of its scope (FR-08.9,
+    FR-08.10).
+
+    Only what can be granted is here. What a bot can never do — anything on
+    projects, editing or deleting comments — has no field to set to false:
+    the endpoints for it take a human caller, so a bot cannot reach them at
+    all. Tags have no field yet either, because what a tag permission would
+    mean is still an open question (Q-16); a bot changes no tags meanwhile.
+    """
+
+    create_tasks: bool = False
+    read_tasks: bool = False
+    update_tasks: bool = False
+    delete_tasks: bool = False
+    add_comments: bool = False
+
+
+class BotScope(SQLModel):
+    """
+    Where a bot user may act and what it may do there.
+
+    The projects are always named one by one: there is no value meaning "all
+    projects" (FR-08.6), so a project created tomorrow is never in the scope
+    of a bot set up today.
+    """
+
+    project_ids: list[uuid.UUID]
+    permissions: BotPermissions
+
+
+class BotUserCreate(SQLModel):
+    name: BotUserName
+    scope: BotScope
+
+
+class BotUser(SQLModel, table=True):
+    """
+    An identity for an integration, owned by one user and far weaker than
+    them (FR-08.1–FR-08.4).
+
+    Not a kind of `User`: login, registration, password reset and the
+    superuser's account list all work on users, so none of them can reach a
+    bot user by forgetting to check for one. It has no password and no email;
+    the only way in is its token.
+    """
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    owner_id: uuid.UUID = Field(
+        foreign_key="user.id", nullable=False, ondelete="CASCADE", index=True
+    )
+    name: str = Field(max_length=255)
+    create_tasks: bool = False
+    read_tasks: bool = False
+    update_tasks: bool = False
+    delete_tasks: bool = False
+    add_comments: bool = False
+    # A SHA-256 of the token, never the token itself, so the token cannot be
+    # read back from anywhere once the response that issued it is gone
+    # (FR-08.13). One column, so a bot user holds at most one token
+    # (FR-08.12). A token is random and long, which is what makes a plain
+    # digest enough where a password needs a slow hash.
+    token_hash: str | None = Field(
+        default=None, max_length=64, unique=True, nullable=True
+    )
+    token_issued_at: datetime | None = Field(
+        default=None,
+        sa_type=DateTime(timezone=True),  # type: ignore
+    )
+    created_at: datetime | None = Field(
+        default_factory=get_datetime_utc,
+        sa_type=DateTime(timezone=True),  # type: ignore
+    )
+
+
+class BotUserProject(SQLModel, table=True):
+    """The projects in a bot user's scope, each listed explicitly."""
+
+    bot_user_id: uuid.UUID = Field(
+        foreign_key="botuser.id", primary_key=True, ondelete="CASCADE"
+    )
+    project_id: uuid.UUID = Field(
+        foreign_key="project.id", primary_key=True, ondelete="CASCADE"
+    )
+
+
+class BotUserPublic(SQLModel):
+    id: uuid.UUID
+    name: str
+    scope: BotScope
+    # Whether a token is out; the token itself is never reported again.
+    has_token: bool
+    token_issued_at: datetime | None = None
+    created_at: datetime | None = None
+
+
+class BotUsersPublic(SQLModel):
+    data: list[BotUserPublic]
+    count: int
+
+
+class BotTokenIssued(SQLModel):
+    """The one response that carries a bot user's token (FR-08.13)."""
+
+    bot_user_id: uuid.UUID
+    token: str
+
+
 # Generic message
 class Message(SQLModel):
     message: str

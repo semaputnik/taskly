@@ -2,10 +2,12 @@ import uuid
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
-from sqlmodel import func, select
+from sqlmodel import col, func, select
 
 from app import crud
+from app.api import authorization
 from app.api.deps import (
+    CallerDep,
     CurrentUser,
     SessionDep,
     get_owned_project,
@@ -26,7 +28,7 @@ router = APIRouter(prefix="/projects", tags=["projects"])
 @router.get("/", response_model=ProjectsPublic)
 def read_projects(
     session: SessionDep,
-    current_user: CurrentUser,
+    caller: CallerDep,
     skip: int = 0,
     limit: int = 100,
     archived: bool = False,
@@ -34,12 +36,19 @@ def read_projects(
     """
     Retrieve the current user's projects: the live ones, or only the archived
     ones when `archived` asks for the archive (FR-05.14).
+
+    A bot user sees only the projects in its scope, and never the archive
+    (FR-08.9, FR-05.13).
     """
+    if archived:
+        authorization.refuse_archived_for_bot(caller)
     conditions: list[Any] = [
-        Project.owner_id == current_user.id,
+        Project.owner_id == caller.owner_id,
         crud.not_deleted(Project),
         Project.is_archived == archived,
     ]
+    if caller.bot is not None:
+        conditions.append(col(Project.id).in_(caller.project_ids))
     count_statement = select(func.count()).select_from(Project).where(*conditions)
     count = session.exec(count_statement).one()
 
