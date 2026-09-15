@@ -15,6 +15,8 @@ from app.api.deps import (
     require_task_writable,
 )
 from app.models import (
+    AssigneeBotUser,
+    BotUser,
     Message,
     Recurrence,
     SubtaskCompletion,
@@ -60,11 +62,36 @@ def _unique(names: list[str]) -> list[str]:
     return list(dict.fromkeys(names))
 
 
-def _check_assignee(caller: Caller, assignee_id: uuid.UUID | None) -> None:
-    if assignee_id is not None and assignee_id != caller.owner_id:
+def _resolve_assignee(
+    session: SessionDep,
+    caller: Caller,
+    assignee_id: uuid.UUID | None,
+    current: crud.Assignee | None = None,
+) -> crud.Assignee:
+    """
+    Who `assignee_id` names: the owner, or one of the owner's bot users
+    (FR-01.7) — never another user or their bot users.
+
+    A deleted bot user takes no new tasks, but stays on the ones it already
+    has (FR-08.21), so resending `current` is not a new assignment.
+    """
+    if assignee_id is None:
+        return crud.Assignee()
+    if assignee_id == caller.owner_id:
+        return crud.Assignee(user_id=assignee_id)
+    bot = session.get(BotUser, assignee_id)
+    if bot is None or bot.owner_id != caller.owner_id:
         raise HTTPException(
-            status_code=400, detail="A task can only be assigned to yourself"
+            status_code=400,
+            detail="A task can only be assigned to you or to one of your bot users",
         )
+    assignee = crud.Assignee(bot_user_id=bot.id)
+    if bot.deleted_at is not None and assignee != current:
+        raise HTTPException(
+            status_code=400,
+            detail=f"The bot user “{bot.name}” is deleted and takes no new tasks",
+        )
+    return assignee
 
 
 def _check_recurrence(
@@ -91,15 +118,24 @@ def _public(
     project_id: uuid.UUID,
     tags: list[str],
     recurrence: Recurrence | None,
+    bot_users: dict[uuid.UUID, AssigneeBotUser],
 ) -> TaskPublic:
     """
-    A task as the API reports it, with the project it resolves to, its tags and
-    its recurrence filled in. Listings resolve them in bulk; `_read` does one
-    task.
+    A task as the API reports it, with the project it resolves to, its tags,
+    its recurrence and its assignee filled in. Listings resolve them in bulk;
+    `_read` does one task.
     """
     return TaskPublic.model_validate(
         task,
-        update={"project_id": project_id, "tags": tags, "recurrence": recurrence},
+        update={
+            "project_id": project_id,
+            "tags": tags,
+            "recurrence": recurrence,
+            "assignee_id": task.assignee_id or task.assignee_bot_user_id,
+            "assignee_bot_user": bot_users.get(task.assignee_bot_user_id)
+            if task.assignee_bot_user_id
+            else None,
+        },
     )
 
 
@@ -110,6 +146,7 @@ def _read(session: SessionDep, task: Task) -> TaskPublic:
         project_id=crud.get_task_project_id(session=session, task=task),
         tags=crud.get_task_tags(session=session, task_ids=[task.id])[task.id],
         recurrence=crud.get_recurrences(session=session, tasks=[task])[task.id],
+        bot_users=crud.get_assignee_bot_users(session=session, tasks=[task]),
     )
 
 
@@ -144,6 +181,7 @@ def read_tasks(
     project_ids = crud.get_task_project_ids(session=session, owner_id=caller.owner_id)
     tags = crud.get_task_tags(session=session, task_ids=[task.id for task in tasks])
     recurrences = crud.get_recurrences(session=session, tasks=tasks)
+    bot_users = crud.get_assignee_bot_users(session=session, tasks=tasks)
     return TasksPublic(
         data=[
             _public(
@@ -151,6 +189,7 @@ def read_tasks(
                 project_id=project_ids[task.id],
                 tags=tags[task.id],
                 recurrence=recurrences[task.id],
+                bot_users=bot_users,
             )
             for task in tasks
         ],
@@ -185,7 +224,7 @@ def create_task(*, session: SessionDep, caller: CallerDep, task_in: TaskCreate) 
         authorization.authorize_tasks(caller, TaskAction.CREATE, project)
     authorization.refuse_tag_changes_for_bot(caller, task_in.model_fields_set)
 
-    _check_assignee(caller, task_in.assignee_id)
+    assignee = _resolve_assignee(session, caller, task_in.assignee_id)
     _check_recurrence(
         parent_id=task_in.parent_id,
         recurrence=task_in.recurrence,
@@ -210,6 +249,7 @@ def create_task(*, session: SessionDep, caller: CallerDep, task_in: TaskCreate) 
         task_create=task_in,
         project_id=project_id,
         owner_id=caller.owner_id,
+        assignee=assignee,
         tag_names=_unique(task_in.tags),
     )
     return _read(session, task)
@@ -274,8 +314,14 @@ def update_task(
         )
         project_id = task_in.project_id
 
+    assignee = None
     if "assignee_id" in task_in.model_fields_set:
-        _check_assignee(caller, task_in.assignee_id)
+        assignee = _resolve_assignee(
+            session,
+            caller,
+            task_in.assignee_id,
+            current=crud.Assignee(task.assignee_id, task.assignee_bot_user_id),
+        )
 
     if task_in.subtasks is not None and task_in.completed is not True:
         raise HTTPException(
@@ -304,6 +350,7 @@ def update_task(
         session=session,
         db_task=task,
         task_in=task_in,
+        assignee=assignee,
         tag_names=_unique(task_in.tags) if task_in.tags is not None else None,
     )
 
@@ -312,6 +359,7 @@ def update_task(
         project_id=project_id,
         tags=crud.get_task_tags(session=session, task_ids=[task.id])[task.id],
         recurrence=crud.get_recurrences(session=session, tasks=[task])[task.id],
+        bot_users=crud.get_assignee_bot_users(session=session, tasks=[task]),
     )
 
 

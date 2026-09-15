@@ -43,6 +43,7 @@ import {
 import useAuth from "@/hooks/useAuth"
 import useCustomToast from "@/hooks/useCustomToast"
 import { handleError } from "@/utils"
+import { AssigneeSelect, assigneeFormValue, toAssigneeId } from "./assignee"
 import {
   checkRecurrence,
   DueDateScopeDialog,
@@ -55,8 +56,6 @@ import {
 import { TagsField } from "./TagsField"
 
 const NO_PRIORITY = "none"
-const UNASSIGNED = "unassigned"
-const ASSIGNED_TO_ME = "me"
 
 const formSchema = z
   .object({
@@ -108,7 +107,7 @@ const EditTask = ({ task, onSuccess }: EditTaskProps) => {
       project_id: task.project_id,
       due_date: task.due_date ?? "",
       priority: task.priority ?? NO_PRIORITY,
-      assignee: task.assignee_id ? ASSIGNED_TO_ME : UNASSIGNED,
+      assignee: assigneeFormValue(task),
       tags: task.tags ?? [],
       ...recurrenceFormValues(task.recurrence),
     },
@@ -149,7 +148,7 @@ const EditTask = ({ task, onSuccess }: EditTaskProps) => {
         data.priority && data.priority !== NO_PRIORITY
           ? (data.priority as TaskUpdate["priority"])
           : null,
-      assignee_id: data.assignee === ASSIGNED_TO_ME ? currentUser?.id : null,
+      assignee_id: toAssigneeId(data.assignee, currentUser?.id),
       tags: data.tags,
       recurrence: isSubtask ? undefined : recurrence,
     }
@@ -322,19 +321,14 @@ const EditTask = ({ task, onSuccess }: EditTaskProps) => {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Assignee</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger className="w-full">
-                          <SelectValue />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value={UNASSIGNED}>Unassigned</SelectItem>
-                        <SelectItem value={ASSIGNED_TO_ME}>
-                          Me ({currentUser?.email})
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <FormControl>
+                      <AssigneeSelect
+                        value={field.value}
+                        onChange={field.onChange}
+                        currentUserEmail={currentUser?.email}
+                        current={task.assignee_bot_user}
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}

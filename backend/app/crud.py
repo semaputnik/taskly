@@ -2,7 +2,7 @@ import calendar
 import uuid
 from collections.abc import Collection, Sequence
 from datetime import UTC, date, datetime, timedelta
-from typing import Any
+from typing import Any, NamedTuple
 
 from sqlalchemy import case, nullslast, or_
 from sqlalchemy.orm import aliased
@@ -15,6 +15,7 @@ from app.core.security import (
     verify_password,
 )
 from app.models import (
+    AssigneeBotUser,
     Attachment,
     BotUser,
     BotUserCreate,
@@ -134,12 +135,23 @@ def get_inbox_project(*, session: Session, owner_id: uuid.UUID) -> Project:
     return session.exec(statement).one()
 
 
+class Assignee(NamedTuple):
+    """
+    Who a task is assigned to, as the two columns that can hold it. Both None
+    is nobody; the API's single `assignee_id` is resolved into this first.
+    """
+
+    user_id: uuid.UUID | None = None
+    bot_user_id: uuid.UUID | None = None
+
+
 def create_task(
     *,
     session: Session,
     task_create: TaskCreate,
     project_id: uuid.UUID | None,
     owner_id: uuid.UUID,
+    assignee: Assignee = Assignee(),
     tag_names: Sequence[str] = (),
 ) -> Task:
     """
@@ -149,7 +161,13 @@ def create_task(
     checked it can be: a root task with a due date.
     """
     db_obj = Task.model_validate(
-        task_create, update={"project_id": project_id, "owner_id": owner_id}
+        task_create,
+        update={
+            "project_id": project_id,
+            "owner_id": owner_id,
+            "assignee_id": assignee.user_id,
+            "assignee_bot_user_id": assignee.bot_user_id,
+        },
     )
     session.add(db_obj)
     # Flush so the task row exists before the tag links that point at it, while
@@ -171,6 +189,7 @@ def update_task(
     session: Session,
     db_task: Task,
     task_in: TaskUpdate,
+    assignee: Assignee | None = None,
     tag_names: Sequence[str] | None = None,
 ) -> Task:
     """
@@ -183,11 +202,17 @@ def update_task(
     """
     # The directives steer what happens around the row (the subtree, the
     # series) rather than naming columns of it, so they never reach it as such.
+    # The assignee arrives resolved, as `assignee`.
     task_data = task_in.model_dump(
         exclude_unset=True,
-        exclude={"subtasks", "tags", "recurrence", "due_date_scope"},
+        exclude={"subtasks", "tags", "recurrence", "due_date_scope", "assignee_id"},
     )
     fields_set = task_in.model_fields_set
+    if "assignee_id" in fields_set and assignee is None:
+        raise ValueError("An update that sets the assignee needs it resolved")
+    if assignee is not None:
+        task_data["assignee_id"] = assignee.user_id
+        task_data["assignee_bot_user_id"] = assignee.bot_user_id
     was_completed = db_task.completed
 
     db_task.sqlmodel_update(task_data)
@@ -392,6 +417,7 @@ def _stage_copy(
         description=source.description,
         priority=source.priority,
         assignee_id=source.assignee_id,
+        assignee_bot_user_id=source.assignee_bot_user_id,
         due_date=due_date,
         parent_id=parent_id,
         project_id=project_id,
@@ -490,8 +516,15 @@ def _task_filters(*, owner_id: uuid.UUID, query: TaskQuery) -> list[Any]:
 
     if query.unassigned:
         conditions.append(col(Task.assignee_id).is_(None))
+        conditions.append(col(Task.assignee_bot_user_id).is_(None))
     elif query.assignee_id is not None:
-        conditions.append(Task.assignee_id == query.assignee_id)
+        # The owner or a bot user: the id names one or the other.
+        conditions.append(
+            or_(
+                col(Task.assignee_id) == query.assignee_id,
+                col(Task.assignee_bot_user_id) == query.assignee_id,
+            )
+        )
 
     if query.tag is not None:
         tagged = (
@@ -1093,3 +1126,19 @@ def issue_bot_token(*, session: Session, bot: BotUser) -> str:
     session.commit()
     session.refresh(bot)
     return token
+
+
+def get_assignee_bot_users(
+    *, session: Session, tasks: Sequence[Task]
+) -> dict[uuid.UUID, AssigneeBotUser]:
+    """The bot users the tasks are assigned to, deleted ones included, by id."""
+    bot_ids = {task.assignee_bot_user_id for task in tasks if task.assignee_bot_user_id}
+    if not bot_ids:
+        return {}
+    bots = session.exec(select(BotUser).where(col(BotUser.id).in_(bot_ids))).all()
+    return {
+        bot.id: AssigneeBotUser(
+            id=bot.id, name=bot.name, deleted=bot.deleted_at is not None
+        )
+        for bot in bots
+    }

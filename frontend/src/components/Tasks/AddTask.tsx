@@ -43,6 +43,7 @@ import {
 import useAuth from "@/hooks/useAuth"
 import useCustomToast from "@/hooks/useCustomToast"
 import { handleError } from "@/utils"
+import { AssigneeSelect, toAssigneeId, UNASSIGNED } from "./assignee"
 import {
   checkRecurrence,
   RecurrenceFields,
@@ -53,8 +54,6 @@ import {
 import { TagsField } from "./TagsField"
 
 const NO_PRIORITY = "none"
-const UNASSIGNED = "unassigned"
-const ASSIGNED_TO_ME = "me"
 
 const formSchema = z
   .object({
@@ -139,8 +138,7 @@ const AddTask = ({ parent, onSuccess }: AddTaskProps = {}) => {
         data.priority && data.priority !== NO_PRIORITY
           ? (data.priority as TaskCreate["priority"])
           : undefined,
-      assignee_id:
-        data.assignee === ASSIGNED_TO_ME ? currentUser?.id : undefined,
+      assignee_id: toAssigneeId(data.assignee, currentUser?.id) ?? undefined,
       tags: data.tags,
       // Only a task at the top of its tree can recur.
       recurrence: parent ? undefined : (toRecurrence(data) ?? undefined),
@@ -301,19 +299,13 @@ const AddTask = ({ parent, onSuccess }: AddTaskProps = {}) => {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Assignee</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger className="w-full">
-                          <SelectValue />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value={UNASSIGNED}>Unassigned</SelectItem>
-                        <SelectItem value={ASSIGNED_TO_ME}>
-                          Me ({currentUser?.email})
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <FormControl>
+                      <AssigneeSelect
+                        value={field.value}
+                        onChange={field.onChange}
+                        currentUserEmail={currentUser?.email}
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}

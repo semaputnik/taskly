@@ -46,7 +46,7 @@ def _get_owned_bot_user(
     session: SessionDep, current_user: CurrentUser, bot_user_id: uuid.UUID
 ) -> BotUser:
     bot = session.get(BotUser, bot_user_id)
-    if not bot or bot.owner_id != current_user.id:
+    if not bot or bot.owner_id != current_user.id or bot.deleted_at is not None:
         raise HTTPException(status_code=404, detail="Bot user not found")
     return bot
 
@@ -57,15 +57,16 @@ def read_bot_users(
 ) -> Any:
     """
     Retrieve the current user's bot users, with their scopes, oldest first.
+    Deleted bot users are not among them.
     """
     count = session.exec(
         select(func.count())
         .select_from(BotUser)
-        .where(BotUser.owner_id == current_user.id)
+        .where(BotUser.owner_id == current_user.id, col(BotUser.deleted_at).is_(None))
     ).one()
     bots = session.exec(
         select(BotUser)
-        .where(BotUser.owner_id == current_user.id)
+        .where(BotUser.owner_id == current_user.id, col(BotUser.deleted_at).is_(None))
         .order_by(col(BotUser.created_at))
         .offset(skip)
         .limit(limit)

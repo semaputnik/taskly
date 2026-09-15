@@ -12,6 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { useBotUsers } from "./assignee"
 import { clearedFilters, hasActiveFilters, type TaskSearch } from "./search"
 
 // A Select cannot hold an empty value, so "no filter" needs a name of its own.
@@ -52,7 +53,7 @@ function FilterSelect({
         value={value ?? ANY}
         onValueChange={(next) => onChange(next === ANY ? undefined : next)}
       >
-        <SelectTrigger className={width}>
+        <SelectTrigger className={width} aria-label={label}>
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -98,6 +99,7 @@ function DateFilter({
  * or reloaded.
  */
 export function TaskFilters({ search, onChange }: TaskFiltersProps) {
+  const { data: bots } = useBotUsers()
   const { data: projects } = useQuery({
     queryKey: ["projects"],
     queryFn: async () =>
@@ -142,6 +144,10 @@ export function TaskFilters({ search, onChange }: TaskFiltersProps) {
         options={[
           { value: "me", label: "Me" },
           { value: "unassigned", label: "Unassigned" },
+          ...(bots?.data ?? []).map((bot) => ({
+            value: bot.id,
+            label: bot.name,
+          })),
         ]}
         onChange={(value) =>
           onChange({ assignee: value as TaskSearch["assignee"] })

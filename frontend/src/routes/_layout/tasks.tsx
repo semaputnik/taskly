@@ -16,8 +16,14 @@ function getTasksQueryOptions(search: TaskSearch, currentUserId?: string) {
   const { assignee, ...filters } = search
   const query = {
     ...filters,
-    // "Me" needs the id the API filters on; "unassigned" is its own flag.
-    assignee_id: assignee === "me" ? currentUserId : undefined,
+    // "Me" needs the id the API filters on, a bot user is named by its own
+    // id, and "unassigned" is a flag of its own.
+    assignee_id:
+      assignee === "me"
+        ? currentUserId
+        : assignee === "unassigned"
+          ? undefined
+          : assignee,
     unassigned: assignee === "unassigned" ? true : undefined,
     skip: 0,
     limit: 100,

@@ -85,6 +85,27 @@ export type ActivityEntryPublic = {
 };
 
 /**
+ * AssigneeBotUser
+ *
+ * The bot user a task is assigned to, as a task reports it. A deleted bot
+ * user stays the assignee of what it was given (FR-08.21), marked deleted.
+ */
+export type AssigneeBotUser = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Deleted
+     */
+    deleted: boolean;
+};
+
+/**
  * AttachmentPublic
  */
 export type AttachmentPublic = {
@@ -628,6 +649,7 @@ export type TaskPublic = {
      * Assignee Id
      */
     assignee_id?: string | null;
+    assignee_bot_user?: AssigneeBotUser | null;
     recurrence?: Recurrence | null;
     /**
      * Created At

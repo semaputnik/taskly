@@ -8,7 +8,11 @@ import { z } from "zod"
  */
 export const taskSearchSchema = z.object({
   project_id: z.string().optional().catch(undefined),
-  assignee: z.enum(["me", "unassigned"]).optional().catch(undefined),
+  // "me", "unassigned", or the id of one of the user's bot users.
+  assignee: z
+    .union([z.enum(["me", "unassigned"]), z.string().uuid()])
+    .optional()
+    .catch(undefined),
   tag: z.string().optional().catch(undefined),
   priority: z.enum(["P1", "P2", "P3", "P4"]).optional().catch(undefined),
   completed: z.boolean().optional().catch(undefined),

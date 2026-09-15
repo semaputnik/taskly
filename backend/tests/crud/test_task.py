@@ -77,6 +77,7 @@ def test_update_task_fields(db: Session) -> None:
             due_date=datetime.date(2026, 2, 2),
             assignee_id=user.id,
         ),
+        assignee=crud.Assignee(user_id=user.id),
     )
 
     assert updated.title == "New title"

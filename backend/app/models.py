@@ -408,8 +408,7 @@ class TaskCreate(TaskBase):
     # parent's project instead, so the two fields are mutually exclusive.
     project_id: uuid.UUID | None = None
     parent_id: uuid.UUID | None = None
-    # Only the task owner is a valid assignee for now; bot users become
-    # assignable in semaputnik/taskly#7 without needing to reshape this field.
+    # The owner's id, or the id of one of the owner's bot users (FR-01.7).
     assignee_id: uuid.UUID | None = None
     recurrence: Recurrence | None = None
 
@@ -421,6 +420,7 @@ class TaskUpdate(SQLModel):
     due_date: date | None = None
     priority: TaskPriority | None = None
     project_id: uuid.UUID | None = None
+    # The owner's id, or the id of one of the owner's bot users (FR-01.7).
     assignee_id: uuid.UUID | None = None
     completed: bool | None = None
     # The task's tags in full: what is sent replaces what it had, and omitting
@@ -460,6 +460,11 @@ class Task(TaskBase, table=True):
             unique=True,
             postgresql_where=text("NOT completed AND deletion_id IS NULL"),
         ),
+        # One assignee at most: the owner or a bot user, never both.
+        CheckConstraint(
+            "assignee_id IS NULL OR assignee_bot_user_id IS NULL",
+            name="task_one_assignee",
+        ),
     )
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
@@ -479,8 +484,13 @@ class Task(TaskBase, table=True):
     owner_id: uuid.UUID = Field(
         foreign_key="user.id", nullable=False, ondelete="CASCADE"
     )
+    # Who is responsible for the task: its owner, or one of the owner's bot
+    # users. At most one of the two is set; neither means nobody (FR-01.6).
     assignee_id: uuid.UUID | None = Field(
         default=None, foreign_key="user.id", nullable=True, ondelete="SET NULL"
+    )
+    assignee_bot_user_id: uuid.UUID | None = Field(
+        default=None, foreign_key="botuser.id", nullable=True, ondelete="SET NULL"
     )
     # Set once the task is deleted; None means it is live (FR-01.8).
     deletion_id: uuid.UUID | None = Field(
@@ -503,6 +513,17 @@ class Task(TaskBase, table=True):
     )
 
 
+class AssigneeBotUser(SQLModel):
+    """
+    The bot user a task is assigned to, as a task reports it. A deleted bot
+    user stays the assignee of what it was given (FR-08.21), marked deleted.
+    """
+
+    id: uuid.UUID
+    name: str
+    deleted: bool
+
+
 # Properties to return via API, id is always required
 class TaskPublic(TaskBase):
     id: uuid.UUID
@@ -511,7 +532,10 @@ class TaskPublic(TaskBase):
     project_id: uuid.UUID
     parent_id: uuid.UUID | None = None
     tags: list[str] = []
+    # Whoever the task is assigned to: the owner, or a bot user. When it is a
+    # bot user, `assignee_bot_user` says which, and whether it is deleted.
     assignee_id: uuid.UUID | None = None
+    assignee_bot_user: AssigneeBotUser | None = None
     recurrence: Recurrence | None = None
     created_at: datetime | None = None
 
@@ -801,6 +825,12 @@ class BotUser(SQLModel, table=True):
         default=None, max_length=64, unique=True, nullable=True
     )
     token_issued_at: datetime | None = Field(
+        default=None,
+        sa_type=DateTime(timezone=True),  # type: ignore
+    )
+    # Set once the bot user is deleted. It is kept rather than removed, so
+    # what it did and what it was assigned still name it (FR-08.19, FR-08.21).
+    deleted_at: datetime | None = Field(
         default=None,
         sa_type=DateTime(timezone=True),  # type: ignore
     )

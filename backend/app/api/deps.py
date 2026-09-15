@@ -53,7 +53,9 @@ def _authenticate_bot(session: Session, token: str) -> BotUser:
     bot = session.exec(
         select(BotUser).where(BotUser.token_hash == security.hash_bot_token(token))
     ).first()
-    if not bot:
+    # A deleted bot user is locked out before anything else about the request
+    # is considered (FR-08.20).
+    if not bot or bot.deleted_at is not None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Could not validate credentials",
