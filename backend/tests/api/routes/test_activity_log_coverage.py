@@ -42,13 +42,10 @@ NOT_LOGGED = {
     f"POST {API}/password-recovery/{{email}}": ACCOUNT,
     f"POST {API}/password-recovery-html-content/{{email}}": ACCOUNT,
     f"POST {API}/reset-password/": ACCOUNT,
-    f"POST {API}/users/": ACCOUNT,
     f"POST {API}/users/signup": ACCOUNT,
     f"PATCH {API}/users/me": ACCOUNT,
     f"PATCH {API}/users/me/password": ACCOUNT,
     f"DELETE {API}/users/me": ACCOUNT,
-    f"PATCH {API}/users/{{user_id}}": ACCOUNT,
-    f"DELETE {API}/users/{{user_id}}": ACCOUNT,
     f"POST {API}/utils/test-email/": "Sends an email; changes nothing",
     f"POST {API}/private/users/": "Local development helper for test accounts",
 }

@@ -4,12 +4,15 @@ import type { UserPublic } from "@/client"
 import type { DataTableFeatures } from "@/components/Common/DataTable"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
-import { UserActionsMenu } from "./UserActionsMenu"
 
 export type UserTableData = UserPublic & {
   isCurrentUser: boolean
 }
 
+/**
+ * The registered accounts, read-only: listing them is the whole of what a
+ * superuser can do with other people's accounts (FR-09.2, FR-09.3).
+ */
 export const columns: ColumnDef<DataTableFeatures, UserTableData>[] = [
   {
     accessorKey: "full_name",
@@ -62,15 +65,6 @@ export const columns: ColumnDef<DataTableFeatures, UserTableData>[] = [
         <span className={row.original.is_active ? "" : "text-muted-foreground"}>
           {row.original.is_active ? "Active" : "Inactive"}
         </span>
-      </div>
-    ),
-  },
-  {
-    id: "actions",
-    header: () => <span className="sr-only">Actions</span>,
-    cell: ({ row }) => (
-      <div className="flex justify-end">
-        <UserActionsMenu user={row.original} />
       </div>
     ),
   },
