@@ -419,7 +419,7 @@ export class CommentsService {
      * Read Comments
      *
      * Retrieve a task's comments, oldest first, so the thread reads as a
-     * narrative (FR-03.1).
+     * narrative (FR-03.1). A bot user reads them wherever it can read the task.
      */
     public static readComments<ThrowOnError extends boolean = true>(options: Options<commentsReadCommentsData, ThrowOnError>) {
         return (options.client ?? client).get<commentsReadCommentsResponses, commentsReadCommentsErrors, ThrowOnError>({
@@ -434,6 +434,9 @@ export class CommentsService {
      * Create Comment
      *
      * Add a comment to a task, including a subtask (FR-03.1).
+     *
+     * A bot user needs the add-comments permission, and not update on tasks: it
+     * can report on a task without being able to change it (FR-08.10).
      */
     public static createComment<ThrowOnError extends boolean = true>(options: Options<commentsCreateCommentData, ThrowOnError>) {
         return (options.client ?? client).post<commentsCreateCommentResponses, commentsCreateCommentErrors, ThrowOnError>({
@@ -451,7 +454,8 @@ export class CommentsService {
     /**
      * Delete Comment
      *
-     * Delete a comment. A user can only delete their own (FR-03.2).
+     * Delete a comment. A user can only delete their own (FR-03.2): not one a
+     * bot user wrote.
      */
     public static deleteComment<ThrowOnError extends boolean = true>(options: Options<commentsDeleteCommentData, ThrowOnError>) {
         return (options.client ?? client).delete<commentsDeleteCommentResponses, commentsDeleteCommentErrors, ThrowOnError>({
@@ -465,7 +469,8 @@ export class CommentsService {
     /**
      * Update Comment
      *
-     * Edit a comment. A user can only edit their own (FR-03.2).
+     * Edit a comment. A user can only edit their own (FR-03.2): not one a bot
+     * user wrote.
      */
     public static updateComment<ThrowOnError extends boolean = true>(options: Options<commentsUpdateCommentData, ThrowOnError>) {
         return (options.client ?? client).patch<commentsUpdateCommentResponses, commentsUpdateCommentErrors, ThrowOnError>({
@@ -485,7 +490,8 @@ export class AttachmentsService {
     /**
      * Read Attachments
      *
-     * Retrieve a task's attachments (FR-04.1).
+     * Retrieve a task's attachments (FR-04.1). A bot user lists them wherever it
+     * can read the task (FR-08.11).
      */
     public static readAttachments<ThrowOnError extends boolean = true>(options: Options<attachmentsReadAttachmentsData, ThrowOnError>) {
         return (options.client ?? client).get<attachmentsReadAttachmentsResponses, attachmentsReadAttachmentsErrors, ThrowOnError>({
@@ -502,6 +508,8 @@ export class AttachmentsService {
      * Attach a file to a task, including a subtask (FR-04.1). No file type is
      * turned away and a task can carry any number of attachments — only the
      * configured size limit is enforced (FR-04.2).
+     *
+     * A bot user adds attachments wherever it can update the task (FR-08.11).
      */
     public static uploadAttachment<ThrowOnError extends boolean = true>(options: Options<attachmentsUploadAttachmentData, ThrowOnError>) {
         return (options.client ?? client).post<attachmentsUploadAttachmentResponses, attachmentsUploadAttachmentErrors, ThrowOnError>({
@@ -520,7 +528,8 @@ export class AttachmentsService {
     /**
      * Delete Attachment
      *
-     * Delete an attachment and release its bytes from storage.
+     * Delete an attachment and release its bytes from storage. A bot user
+     * deletes wherever it can update the task (FR-08.11).
      */
     public static deleteAttachment<ThrowOnError extends boolean = true>(options: Options<attachmentsDeleteAttachmentData, ThrowOnError>) {
         return (options.client ?? client).delete<attachmentsDeleteAttachmentResponses, attachmentsDeleteAttachmentErrors, ThrowOnError>({
@@ -534,7 +543,8 @@ export class AttachmentsService {
     /**
      * Download Attachment
      *
-     * Download an attachment's exact bytes.
+     * Download an attachment's exact bytes. A bot user downloads wherever it can
+     * read the task (FR-08.11).
      */
     public static downloadAttachment<ThrowOnError extends boolean = true>(options: Options<attachmentsDownloadAttachmentData, ThrowOnError>) {
         return (options.client ?? client).get<attachmentsDownloadAttachmentResponses, attachmentsDownloadAttachmentErrors, ThrowOnError>({

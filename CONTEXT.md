@@ -87,7 +87,9 @@ does not appear among the accounts the superuser can list. Creating and
 configuring bot users is a human action in the web UI — a bot user can never
 create or configure another bot user, or itself. A task can be assigned to one
 of its owner's bot users, to show which integration is responsible for it; a
-deleted bot user stays assigned to what it had, and takes nothing new.
+deleted bot user stays assigned to what it had, and takes nothing new. A bot
+user's comments name it as their author and are append-only: nobody, its owner
+included, can edit or delete them.
 _Avoid_: "service account", "API key", "integration user".
 
 **Owner** (of a bot user):

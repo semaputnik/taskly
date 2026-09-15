@@ -18,7 +18,6 @@ from app.core.config import settings
 from app.core.db import engine
 from app.core.storage import AttachmentStorage, LocalAttachmentStorage
 from app.models import (
-    Attachment,
     BotUser,
     BotUserProject,
     Comment,
@@ -225,7 +224,7 @@ def require_task_writable(session: Session, task_id: uuid.UUID) -> None:
         require_project_writable(project)
 
 
-def _require_task_visible(session: Session, task_id: uuid.UUID, detail: str) -> None:
+def require_task_visible(session: Session, task_id: uuid.UUID, detail: str) -> None:
     """
     A row that hangs off a task (a comment, an attachment) is only visible
     while its task is: once the task is soft-deleted, reading the row through
@@ -243,18 +242,8 @@ def get_owned_comment(
     comment = session.get(Comment, comment_id)
     if not comment or comment.owner_id != current_user.id:
         raise HTTPException(status_code=404, detail="Comment not found")
-    _require_task_visible(session, comment.task_id, "Comment not found")
+    require_task_visible(session, comment.task_id, "Comment not found")
     return comment
-
-
-def get_owned_attachment(
-    session: SessionDep, current_user: CurrentUser, attachment_id: uuid.UUID
-) -> Attachment:
-    attachment = session.get(Attachment, attachment_id)
-    if not attachment or attachment.owner_id != current_user.id:
-        raise HTTPException(status_code=404, detail="Attachment not found")
-    _require_task_visible(session, attachment.task_id, "Attachment not found")
-    return attachment
 
 
 @lru_cache

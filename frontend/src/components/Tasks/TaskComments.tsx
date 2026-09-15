@@ -1,8 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { MessageSquare, Pencil, Trash2 } from "lucide-react"
+import { Bot, MessageSquare, Pencil, Trash2 } from "lucide-react"
 import { useState } from "react"
 
 import { CommentsService, type TaskPublic } from "@/client"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -24,7 +25,7 @@ interface TaskCommentsProps {
 /**
  * A task's comment thread: a running note read oldest-first, so a human's
  * replies and an AI agent's status reports read back as one narrative
- * (FR-03.1).
+ * (FR-03.1). A comment a bot user wrote names it.
  */
 const TaskComments = ({ task, onSuccess }: TaskCommentsProps) => {
   const [isOpen, setIsOpen] = useState(false)
@@ -137,30 +138,50 @@ const TaskComments = ({ task, onSuccess }: TaskCommentsProps) => {
                   </div>
                 ) : (
                   <>
+                    {comment.author_bot_user && (
+                      <p className="mb-1 flex items-center gap-1.5 font-medium">
+                        <Bot
+                          className="size-3.5 text-muted-foreground"
+                          aria-hidden
+                        />
+                        {comment.author_bot_user.name}
+                        <Badge variant="outline" className="text-xs">
+                          {comment.author_bot_user.deleted
+                            ? "Deleted bot"
+                            : "Bot"}
+                        </Badge>
+                      </p>
+                    )}
                     <p className="whitespace-pre-wrap">{comment.body}</p>
                     <div className="mt-2 flex items-center justify-between">
                       <span className="text-muted-foreground text-xs">
                         {comment.created_at &&
                           new Date(comment.created_at).toLocaleString()}
                       </span>
-                      <div className="flex gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          aria-label="Edit comment"
-                          onClick={() => startEditing(comment.id, comment.body)}
-                        >
-                          <Pencil className="size-3.5" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          aria-label="Delete comment"
-                          onClick={() => deleteMutation.mutate(comment.id)}
-                        >
-                          <Trash2 className="size-3.5" />
-                        </Button>
-                      </div>
+                      {/* A bot user's comments are append-only, for everyone
+                          (FR-03.2, FR-08.10). */}
+                      {!comment.author_bot_user && (
+                        <div className="flex gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            aria-label="Edit comment"
+                            onClick={() =>
+                              startEditing(comment.id, comment.body)
+                            }
+                          >
+                            <Pencil className="size-3.5" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            aria-label="Delete comment"
+                            onClick={() => deleteMutation.mutate(comment.id)}
+                          >
+                            <Trash2 className="size-3.5" />
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   </>
                 )}
