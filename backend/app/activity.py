@@ -43,7 +43,7 @@ from app.models import (
     TaskTag,
 )
 
-_ACTOR_KEY = "activity_actor_id"
+_ACTOR_KEY = "activity_actor"
 _PENDING_KEY = "activity_pending"
 
 # The task fields a "changed" entry reports. Completion, project and assignee
@@ -51,9 +51,23 @@ _PENDING_KEY = "activity_pending"
 _CHANGED_FIELDS = ("title", "description", "due_date", "priority", "tags", "recurrence")
 
 
-def set_actor(session: Session, actor_id: uuid.UUID) -> None:
-    """Attribute every change this session commits to `actor_id`."""
-    session.info[_ACTOR_KEY] = actor_id
+@dataclass(frozen=True)
+class _Actor:
+    user_id: uuid.UUID | None = None
+    bot_user_id: uuid.UUID | None = None
+
+
+def set_actor(session: Session, user_id: uuid.UUID) -> None:
+    """Attribute every change this session commits to the user `user_id`."""
+    session.info[_ACTOR_KEY] = _Actor(user_id=user_id)
+
+
+def set_bot_actor(session: Session, bot_user_id: uuid.UUID) -> None:
+    """
+    Attribute every change this session commits to the bot user
+    `bot_user_id`, and so never to its owner (FR-10.2).
+    """
+    session.info[_ACTOR_KEY] = _Actor(bot_user_id=bot_user_id)
 
 
 @dataclass(frozen=True)
@@ -188,9 +202,6 @@ def _write(session: Session) -> None:
 
     after = _load_states(session, list(pending.before))
     projects = _ProjectRefs(session)
-    # Changes made outside a request, such as a script, have no one else to
-    # attribute them to than the account they belong to.
-    actor_id: uuid.UUID | None = session.info.get(_ACTOR_KEY)
     entries: list[ActivityEntry] = []
     # Deletion events this transaction brought rows back from, each with how
     # many of its rows came back.
@@ -205,20 +216,16 @@ def _write(session: Session) -> None:
         # Restoring is logged the same way: once for the event, not per row.
         if before is not None and before.deletion_id is not None:
             restored[before.deletion_id] = restored.get(before.deletion_id, 0) + 1
-        entries.extend(
-            _task_entries(task_id, before, state, actor_id or state.owner_id, projects)
-        )
+        entries.extend(_task_entries(task_id, before, state, projects))
 
     for deletion_id in pending.deletions:
-        entries.append(_deletion_entry(session, deletion_id, actor_id, projects))
+        entries.append(_deletion_entry(session, deletion_id, projects))
 
     for deletion_id, count in restored.items():
         # A project's tasks coming back are part of the project's restore,
         # which is logged with the project below.
         if session.get_one(Deletion, deletion_id).task_id is not None:
-            entries.append(
-                _restore_entry(session, deletion_id, count, actor_id, projects)
-            )
+            entries.append(_restore_entry(session, deletion_id, count, projects))
 
     entries.extend(_project_entries(session, pending, restored))
     entries.extend(_comment_entries(session, pending))
@@ -228,10 +235,15 @@ def _write(session: Session) -> None:
             entries.append(_attachment_added_entry(session, attachment))
     entries.extend(pending.removed)
 
+    actor: _Actor | None = session.info.get(_ACTOR_KEY)
     for entry in entries:
-        # Changes made outside a request, such as a script, have no one else
-        # to attribute them to than the account they belong to.
-        entry.actor_id = actor_id or entry.owner_id
+        if actor is None:
+            # Changes made outside a request, such as a script, have no one
+            # else to attribute them to than the account they belong to.
+            entry.actor_id = entry.owner_id
+        else:
+            entry.actor_id = actor.user_id
+            entry.actor_bot_user_id = actor.bot_user_id
     session.add_all(entries)
 
 
@@ -266,13 +278,11 @@ def _task_entries(
     task_id: uuid.UUID,
     before: _TaskState | None,
     after: _TaskState,
-    actor_id: uuid.UUID,
     projects: _ProjectRefs,
 ) -> list[ActivityEntry]:
     def entry(action: ActivityAction, **details: Any) -> ActivityEntry:
         return ActivityEntry(
             owner_id=after.owner_id,
-            actor_id=actor_id,
             action=action,
             entity_type=ActivityEntityType.TASK,
             entity_id=task_id,
@@ -334,7 +344,6 @@ def _task_entries(
 def _deletion_entry(
     session: Session,
     deletion_id: uuid.UUID,
-    actor_id: uuid.UUID | None,
     projects: _ProjectRefs,
 ) -> ActivityEntry:
     deletion = session.get_one(Deletion, deletion_id)
@@ -345,7 +354,6 @@ def _deletion_entry(
     ).all()
     return ActivityEntry(
         owner_id=deletion.owner_id,
-        actor_id=actor_id or deletion.owner_id,
         action=ActivityAction.TASK_DELETED,
         entity_type=ActivityEntityType.TASK,
         entity_id=task.id,
@@ -366,7 +374,6 @@ def _restore_entry(
     session: Session,
     deletion_id: uuid.UUID,
     count: int,
-    actor_id: uuid.UUID | None,
     projects: _ProjectRefs,
 ) -> ActivityEntry:
     deletion = session.get_one(Deletion, deletion_id)
@@ -374,7 +381,6 @@ def _restore_entry(
     task = session.get_one(Task, deletion.task_id)
     return ActivityEntry(
         owner_id=deletion.owner_id,
-        actor_id=actor_id or deletion.owner_id,
         action=ActivityAction.TASK_RESTORED,
         entity_type=ActivityEntityType.TASK,
         entity_id=task.id,
@@ -493,8 +499,6 @@ def _entry(
 ) -> ActivityEntry:
     return ActivityEntry(
         owner_id=owner_id,
-        # Replaced with the transaction's actor when the entry is written.
-        actor_id=owner_id,
         action=action,
         entity_type=entity_type,
         entity_id=entity_id,

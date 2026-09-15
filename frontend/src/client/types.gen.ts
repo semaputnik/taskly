@@ -47,7 +47,15 @@ export type ActivityEntryPublic = {
     /**
      * Actor Id
      */
-    actor_id: string;
+    actor_id?: string | null;
+    /**
+     * Actor Bot User Id
+     */
+    actor_bot_user_id?: string | null;
+    /**
+     * Actor Bot User Name
+     */
+    actor_bot_user_name?: string | null;
     /**
      * Deletion Id
      */

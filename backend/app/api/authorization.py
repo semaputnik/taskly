@@ -26,6 +26,7 @@ from app.models import BotUser, Project, Task
 BOT_REFUSED_STATUS = 403
 OUTSIDE_SCOPE_CODE = "outside_scope"
 PERMISSION_NOT_GRANTED_CODE = "permission_not_granted"
+TAGS_READ_ONLY_CODE = "tags_read_only"
 
 
 class TaskAction(StrEnum):
@@ -98,13 +99,32 @@ def authorize_tasks(
         )
 
 
-def get_project(session: Session, caller: Caller, project_id: uuid.UUID) -> Project:
+def refuse_tag_changes_for_bot(caller: Caller, fields_set: set[str]) -> None:
     """
-    A project the caller asks tasks of, refused like `authorize_tasks` refuses
-    anything in it when the caller is a bot and may not read there.
+    Refuse a bot's request that sends tags, before anything in it is applied.
+
+    What a tag permission would mean is still open (Q-16), so no bot can hold
+    one yet: a bot reads the tags on tasks it can read, and changes none.
+    """
+    if caller.bot is not None and "tags" in fields_set:
+        raise _refuse(
+            TAGS_READ_ONLY_CODE,
+            "Bot users cannot set or change tags. Send the request without `tags`.",
+        )
+
+
+def get_project(
+    session: Session,
+    caller: Caller,
+    project_id: uuid.UUID,
+    action: TaskAction = TaskAction.READ,
+) -> Project:
+    """
+    A project the caller does `action` on tasks in, refused like
+    `authorize_tasks` refuses anything in it when the caller is a bot.
     """
     project = get_project_of(session, caller.owner_id, project_id)
-    authorize_tasks(caller, TaskAction.READ, project)
+    authorize_tasks(caller, action, project)
     return project
 
 

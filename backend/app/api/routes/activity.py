@@ -14,6 +14,7 @@ from app.models import (
     ActivityEntry,
     ActivityEntryPublic,
     Attachment,
+    BotUser,
     Comment,
     Deletion,
     Message,
@@ -70,6 +71,15 @@ def read_activity_log(
     ).all()
 
     locations = _locate(session, current_user.id, entries)
+    bot_names = dict(
+        session.exec(
+            select(BotUser.id, BotUser.name).where(
+                col(BotUser.id).in_(
+                    {e.actor_bot_user_id for e in entries if e.actor_bot_user_id}
+                )
+            )
+        ).all()
+    )
     # The deletion events on this page that still have rows to bring back.
     deletion_ids = {
         entry.deletion_id
@@ -96,6 +106,9 @@ def read_activity_log(
                     "entity_project_id": locations.get(entry.entity_id),
                     "restorable": entry.action in _DELETIONS
                     and entry.deletion_id in still_deleted,
+                    "actor_bot_user_name": bot_names.get(entry.actor_bot_user_id)
+                    if entry.actor_bot_user_id
+                    else None,
                 },
             )
             for entry in entries

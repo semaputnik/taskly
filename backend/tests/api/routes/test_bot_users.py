@@ -1,105 +1,27 @@
 import hashlib
 import uuid
 from datetime import timedelta
-from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
-from app import crud
 from app.core import security
 from app.core.config import settings
 from app.main import app
-from app.models import BotUser, UserCreate
-from tests.utils.utils import random_email, random_lower_string
+from app.models import BotUser
+from tests.utils.bot import (
+    ALL_PERMISSIONS,
+    READ_ONLY,
+    create_bot_user,
+    create_project,
+    create_task,
+    create_user_headers,
+    error_code,
+    issue_bot_headers,
+)
 
 API = settings.API_V1_STR
-
-ALL_PERMISSIONS = {
-    "create_tasks": True,
-    "read_tasks": True,
-    "update_tasks": True,
-    "delete_tasks": True,
-    "add_comments": True,
-}
-READ_ONLY = {"read_tasks": True}
-
-
-def _new_user(client: TestClient, db: Session) -> dict[str, str]:
-    email = random_email()
-    password = random_lower_string()
-    crud.create_user(session=db, user_create=UserCreate(email=email, password=password))
-    r = client.post(
-        f"{API}/login/access-token", data={"username": email, "password": password}
-    )
-    return {"Authorization": f"Bearer {r.json()['access_token']}"}
-
-
-def _project(client: TestClient, headers: dict[str, str], name: str = "P") -> str:
-    r = client.post(f"{API}/projects/", headers=headers, json={"name": name})
-    assert r.status_code == 200, r.text
-    project_id: str = r.json()["id"]
-    return project_id
-
-
-def _task(
-    client: TestClient,
-    headers: dict[str, str],
-    *,
-    project_id: str | None = None,
-    parent_id: str | None = None,
-    title: str = "T",
-) -> str:
-    body: dict[str, Any] = {"title": title}
-    if project_id:
-        body["project_id"] = project_id
-    if parent_id:
-        body["parent_id"] = parent_id
-    r = client.post(f"{API}/tasks/", headers=headers, json=body)
-    assert r.status_code == 200, r.text
-    task_id: str = r.json()["id"]
-    return task_id
-
-
-def _create_bot(
-    client: TestClient,
-    headers: dict[str, str],
-    *,
-    project_ids: list[str],
-    permissions: dict[str, bool],
-    name: str = "Triage agent",
-) -> dict[str, Any]:
-    r = client.post(
-        f"{API}/bot-users/",
-        headers=headers,
-        json={
-            "name": name,
-            "scope": {"project_ids": project_ids, "permissions": permissions},
-        },
-    )
-    assert r.status_code == 200, r.text
-    bot: dict[str, Any] = r.json()
-    return bot
-
-
-def _bot_headers(
-    client: TestClient,
-    headers: dict[str, str],
-    *,
-    project_ids: list[str],
-    permissions: dict[str, bool],
-) -> dict[str, str]:
-    bot = _create_bot(client, headers, project_ids=project_ids, permissions=permissions)
-    r = client.post(f"{API}/bot-users/{bot['id']}/token", headers=headers)
-    assert r.status_code == 200, r.text
-    return {"Authorization": f"Bearer {r.json()['token']}"}
-
-
-def _code(r: Any) -> str | None:
-    detail = r.json().get("detail")
-    return detail.get("code") if isinstance(detail, dict) else None
-
 
 # --- Creating a bot user and issuing its token --------------------------------
 
@@ -107,10 +29,10 @@ def _code(r: Any) -> str | None:
 def test_a_user_creates_a_bot_user_with_its_scope(
     client: TestClient, db: Session
 ) -> None:
-    headers = _new_user(client, db)
-    project_id = _project(client, headers)
+    headers = create_user_headers(client, db)
+    project_id = create_project(client, headers)
 
-    bot = _create_bot(
+    bot = create_bot_user(
         client,
         headers,
         project_ids=[project_id],
@@ -137,16 +59,16 @@ def test_a_user_creates_a_bot_user_with_its_scope(
 def test_the_scope_has_no_all_projects_value_and_no_grants_that_are_never_allowed(
     client: TestClient, db: Session
 ) -> None:
-    headers = _new_user(client, db)
+    headers = create_user_headers(client, db)
 
-    bot = _create_bot(client, headers, project_ids=[], permissions=ALL_PERMISSIONS)
+    bot = create_bot_user(client, headers, project_ids=[], permissions=ALL_PERMISSIONS)
     assert bot["scope"]["project_ids"] == []
     assert set(bot["scope"]["permissions"]) == set(ALL_PERMISSIONS)
 
 
 @pytest.mark.parametrize("name", ["", "   "])
 def test_a_bot_user_needs_a_name(client: TestClient, db: Session, name: str) -> None:
-    headers = _new_user(client, db)
+    headers = create_user_headers(client, db)
     r = client.post(
         f"{API}/bot-users/",
         headers=headers,
@@ -158,8 +80,8 @@ def test_a_bot_user_needs_a_name(client: TestClient, db: Session, name: str) -> 
 def test_a_scope_can_only_name_projects_of_the_owner(
     client: TestClient, db: Session
 ) -> None:
-    headers = _new_user(client, db)
-    other_project = _project(client, _new_user(client, db))
+    headers = create_user_headers(client, db)
+    other_project = create_project(client, create_user_headers(client, db))
 
     for project_id in (other_project, str(uuid.uuid4())):
         r = client.post(
@@ -177,8 +99,8 @@ def test_a_scope_can_only_name_projects_of_the_owner(
 def test_the_token_is_returned_once_and_stored_only_as_a_digest(
     client: TestClient, db: Session
 ) -> None:
-    headers = _new_user(client, db)
-    bot = _create_bot(client, headers, project_ids=[], permissions=READ_ONLY)
+    headers = create_user_headers(client, db)
+    bot = create_bot_user(client, headers, project_ids=[], permissions=READ_ONLY)
 
     r = client.post(f"{API}/bot-users/{bot['id']}/token", headers=headers)
     assert r.status_code == 200
@@ -191,7 +113,7 @@ def test_the_token_is_returned_once_and_stored_only_as_a_digest(
     assert listed.json()["data"][0]["has_token"] is True
     r = client.post(f"{API}/bot-users/{bot['id']}/token", headers=headers)
     assert r.status_code == 409
-    assert _code(r) == "token_already_issued"
+    assert error_code(r) == "token_already_issued"
     assert token not in r.text
 
     stored = db.get(BotUser, uuid.UUID(bot["id"]))
@@ -204,9 +126,9 @@ def test_the_token_is_returned_once_and_stored_only_as_a_digest(
 def test_a_user_only_sees_and_manages_their_own_bot_users(
     client: TestClient, db: Session
 ) -> None:
-    owner = _new_user(client, db)
-    other = _new_user(client, db)
-    bot = _create_bot(client, owner, project_ids=[], permissions=READ_ONLY)
+    owner = create_user_headers(client, db)
+    other = create_user_headers(client, db)
+    bot = create_bot_user(client, owner, project_ids=[], permissions=READ_ONLY)
 
     assert client.get(f"{API}/bot-users/", headers=other).json()["count"] == 0
     r = client.post(f"{API}/bot-users/{bot['id']}/token", headers=other)
@@ -216,8 +138,8 @@ def test_a_user_only_sees_and_manages_their_own_bot_users(
 def test_bot_users_are_not_accounts(
     client: TestClient, db: Session, superuser_token_headers: dict[str, str]
 ) -> None:
-    headers = _new_user(client, db)
-    bot = _create_bot(client, headers, project_ids=[], permissions=READ_ONLY)
+    headers = create_user_headers(client, db)
+    bot = create_bot_user(client, headers, project_ids=[], permissions=READ_ONLY)
 
     r = client.get(
         f"{API}/users/", headers=superuser_token_headers, params={"limit": 1000}
@@ -234,7 +156,10 @@ def test_bot_users_are_not_accounts(
 # deliberately opened here.
 BOT_REACHABLE = {
     f"GET {API}/tasks/",
+    f"POST {API}/tasks/",
     f"GET {API}/tasks/{{task_id}}",
+    f"PATCH {API}/tasks/{{task_id}}",
+    f"DELETE {API}/tasks/{{task_id}}",
     f"GET {API}/projects/",
 }
 
@@ -265,9 +190,9 @@ def test_the_bot_reachable_routes_exist() -> None:
 def test_a_bot_token_is_refused_by_every_human_only_endpoint(
     client: TestClient, db: Session, method: str, path: str
 ) -> None:
-    headers = _new_user(client, db)
-    project_id = _project(client, headers)
-    bot_headers = _bot_headers(
+    headers = create_user_headers(client, db)
+    project_id = create_project(client, headers)
+    bot_headers = issue_bot_headers(
         client, headers, project_ids=[project_id], permissions=ALL_PERMISSIONS
     )
 
@@ -276,7 +201,7 @@ def test_a_bot_token_is_refused_by_every_human_only_endpoint(
     url = path.format(**{name: uuid.uuid4() for name in _path_params(path)})
     r = client.request(method, url, headers=bot_headers)
     assert r.status_code == 403, r.text
-    assert _code(r) == "human_only"
+    assert error_code(r) == "human_only"
 
 
 def _path_params(path: str) -> list[str]:
@@ -286,9 +211,9 @@ def _path_params(path: str) -> list[str]:
 def test_a_bot_cannot_create_or_configure_bot_users_whatever_it_is_granted(
     client: TestClient, db: Session
 ) -> None:
-    headers = _new_user(client, db)
-    project_id = _project(client, headers)
-    bot = _create_bot(
+    headers = create_user_headers(client, db)
+    project_id = create_project(client, headers)
+    bot = create_bot_user(
         client, headers, project_ids=[project_id], permissions=ALL_PERMISSIONS
     )
     token = client.post(f"{API}/bot-users/{bot['id']}/token", headers=headers).json()[
@@ -305,20 +230,20 @@ def test_a_bot_cannot_create_or_configure_bot_users_whatever_it_is_granted(
         },
     )
     assert r.status_code == 403
-    assert _code(r) == "human_only"
+    assert error_code(r) == "human_only"
     # Not even for itself.
     r = client.post(f"{API}/bot-users/{bot['id']}/token", headers=bot_headers)
     assert r.status_code == 403
-    assert _code(r) == "human_only"
+    assert error_code(r) == "human_only"
     assert client.get(f"{API}/bot-users/", headers=headers).json()["count"] == 1
 
 
 def test_a_bot_token_authenticates_bot_reachable_endpoints(
     client: TestClient, db: Session
 ) -> None:
-    headers = _new_user(client, db)
-    project_id = _project(client, headers)
-    bot_headers = _bot_headers(
+    headers = create_user_headers(client, db)
+    project_id = create_project(client, headers)
+    bot_headers = issue_bot_headers(
         client, headers, project_ids=[project_id], permissions=READ_ONLY
     )
 
@@ -327,8 +252,8 @@ def test_a_bot_token_authenticates_bot_reachable_endpoints(
 
 
 def test_a_human_jwt_is_not_a_bot_token(client: TestClient, db: Session) -> None:
-    headers = _new_user(client, db)
-    bot = _create_bot(client, headers, project_ids=[], permissions=READ_ONLY)
+    headers = create_user_headers(client, db)
+    bot = create_bot_user(client, headers, project_ids=[], permissions=READ_ONLY)
 
     # A well-signed session token that names the bot user's id resolves to no
     # one: bot users are not reachable through the human session at all.
@@ -347,7 +272,7 @@ def test_a_token_that_matches_no_bot_user_is_refused(
 ) -> None:
     r = client.get(f"{API}/tasks/", headers={"Authorization": f"Bearer {token}"})
     assert r.status_code in (401, 403)
-    assert _code(r) is None
+    assert error_code(r) is None
 
 
 # --- Reading tasks within the scope -------------------------------------------
@@ -356,18 +281,18 @@ def test_a_token_that_matches_no_bot_user_is_refused(
 def test_a_bot_lists_only_the_tasks_of_projects_in_its_scope(
     client: TestClient, db: Session
 ) -> None:
-    headers = _new_user(client, db)
-    scoped = _project(client, headers, "Scoped")
-    unscoped = _project(client, headers, "Unscoped")
-    root = _task(client, headers, project_id=scoped)
-    child = _task(client, headers, parent_id=root)
-    grandchild = _task(client, headers, parent_id=child)
-    _task(client, headers, project_id=unscoped)
-    outside_child = _task(
-        client, headers, parent_id=_task(client, headers, project_id=unscoped)
+    headers = create_user_headers(client, db)
+    scoped = create_project(client, headers, "Scoped")
+    unscoped = create_project(client, headers, "Unscoped")
+    root = create_task(client, headers, project_id=scoped)
+    child = create_task(client, headers, parent_id=root)
+    grandchild = create_task(client, headers, parent_id=child)
+    create_task(client, headers, project_id=unscoped)
+    outside_child = create_task(
+        client, headers, parent_id=create_task(client, headers, project_id=unscoped)
     )
-    _task(client, headers)  # Inbox, not in scope either
-    bot_headers = _bot_headers(
+    create_task(client, headers)  # Inbox, not in scope either
+    bot_headers = issue_bot_headers(
         client, headers, project_ids=[scoped], permissions=READ_ONLY
     )
 
@@ -385,11 +310,11 @@ def test_a_bot_lists_only_the_tasks_of_projects_in_its_scope(
 def test_a_bot_reads_a_task_and_a_subtask_in_its_scope(
     client: TestClient, db: Session
 ) -> None:
-    headers = _new_user(client, db)
-    scoped = _project(client, headers)
-    root = _task(client, headers, project_id=scoped, title="Root")
-    child = _task(client, headers, parent_id=root, title="Child")
-    bot_headers = _bot_headers(
+    headers = create_user_headers(client, db)
+    scoped = create_project(client, headers)
+    root = create_task(client, headers, project_id=scoped, title="Root")
+    child = create_task(client, headers, parent_id=root, title="Child")
+    bot_headers = issue_bot_headers(
         client, headers, project_ids=[scoped], permissions=READ_ONLY
     )
 
@@ -401,28 +326,28 @@ def test_a_bot_reads_a_task_and_a_subtask_in_its_scope(
     assert r.json()["project_id"] == scoped
 
 
-def test_outside_the_scope_is_a_scope_error_not_a_missing_task(
+def test_outside_the_scope_is_a_scope_error_not_a_missingtask(
     client: TestClient, db: Session
 ) -> None:
-    headers = _new_user(client, db)
-    scoped = _project(client, headers)
-    unscoped = _project(client, headers)
-    outside_root = _task(client, headers, project_id=unscoped)
-    outside_child = _task(client, headers, parent_id=outside_root)
-    bot_headers = _bot_headers(
+    headers = create_user_headers(client, db)
+    scoped = create_project(client, headers)
+    unscoped = create_project(client, headers)
+    outside_root = create_task(client, headers, project_id=unscoped)
+    outside_child = create_task(client, headers, parent_id=outside_root)
+    bot_headers = issue_bot_headers(
         client, headers, project_ids=[scoped], permissions=ALL_PERMISSIONS
     )
 
     for task_id in (outside_root, outside_child):
         r = client.get(f"{API}/tasks/{task_id}", headers=bot_headers)
         assert r.status_code == 403
-        assert _code(r) == "outside_scope"
+        assert error_code(r) == "outside_scope"
 
     r = client.get(
         f"{API}/tasks/", headers=bot_headers, params={"project_id": unscoped}
     )
     assert r.status_code == 403
-    assert _code(r) == "outside_scope"
+    assert error_code(r) == "outside_scope"
 
     r = client.get(f"{API}/tasks/{uuid.uuid4()}", headers=bot_headers)
     assert r.status_code == 404
@@ -435,11 +360,11 @@ def test_outside_the_scope_is_a_scope_error_not_a_missing_task(
 def test_a_bot_without_task_read_is_refused_even_in_its_scope(
     client: TestClient, db: Session
 ) -> None:
-    headers = _new_user(client, db)
-    scoped = _project(client, headers)
-    task_id = _task(client, headers, project_id=scoped)
+    headers = create_user_headers(client, db)
+    scoped = create_project(client, headers)
+    task_id = create_task(client, headers, project_id=scoped)
     everything_but_read = {**ALL_PERMISSIONS, "read_tasks": False}
-    bot_headers = _bot_headers(
+    bot_headers = issue_bot_headers(
         client, headers, project_ids=[scoped], permissions=everything_but_read
     )
 
@@ -450,20 +375,20 @@ def test_a_bot_without_task_read_is_refused_even_in_its_scope(
     ):
         r = client.get(url, headers=bot_headers, params=params)
         assert r.status_code == 403, url
-        assert _code(r) == "permission_not_granted"
+        assert error_code(r) == "permission_not_granted"
 
 
 @pytest.mark.parametrize("in_scope", [True, False], ids=["in scope", "out of scope"])
 def test_an_archived_project_is_refused_before_the_scope_is_considered(
     client: TestClient, db: Session, in_scope: bool
 ) -> None:
-    headers = _new_user(client, db)
-    live = _project(client, headers, "Live")
-    archived = _project(client, headers, "Archived")
-    root = _task(client, headers, project_id=archived)
-    child = _task(client, headers, parent_id=root)
-    live_task = _task(client, headers, project_id=live)
-    bot_headers = _bot_headers(
+    headers = create_user_headers(client, db)
+    live = create_project(client, headers, "Live")
+    archived = create_project(client, headers, "Archived")
+    root = create_task(client, headers, project_id=archived)
+    child = create_task(client, headers, parent_id=root)
+    live_task = create_task(client, headers, project_id=live)
+    bot_headers = issue_bot_headers(
         client,
         headers,
         project_ids=[live, archived] if in_scope else [live],
@@ -475,19 +400,19 @@ def test_an_archived_project_is_refused_before_the_scope_is_considered(
     for task_id in (root, child):
         r = client.get(f"{API}/tasks/{task_id}", headers=bot_headers)
         assert r.status_code == 403
-        assert _code(r) == "project_archived"
+        assert error_code(r) == "project_archived"
     r = client.get(
         f"{API}/tasks/", headers=bot_headers, params={"project_id": archived}
     )
     assert r.status_code == 403
-    assert _code(r) == "project_archived"
+    assert error_code(r) == "project_archived"
 
     r = client.get(f"{API}/tasks/", headers=bot_headers)
     assert {t["id"] for t in r.json()["data"]} == {live_task}
     for url in (f"{API}/tasks/", f"{API}/projects/"):
         r = client.get(url, headers=bot_headers, params={"archived": True})
         assert r.status_code == 403
-        assert _code(r) == "project_archived"
+        assert error_code(r) == "project_archived"
 
     # The owner still reads it: the archive is closed to bots, not to them.
     assert client.get(f"{API}/tasks/{root}", headers=headers).status_code == 200
@@ -496,11 +421,13 @@ def test_an_archived_project_is_refused_before_the_scope_is_considered(
 def test_a_bot_lists_only_the_projects_in_its_scope(
     client: TestClient, db: Session
 ) -> None:
-    headers = _new_user(client, db)
-    scoped = _project(client, headers, "Scoped")
-    _project(client, headers, "Unscoped")
+    headers = create_user_headers(client, db)
+    scoped = create_project(client, headers, "Scoped")
+    create_project(client, headers, "Unscoped")
     # Scope needs no task permission to list what it names (FR-08.9).
-    bot_headers = _bot_headers(client, headers, project_ids=[scoped], permissions={})
+    bot_headers = issue_bot_headers(
+        client, headers, project_ids=[scoped], permissions={}
+    )
 
     r = client.get(f"{API}/projects/", headers=bot_headers)
     assert r.status_code == 200
@@ -511,12 +438,15 @@ def test_a_bot_lists_only_the_projects_in_its_scope(
 def test_a_bot_never_reaches_another_users_data(
     client: TestClient, db: Session
 ) -> None:
-    owner = _new_user(client, db)
-    other = _new_user(client, db)
-    other_project = _project(client, other)
-    other_task = _task(client, other, project_id=other_project)
-    bot_headers = _bot_headers(
-        client, owner, project_ids=[_project(client, owner)], permissions=READ_ONLY
+    owner = create_user_headers(client, db)
+    other = create_user_headers(client, db)
+    other_project = create_project(client, other)
+    other_task = create_task(client, other, project_id=other_project)
+    bot_headers = issue_bot_headers(
+        client,
+        owner,
+        project_ids=[create_project(client, owner)],
+        permissions=READ_ONLY,
     )
 
     r = client.get(f"{API}/tasks/{other_task}", headers=bot_headers)
