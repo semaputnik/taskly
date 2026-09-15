@@ -13,7 +13,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { DropdownMenuItem } from "@/components/ui/dropdown-menu"
 import { LoadingButton } from "@/components/ui/loading-button"
 import useCustomToast from "@/hooks/useCustomToast"
 import { handleError, isSubtaskCascadeError } from "@/utils"
@@ -70,14 +69,17 @@ const DeleteTask = ({ task, onSuccess }: DeleteTaskProps) => {
 
   return (
     <Dialog open={isOpen} onOpenChange={openDialog}>
-      <DropdownMenuItem
-        variant="destructive"
-        onSelect={(e) => e.preventDefault()}
+      {/* The one thing that cannot be undone gets the one control in the
+          panel's corner: no menu to open first, and no neighbours to mis-hit. */}
+      <Button
+        variant="ghost"
+        size="icon"
+        aria-label="Delete task"
+        className="text-muted-foreground hover:text-destructive"
         onClick={() => openDialog(true)}
       >
         <Trash2 />
-        Delete Task
-      </DropdownMenuItem>
+      </Button>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>

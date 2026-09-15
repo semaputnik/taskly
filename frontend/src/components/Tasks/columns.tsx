@@ -1,5 +1,5 @@
 import type { ColumnDef } from "@tanstack/react-table"
-import { Repeat } from "lucide-react"
+import { CornerDownRight, Repeat } from "lucide-react"
 
 import type { TaskPublic } from "@/client"
 import type { DataTableFeatures } from "@/components/Common/DataTable"
@@ -8,10 +8,6 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { cn } from "@/lib/utils"
 import { CompleteTask } from "./CompleteTask"
 import { describeRecurrence } from "./recurrence"
-import { TaskActionsMenu } from "./TaskActionsMenu"
-
-// Each level of nesting shifts a subtask's title right by this much.
-const INDENT_PER_LEVEL_REM = 1.25
 
 interface ColumnOptions {
   /**
@@ -23,7 +19,7 @@ interface ColumnOptions {
 
 export function getColumns(
   projectNames: Record<string, string>,
-  depths: Record<string, number>,
+  _depths: Record<string, number>,
   { readOnly = false }: ColumnOptions = {},
 ): ColumnDef<DataTableFeatures, TaskPublic>[] {
   const columns: ColumnDef<DataTableFeatures, TaskPublic>[] = [
@@ -45,12 +41,17 @@ export function getColumns(
       accessorKey: "title",
       header: "Title",
       cell: ({ row }) => (
-        <div
-          className="flex items-center gap-2"
-          style={{
-            paddingLeft: `${(depths[row.original.id] ?? 0) * INDENT_PER_LEVEL_REM}rem`,
-          }}
-        >
+        <div className="flex items-center gap-2">
+          {/* A subtask says so for itself. Indenting it instead would claim a
+              parent–child relationship the row above may not have: sorting or
+              filtering can put any two rows next to each other, and the parent
+              may not be in the list at all. */}
+          {row.original.parent_id && (
+            <CornerDownRight
+              className="text-muted-foreground size-3.5 shrink-0"
+              aria-label="Subtask"
+            />
+          )}
           <span
             className={cn(
               "font-medium",
@@ -121,17 +122,8 @@ export function getColumns(
     },
   ]
 
-  if (!readOnly) {
-    columns.push({
-      id: "actions",
-      header: () => <span className="sr-only">Actions</span>,
-      cell: ({ row }) => (
-        <div className="flex justify-end">
-          <TaskActionsMenu task={row.original} />
-        </div>
-      ),
-    })
-  }
-
+  // No row menu: editing, adding a subtask and deleting all live in the task's
+  // detail panel, which the row opens. One place to act on a task beats the
+  // same three items repeated on every line.
   return columns
 }

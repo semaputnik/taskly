@@ -77,16 +77,34 @@ export function ActivityDescription({
   currentUserId,
 }: ActivityDescriptionProps) {
   const name = subjectName(entry)
-  const subject: ReactNode = entry.entity_exists ? (
+  const linkClass = "font-medium underline-offset-4 hover:underline"
+
+  // A task opens its panel on the screen the reader is already on — `to="."`
+  // is the current route — so following a link from a long log does not cost
+  // them their place in it. A project or a tag has no panel, so it falls back
+  // to the task list narrowed to it; dropping the reader on the unfiltered
+  // list would make the link a lie.
+  const subject: ReactNode = !entry.entity_exists ? (
+    <span className="font-medium">{name}</span>
+  ) : entry.entity_type === "task" ? (
     <Link
-      to="/tasks"
-      search={{ project_id: entry.entity_project_id ?? undefined }}
-      className="font-medium underline-offset-4 hover:underline"
+      to="."
+      search={(previous: Record<string, unknown>) => ({
+        ...previous,
+        task: entry.entity_id,
+      })}
+      className={linkClass}
     >
       {name}
     </Link>
   ) : (
-    <span className="font-medium">{name}</span>
+    <Link
+      to="/tasks"
+      search={{ project_id: entry.entity_project_id ?? undefined }}
+      className={linkClass}
+    >
+      {name}
+    </Link>
   )
 
   switch (entry.action) {

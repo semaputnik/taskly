@@ -1,6 +1,5 @@
 import { useQuery } from "@tanstack/react-query"
 import { Bot } from "lucide-react"
-
 import { BotsService, type BotUserRef, type TaskPublic } from "@/client"
 import {
   Select,
@@ -9,6 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { cn } from "@/lib/utils"
 
 // The form's values: nobody, the user, or a bot user's id as it is.
 export const UNASSIGNED = "unassigned"
@@ -47,6 +47,8 @@ interface AssigneeSelectProps {
    * offered here, marked deleted, only to keep what the task has.
    */
   current?: BotUserRef | null
+  /** Styling for the trigger, so the control can sit flat in a property list. */
+  className?: string
 }
 
 /** Who a task can be assigned to: the user or one of their bot users. */
@@ -55,6 +57,7 @@ export function AssigneeSelect({
   onChange,
   currentUserEmail,
   current,
+  className,
 }: AssigneeSelectProps) {
   const { data: bots } = useBotUsers()
   const botOptions = (bots?.data ?? []).map((bot) => ({
@@ -68,7 +71,7 @@ export function AssigneeSelect({
 
   return (
     <Select onValueChange={onChange} value={value}>
-      <SelectTrigger className="w-full" aria-label="Assignee">
+      <SelectTrigger className={cn("w-full", className)} aria-label="Assignee">
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
