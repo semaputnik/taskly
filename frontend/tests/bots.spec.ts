@@ -129,3 +129,100 @@ test("A token is revoked and a new one issued with an expiry", async ({
   })
   expect(accepted.ok()).toBe(true)
 })
+
+test("A bot's scope is narrowed and the bot is deleted from the Bots page", async ({
+  page,
+  request,
+}) => {
+  const email = randomEmail()
+  const password = randomPassword()
+  await createUser({ email, password })
+  await logInUser(page, email, password)
+  const api = `${process.env.VITE_API_URL}/api/v1`
+
+  await page.goto("/projects")
+  for (const name of ["Docs", "Billing"]) {
+    await page.getByRole("button", { name: "Add Project" }).click()
+    await page.getByPlaceholder("Project name").fill(name)
+    await page.getByRole("button", { name: "Save" }).click()
+    await expect(page.getByText("Project created successfully")).toBeVisible()
+    await expect(page.getByRole("dialog")).toBeHidden()
+  }
+
+  await page.goto("/bots")
+  await page.getByRole("button", { name: "Add Bot" }).click()
+  await page.getByPlaceholder("Bot name").fill("Changelog agent")
+  await page.getByRole("checkbox", { name: "Docs" }).check()
+  await page.getByRole("checkbox", { name: "Billing" }).check()
+  await page.getByRole("checkbox", { name: "Create tasks" }).check()
+  await page.getByRole("button", { name: "Create and issue token" }).click()
+  const tokenDialog = page.getByRole("dialog", {
+    name: "Token for Changelog agent",
+  })
+  const token = await tokenDialog
+    .getByRole("textbox", { name: "Bot token" })
+    .inputValue()
+  await tokenDialog.getByRole("button", { name: "Done" }).click()
+  const asBot = { Authorization: `Bearer ${token}` }
+
+  // The bot works in Billing while Billing is still in its scope.
+  const projects = await (
+    await request.get(`${api}/projects/`, { headers: asBot })
+  ).json()
+  const billing = projects.data.find(
+    (p: { name: string }) => p.name === "Billing",
+  )
+  const created = await request.post(`${api}/tasks/`, {
+    headers: asBot,
+    data: { title: "Draft the invoice notes", project_id: billing.id },
+  })
+  expect(created.ok()).toBe(true)
+  const task = await created.json()
+
+  // Narrowed to Docs, renamed, and able to create nothing any more.
+  await page
+    .getByRole("button", { name: "Actions for Changelog agent" })
+    .click()
+  await page.getByRole("menuitem", { name: "Edit Bot" }).click()
+  const editDialog = page.getByRole("dialog", { name: "Edit Bot" })
+  await expect(
+    editDialog.getByRole("checkbox", { name: "Billing" }),
+  ).toBeChecked()
+  await editDialog.getByPlaceholder("Bot name").fill("Docs agent")
+  await editDialog.getByRole("checkbox", { name: "Billing" }).uncheck()
+  await editDialog.getByRole("checkbox", { name: "Create tasks" }).uncheck()
+  await editDialog.getByRole("button", { name: "Save" }).click()
+  await expect(page.getByText("Bot updated successfully")).toBeVisible()
+  await expect(editDialog).toBeHidden()
+
+  const row = page.getByRole("row").filter({ hasText: "Docs agent" })
+  await expect(row).toContainText("Docs")
+  await expect(row).not.toContainText("Billing")
+  await expect(row).toContainText("Read tasks")
+  await expect(row).not.toContainText("Create tasks")
+
+  // The same token's very next request is held to the new scope.
+  const outside = await request.get(`${api}/tasks/${task.id}`, {
+    headers: asBot,
+  })
+  expect(outside.status()).toBe(403)
+  expect((await outside.json()).detail.code).toBe("outside_scope")
+
+  await page.getByRole("button", { name: "Actions for Docs agent" }).click()
+  await page.getByRole("menuitem", { name: "Delete Bot" }).click()
+  await page
+    .getByRole("dialog", { name: "Delete Docs agent?" })
+    .getByRole("button", { name: "Delete" })
+    .click()
+  await expect(page.getByText("“Docs agent” was deleted")).toBeVisible()
+  await expect(row).toHaveCount(0)
+
+  const refused = await request.get(`${api}/tasks/`, { headers: asBot })
+  expect(refused.status()).toBe(401)
+
+  // What it did is still in the log under its name.
+  await page.goto("/activity")
+  await expect(
+    page.getByRole("row").filter({ hasText: "Draft the invoice notes" }),
+  ).toContainText("Docs agent")
+})

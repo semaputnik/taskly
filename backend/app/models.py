@@ -802,6 +802,17 @@ class BotUserCreate(SQLModel):
     scope: BotScope
 
 
+class BotUserUpdate(SQLModel):
+    """
+    A change to a bot user: its name, its scope, or both. A scope is sent
+    whole — its projects and its permissions — and replaces the one the bot
+    user had, so what is granted is always exactly what the user last saw.
+    """
+
+    name: BotUserName | None = None
+    scope: BotScope | None = None
+
+
 class BotUser(SQLModel, table=True):
     """
     An identity for an integration, owned by one user and far weaker than

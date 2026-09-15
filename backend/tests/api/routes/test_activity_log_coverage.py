@@ -51,6 +51,14 @@ NOT_LOGGED = {
         "Bot user management is not among the changes FR-10.3 covers; what a bot "
         "user does is logged, as its own actor"
     ),
+    f"PATCH {API}/bot-users/{{bot_user_id}}": (
+        "Bot user management is not among the changes FR-10.3 covers; what a bot "
+        "user does is logged, as its own actor"
+    ),
+    f"DELETE {API}/bot-users/{{bot_user_id}}": (
+        "Bot user management is not among the changes FR-10.3 covers; the bot "
+        "user is kept, so the entries it made still name it (FR-08.19)"
+    ),
     f"POST {API}/bot-users/{{bot_user_id}}/token": (
         "Issuing a token is a credential, not a change to tasks or projects"
     ),

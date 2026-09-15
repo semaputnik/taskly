@@ -2,7 +2,7 @@
 
 import { type Client, formDataBodySerializer, type Options as Options2, type TDataShape, urlSearchParamsBodySerializer } from './client';
 import { client } from './client.gen';
-import type { activityReadActivityLogData, activityReadActivityLogErrors, activityReadActivityLogResponses, activityRestoreFromActivityEntryData, activityRestoreFromActivityEntryErrors, activityRestoreFromActivityEntryResponses, attachmentsDeleteAttachmentData, attachmentsDeleteAttachmentErrors, attachmentsDeleteAttachmentResponses, attachmentsDownloadAttachmentData, attachmentsDownloadAttachmentErrors, attachmentsDownloadAttachmentResponses, attachmentsReadAttachmentsData, attachmentsReadAttachmentsErrors, attachmentsReadAttachmentsResponses, attachmentsUploadAttachmentData, attachmentsUploadAttachmentErrors, attachmentsUploadAttachmentResponses, botsCreateBotUserData, botsCreateBotUserErrors, botsCreateBotUserResponses, botsIssueBotUserTokenData, botsIssueBotUserTokenErrors, botsIssueBotUserTokenResponses, botsReadBotUsersData, botsReadBotUsersErrors, botsReadBotUsersResponses, botsRevokeBotUserTokenData, botsRevokeBotUserTokenErrors, botsRevokeBotUserTokenResponses, commentsCreateCommentData, commentsCreateCommentErrors, commentsCreateCommentResponses, commentsDeleteCommentData, commentsDeleteCommentErrors, commentsDeleteCommentResponses, commentsReadCommentsData, commentsReadCommentsErrors, commentsReadCommentsResponses, commentsUpdateCommentData, commentsUpdateCommentErrors, commentsUpdateCommentResponses, loginLoginAccessTokenData, loginLoginAccessTokenErrors, loginLoginAccessTokenResponses, loginRecoverPasswordData, loginRecoverPasswordErrors, loginRecoverPasswordHtmlContentData, loginRecoverPasswordHtmlContentErrors, loginRecoverPasswordHtmlContentResponses, loginRecoverPasswordResponses, loginResetPasswordData, loginResetPasswordErrors, loginResetPasswordResponses, loginTestTokenData, loginTestTokenResponses, privateCreateUserData, privateCreateUserErrors, privateCreateUserResponses, projectsArchiveProjectData, projectsArchiveProjectErrors, projectsArchiveProjectResponses, projectsCreateProjectData, projectsCreateProjectErrors, projectsCreateProjectResponses, projectsDeleteProjectData, projectsDeleteProjectErrors, projectsDeleteProjectResponses, projectsReadProjectsData, projectsReadProjectsErrors, projectsReadProjectsResponses, projectsUnarchiveProjectData, projectsUnarchiveProjectErrors, projectsUnarchiveProjectResponses, projectsUpdateProjectData, projectsUpdateProjectErrors, projectsUpdateProjectResponses, tagsReadTagsData, tagsReadTagsErrors, tagsReadTagsResponses, tasksCreateTaskData, tasksCreateTaskErrors, tasksCreateTaskResponses, tasksDeleteTaskData, tasksDeleteTaskErrors, tasksDeleteTaskResponses, tasksReadTaskData, tasksReadTaskErrors, tasksReadTaskResponses, tasksReadTasksData, tasksReadTasksErrors, tasksReadTasksResponses, tasksUpdateTaskData, tasksUpdateTaskErrors, tasksUpdateTaskResponses, usersDeleteUserMeData, usersDeleteUserMeResponses, usersReadUserMeData, usersReadUserMeResponses, usersReadUsersData, usersReadUsersErrors, usersReadUsersResponses, usersRegisterUserData, usersRegisterUserErrors, usersRegisterUserResponses, usersUpdatePasswordMeData, usersUpdatePasswordMeErrors, usersUpdatePasswordMeResponses, usersUpdateUserMeData, usersUpdateUserMeErrors, usersUpdateUserMeResponses, utilsHealthCheckData, utilsHealthCheckResponses, utilsTestEmailData, utilsTestEmailErrors, utilsTestEmailResponses } from './types.gen';
+import type { activityReadActivityLogData, activityReadActivityLogErrors, activityReadActivityLogResponses, activityRestoreFromActivityEntryData, activityRestoreFromActivityEntryErrors, activityRestoreFromActivityEntryResponses, attachmentsDeleteAttachmentData, attachmentsDeleteAttachmentErrors, attachmentsDeleteAttachmentResponses, attachmentsDownloadAttachmentData, attachmentsDownloadAttachmentErrors, attachmentsDownloadAttachmentResponses, attachmentsReadAttachmentsData, attachmentsReadAttachmentsErrors, attachmentsReadAttachmentsResponses, attachmentsUploadAttachmentData, attachmentsUploadAttachmentErrors, attachmentsUploadAttachmentResponses, botsCreateBotUserData, botsCreateBotUserErrors, botsCreateBotUserResponses, botsDeleteBotUserData, botsDeleteBotUserErrors, botsDeleteBotUserResponses, botsIssueBotUserTokenData, botsIssueBotUserTokenErrors, botsIssueBotUserTokenResponses, botsReadBotUsersData, botsReadBotUsersErrors, botsReadBotUsersResponses, botsRevokeBotUserTokenData, botsRevokeBotUserTokenErrors, botsRevokeBotUserTokenResponses, botsUpdateBotUserData, botsUpdateBotUserErrors, botsUpdateBotUserResponses, commentsCreateCommentData, commentsCreateCommentErrors, commentsCreateCommentResponses, commentsDeleteCommentData, commentsDeleteCommentErrors, commentsDeleteCommentResponses, commentsReadCommentsData, commentsReadCommentsErrors, commentsReadCommentsResponses, commentsUpdateCommentData, commentsUpdateCommentErrors, commentsUpdateCommentResponses, loginLoginAccessTokenData, loginLoginAccessTokenErrors, loginLoginAccessTokenResponses, loginRecoverPasswordData, loginRecoverPasswordErrors, loginRecoverPasswordHtmlContentData, loginRecoverPasswordHtmlContentErrors, loginRecoverPasswordHtmlContentResponses, loginRecoverPasswordResponses, loginResetPasswordData, loginResetPasswordErrors, loginResetPasswordResponses, loginTestTokenData, loginTestTokenResponses, privateCreateUserData, privateCreateUserErrors, privateCreateUserResponses, projectsArchiveProjectData, projectsArchiveProjectErrors, projectsArchiveProjectResponses, projectsCreateProjectData, projectsCreateProjectErrors, projectsCreateProjectResponses, projectsDeleteProjectData, projectsDeleteProjectErrors, projectsDeleteProjectResponses, projectsReadProjectsData, projectsReadProjectsErrors, projectsReadProjectsResponses, projectsUnarchiveProjectData, projectsUnarchiveProjectErrors, projectsUnarchiveProjectResponses, projectsUpdateProjectData, projectsUpdateProjectErrors, projectsUpdateProjectResponses, tagsReadTagsData, tagsReadTagsErrors, tagsReadTagsResponses, tasksCreateTaskData, tasksCreateTaskErrors, tasksCreateTaskResponses, tasksDeleteTaskData, tasksDeleteTaskErrors, tasksDeleteTaskResponses, tasksReadTaskData, tasksReadTaskErrors, tasksReadTaskResponses, tasksReadTasksData, tasksReadTasksErrors, tasksReadTasksResponses, tasksUpdateTaskData, tasksUpdateTaskErrors, tasksUpdateTaskResponses, usersDeleteUserMeData, usersDeleteUserMeResponses, usersReadUserMeData, usersReadUserMeResponses, usersReadUsersData, usersReadUsersErrors, usersReadUsersResponses, usersRegisterUserData, usersRegisterUserErrors, usersRegisterUserResponses, usersUpdatePasswordMeData, usersUpdatePasswordMeErrors, usersUpdatePasswordMeResponses, usersUpdateUserMeData, usersUpdateUserMeErrors, usersUpdateUserMeResponses, utilsHealthCheckData, utilsHealthCheckResponses, utilsTestEmailData, utilsTestEmailErrors, utilsTestEmailResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -645,6 +645,46 @@ export class BotsService {
             responseType: 'json',
             security: [{ scheme: 'bearer', type: 'http' }],
             url: '/api/v1/bot-users/',
+            ...options,
+            headers: {
+                'Content-Type': 'application/json',
+                ...options.headers
+            }
+        });
+    }
+    
+    /**
+     * Delete Bot User
+     *
+     * Delete a bot user (FR-08.18). It is marked deleted rather than removed, so
+     * what it did and what it was assigned still name it (FR-08.19, FR-08.21),
+     * and its token is refused from the next request on (FR-08.20).
+     *
+     * There is no undoing it: a deleted bot user is gone from every endpoint
+     * here, as if it did not exist.
+     */
+    public static deleteBotUser<ThrowOnError extends boolean = true>(options: Options<botsDeleteBotUserData, ThrowOnError>) {
+        return (options.client ?? client).delete<botsDeleteBotUserResponses, botsDeleteBotUserErrors, ThrowOnError>({
+            responseType: 'json',
+            security: [{ scheme: 'bearer', type: 'http' }],
+            url: '/api/v1/bot-users/{bot_user_id}',
+            ...options
+        });
+    }
+    
+    /**
+     * Update Bot User
+     *
+     * Rename a bot user, or replace its scope, or both. The bot user's next
+     * request is authorized against the new scope; its token is untouched.
+     *
+     * As on creation, every project has to be one of the user's own.
+     */
+    public static updateBotUser<ThrowOnError extends boolean = true>(options: Options<botsUpdateBotUserData, ThrowOnError>) {
+        return (options.client ?? client).patch<botsUpdateBotUserResponses, botsUpdateBotUserErrors, ThrowOnError>({
+            responseType: 'json',
+            security: [{ scheme: 'bearer', type: 'http' }],
+            url: '/api/v1/bot-users/{bot_user_id}',
             ...options,
             headers: {
                 'Content-Type': 'application/json',

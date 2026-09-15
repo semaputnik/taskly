@@ -20,6 +20,7 @@ from app.models import (
     BotUserCreate,
     BotUserProject,
     BotUserRef,
+    BotUserUpdate,
     Comment,
     CommentCreate,
     CommentUpdate,
@@ -1105,14 +1106,73 @@ def create_bot_user(
     return bot
 
 
+def update_bot_user(
+    *, session: Session, bot: BotUser, bot_user_update: BotUserUpdate
+) -> BotUser:
+    """
+    Rename a bot user and replace its scope. Nothing about the bot user is
+    cached anywhere, so its very next request is authorized against what is
+    saved here (FR-08.6, FR-08.9).
+
+    A deleted project stays in the scope it was in, out of sight: it drops out
+    of what the bot user can reach while it is deleted, and restoring it puts
+    it back as it was, whether or not the scope was edited in between.
+    """
+    if bot_user_update.name is not None:
+        bot.name = bot_user_update.name
+    scope = bot_user_update.scope
+    if scope is not None:
+        bot.sqlmodel_update(scope.permissions.model_dump())
+        wanted = set(scope.project_ids)
+        rows = session.exec(
+            select(BotUserProject, Project.deletion_id).where(
+                BotUserProject.bot_user_id == bot.id,
+                BotUserProject.project_id == Project.id,
+            )
+        ).all()
+        for row, deletion_id in rows:
+            if deletion_id is None and row.project_id not in wanted:
+                session.delete(row)
+        held = {row.project_id for row, _ in rows}
+        for project_id in dict.fromkeys(scope.project_ids):
+            if project_id not in held:
+                session.add(BotUserProject(bot_user_id=bot.id, project_id=project_id))
+    session.add(bot)
+    session.commit()
+    session.refresh(bot)
+    return bot
+
+
+def delete_bot_user(*, session: Session, bot: BotUser) -> None:
+    """
+    Mark a bot user deleted. The row stays, so its activity log entries, its
+    comments and the tasks assigned to it keep naming it (FR-08.19, FR-08.21).
+    Its token goes with it: authentication refuses a deleted bot user anyway
+    (FR-08.20), and this way it holds no credential at all.
+    """
+    now = datetime.now(UTC)
+    bot.deleted_at = now
+    if bot.token_hash is not None:
+        bot.token_hash = None
+        bot.token_revoked_at = now
+    session.add(bot)
+    session.commit()
+
+
 def get_bot_user_project_ids(
     *, session: Session, bot_ids: Sequence[uuid.UUID]
 ) -> dict[uuid.UUID, list[uuid.UUID]]:
-    """The projects in each bot user's scope, keyed by bot user id."""
+    """
+    The projects in each bot user's scope, keyed by bot user id. A deleted
+    project is left out: the scope never points at anything the owner cannot
+    see.
+    """
     project_ids: dict[uuid.UUID, list[uuid.UUID]] = {bot_id: [] for bot_id in bot_ids}
     rows = session.exec(
         select(BotUserProject.bot_user_id, BotUserProject.project_id).where(
-            col(BotUserProject.bot_user_id).in_(bot_ids)
+            col(BotUserProject.bot_user_id).in_(bot_ids),
+            BotUserProject.project_id == Project.id,
+            not_deleted(Project),
         )
     ).all()
     for bot_id, project_id in rows:

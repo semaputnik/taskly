@@ -15,10 +15,12 @@ from app.models import (
     BotUserCreate,
     BotUserPublic,
     BotUsersPublic,
+    BotUserUpdate,
+    Message,
 )
 
-# Every endpoint here takes a human caller: creating, scoping and issuing
-# tokens for bot users is the user's to do, and a bot user cannot do it for
+# Every endpoint here takes a human caller: creating, scoping, issuing tokens
+# for and deleting bot users is the user's to do, and a bot user cannot do it for
 # another bot user or for itself (FR-07.3).
 router = APIRouter(prefix="/bot-users", tags=["bots"])
 
@@ -101,6 +103,47 @@ def create_bot_user(
     return _public(
         bot, crud.get_bot_user_project_ids(session=session, bot_ids=[bot.id])[bot.id]
     )
+
+
+@router.patch("/{bot_user_id}", response_model=BotUserPublic)
+def update_bot_user(
+    *,
+    session: SessionDep,
+    current_user: CurrentUser,
+    bot_user_id: uuid.UUID,
+    bot_user_in: BotUserUpdate,
+) -> Any:
+    """
+    Rename a bot user, or replace its scope, or both. The bot user's next
+    request is authorized against the new scope; its token is untouched.
+
+    As on creation, every project has to be one of the user's own.
+    """
+    bot = _get_owned_bot_user(session, current_user, bot_user_id)
+    if bot_user_in.scope is not None:
+        for project_id in bot_user_in.scope.project_ids:
+            get_project_of(session, current_user.id, project_id)
+    bot = crud.update_bot_user(session=session, bot=bot, bot_user_update=bot_user_in)
+    return _public(
+        bot, crud.get_bot_user_project_ids(session=session, bot_ids=[bot.id])[bot.id]
+    )
+
+
+@router.delete("/{bot_user_id}")
+def delete_bot_user(
+    *, session: SessionDep, current_user: CurrentUser, bot_user_id: uuid.UUID
+) -> Message:
+    """
+    Delete a bot user (FR-08.18). It is marked deleted rather than removed, so
+    what it did and what it was assigned still name it (FR-08.19, FR-08.21),
+    and its token is refused from the next request on (FR-08.20).
+
+    There is no undoing it: a deleted bot user is gone from every endpoint
+    here, as if it did not exist.
+    """
+    bot = _get_owned_bot_user(session, current_user, bot_user_id)
+    crud.delete_bot_user(session=session, bot=bot)
+    return Message(message="Bot user deleted successfully")
 
 
 @router.post("/{bot_user_id}/token", response_model=BotTokenIssued)

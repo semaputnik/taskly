@@ -1,13 +1,11 @@
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Plus } from "lucide-react"
-import { useId, useState } from "react"
+import { useState } from "react"
 import { useForm } from "react-hook-form"
-import { z } from "zod"
 
-import { BotsService, type BotUserCreate, ProjectsService } from "@/client"
+import { BotsService } from "@/client"
 import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
 import {
   Dialog,
   DialogClose,
@@ -25,38 +23,20 @@ import {
   FormField,
   FormItem,
   FormLabel,
-  FormMessage,
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { LoadingButton } from "@/components/ui/loading-button"
 import useCustomToast from "@/hooks/useCustomToast"
 import { handleError } from "@/utils"
+import {
+  type BotFormData,
+  BotFormFields,
+  botFormSchema,
+  scopeProjectsQueryOptions,
+  toBotScope,
+} from "./BotFormFields"
 import { useShowIssuedToken } from "./IssuedToken"
-import { PERMISSIONS } from "./permissions"
 import { expiryFromDate, today } from "./tokens"
-
-const formSchema = z.object({
-  name: z.string().trim().min(1, { message: "Name is required" }),
-  project_ids: z.array(z.string()),
-  permissions: z.array(z.string()),
-  // A `yyyy-mm-dd`, or empty for a token that works until it is revoked.
-  token_expires_on: z.string().optional(),
-})
-
-type FormData = z.infer<typeof formSchema>
-
-function toBotUserCreate(data: FormData): BotUserCreate {
-  return {
-    name: data.name,
-    scope: {
-      project_ids: data.project_ids,
-      permissions: Object.fromEntries(
-        PERMISSIONS.map(({ key }) => [key, data.permissions.includes(key)]),
-      ),
-    },
-  }
-}
 
 /**
  * Creates a bot user with its scope and issues its token straight away, so
@@ -70,15 +50,12 @@ const AddBotUser = () => {
   const { showErrorToast } = useCustomToast()
 
   const { data: projects } = useQuery({
-    queryFn: async () =>
-      (await ProjectsService.readProjects({ query: { skip: 0, limit: 100 } }))
-        .data,
-    queryKey: ["projects"],
+    ...scopeProjectsQueryOptions(),
     enabled: isOpen,
   })
 
-  const form = useForm<FormData>({
-    resolver: zodResolver(formSchema),
+  const form = useForm<BotFormData>({
+    resolver: zodResolver(botFormSchema),
     mode: "onBlur",
     criteriaMode: "all",
     defaultValues: {
@@ -90,9 +67,9 @@ const AddBotUser = () => {
   })
 
   const mutation = useMutation({
-    mutationFn: async (data: FormData) => {
+    mutationFn: async (data: BotFormData) => {
       const { data: bot } = await BotsService.createBotUser({
-        body: toBotUserCreate(data),
+        body: { name: data.name, scope: toBotScope(data) },
       })
       const { data: issuedToken } = await BotsService.issueBotUserToken({
         path: { bot_user_id: bot.id },
@@ -134,77 +111,7 @@ const AddBotUser = () => {
         <Form {...form}>
           <form onSubmit={form.handleSubmit((data) => mutation.mutate(data))}>
             <div className="grid gap-4 py-4">
-              <FormField
-                control={form.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>
-                      Name <span className="text-destructive">*</span>
-                    </FormLabel>
-                    <FormControl>
-                      <Input placeholder="Bot name" type="text" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="project_ids"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Projects</FormLabel>
-                    <FormDescription>
-                      Each project is picked on its own: a project you create
-                      later is never added by itself.
-                    </FormDescription>
-                    <div className="flex flex-col gap-2">
-                      {projects?.data.map((project) => (
-                        <CheckboxRow
-                          key={project.id}
-                          label={project.name}
-                          checked={field.value.includes(project.id)}
-                          onCheckedChange={(checked) =>
-                            field.onChange(
-                              checked
-                                ? [...field.value, project.id]
-                                : field.value.filter((id) => id !== project.id),
-                            )
-                          }
-                        />
-                      ))}
-                    </div>
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="permissions"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Permissions</FormLabel>
-                    <div className="flex flex-col gap-2">
-                      {PERMISSIONS.map(({ key, label }) => (
-                        <CheckboxRow
-                          key={key}
-                          label={label}
-                          checked={field.value.includes(key)}
-                          onCheckedChange={(checked) =>
-                            field.onChange(
-                              checked
-                                ? [...field.value, key]
-                                : field.value.filter((value) => value !== key),
-                            )
-                          }
-                        />
-                      ))}
-                    </div>
-                  </FormItem>
-                )}
-              />
+              <BotFormFields form={form} projects={projects ?? []} />
 
               <FormField
                 control={form.control}
@@ -237,28 +144,6 @@ const AddBotUser = () => {
         </Form>
       </DialogContent>
     </Dialog>
-  )
-}
-
-interface CheckboxRowProps {
-  label: string
-  checked: boolean
-  onCheckedChange: (checked: boolean) => void
-}
-
-const CheckboxRow = ({ label, checked, onCheckedChange }: CheckboxRowProps) => {
-  const id = useId()
-  return (
-    <div className="flex items-center gap-2">
-      <Checkbox
-        id={id}
-        checked={checked}
-        onCheckedChange={(value) => onCheckedChange(value === true)}
-      />
-      <Label htmlFor={id} className="font-normal">
-        {label}
-      </Label>
-    </div>
   )
 }
 

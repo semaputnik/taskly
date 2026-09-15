@@ -325,6 +325,21 @@ export type BotUserRef = {
 };
 
 /**
+ * BotUserUpdate
+ *
+ * A change to a bot user: its name, its scope, or both. A scope is sent
+ * whole — its projects and its permissions — and replaces the one the bot
+ * user had, so what is granted is always exactly what the user last saw.
+ */
+export type BotUserUpdate = {
+    /**
+     * Name
+     */
+    name?: string | null;
+    scope?: BotScope | null;
+};
+
+/**
  * BotUsersPublic
  */
 export type BotUsersPublic = {
@@ -1923,6 +1938,66 @@ export type botsCreateBotUserResponses = {
 };
 
 export type botsCreateBotUserResponse = botsCreateBotUserResponses[keyof botsCreateBotUserResponses];
+
+export type botsDeleteBotUserData = {
+    body?: never;
+    path: {
+        /**
+         * Bot User Id
+         */
+        bot_user_id: string;
+    };
+    query?: never;
+    url: '/api/v1/bot-users/{bot_user_id}';
+};
+
+export type botsDeleteBotUserErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type botsDeleteBotUserError = botsDeleteBotUserErrors[keyof botsDeleteBotUserErrors];
+
+export type botsDeleteBotUserResponses = {
+    /**
+     * Successful Response
+     */
+    200: Message;
+};
+
+export type botsDeleteBotUserResponse = botsDeleteBotUserResponses[keyof botsDeleteBotUserResponses];
+
+export type botsUpdateBotUserData = {
+    body: BotUserUpdate;
+    path: {
+        /**
+         * Bot User Id
+         */
+        bot_user_id: string;
+    };
+    query?: never;
+    url: '/api/v1/bot-users/{bot_user_id}';
+};
+
+export type botsUpdateBotUserErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type botsUpdateBotUserError = botsUpdateBotUserErrors[keyof botsUpdateBotUserErrors];
+
+export type botsUpdateBotUserResponses = {
+    /**
+     * Successful Response
+     */
+    200: BotUserPublic;
+};
+
+export type botsUpdateBotUserResponse = botsUpdateBotUserResponses[keyof botsUpdateBotUserResponses];
 
 export type botsRevokeBotUserTokenData = {
     body?: never;
