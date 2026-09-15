@@ -43,7 +43,11 @@
 
 :root {
   --radius: 0.625rem;
-  --background: oklch(1 0 0);
+  /* The ground the work area sits on. It is a step below --card on purpose:
+     tables, dialogs and popovers are sheets laid on it, and without the step
+     they would be white on white, held together by their border alone. Dark
+     mode has always had this relationship; light mode did not. */
+  --background: oklch(0.97 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.145 0 0);
