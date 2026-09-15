@@ -344,7 +344,7 @@ def _complete_task(client: TestClient, a: Account) -> httpx.Response:
     )
 
 
-def _uncomplete_task(client: TestClient, a: Account) -> httpx.Response:
+def _reopen_task(client: TestClient, a: Account) -> httpx.Response:
     return client.patch(
         f"{API}/tasks/{a.archived_subtask['id']}",
         headers=a.headers,
@@ -422,7 +422,7 @@ REFUSED_WRITES: list[Callable[[TestClient, Account], httpx.Response]] = [
     _create_subtask,
     _edit_task,
     _complete_task,
-    _uncomplete_task,
+    _reopen_task,
     _delete_task,
     _move_task_out,
     _move_task_in,
