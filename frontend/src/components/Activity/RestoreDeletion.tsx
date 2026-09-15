@@ -17,25 +17,53 @@ import { LoadingButton } from "@/components/ui/loading-button"
 import useCustomToast from "@/hooks/useCustomToast"
 import { handleError } from "@/utils"
 
-interface RestoreTaskProps {
+interface RestoreDeletionProps {
   entry: ActivityEntryPublic
 }
 
+function plural(count: number, one: string, many: string): string {
+  return count === 1 ? one : `${count} ${many}`
+}
+
+/** What the confirmation says comes back, for a task or a project. */
+function describe(entry: ActivityEntryPublic) {
+  if (entry.entity_type === "project") {
+    const name = (entry.details.name as string | undefined) ?? "this project"
+    const tasks = (entry.details.task_count as number | undefined) ?? 0
+    return {
+      heading: "Restore project",
+      name,
+      comesBack:
+        tasks > 0
+          ? `, with ${plural(tasks, "the task", "tasks")} deleted along with it`
+          : "",
+    }
+  }
+  const name = (entry.details.title as string | undefined) ?? "this task"
+  const subtasks = (entry.details.subtask_count as number | undefined) ?? 0
+  return {
+    heading: "Restore task",
+    name,
+    comesBack:
+      subtasks > 0
+        ? `, with ${plural(subtasks, "the subtask", "subtasks")} deleted along with it`
+        : "",
+  }
+}
+
 /**
- * Restoring a deleted task from its deletion entry, behind a confirmation
- * that says what else comes back with it (FR-10.4).
+ * Restoring what a deletion entry took down — a task with its subtasks, or a
+ * project with its tasks — behind a confirmation that says what else comes
+ * back (FR-10.4).
  *
- * When the task has nowhere to come back to — its parent or project is gone,
- * its project is archived — the API says so, and that message is what the
- * user sees.
+ * When a restore has nowhere to come back to, the API says why, and that
+ * message is what the user sees.
  */
-export function RestoreTask({ entry }: RestoreTaskProps) {
+export function RestoreDeletion({ entry }: RestoreDeletionProps) {
   const [isOpen, setIsOpen] = useState(false)
   const queryClient = useQueryClient()
   const { showSuccessToast, showErrorToast } = useCustomToast()
-
-  const title = (entry.details.title as string | undefined) ?? "this task"
-  const subtasks = (entry.details.subtask_count as number | undefined) ?? 0
+  const { heading, name, comesBack } = describe(entry)
 
   const mutation = useMutation({
     mutationFn: () =>
@@ -43,7 +71,7 @@ export function RestoreTask({ entry }: RestoreTaskProps) {
         path: { entry_id: entry.id },
       }),
     onSuccess: () => {
-      showSuccessToast(`“${title}” restored`)
+      showSuccessToast(`“${name}” restored`)
       setIsOpen(false)
     },
     onError: (error: Error) => {
@@ -53,6 +81,7 @@ export function RestoreTask({ entry }: RestoreTaskProps) {
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["activity"] })
       queryClient.invalidateQueries({ queryKey: ["tasks"] })
+      queryClient.invalidateQueries({ queryKey: ["projects"] })
     },
   })
 
@@ -64,13 +93,10 @@ export function RestoreTask({ entry }: RestoreTaskProps) {
       </Button>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Restore task</DialogTitle>
+          <DialogTitle>{heading}</DialogTitle>
           <DialogDescription>
-            “{title}” comes back where it was
-            {subtasks === 1 && ", with the subtask deleted along with it"}
-            {subtasks > 1 &&
-              `, with the ${subtasks} subtasks deleted along with it`}
-            . Comments and attachments come back too.
+            “{name}” comes back where it was{comesBack}. Comments and
+            attachments come back too.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>

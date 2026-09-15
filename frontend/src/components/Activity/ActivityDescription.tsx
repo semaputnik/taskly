@@ -144,6 +144,15 @@ export function ActivityDescription({
         </>
       )
     }
+    case "project_restored": {
+      const tasks = detail<number>(entry, "task_count") ?? 0
+      return (
+        <>
+          Restored the project {subject}
+          {tasks > 0 && ` and ${tasks} ${tasks === 1 ? "task" : "tasks"}`}
+        </>
+      )
+    }
     case "comment_added":
       return <>Commented on {subject}</>
     case "comment_edited":

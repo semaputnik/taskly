@@ -340,3 +340,197 @@ def test_a_restore_is_logged_and_the_deletion_entry_is_left_as_it_was(
         for e in client.get(f"{API}/activity-log/", headers=headers).json()["data"]
     ]
     assert actions.count("task_restored") == 1
+
+
+# --- Projects -----------------------------------------------------------------
+
+
+def _delete_project(
+    client: TestClient, headers: dict[str, str], project_id: str
+) -> dict:
+    """Delete a project and return the deletion's entry."""
+    r = client.delete(f"{API}/projects/{project_id}", headers=headers)
+    assert r.status_code == 200, r.text
+    return _latest_entry(client, headers, "project_deleted", project_id)
+
+
+def _project_ids(
+    client: TestClient, headers: dict[str, str], **params: object
+) -> set[str]:
+    r = client.get(f"{API}/projects/", headers=headers, params=params)
+    return {project["id"] for project in r.json()["data"]}
+
+
+def test_restoring_a_project_brings_it_back_with_its_tasks(
+    client: TestClient, db: Session
+) -> None:
+    headers = _headers_for_new_user(client, db)
+    r = client.post(
+        f"{API}/projects/",
+        headers=headers,
+        json={"name": "Garden", "description": "Back yard"},
+    )
+    project = r.json()
+    root = _create_task(client, headers, "Plant beds", project_id=project["id"])
+    _create_task(client, headers, "Buy soil", parent_id=root["id"])
+    _create_task(client, headers, "Fix the fence", project_id=project["id"])
+    entry = _delete_project(client, headers, project["id"])
+    assert entry["restorable"] is True
+    assert project["id"] not in _project_ids(client, headers)
+
+    r = _restore(client, headers, entry)
+    assert r.status_code == 200, r.text
+
+    r = client.get(f"{API}/projects/", headers=headers)
+    [restored] = [p for p in r.json()["data"] if p["id"] == project["id"]]
+    assert restored == project
+    assert _visible_titles(client, headers) == {
+        "Plant beds",
+        "Buy soil",
+        "Fix the fence",
+    }
+
+
+def test_a_task_deleted_on_its_own_before_its_project_stays_deleted(
+    client: TestClient, db: Session
+) -> None:
+    headers = _headers_for_new_user(client, db)
+    project = _create_project(client, headers, "Garden")
+    _create_task(client, headers, "Plant beds", project_id=project["id"])
+    dropped = _create_task(client, headers, "Build a pond", project_id=project["id"])
+
+    # The task goes first, on its own; then the project.
+    dropped_entry = _delete_task(client, headers, dropped["id"])
+    project_entry = _delete_project(client, headers, project["id"])
+
+    assert _restore(client, headers, project_entry).status_code == 200
+    assert _visible_titles(client, headers) == {"Plant beds"}
+
+    # Its own deletion still brings it back, into the restored project.
+    assert _restore(client, headers, dropped_entry).status_code == 200
+    assert _visible_titles(client, headers) == {"Plant beds", "Build a pond"}
+
+
+def test_a_project_archived_when_deleted_comes_back_archived(
+    client: TestClient, db: Session
+) -> None:
+    headers = _headers_for_new_user(client, db)
+    project = _create_project(client, headers, "Someday")
+    _create_task(client, headers, "Learn the cello", project_id=project["id"])
+    r = client.post(f"{API}/projects/{project['id']}/archive", headers=headers)
+    assert r.status_code == 200
+    entry = _delete_project(client, headers, project["id"])
+
+    r = _restore(client, headers, entry)
+    assert r.status_code == 200, r.text
+
+    assert project["id"] not in _project_ids(client, headers)
+    assert project["id"] in _project_ids(client, headers, archived=True)
+    r = client.get(f"{API}/tasks/", headers=headers, params={"archived": True})
+    assert [t["title"] for t in r.json()["data"]] == ["Learn the cello"]
+
+
+def test_a_project_restore_that_would_reopen_a_series_is_refused_whole(
+    client: TestClient, db: Session
+) -> None:
+    headers = _headers_for_new_user(client, db)
+    project = _create_project(client, headers, "Home")
+    inbox = next(
+        p["id"]
+        for p in client.get(f"{API}/projects/", headers=headers).json()["data"]
+        if p["is_inbox"]
+    )
+    first = _create_task(
+        client,
+        headers,
+        "Water plants",
+        project_id=project["id"],
+        due_date="2026-03-02",
+        recurrence={"frequency": "weekly"},
+    )
+    _create_task(client, headers, "Fix the tap", project_id=project["id"])
+    r = client.patch(
+        f"{API}/tasks/{first['id']}", headers=headers, json={"completed": True}
+    )
+    assert r.status_code == 200
+    # The completed occurrence leaves the project; its successor stays in it.
+    r = client.patch(
+        f"{API}/tasks/{first['id']}", headers=headers, json={"project_id": inbox}
+    )
+    assert r.status_code == 200
+    entry = _delete_project(client, headers, project["id"])
+    # With the successor deleted, the first occurrence is the latest left and
+    # can be reopened, so the series is open again outside the project.
+    r = client.patch(
+        f"{API}/tasks/{first['id']}", headers=headers, json={"completed": False}
+    )
+    assert r.status_code == 200, r.text
+
+    r = _restore(client, headers, entry)
+    assert r.status_code == 409
+    assert r.json()["detail"]["code"] == "series_has_open_occurrence"
+
+    assert project["id"] not in _project_ids(client, headers)
+    assert _visible_titles(client, headers) == {"Water plants"}
+
+
+def test_restoring_a_project_twice_changes_nothing_the_second_time(
+    client: TestClient, db: Session
+) -> None:
+    headers = _headers_for_new_user(client, db)
+    project = _create_project(client, headers, "Garden")
+    _create_task(client, headers, "Plant beds", project_id=project["id"])
+    entry = _delete_project(client, headers, project["id"])
+    assert _restore(client, headers, entry).status_code == 200
+    log_length = client.get(f"{API}/activity-log/", headers=headers).json()["count"]
+
+    r = _restore(client, headers, entry)
+    assert r.status_code == 200
+    assert project["id"] in _project_ids(client, headers)
+    assert (
+        client.get(f"{API}/activity-log/", headers=headers).json()["count"]
+        == log_length
+    )
+
+
+def test_restoring_a_project_deleted_again_since_is_refused(
+    client: TestClient, db: Session
+) -> None:
+    headers = _headers_for_new_user(client, db)
+    project = _create_project(client, headers, "Garden")
+    first_entry = _delete_project(client, headers, project["id"])
+    assert _restore(client, headers, first_entry).status_code == 200
+    second_entry = _delete_project(client, headers, project["id"])
+
+    r = _restore(client, headers, first_entry)
+    assert r.status_code == 409
+    assert r.json()["detail"]["code"] == "deleted_again"
+
+    assert _restore(client, headers, second_entry).status_code == 200
+
+
+def test_a_project_restore_is_logged_once_for_the_project(
+    client: TestClient, db: Session
+) -> None:
+    headers = _headers_for_new_user(client, db)
+    project = _create_project(client, headers, "Garden")
+    root = _create_task(client, headers, "Plant beds", project_id=project["id"])
+    _create_task(client, headers, "Buy soil", parent_id=root["id"])
+    entry = _delete_project(client, headers, project["id"])
+
+    assert _restore(client, headers, entry).status_code == 200
+
+    restored = _latest_entry(client, headers, "project_restored", project["id"])
+    assert restored["deletion_id"] == entry["deletion_id"]
+    assert restored["details"] == {"name": "Garden", "task_count": 2}
+
+    deleted = _latest_entry(client, headers, "project_deleted", project["id"])
+    assert deleted["details"] == entry["details"]
+    assert deleted["restorable"] is False
+
+    actions = [
+        e["action"]
+        for e in client.get(f"{API}/activity-log/", headers=headers).json()["data"]
+    ]
+    assert "task_restored" not in actions
+    assert actions.count("project_restored") == 1

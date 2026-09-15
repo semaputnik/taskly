@@ -213,9 +213,14 @@ def _write(session: Session) -> None:
         entries.append(_deletion_entry(session, deletion_id, actor_id, projects))
 
     for deletion_id, count in restored.items():
-        entries.append(_restore_entry(session, deletion_id, count, actor_id, projects))
+        # A project's tasks coming back are part of the project's restore,
+        # which is logged with the project below.
+        if session.get_one(Deletion, deletion_id).task_id is not None:
+            entries.append(
+                _restore_entry(session, deletion_id, count, actor_id, projects)
+            )
 
-    entries.extend(_project_entries(session, pending))
+    entries.extend(_project_entries(session, pending, restored))
     entries.extend(_comment_entries(session, pending))
     for attachment_id in pending.attachments_added:
         attachment = session.get(Attachment, attachment_id)
@@ -497,13 +502,33 @@ def _entry(
     )
 
 
-def _project_entries(session: Session, pending: _Pending) -> list[ActivityEntry]:
+def _project_entries(
+    session: Session, pending: _Pending, restored: dict[uuid.UUID, int]
+) -> list[ActivityEntry]:
+    """
+    `restored` counts the tasks this transaction brought back, by the deletion
+    event they came back from, so a project's restore can say how many of its
+    tasks came with it.
+    """
     entries = []
     after = _load_project_states(session, list(pending.projects))
     for project_id, before in pending.projects.items():
         state = after.get(project_id)
         # Deleting is logged by its deletion event below.
         if state is None or state.deletion_id is not None:
+            continue
+        if before is not None and before.deletion_id is not None:
+            entry = _entry(
+                state.owner_id,
+                ActivityAction.PROJECT_RESTORED,
+                ActivityEntityType.PROJECT,
+                project_id,
+                name=state.name,
+                task_count=restored.get(before.deletion_id, 0),
+            )
+            # The event it undid, so the log reads which deletion came back.
+            entry.deletion_id = before.deletion_id
+            entries.append(entry)
             continue
         if before is None:
             entries.append(

@@ -577,12 +577,12 @@ export class ActivityService {
      *
      * Restore what a deletion entry records as deleted (FR-10.4).
      *
-     * The deletion entry is the handle: there is no trash to restore from. The
-     * task comes back with exactly the subtasks that went down in the same
-     * deletion, so a subtask deleted on its own before stays deleted (FR-01.10).
-     * A restore is refused, with a code naming the cause, when the task would
-     * have nowhere to come back to. Restoring what is already back changes
-     * nothing.
+     * The deletion entry is the handle: there is no trash to restore from. What
+     * comes back is exactly what went down in that deletion — a task with its
+     * subtasks (FR-01.10), or a project with its tasks (FR-05.9) — so anything
+     * deleted on its own before stays deleted. A restore is refused, with a code
+     * naming the cause, when it has nowhere to come back to. Restoring what is
+     * already back changes nothing.
      */
     public static restoreFromActivityEntry<ThrowOnError extends boolean = true>(options: Options<activityRestoreFromActivityEntryData, ThrowOnError>) {
         return (options.client ?? client).post<activityRestoreFromActivityEntryResponses, activityRestoreFromActivityEntryErrors, ThrowOnError>({

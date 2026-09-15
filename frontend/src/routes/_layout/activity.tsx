@@ -4,7 +4,7 @@ import { z } from "zod"
 
 import { type ActivityEntryPublic, ActivityService } from "@/client"
 import { ActivityDescription } from "@/components/Activity/ActivityDescription"
-import { RestoreTask } from "@/components/Activity/RestoreTask"
+import { RestoreDeletion } from "@/components/Activity/RestoreDeletion"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
@@ -70,7 +70,7 @@ function ActivityRows({
         <ActivityDescription entry={entry} currentUserId={currentUserId} />
       </TableCell>
       <TableCell className="text-right">
-        {entry.restorable && <RestoreTask entry={entry} />}
+        {entry.restorable && <RestoreDeletion entry={entry} />}
       </TableCell>
     </TableRow>
   ))

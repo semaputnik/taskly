@@ -633,6 +633,7 @@ class ActivityAction(StrEnum):
     PROJECT_CREATED = "project_created"
     PROJECT_CHANGED = "project_changed"
     PROJECT_DELETED = "project_deleted"
+    PROJECT_RESTORED = "project_restored"
     COMMENT_ADDED = "comment_added"
     COMMENT_EDITED = "comment_edited"
     COMMENT_DELETED = "comment_deleted"
