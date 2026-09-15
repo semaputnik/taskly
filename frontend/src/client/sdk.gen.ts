@@ -2,7 +2,7 @@
 
 import { type Client, formDataBodySerializer, type Options as Options2, type TDataShape, urlSearchParamsBodySerializer } from './client';
 import { client } from './client.gen';
-import type { activityReadActivityLogData, activityReadActivityLogErrors, activityReadActivityLogResponses, attachmentsDeleteAttachmentData, attachmentsDeleteAttachmentErrors, attachmentsDeleteAttachmentResponses, attachmentsDownloadAttachmentData, attachmentsDownloadAttachmentErrors, attachmentsDownloadAttachmentResponses, attachmentsReadAttachmentsData, attachmentsReadAttachmentsErrors, attachmentsReadAttachmentsResponses, attachmentsUploadAttachmentData, attachmentsUploadAttachmentErrors, attachmentsUploadAttachmentResponses, commentsCreateCommentData, commentsCreateCommentErrors, commentsCreateCommentResponses, commentsDeleteCommentData, commentsDeleteCommentErrors, commentsDeleteCommentResponses, commentsReadCommentsData, commentsReadCommentsErrors, commentsReadCommentsResponses, commentsUpdateCommentData, commentsUpdateCommentErrors, commentsUpdateCommentResponses, loginLoginAccessTokenData, loginLoginAccessTokenErrors, loginLoginAccessTokenResponses, loginRecoverPasswordData, loginRecoverPasswordErrors, loginRecoverPasswordHtmlContentData, loginRecoverPasswordHtmlContentErrors, loginRecoverPasswordHtmlContentResponses, loginRecoverPasswordResponses, loginResetPasswordData, loginResetPasswordErrors, loginResetPasswordResponses, loginTestTokenData, loginTestTokenResponses, privateCreateUserData, privateCreateUserErrors, privateCreateUserResponses, projectsArchiveProjectData, projectsArchiveProjectErrors, projectsArchiveProjectResponses, projectsCreateProjectData, projectsCreateProjectErrors, projectsCreateProjectResponses, projectsDeleteProjectData, projectsDeleteProjectErrors, projectsDeleteProjectResponses, projectsReadProjectsData, projectsReadProjectsErrors, projectsReadProjectsResponses, projectsUnarchiveProjectData, projectsUnarchiveProjectErrors, projectsUnarchiveProjectResponses, projectsUpdateProjectData, projectsUpdateProjectErrors, projectsUpdateProjectResponses, tagsReadTagsData, tagsReadTagsErrors, tagsReadTagsResponses, tasksCreateTaskData, tasksCreateTaskErrors, tasksCreateTaskResponses, tasksDeleteTaskData, tasksDeleteTaskErrors, tasksDeleteTaskResponses, tasksReadTaskData, tasksReadTaskErrors, tasksReadTaskResponses, tasksReadTasksData, tasksReadTasksErrors, tasksReadTasksResponses, tasksUpdateTaskData, tasksUpdateTaskErrors, tasksUpdateTaskResponses, usersCreateUserData, usersCreateUserErrors, usersCreateUserResponses, usersDeleteUserData, usersDeleteUserErrors, usersDeleteUserMeData, usersDeleteUserMeResponses, usersDeleteUserResponses, usersReadUserByIdData, usersReadUserByIdErrors, usersReadUserByIdResponses, usersReadUserMeData, usersReadUserMeResponses, usersReadUsersData, usersReadUsersErrors, usersReadUsersResponses, usersRegisterUserData, usersRegisterUserErrors, usersRegisterUserResponses, usersUpdatePasswordMeData, usersUpdatePasswordMeErrors, usersUpdatePasswordMeResponses, usersUpdateUserData, usersUpdateUserErrors, usersUpdateUserMeData, usersUpdateUserMeErrors, usersUpdateUserMeResponses, usersUpdateUserResponses, utilsHealthCheckData, utilsHealthCheckResponses, utilsTestEmailData, utilsTestEmailErrors, utilsTestEmailResponses } from './types.gen';
+import type { activityReadActivityLogData, activityReadActivityLogErrors, activityReadActivityLogResponses, attachmentsDeleteAttachmentData, attachmentsDeleteAttachmentErrors, attachmentsDeleteAttachmentResponses, attachmentsDownloadAttachmentData, attachmentsDownloadAttachmentErrors, attachmentsDownloadAttachmentResponses, attachmentsReadAttachmentsData, attachmentsReadAttachmentsErrors, attachmentsReadAttachmentsResponses, attachmentsUploadAttachmentData, attachmentsUploadAttachmentErrors, attachmentsUploadAttachmentResponses, commentsCreateCommentData, commentsCreateCommentErrors, commentsCreateCommentResponses, commentsDeleteCommentData, commentsDeleteCommentErrors, commentsDeleteCommentResponses, commentsReadCommentsData, commentsReadCommentsErrors, commentsReadCommentsResponses, commentsUpdateCommentData, commentsUpdateCommentErrors, commentsUpdateCommentResponses, loginLoginAccessTokenData, loginLoginAccessTokenErrors, loginLoginAccessTokenResponses, loginRecoverPasswordData, loginRecoverPasswordErrors, loginRecoverPasswordHtmlContentData, loginRecoverPasswordHtmlContentErrors, loginRecoverPasswordHtmlContentResponses, loginRecoverPasswordResponses, loginResetPasswordData, loginResetPasswordErrors, loginResetPasswordResponses, loginTestTokenData, loginTestTokenResponses, privateCreateUserData, privateCreateUserErrors, privateCreateUserResponses, projectsArchiveProjectData, projectsArchiveProjectErrors, projectsArchiveProjectResponses, projectsCreateProjectData, projectsCreateProjectErrors, projectsCreateProjectResponses, projectsDeleteProjectData, projectsDeleteProjectErrors, projectsDeleteProjectResponses, projectsReadProjectsData, projectsReadProjectsErrors, projectsReadProjectsResponses, projectsUnarchiveProjectData, projectsUnarchiveProjectErrors, projectsUnarchiveProjectResponses, projectsUpdateProjectData, projectsUpdateProjectErrors, projectsUpdateProjectResponses, tagsReadTagsData, tagsReadTagsErrors, tagsReadTagsResponses, tasksCreateTaskData, tasksCreateTaskErrors, tasksCreateTaskResponses, tasksDeleteTaskData, tasksDeleteTaskErrors, tasksDeleteTaskResponses, tasksReadTaskData, tasksReadTaskErrors, tasksReadTaskResponses, tasksReadTasksData, tasksReadTasksErrors, tasksReadTasksResponses, tasksUpdateTaskData, tasksUpdateTaskErrors, tasksUpdateTaskResponses, usersDeleteUserMeData, usersDeleteUserMeResponses, usersReadUserMeData, usersReadUserMeResponses, usersReadUsersData, usersReadUsersErrors, usersReadUsersResponses, usersRegisterUserData, usersRegisterUserErrors, usersRegisterUserResponses, usersUpdatePasswordMeData, usersUpdatePasswordMeErrors, usersUpdatePasswordMeResponses, usersUpdateUserMeData, usersUpdateUserMeErrors, usersUpdateUserMeResponses, utilsHealthCheckData, utilsHealthCheckResponses, utilsTestEmailData, utilsTestEmailErrors, utilsTestEmailResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -100,7 +100,12 @@ export class UsersService {
     /**
      * Read Users
      *
-     * Retrieve users.
+     * Retrieve the registered accounts (FR-09.2).
+     *
+     * This list is everything a superuser can do beyond using Taskly like anyone
+     * else (FR-09.3). It carries account fields only: nothing about what an
+     * account holds or does, since a user's data stays private from the
+     * superuser too (FR-10.7).
      */
     public static readUsers<ThrowOnError extends boolean = true>(options?: Options<usersReadUsersData, ThrowOnError>) {
         return (options?.client ?? client).get<usersReadUsersResponses, usersReadUsersErrors, ThrowOnError>({
@@ -108,24 +113,6 @@ export class UsersService {
             security: [{ scheme: 'bearer', type: 'http' }],
             url: '/api/v1/users/',
             ...options
-        });
-    }
-    
-    /**
-     * Create User
-     *
-     * Create new user.
-     */
-    public static createUser<ThrowOnError extends boolean = true>(options: Options<usersCreateUserData, ThrowOnError>) {
-        return (options.client ?? client).post<usersCreateUserResponses, usersCreateUserErrors, ThrowOnError>({
-            responseType: 'json',
-            security: [{ scheme: 'bearer', type: 'http' }],
-            url: '/api/v1/users/',
-            ...options,
-            headers: {
-                'Content-Type': 'application/json',
-                ...options.headers
-            }
         });
     }
     
@@ -196,58 +183,14 @@ export class UsersService {
     /**
      * Register User
      *
-     * Create new user without the need to be logged in.
+     * Register an account. Open to anyone, with no invitation or approval: this
+     * is how every account other than the seeded superuser comes to exist
+     * (FR-09.4).
      */
     public static registerUser<ThrowOnError extends boolean = true>(options: Options<usersRegisterUserData, ThrowOnError>) {
         return (options.client ?? client).post<usersRegisterUserResponses, usersRegisterUserErrors, ThrowOnError>({
             responseType: 'json',
             url: '/api/v1/users/signup',
-            ...options,
-            headers: {
-                'Content-Type': 'application/json',
-                ...options.headers
-            }
-        });
-    }
-    
-    /**
-     * Delete User
-     *
-     * Delete a user.
-     */
-    public static deleteUser<ThrowOnError extends boolean = true>(options: Options<usersDeleteUserData, ThrowOnError>) {
-        return (options.client ?? client).delete<usersDeleteUserResponses, usersDeleteUserErrors, ThrowOnError>({
-            responseType: 'json',
-            security: [{ scheme: 'bearer', type: 'http' }],
-            url: '/api/v1/users/{user_id}',
-            ...options
-        });
-    }
-    
-    /**
-     * Read User By Id
-     *
-     * Get a specific user by id.
-     */
-    public static readUserById<ThrowOnError extends boolean = true>(options: Options<usersReadUserByIdData, ThrowOnError>) {
-        return (options.client ?? client).get<usersReadUserByIdResponses, usersReadUserByIdErrors, ThrowOnError>({
-            responseType: 'json',
-            security: [{ scheme: 'bearer', type: 'http' }],
-            url: '/api/v1/users/{user_id}',
-            ...options
-        });
-    }
-    
-    /**
-     * Update User
-     *
-     * Update a user.
-     */
-    public static updateUser<ThrowOnError extends boolean = true>(options: Options<usersUpdateUserData, ThrowOnError>) {
-        return (options.client ?? client).patch<usersUpdateUserResponses, usersUpdateUserErrors, ThrowOnError>({
-            responseType: 'json',
-            security: [{ scheme: 'bearer', type: 'http' }],
-            url: '/api/v1/users/{user_id}',
             ...options,
             headers: {
                 'Content-Type': 'application/json',

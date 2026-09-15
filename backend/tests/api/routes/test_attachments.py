@@ -410,31 +410,3 @@ def test_deleting_your_own_account_releases_attachment_storage_bytes(
     r = client.delete(f"{settings.API_V1_STR}/users/me", headers=headers)
     assert r.status_code == 200
     assert uploaded["id"] not in storage.files
-
-
-def test_a_superuser_deleting_a_user_releases_their_attachment_storage_bytes(
-    client: TestClient,
-    db: Session,
-    storage: InMemoryAttachmentStorage,
-    superuser_token_headers: dict[str, str],
-) -> None:
-    email = random_email()
-    password = random_lower_string()
-    user = crud.create_user(
-        session=db, user_create=UserCreate(email=email, password=password)
-    )
-    login_data = {"username": email, "password": password}
-    token = client.post(
-        f"{settings.API_V1_STR}/login/access-token", data=login_data
-    ).json()["access_token"]
-    headers = {"Authorization": f"Bearer {token}"}
-
-    task = _create_task(client, headers, "Task")
-    uploaded = _upload(client, headers, task["id"]).json()
-    assert uploaded["id"] in storage.files
-
-    r = client.delete(
-        f"{settings.API_V1_STR}/users/{user.id}", headers=superuser_token_headers
-    )
-    assert r.status_code == 200
-    assert uploaded["id"] not in storage.files

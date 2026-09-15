@@ -589,32 +589,6 @@ export type UpdatePassword = {
 };
 
 /**
- * UserCreate
- */
-export type UserCreate = {
-    /**
-     * Email
-     */
-    email: string;
-    /**
-     * Is Active
-     */
-    is_active?: boolean;
-    /**
-     * Is Superuser
-     */
-    is_superuser?: boolean;
-    /**
-     * Full Name
-     */
-    full_name?: string | null;
-    /**
-     * Password
-     */
-    password: string;
-};
-
-/**
  * UserPublic
  */
 export type UserPublic = {
@@ -660,32 +634,6 @@ export type UserRegister = {
      * Full Name
      */
     full_name?: string | null;
-};
-
-/**
- * UserUpdate
- */
-export type UserUpdate = {
-    /**
-     * Email
-     */
-    email?: string | null;
-    /**
-     * Is Active
-     */
-    is_active?: boolean | null;
-    /**
-     * Is Superuser
-     */
-    is_superuser?: boolean | null;
-    /**
-     * Full Name
-     */
-    full_name?: string | null;
-    /**
-     * Password
-     */
-    password?: string | null;
 };
 
 /**
@@ -904,31 +852,6 @@ export type usersReadUsersResponses = {
 
 export type usersReadUsersResponse = usersReadUsersResponses[keyof usersReadUsersResponses];
 
-export type usersCreateUserData = {
-    body: UserCreate;
-    path?: never;
-    query?: never;
-    url: '/api/v1/users/';
-};
-
-export type usersCreateUserErrors = {
-    /**
-     * Validation Error
-     */
-    422: HTTPValidationError;
-};
-
-export type usersCreateUserError = usersCreateUserErrors[keyof usersCreateUserErrors];
-
-export type usersCreateUserResponses = {
-    /**
-     * Successful Response
-     */
-    200: UserPublic;
-};
-
-export type usersCreateUserResponse = usersCreateUserResponses[keyof usersCreateUserResponses];
-
 export type usersDeleteUserMeData = {
     body?: never;
     path?: never;
@@ -1035,96 +958,6 @@ export type usersRegisterUserResponses = {
 };
 
 export type usersRegisterUserResponse = usersRegisterUserResponses[keyof usersRegisterUserResponses];
-
-export type usersDeleteUserData = {
-    body?: never;
-    path: {
-        /**
-         * User Id
-         */
-        user_id: string;
-    };
-    query?: never;
-    url: '/api/v1/users/{user_id}';
-};
-
-export type usersDeleteUserErrors = {
-    /**
-     * Validation Error
-     */
-    422: HTTPValidationError;
-};
-
-export type usersDeleteUserError = usersDeleteUserErrors[keyof usersDeleteUserErrors];
-
-export type usersDeleteUserResponses = {
-    /**
-     * Successful Response
-     */
-    200: Message;
-};
-
-export type usersDeleteUserResponse = usersDeleteUserResponses[keyof usersDeleteUserResponses];
-
-export type usersReadUserByIdData = {
-    body?: never;
-    path: {
-        /**
-         * User Id
-         */
-        user_id: string;
-    };
-    query?: never;
-    url: '/api/v1/users/{user_id}';
-};
-
-export type usersReadUserByIdErrors = {
-    /**
-     * Validation Error
-     */
-    422: HTTPValidationError;
-};
-
-export type usersReadUserByIdError = usersReadUserByIdErrors[keyof usersReadUserByIdErrors];
-
-export type usersReadUserByIdResponses = {
-    /**
-     * Successful Response
-     */
-    200: UserPublic;
-};
-
-export type usersReadUserByIdResponse = usersReadUserByIdResponses[keyof usersReadUserByIdResponses];
-
-export type usersUpdateUserData = {
-    body: UserUpdate;
-    path: {
-        /**
-         * User Id
-         */
-        user_id: string;
-    };
-    query?: never;
-    url: '/api/v1/users/{user_id}';
-};
-
-export type usersUpdateUserErrors = {
-    /**
-     * Validation Error
-     */
-    422: HTTPValidationError;
-};
-
-export type usersUpdateUserError = usersUpdateUserErrors[keyof usersUpdateUserErrors];
-
-export type usersUpdateUserResponses = {
-    /**
-     * Successful Response
-     */
-    200: UserPublic;
-};
-
-export type usersUpdateUserResponse = usersUpdateUserResponses[keyof usersUpdateUserResponses];
 
 export type projectsReadProjectsData = {
     body?: never;
