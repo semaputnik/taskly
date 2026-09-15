@@ -5,6 +5,7 @@ import { Suspense } from "react"
 import { BotsService, ProjectsService } from "@/client"
 import AddBotUser from "@/components/Bots/AddBotUser"
 import { getColumns } from "@/components/Bots/columns"
+import { IssuedTokenProvider } from "@/components/Bots/IssuedToken"
 import { DataTable } from "@/components/Common/DataTable"
 import PendingBots from "@/components/Pending/PendingBots"
 
@@ -54,19 +55,21 @@ function BotsTableContent() {
  */
 function Bots() {
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Bots</h1>
-          <p className="text-muted-foreground">
-            Bot users let integrations work on your tasks through the REST API
-          </p>
+    <IssuedTokenProvider>
+      <div className="flex flex-col gap-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Bots</h1>
+            <p className="text-muted-foreground">
+              Bot users let integrations work on your tasks through the REST API
+            </p>
+          </div>
+          <AddBotUser />
         </div>
-        <AddBotUser />
+        <Suspense fallback={<PendingBots />}>
+          <BotsTableContent />
+        </Suspense>
       </div>
-      <Suspense fallback={<PendingBots />}>
-        <BotsTableContent />
-      </Suspense>
-    </div>
+    </IssuedTokenProvider>
   )
 }

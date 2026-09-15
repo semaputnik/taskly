@@ -111,7 +111,10 @@ _Avoid_: "role" — a scope is set per bot user, not picked from shared roles.
 **Token** (of a bot user):
 The bearer credential a bot user sends with every request. A bot user holds at
 most one. It is shown once, when it is issued, and stored only as a digest, so
-it can never be shown again. Not interchangeable with a human's session: a
+it can never be shown again. It may carry an expiry, and the user can revoke
+it at any moment; replacing it is always a revoke followed by a fresh issue,
+never an overwrite. An expired or revoked token is refused exactly like one
+that never existed. When it was last used is recorded approximately. Not interchangeable with a human's session: a
 human session is not a bot token, and a bot token opens no endpoint that only a
 human may call.
 _Avoid_: "password", "session" for a bot user's credential.

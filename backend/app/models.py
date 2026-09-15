@@ -835,6 +835,24 @@ class BotUser(SQLModel, table=True):
         default=None,
         sa_type=DateTime(timezone=True),  # type: ignore
     )
+    # Optional; past it the token is refused like any other invalid one
+    # (FR-08.14).
+    token_expires_at: datetime | None = Field(
+        default=None,
+        sa_type=DateTime(timezone=True),  # type: ignore
+    )
+    # Approximate, not exact: see `deps.record_bot_token_use` (FR-08.17).
+    token_last_used_at: datetime | None = Field(
+        default=None,
+        sa_type=DateTime(timezone=True),  # type: ignore
+    )
+    # When the last token was revoked. Revoking clears `token_hash`, so this
+    # is all that is left of it: enough to tell the user why the bot user has
+    # no token (FR-08.15).
+    token_revoked_at: datetime | None = Field(
+        default=None,
+        sa_type=DateTime(timezone=True),  # type: ignore
+    )
     # Set once the bot user is deleted. It is kept rather than removed, so
     # what it did and what it was assigned still name it (FR-08.19, FR-08.21).
     deleted_at: datetime | None = Field(
@@ -862,9 +880,13 @@ class BotUserPublic(SQLModel):
     id: uuid.UUID
     name: str
     scope: BotScope
-    # Whether a token is out; the token itself is never reported again.
+    # Whether a token is out, revoked or not; the token itself is never
+    # reported again. One that has expired is still out until it is revoked.
     has_token: bool
     token_issued_at: datetime | None = None
+    token_expires_at: datetime | None = None
+    token_last_used_at: datetime | None = None
+    token_revoked_at: datetime | None = None
     created_at: datetime | None = None
 
 
@@ -873,11 +895,28 @@ class BotUsersPublic(SQLModel):
     count: int
 
 
+class BotTokenIssue(SQLModel):
+    """How a token is issued: with an expiry, or none to last until revoked."""
+
+    expires_at: datetime | None = None
+
+    @model_validator(mode="after")
+    def check_expiry(self) -> BotTokenIssue:
+        if self.expires_at is None:
+            return self
+        if self.expires_at.tzinfo is None:
+            raise ValueError("`expires_at` needs a timezone")
+        if self.expires_at <= datetime.now(UTC):
+            raise ValueError("`expires_at` has to be in the future")
+        return self
+
+
 class BotTokenIssued(SQLModel):
     """The one response that carries a bot user's token (FR-08.13)."""
 
     bot_user_id: uuid.UUID
     token: str
+    expires_at: datetime | None = None
 
 
 # Generic message

@@ -9,6 +9,7 @@ from app.api.deps import CurrentUser, SessionDep, get_project_of
 from app.models import (
     BotPermissions,
     BotScope,
+    BotTokenIssue,
     BotTokenIssued,
     BotUser,
     BotUserCreate,
@@ -38,6 +39,9 @@ def _public(bot: BotUser, project_ids: list[uuid.UUID]) -> BotUserPublic:
         ),
         has_token=bot.token_hash is not None,
         token_issued_at=bot.token_issued_at,
+        token_expires_at=bot.token_expires_at,
+        token_last_used_at=bot.token_last_used_at,
+        token_revoked_at=bot.token_revoked_at,
         created_at=bot.created_at,
     )
 
@@ -101,14 +105,19 @@ def create_bot_user(
 
 @router.post("/{bot_user_id}/token", response_model=BotTokenIssued)
 def issue_bot_user_token(
-    *, session: SessionDep, current_user: CurrentUser, bot_user_id: uuid.UUID
+    *,
+    session: SessionDep,
+    current_user: CurrentUser,
+    bot_user_id: uuid.UUID,
+    token_in: BotTokenIssue | None = None,
 ) -> Any:
     """
-    Issue the bot user's token.
+    Issue the bot user's token, optionally with an expiry (FR-08.14).
 
     This response is the only place the token appears: only its digest is
     stored, and no endpoint returns it again (FR-08.13). A bot user that
-    already holds a token is refused another.
+    already holds a token — even an expired one — is refused another until
+    that one is revoked (FR-08.16).
     """
     bot = _get_owned_bot_user(session, current_user, bot_user_id)
     if bot.token_hash is not None:
@@ -118,9 +127,29 @@ def issue_bot_user_token(
                 "code": TOKEN_ALREADY_ISSUED_CODE,
                 "message": (
                     f"“{bot.name}” already has a token. A bot user holds one "
-                    "token at a time."
+                    "token at a time: revoke it before issuing a new one."
                 ),
             },
         )
-    token = crud.issue_bot_token(session=session, bot=bot)
-    return BotTokenIssued(bot_user_id=bot.id, token=token)
+    expires_at = token_in.expires_at if token_in else None
+    token = crud.issue_bot_token(session=session, bot=bot, expires_at=expires_at)
+    return BotTokenIssued(bot_user_id=bot.id, token=token, expires_at=expires_at)
+
+
+@router.delete("/{bot_user_id}/token", response_model=BotUserPublic)
+def revoke_bot_user_token(
+    *, session: SessionDep, current_user: CurrentUser, bot_user_id: uuid.UUID
+) -> Any:
+    """
+    Revoke the bot user's token: the next request with it is refused
+    (FR-08.15). The bot user keeps its name and scope, and stays without a
+    token until one is issued again.
+
+    Revoking a bot user that holds no token changes nothing.
+    """
+    bot = _get_owned_bot_user(session, current_user, bot_user_id)
+    if bot.token_hash is not None:
+        bot = crud.revoke_bot_token(session=session, bot=bot)
+    return _public(
+        bot, crud.get_bot_user_project_ids(session=session, bot_ids=[bot.id])[bot.id]
+    )

@@ -1120,18 +1120,40 @@ def get_bot_user_project_ids(
     return project_ids
 
 
-def issue_bot_token(*, session: Session, bot: BotUser) -> str:
+def issue_bot_token(
+    *, session: Session, bot: BotUser, expires_at: datetime | None = None
+) -> str:
     """
     Issue a token for a bot user and return it. Only its digest is kept, so
     the caller's response is the one place the token is ever seen (FR-08.13).
+
+    Everything about the previous token goes with it: a re-issued token starts
+    unused, with its own expiry (FR-08.16).
     """
     token = generate_bot_token()
     bot.token_hash = hash_bot_token(token)
     bot.token_issued_at = datetime.now(UTC)
+    bot.token_expires_at = expires_at
+    bot.token_last_used_at = None
+    bot.token_revoked_at = None
     session.add(bot)
     session.commit()
     session.refresh(bot)
     return token
+
+
+def revoke_bot_token(*, session: Session, bot: BotUser) -> BotUser:
+    """
+    Revoke a bot user's token. Its digest goes, so the token matches nothing
+    from the next request on (FR-08.15), and the bot user holds no token until
+    one is issued again.
+    """
+    bot.token_hash = None
+    bot.token_revoked_at = datetime.now(UTC)
+    session.add(bot)
+    session.commit()
+    session.refresh(bot)
+    return bot
 
 
 def get_bot_user_refs(

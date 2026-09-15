@@ -221,6 +221,18 @@ export type BotScope = {
 };
 
 /**
+ * BotTokenIssue
+ *
+ * How a token is issued: with an expiry, or none to last until revoked.
+ */
+export type BotTokenIssue = {
+    /**
+     * Expires At
+     */
+    expires_at?: string | null;
+};
+
+/**
  * BotTokenIssued
  *
  * The one response that carries a bot user's token (FR-08.13).
@@ -234,6 +246,10 @@ export type BotTokenIssued = {
      * Token
      */
     token: string;
+    /**
+     * Expires At
+     */
+    expires_at?: string | null;
 };
 
 /**
@@ -268,6 +284,18 @@ export type BotUserPublic = {
      * Token Issued At
      */
     token_issued_at?: string | null;
+    /**
+     * Token Expires At
+     */
+    token_expires_at?: string | null;
+    /**
+     * Token Last Used At
+     */
+    token_last_used_at?: string | null;
+    /**
+     * Token Revoked At
+     */
+    token_revoked_at?: string | null;
     /**
      * Created At
      */
@@ -1896,8 +1924,41 @@ export type botsCreateBotUserResponses = {
 
 export type botsCreateBotUserResponse = botsCreateBotUserResponses[keyof botsCreateBotUserResponses];
 
-export type botsIssueBotUserTokenData = {
+export type botsRevokeBotUserTokenData = {
     body?: never;
+    path: {
+        /**
+         * Bot User Id
+         */
+        bot_user_id: string;
+    };
+    query?: never;
+    url: '/api/v1/bot-users/{bot_user_id}/token';
+};
+
+export type botsRevokeBotUserTokenErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type botsRevokeBotUserTokenError = botsRevokeBotUserTokenErrors[keyof botsRevokeBotUserTokenErrors];
+
+export type botsRevokeBotUserTokenResponses = {
+    /**
+     * Successful Response
+     */
+    200: BotUserPublic;
+};
+
+export type botsRevokeBotUserTokenResponse = botsRevokeBotUserTokenResponses[keyof botsRevokeBotUserTokenResponses];
+
+export type botsIssueBotUserTokenData = {
+    /**
+     * Token In
+     */
+    body?: BotTokenIssue | null;
     path: {
         /**
          * Bot User Id

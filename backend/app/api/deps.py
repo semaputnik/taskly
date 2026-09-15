@@ -1,6 +1,7 @@
 import uuid
 from collections.abc import Generator
 from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 from functools import lru_cache
 from pathlib import Path
 from typing import Annotated
@@ -10,7 +11,8 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jwt.exceptions import InvalidTokenError
 from pydantic import ValidationError
-from sqlmodel import Session, select
+from sqlalchemy import or_, update
+from sqlmodel import Session, col, select
 
 from app import activity, crud
 from app.core import security
@@ -48,19 +50,61 @@ HUMAN_ONLY_STATUS = 403
 HUMAN_ONLY_CODE = "human_only"
 
 
+# How fine-grained "last used" is. Recording every request would be a write on
+# every bot call; at most one per bot user per interval tells the user just as
+# much about whether an integration is alive (FR-08.17).
+BOT_TOKEN_USE_RESOLUTION = timedelta(minutes=1)
+
+
 def _authenticate_bot(session: Session, token: str) -> BotUser:
+    """
+    The bot user a token belongs to. A token that matches nothing — unknown,
+    revoked — one that has expired, and one of a deleted bot user are all
+    refused the same way, before anything else about the request is looked
+    at, so the refusal says nothing about why (FR-08.14, FR-08.15, FR-08.20).
+    """
     bot = session.exec(
         select(BotUser).where(BotUser.token_hash == security.hash_bot_token(token))
     ).first()
-    # A deleted bot user is locked out before anything else about the request
-    # is considered (FR-08.20).
-    if not bot or bot.deleted_at is not None:
+    now = datetime.now(UTC)
+    if (
+        not bot
+        or bot.deleted_at is not None
+        or (bot.token_expires_at is not None and bot.token_expires_at <= now)
+    ):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Could not validate credentials",
             headers={"WWW-Authenticate": "Bearer"},
         )
+    _record_bot_token_use(bot, now)
     return bot
+
+
+def _record_bot_token_use(bot: BotUser, now: datetime) -> None:
+    """
+    Note that the bot user's token was just used, if the last note is older
+    than `BOT_TOKEN_USE_RESOLUTION`.
+
+    Written on its own connection and committed at once, rather than in the
+    request's transaction: the note is true whatever the request goes on to do,
+    and a bot's requests do not queue up behind each other's row lock.
+    """
+    last_used = bot.token_last_used_at
+    if last_used is not None and now - last_used < BOT_TOKEN_USE_RESOLUTION:
+        return
+    with engine.begin() as connection:
+        connection.execute(
+            update(BotUser)
+            .where(
+                col(BotUser.id) == bot.id,
+                or_(
+                    col(BotUser.token_last_used_at).is_(None),
+                    col(BotUser.token_last_used_at) < now - BOT_TOKEN_USE_RESOLUTION,
+                ),
+            )
+            .values(token_last_used_at=now)
+        )
 
 
 def get_current_user(session: SessionDep, token: TokenDep) -> User:
