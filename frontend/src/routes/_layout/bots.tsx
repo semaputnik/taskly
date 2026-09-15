@@ -1,5 +1,6 @@
 import { useSuspenseQuery } from "@tanstack/react-query"
 import { createFileRoute } from "@tanstack/react-router"
+import { Bot } from "lucide-react"
 import { Suspense } from "react"
 
 import { BotsService } from "@/client"
@@ -8,6 +9,7 @@ import { scopeProjectsQueryOptions } from "@/components/Bots/BotFormFields"
 import { getColumns } from "@/components/Bots/columns"
 import { IssuedTokenProvider } from "@/components/Bots/IssuedToken"
 import { DataTable } from "@/components/Common/DataTable"
+import { EmptyState } from "@/components/Common/EmptyState"
 import PendingBots from "@/components/Pending/PendingBots"
 
 function getBotsQueryOptions() {
@@ -37,7 +39,19 @@ function BotsTableContent() {
     projects.map((project) => [project.id, project]),
   )
 
-  return <DataTable columns={getColumns(projectsById)} data={bots.data} />
+  return (
+    <DataTable
+      columns={getColumns(projectsById)}
+      data={bots.data}
+      empty={
+        <EmptyState
+          icon={Bot}
+          title="No bot users yet"
+          description="A bot user lets an AI agent or integration work on your tasks through the REST API — only in the projects you name, and only with the permissions you grant."
+        />
+      }
+    />
+  )
 }
 
 /**

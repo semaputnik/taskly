@@ -1,9 +1,11 @@
 import { useSuspenseQuery } from "@tanstack/react-query"
 import { createFileRoute } from "@tanstack/react-router"
+import { Archive as ArchiveIcon } from "lucide-react"
 import { Suspense } from "react"
 
 import { ProjectsService, TasksService } from "@/client"
 import { DataTable } from "@/components/Common/DataTable"
+import { EmptyState } from "@/components/Common/EmptyState"
 import PendingProjects from "@/components/Pending/PendingProjects"
 import PendingTasks from "@/components/Pending/PendingTasks"
 import { archivedColumns } from "@/components/Projects/archivedColumns"
@@ -42,7 +44,19 @@ export const Route = createFileRoute("/_layout/archive")({
 function ArchivedProjectsContent() {
   const { data: projects } = useSuspenseQuery(getArchivedProjectsQueryOptions())
 
-  return <DataTable columns={archivedColumns} data={projects.data} />
+  return (
+    <DataTable
+      columns={archivedColumns}
+      data={projects.data}
+      empty={
+        <EmptyState
+          icon={ArchiveIcon}
+          title="Nothing archived"
+          description="Archiving a project puts it and its tasks out of the way without deleting them. They stay readable here, and can come back at any time."
+        />
+      }
+    />
+  )
 }
 
 function ArchivedTasksContent() {
@@ -58,6 +72,13 @@ function ArchivedTasksContent() {
     <DataTable
       columns={getColumns(projectNames, depths, { readOnly: true })}
       data={ordered}
+      empty={
+        <EmptyState
+          icon={ArchiveIcon}
+          title="No archived tasks"
+          description="Tasks appear here when the project holding them is archived. They stay read-only until it is brought back."
+        />
+      }
     />
   )
 }

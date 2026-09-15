@@ -1,9 +1,11 @@
 import { useSuspenseQuery } from "@tanstack/react-query"
 import { createFileRoute } from "@tanstack/react-router"
+import { Tag } from "lucide-react"
 import { Suspense } from "react"
 
 import { TagsService } from "@/client"
 import { DataTable } from "@/components/Common/DataTable"
+import { EmptyState } from "@/components/Common/EmptyState"
 import PendingTags from "@/components/Pending/PendingTags"
 import AddTag from "@/components/Tags/AddTag"
 import { columns } from "@/components/Tags/columns"
@@ -32,7 +34,19 @@ export const Route = createFileRoute("/_layout/tags")({
 function TagsTableContent() {
   const { data: tags } = useSuspenseQuery(getTagsQueryOptions())
 
-  return <DataTable columns={columns} data={tags.data} />
+  return (
+    <DataTable
+      columns={columns}
+      data={tags.data}
+      empty={
+        <EmptyState
+          icon={Tag}
+          title="No tags yet"
+          description="Tags are created by using them: type one on a task and it appears here, ready to rename or reuse."
+        />
+      }
+    />
+  )
 }
 
 /**
