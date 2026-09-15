@@ -26,6 +26,28 @@ function projectName(project: ProjectRef | null | undefined): string {
   return project?.name ?? "a project that no longer exists"
 }
 
+// Entries from before bot users could be assigned carry only the id.
+interface AssigneeRef {
+  type: "user" | "bot_user"
+  id: string
+  name?: string
+}
+
+/**
+ * Who a task was assigned to. A bot user is named as it was called at the
+ * time, which still reads after it is renamed or deleted.
+ */
+function assigneeName(
+  assignee: AssigneeRef | null | undefined,
+  assigneeId: string | undefined,
+  currentUserId: string | undefined,
+): string {
+  if (assignee?.type === "bot_user") {
+    return `the bot user ${assignee.name}`
+  }
+  return (assignee?.id ?? assigneeId) === currentUserId ? "you" : "someone"
+}
+
 interface ActivityDescriptionProps {
   entry: ActivityEntryPublic
   currentUserId?: string
@@ -115,16 +137,29 @@ export function ActivityDescription({
           {projectName(detail<ProjectRef>(entry, "to_project"))}
         </>
       )
-    case "task_assigned": {
-      const assignee = detail<string>(entry, "assignee_id")
+    case "task_assigned":
       return (
         <>
-          Assigned {subject} to {assignee === currentUserId ? "you" : "someone"}
+          Assigned {subject} to{" "}
+          {assigneeName(
+            detail<AssigneeRef>(entry, "assignee"),
+            detail<string>(entry, "assignee_id"),
+            currentUserId,
+          )}
         </>
       )
-    }
-    case "task_unassigned":
+    case "task_unassigned": {
+      const previous = detail<AssigneeRef>(entry, "previous_assignee")
+      if (previous?.type === "bot_user") {
+        return (
+          <>
+            Removed {assigneeName(previous, previous.id, currentUserId)} from{" "}
+            {subject}
+          </>
+        )
+      }
       return <>Removed the assignee from {subject}</>
+    }
     case "project_created":
       return <>Created the project {subject}</>
     case "project_changed": {

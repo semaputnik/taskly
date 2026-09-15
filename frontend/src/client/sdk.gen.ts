@@ -611,6 +611,7 @@ export class BotsService {
      * Read Bot Users
      *
      * Retrieve the current user's bot users, with their scopes, oldest first.
+     * Deleted bot users are not among them.
      */
     public static readBotUsers<ThrowOnError extends boolean = true>(options?: Options<botsReadBotUsersData, ThrowOnError>) {
         return (options?.client ?? client).get<botsReadBotUsersResponses, botsReadBotUsersErrors, ThrowOnError>({

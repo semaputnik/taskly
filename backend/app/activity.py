@@ -33,6 +33,7 @@ from app.models import (
     ActivityEntityType,
     ActivityEntry,
     Attachment,
+    BotUser,
     Comment,
     Deletion,
     Project,
@@ -80,6 +81,7 @@ class _TaskState:
     completed: bool
     project_id: uuid.UUID | None
     assignee_id: uuid.UUID | None
+    assignee_bot_user_id: uuid.UUID | None
     deletion_id: uuid.UUID | None
     tags: tuple[str, ...]
     recurrence: dict[str, Any] | None
@@ -201,7 +203,7 @@ def _write(session: Session) -> None:
     pending: _Pending = session.info.pop(_PENDING_KEY)
 
     after = _load_states(session, list(pending.before))
-    projects = _ProjectRefs(session)
+    refs = _Refs(session)
     entries: list[ActivityEntry] = []
     # Deletion events this transaction brought rows back from, each with how
     # many of its rows came back.
@@ -216,16 +218,16 @@ def _write(session: Session) -> None:
         # Restoring is logged the same way: once for the event, not per row.
         if before is not None and before.deletion_id is not None:
             restored[before.deletion_id] = restored.get(before.deletion_id, 0) + 1
-        entries.extend(_task_entries(task_id, before, state, projects))
+        entries.extend(_task_entries(task_id, before, state, refs))
 
     for deletion_id in pending.deletions:
-        entries.append(_deletion_entry(session, deletion_id, projects))
+        entries.append(_deletion_entry(session, deletion_id, refs))
 
     for deletion_id, count in restored.items():
         # A project's tasks coming back are part of the project's restore,
         # which is logged with the project below.
         if session.get_one(Deletion, deletion_id).task_id is not None:
-            entries.append(_restore_entry(session, deletion_id, count, projects))
+            entries.append(_restore_entry(session, deletion_id, count, refs))
 
     entries.extend(_project_entries(session, pending, restored))
     entries.extend(_comment_entries(session, pending))
@@ -255,30 +257,51 @@ def _discard(session: Session, transaction: Any) -> None:
         session.info.pop(_PENDING_KEY, None)
 
 
-class _ProjectRefs:
+class _Refs:
     """
-    A project as an entry names it: its id, and its name at the time of the
-    change, so the entry still says where a task was after the project is
-    renamed or gone.
+    Other things as an entry names them, with their names at the time of the
+    change, so the entry still reads after they are renamed or gone.
     """
 
     def __init__(self, session: Session) -> None:
         self._session = session
-        self._names: dict[uuid.UUID, str] = {}
+        self._project_names: dict[uuid.UUID, str] = {}
+        self._bot_user_names: dict[uuid.UUID, str] = {}
 
-    def __call__(self, project_id: uuid.UUID | None) -> dict[str, Any] | None:
+    def project(self, project_id: uuid.UUID | None) -> dict[str, Any] | None:
+        """A project: its id and name."""
         if project_id is None:
             return None
-        if project_id not in self._names:
-            self._names[project_id] = self._session.get_one(Project, project_id).name
-        return {"id": project_id, "name": self._names[project_id]}
+        if project_id not in self._project_names:
+            project = self._session.get_one(Project, project_id)
+            self._project_names[project_id] = project.name
+        return {"id": project_id, "name": self._project_names[project_id]}
+
+    def assignee(self, state: _TaskState) -> dict[str, Any] | None:
+        """
+        Who a task is assigned to: the user, or a bot user with its name — a
+        bot user can be renamed or deleted later, the user is always "you".
+        """
+        if state.assignee_id is not None:
+            return {"type": "user", "id": state.assignee_id}
+        bot_user_id = state.assignee_bot_user_id
+        if bot_user_id is None:
+            return None
+        if bot_user_id not in self._bot_user_names:
+            bot_user = self._session.get_one(BotUser, bot_user_id)
+            self._bot_user_names[bot_user_id] = bot_user.name
+        return {
+            "type": "bot_user",
+            "id": bot_user_id,
+            "name": self._bot_user_names[bot_user_id],
+        }
 
 
 def _task_entries(
     task_id: uuid.UUID,
     before: _TaskState | None,
     after: _TaskState,
-    projects: _ProjectRefs,
+    refs: _Refs,
 ) -> list[ActivityEntry]:
     def entry(action: ActivityAction, **details: Any) -> ActivityEntry:
         return ActivityEntry(
@@ -292,7 +315,7 @@ def _task_entries(
         )
 
     if before is None:
-        return [entry(ActivityAction.TASK_CREATED, task=_snapshot(after, projects))]
+        return [entry(ActivityAction.TASK_CREATED, task=_snapshot(after, refs))]
 
     entries = []
     changes = {
@@ -307,25 +330,32 @@ def _task_entries(
         entries.append(
             entry(
                 ActivityAction.TASK_MOVED,
-                from_project=projects(before.project_id),
-                to_project=projects(after.project_id),
+                from_project=refs.project(before.project_id),
+                to_project=refs.project(after.project_id),
             )
         )
 
-    if before.assignee_id != after.assignee_id:
-        if after.assignee_id is None:
+    previous_assignee = refs.assignee(before)
+    assignee = refs.assignee(after)
+    if previous_assignee != assignee:
+        # `assignee_id` and `previous_assignee_id` stay as entries have always
+        # had them; `assignee` and `previous_assignee` say who that is.
+        if assignee is None:
             entries.append(
                 entry(
                     ActivityAction.TASK_UNASSIGNED,
-                    previous_assignee_id=before.assignee_id,
+                    previous_assignee_id=_assignee_id(before),
+                    previous_assignee=previous_assignee,
                 )
             )
         else:
             entries.append(
                 entry(
                     ActivityAction.TASK_ASSIGNED,
-                    assignee_id=after.assignee_id,
-                    previous_assignee_id=before.assignee_id,
+                    assignee_id=_assignee_id(after),
+                    assignee=assignee,
+                    previous_assignee_id=_assignee_id(before),
+                    previous_assignee=previous_assignee,
                 )
             )
 
@@ -344,7 +374,7 @@ def _task_entries(
 def _deletion_entry(
     session: Session,
     deletion_id: uuid.UUID,
-    projects: _ProjectRefs,
+    refs: _Refs,
 ) -> ActivityEntry:
     deletion = session.get_one(Deletion, deletion_id)
     assert deletion.task_id is not None
@@ -361,7 +391,7 @@ def _deletion_entry(
         details=to_jsonable_python(
             {
                 "title": task.title,
-                "project": projects(task.project_id),
+                "project": refs.project(task.project_id),
                 "parent_id": task.parent_id,
                 # What a restore of this event would bring back along with it.
                 "subtask_count": len(went_down) - 1,
@@ -374,7 +404,7 @@ def _restore_entry(
     session: Session,
     deletion_id: uuid.UUID,
     count: int,
-    projects: _ProjectRefs,
+    refs: _Refs,
 ) -> ActivityEntry:
     deletion = session.get_one(Deletion, deletion_id)
     assert deletion.task_id is not None
@@ -389,7 +419,7 @@ def _restore_entry(
         details=to_jsonable_python(
             {
                 "title": task.title,
-                "project": projects(task.project_id),
+                "project": refs.project(task.project_id),
                 "parent_id": task.parent_id,
                 "subtask_count": count - 1,
             }
@@ -397,15 +427,20 @@ def _restore_entry(
     )
 
 
-def _snapshot(state: _TaskState, projects: _ProjectRefs) -> dict[str, Any]:
+def _assignee_id(state: _TaskState) -> uuid.UUID | None:
+    return state.assignee_id or state.assignee_bot_user_id
+
+
+def _snapshot(state: _TaskState, refs: _Refs) -> dict[str, Any]:
     return {
         "title": state.title,
         "description": state.description,
         "due_date": state.due_date,
         "priority": state.priority,
         "completed": state.completed,
-        "project": projects(state.project_id),
-        "assignee_id": state.assignee_id,
+        "project": refs.project(state.project_id),
+        "assignee_id": _assignee_id(state),
+        "assignee": refs.assignee(state),
         "tags": state.tags,
         "recurrence": state.recurrence,
     }
@@ -444,6 +479,7 @@ def _load_states(
         col(Task.completed),
         col(Task.project_id),
         col(Task.assignee_id),
+        col(Task.assignee_bot_user_id),
         col(Task.deletion_id),
         col(Series.frequency),
         col(Series.interval_days),
@@ -472,6 +508,7 @@ def _load_states(
             completed=row.completed,
             project_id=row.project_id,
             assignee_id=row.assignee_id,
+            assignee_bot_user_id=row.assignee_bot_user_id,
             deletion_id=row.deletion_id,
             tags=tuple(sorted(tags[row.id], key=str.lower)),
             recurrence=(
