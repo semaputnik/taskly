@@ -4,6 +4,7 @@ import { z } from "zod"
 
 import { type ActivityEntryPublic, ActivityService } from "@/client"
 import { ActivityDescription } from "@/components/Activity/ActivityDescription"
+import { RestoreTask } from "@/components/Activity/RestoreTask"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
@@ -49,7 +50,7 @@ function ActivityRows({
     return (
       <TableRow className="hover:bg-transparent">
         <TableCell
-          colSpan={3}
+          colSpan={4}
           className="h-32 text-center text-muted-foreground"
         >
           Nothing has happened in your account yet.
@@ -68,6 +69,9 @@ function ActivityRows({
       <TableCell>
         <ActivityDescription entry={entry} currentUserId={currentUserId} />
       </TableCell>
+      <TableCell className="text-right">
+        {entry.restorable && <RestoreTask entry={entry} />}
+      </TableCell>
     </TableRow>
   ))
 }
@@ -84,6 +88,7 @@ function PendingRows() {
       <TableCell>
         <Skeleton className="h-4 w-64" />
       </TableCell>
+      <TableCell />
     </TableRow>
   ))
 }
@@ -124,6 +129,9 @@ function Activity() {
             <TableHead>When</TableHead>
             <TableHead>Who</TableHead>
             <TableHead>What</TableHead>
+            <TableHead>
+              <span className="sr-only">Actions</span>
+            </TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>

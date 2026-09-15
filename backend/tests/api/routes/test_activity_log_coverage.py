@@ -17,6 +17,7 @@ LOGGED = {
     f"POST {API}/tasks/",
     f"PATCH {API}/tasks/{{task_id}}",
     f"DELETE {API}/tasks/{{task_id}}",
+    f"POST {API}/activity-log/{{entry_id}}/restore",
 }
 
 LATER = "Logged once semaputnik/taskly#36 records projects, comments and attachments"

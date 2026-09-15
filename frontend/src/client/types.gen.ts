@@ -9,7 +9,7 @@ export type ClientOptions = {
  *
  * Everything the activity log records (FR-10.3).
  */
-export type ActivityAction = 'task_created' | 'task_changed' | 'task_completed' | 'task_reopened' | 'task_deleted' | 'task_moved' | 'task_assigned' | 'task_unassigned';
+export type ActivityAction = 'task_created' | 'task_changed' | 'task_completed' | 'task_reopened' | 'task_deleted' | 'task_restored' | 'task_moved' | 'task_assigned' | 'task_unassigned';
 
 /**
  * ActivityEntityType
@@ -70,6 +70,10 @@ export type ActivityEntryPublic = {
      * Entity Project Id
      */
     entity_project_id?: string | null;
+    /**
+     * Restorable
+     */
+    restorable?: boolean;
 };
 
 /**
@@ -1650,6 +1654,36 @@ export type activityReadActivityLogResponses = {
 };
 
 export type activityReadActivityLogResponse = activityReadActivityLogResponses[keyof activityReadActivityLogResponses];
+
+export type activityRestoreFromActivityEntryData = {
+    body?: never;
+    path: {
+        /**
+         * Entry Id
+         */
+        entry_id: string;
+    };
+    query?: never;
+    url: '/api/v1/activity-log/{entry_id}/restore';
+};
+
+export type activityRestoreFromActivityEntryErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type activityRestoreFromActivityEntryError = activityRestoreFromActivityEntryErrors[keyof activityRestoreFromActivityEntryErrors];
+
+export type activityRestoreFromActivityEntryResponses = {
+    /**
+     * Successful Response
+     */
+    200: Message;
+};
+
+export type activityRestoreFromActivityEntryResponse = activityRestoreFromActivityEntryResponses[keyof activityRestoreFromActivityEntryResponses];
 
 export type utilsTestEmailData = {
     body?: never;
