@@ -70,13 +70,14 @@ _Avoid_: reading a row's deleted state as a bare flag — it is always tied to
 the event that caused it.
 
 **Tag**:
-A free-text label a user puts on a task. A tag comes into being by being
-typed onto a task and belongs to the **user**, not to a project, so it means
-the same thing across their whole account and can gather work that crosses
-projects. Applying, removing and autocompleting is all the management there
-is: a tag no task carries any more simply stops existing.
-_Avoid_: treating tags as a taxonomy to be set up in advance, or as something
-scoped to a project.
+A named label a user puts on tasks. It belongs to the **user**, not to a
+project, so it means the same thing across their whole account and can gather
+work that crosses projects. A tag is created on the Tags page or by typing a
+new name onto a task, and it stays until the user deletes it, whether or not
+any task carries it. Renaming a tag renames it on every task; deleting it takes
+it off every task and cannot be undone. Only the user renames or deletes tags.
+_Avoid_: treating a tag as text copied onto each task, or as something scoped
+to a project.
 
 **Bot user**:
 An identity a user creates for an AI agent or other integration, deliberately
@@ -104,7 +105,8 @@ they belong to is simply the user.
 **Scope**:
 What a bot user may reach and do: an explicit list of the owner's projects,
 each named one by one with no "all projects" value, and the permissions it
-holds there — create, read, update and delete on tasks, and adding comments.
+holds there — create, read, update and delete on tasks, adding comments, and
+creating tags.
 Anything a bot user can never do has no permission to grant at all. An
 archived project is out of reach whatever the scope says, and a subtask is in
 scope exactly when its root task's project is. The user can change a scope at

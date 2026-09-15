@@ -1,7 +1,7 @@
 # Taskly — Feature Requirements
 
 **Status:** Draft
-**Last updated:** 2026-09-11
+**Last updated:** 2026-09-15
 
 This document lists the features Taskly must provide. It records confirmed
 requirements only. Anything not yet decided is listed under
@@ -33,7 +33,7 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
 | **Project** | A container that groups tasks. Every task belongs to a project. Projects are flat: there is no nesting. |
 | **Inbox** | The default project every user has. Tasks go there unless another project is chosen. Cannot be renamed or deleted. |
 | **Archived project** | A project a user has hidden from daily use without deleting it. Read-only; hidden from default views; no bot access. Distinct from a *deleted* project — see [F-05](#f-05-projects). |
-| **Tag** | A label attached to a task. |
+| **Tag** | A named label a user attaches to tasks. Belongs to the user and is shared across their projects. |
 | **Comment** | A text note attached to a task. |
 | **Attachment** | A file attached to a task. |
 | **Assignee** | The actor responsible for a task: the user or one of their bot users. Optional. |
@@ -70,10 +70,24 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
 
 #### Tags
 
-- **FR-01.20** A tag is free text, created on the fly when applied to a task —
-  there is no separate screen for managing tags.
+- **FR-01.20** A tag is an entity of its own, with a name. A user creates a
+  tag either on the Tags page or on the fly, by typing a name that is not a tag
+  yet onto a task.
 - **FR-01.21** Tags belong to the user, not to a project: a user's tags are
   shared across all of their projects.
+- **FR-01.22** A tag's name is unique among the user's tags. Names are
+  case-sensitive: `urgent` and `Urgent` are two tags. Creating a tag, or
+  renaming one, to a name that is already taken is refused.
+- **FR-01.23** A tag stays until the user deletes it, whether or not any task
+  carries it.
+- **FR-01.24** A user can rename a tag. Every task that carries it shows the new
+  name. Activity log entries written before the rename keep the name the tag
+  had then.
+- **FR-01.25** A user can delete a tag. It is taken off every task that carries
+  it. Deleting a tag is permanent: it cannot be restored from the activity log.
+- **FR-01.26** The Tags page lists the user's tags with the number of tasks
+  each is on, and lets the user create, rename and delete them. Before a tag is
+  deleted, the page asks for confirmation and says how many tasks will lose it.
 
 #### Deletion
 
@@ -239,12 +253,20 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
   | Entity | Create | Read | Update | Delete |
   |---|---|---|---|---|
   | Task | configurable | configurable | configurable | configurable |
-  | Tag | configurable | configurable | configurable | configurable |
+  | Tag | configurable | always | never | never |
   | Project | never | only projects in scope | never | never |
 
-  The Tag row is an open question (see [Q-16](#7-open-questions)). Until it
-  is settled, a bot user cannot change tags: it sees the tags on tasks it can
-  read, and nothing more.
+  Tags (see ADR-0003):
+  - Creating tags is a permission of its own. It covers both creating a tag
+    directly and typing a name that is not a tag yet onto a task.
+  - A bot user reads all of its owner's tags, with the number of tasks each is
+    on, whatever its scope. Tags belong to the user rather than to a project,
+    so the scope has nothing to narrow them by.
+  - Applying and removing tags on a task is part of creating or updating the
+    task: it takes the create or update permission on tasks, plus the
+    permission to create tags for any name that is not a tag yet.
+  - Renaming and deleting tags is for the user only. Both change tasks in
+    every project, including those outside the bot user's scope.
 
 - **FR-08.10** Comments:
   - Adding comments to tasks is a separate permission.
@@ -307,6 +329,10 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
   - Attachments:
     - an attachment is added to a task
     - an attachment is deleted
+  - Tags:
+    - a tag is created, on the Tags page or by being typed onto a task
+    - a tag is renamed
+    - a tag is deleted
   - Projects:
     - a project is created
     - a project is changed
@@ -351,20 +377,12 @@ Not requirements yet. Recorded so they are not lost.
 - More than one token per bot user.
 - Bot users reading the activity log.
 - Bot users editing or deleting comments.
+- Bot users renaming or deleting tags.
 - Nested projects (projects are flat — see FR-05.5).
 - Text search over tasks.
 
 ## 7. Open questions
 
-Q-01 through Q-15, raised while drafting this document, have been resolved
-into the requirements above.
-
-- **Q-16** What do the four tag permissions in FR-08.9 mean? Tags have no
-  endpoints of their own: a tag comes into being by being typed onto a task and
-  stops existing when no task carries it (FR-01.20). Create, read, update and
-  delete on tags therefore have no direct operations to govern. Candidate
-  readings: map them onto what a bot does to tags through tasks (typing a new
-  tag, seeing tags, applying an existing tag, removing one), or keep only
-  create and read and fold applying and removing into updating the task.
-  Raised while splitting semaputnik/taskly#7; bot users cannot change tags
-  until it is answered.
+Q-01 through Q-16, raised while drafting this document and while splitting it
+into issues, have been resolved into the requirements above. There are no open
+questions at the moment.
