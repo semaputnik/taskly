@@ -1,4 +1,5 @@
 import type { ColumnDef } from "@tanstack/react-table"
+import { Repeat } from "lucide-react"
 
 import type { TaskPublic } from "@/client"
 import type { DataTableFeatures } from "@/components/Common/DataTable"
@@ -6,6 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import { cn } from "@/lib/utils"
 import { CompleteTask } from "./CompleteTask"
+import { describeRecurrence } from "./recurrence"
 import { TaskActionsMenu } from "./TaskActionsMenu"
 
 // Each level of nesting shifts a subtask's title right by this much.
@@ -43,17 +45,27 @@ export function getColumns(
       accessorKey: "title",
       header: "Title",
       cell: ({ row }) => (
-        <span
-          className={cn(
-            "font-medium",
-            row.original.completed && "line-through text-muted-foreground",
-          )}
+        <div
+          className="flex items-center gap-2"
           style={{
             paddingLeft: `${(depths[row.original.id] ?? 0) * INDENT_PER_LEVEL_REM}rem`,
           }}
         >
-          {row.original.title}
-        </span>
+          <span
+            className={cn(
+              "font-medium",
+              row.original.completed && "line-through text-muted-foreground",
+            )}
+          >
+            {row.original.title}
+          </span>
+          {row.original.recurrence && (
+            <Badge variant="outline" className="gap-1 text-xs">
+              <Repeat className="size-3" />
+              {describeRecurrence(row.original.recurrence)}
+            </Badge>
+          )}
+        </div>
       ),
     },
     {

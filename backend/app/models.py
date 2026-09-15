@@ -4,7 +4,15 @@ from enum import StrEnum
 from typing import Annotated
 
 from pydantic import EmailStr, StringConstraints, model_validator
-from sqlalchemy import BigInteger, CheckConstraint, DateTime, UniqueConstraint
+from sqlalchemy import (
+    BigInteger,
+    CheckConstraint,
+    DateTime,
+    Index,
+    UniqueConstraint,
+    text,
+)
+from sqlalchemy import Enum as SAEnum
 from sqlmodel import Field, SQLModel
 
 
@@ -293,6 +301,92 @@ class SubtaskCompletion(StrEnum):
     COMPLETE = "complete"
 
 
+class RecurrenceFrequency(StrEnum):
+    DAILY = "daily"
+    WEEKLY = "weekly"
+    MONTHLY = "monthly"
+    EVERY_N_DAYS = "every_n_days"
+
+
+class Recurrence(SQLModel):
+    """
+    How often a recurring task comes back: a fixed interval, never tied to when
+    an occurrence happened to be completed (FR-01.13, FR-01.15).
+    """
+
+    frequency: RecurrenceFrequency
+    # The N of "every N days"; no other frequency takes one.
+    interval_days: int | None = Field(default=None, ge=1)
+
+    @model_validator(mode="after")
+    def check_interval_days(self) -> Recurrence:
+        needs_days = self.frequency is RecurrenceFrequency.EVERY_N_DAYS
+        if needs_days and self.interval_days is None:
+            raise ValueError("Every N days needs `interval_days`")
+        if not needs_days and self.interval_days is not None:
+            raise ValueError("`interval_days` only applies to every N days")
+        return self
+
+
+class DueDateScope(StrEnum):
+    """
+    What moving the due date of an open recurring occurrence means for the rest
+    of its series.
+
+    There is no default: a client that changes the date without saying which
+    one is refused, so a series is never rescheduled by omission (FR-01.17).
+    """
+
+    # Moves this task only; the series keeps its schedule (FR-01.18).
+    THIS_OCCURRENCE = "this_occurrence"
+    # Moves this task and the schedule every later occurrence follows
+    # (FR-01.19).
+    THIS_AND_FOLLOWING = "this_and_following"
+
+
+class Series(SQLModel, table=True):
+    """
+    The occurrences of one recurring task, and the schedule they follow.
+
+    Each occurrence is a task of its own (ADR-0001) with a step number: the
+    first is step 0, and completing step k creates step k+1. Its due date is
+    worked out from the schedule anchor rather than from the previous
+    occurrence's date, so moving one occurrence alone does not drift the rest
+    (FR-01.18), and a monthly series that starts on the 31st comes back to the
+    31st whenever the month has one.
+    """
+
+    __table_args__ = (
+        CheckConstraint(
+            "(frequency = 'every_n_days') = (interval_days IS NOT NULL)",
+            name="series_interval_days_for_every_n_days",
+        ),
+    )
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    owner_id: uuid.UUID = Field(
+        foreign_key="user.id", nullable=False, ondelete="CASCADE"
+    )
+    frequency: RecurrenceFrequency = Field(
+        # Stored by value, so the check above reads the same words the API uses.
+        sa_type=SAEnum(  # type: ignore
+            RecurrenceFrequency,
+            name="recurrencefrequency",
+            values_callable=lambda members: [member.value for member in members],
+        )
+    )
+    interval_days: int | None = None
+    # The schedule: step `anchor_step` falls due on `anchor_date`, and every
+    # other step is a whole number of intervals away from it. Rescheduling "this
+    # and all following" moves the anchor to the occurrence being edited.
+    anchor_date: date
+    anchor_step: int = 0
+    created_at: datetime | None = Field(
+        default_factory=get_datetime_utc,
+        sa_type=DateTime(timezone=True),  # type: ignore
+    )
+
+
 # Shared properties
 class TaskBase(SQLModel):
     title: str = Field(max_length=255)
@@ -314,6 +408,7 @@ class TaskCreate(TaskBase):
     # Only the task owner is a valid assignee for now; bot users become
     # assignable in semaputnik/taskly#7 without needing to reshape this field.
     assignee_id: uuid.UUID | None = None
+    recurrence: Recurrence | None = None
 
 
 # Properties to receive via API on update, all are optional
@@ -331,6 +426,11 @@ class TaskUpdate(SQLModel):
     # A directive about the task's subtasks rather than a stored field: it is
     # only meaningful alongside `completed: true`.
     subtasks: SubtaskCompletion | None = None
+    # `null` stops the task recurring; omitting the field leaves it alone.
+    recurrence: Recurrence | None = None
+    # Another directive: required when the due date of an open recurring
+    # occurrence changes, and refused anywhere else.
+    due_date_scope: DueDateScope | None = None
 
 
 # Database model, database table inferred from class name
@@ -343,6 +443,19 @@ class Task(TaskBase, table=True):
         CheckConstraint(
             "(parent_id IS NULL) <> (project_id IS NULL)",
             name="task_root_has_project",
+        ),
+        CheckConstraint(
+            "(series_id IS NULL) = (series_step IS NULL)",
+            name="task_series_step_with_series",
+        ),
+        # At most one open occurrence per series (FR-01.16), held by the
+        # database rather than by every code path that completes, reopens or
+        # creates a task remembering to check.
+        Index(
+            "ix_task_one_open_occurrence",
+            "series_id",
+            unique=True,
+            postgresql_where=text("NOT completed AND deletion_id IS NULL"),
         ),
     )
 
@@ -376,6 +489,11 @@ class Task(TaskBase, table=True):
         ondelete="SET NULL",
         index=True,
     )
+    # Set on every occurrence of a recurring task, with its place in the series.
+    series_id: uuid.UUID | None = Field(
+        default=None, foreign_key="series.id", nullable=True, index=True
+    )
+    series_step: int | None = None
     created_at: datetime | None = Field(
         default_factory=get_datetime_utc,
         sa_type=DateTime(timezone=True),  # type: ignore
@@ -391,6 +509,7 @@ class TaskPublic(TaskBase):
     parent_id: uuid.UUID | None = None
     tags: list[str] = []
     assignee_id: uuid.UUID | None = None
+    recurrence: Recurrence | None = None
     created_at: datetime | None = None
 
 

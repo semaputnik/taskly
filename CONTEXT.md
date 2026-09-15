@@ -29,6 +29,16 @@ never created while the current one is still open.
 _Avoid_: treating a recurring task as a single task that "resets" — it does
 not; completing it produces a new task.
 
+**Series**:
+The occurrences of one recurring task, in order, and the schedule they keep
+to. The schedule is anchored to a due date, and each occurrence's due date is a
+whole number of intervals from that anchor — never counted from when the
+previous one was completed. Moving one occurrence's due date "only this
+occurrence" leaves the anchor where it was; "this and all following" moves it.
+Only the latest occurrence of a series can be open.
+_Avoid_: "template" or "parent" for the series — no occurrence is special, and
+none of them is the pattern the others are stamped from.
+
 **Activity log**:
 The record of every change in Taskly. Each user sees only their own log —
 including the superuser, who has no visibility into other users' logs.

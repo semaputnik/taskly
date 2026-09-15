@@ -384,6 +384,8 @@ export class TasksService {
      *
      * Create a task, or a subtask of one. A task created without a project lands
      * in the Inbox; a subtask follows its parent's project instead.
+     *
+     * A task created with a recurrence is the first occurrence of its series.
      */
     public static createTask<ThrowOnError extends boolean = true>(options: Options<tasksCreateTaskData, ThrowOnError>) {
         return (options.client ?? client).post<tasksCreateTaskResponses, tasksCreateTaskErrors, ThrowOnError>({
@@ -438,6 +440,10 @@ export class TasksService {
      *
      * Completing a task that still has uncompleted subtasks is refused unless the
      * request says what happens to them, through `subtasks`.
+     *
+     * Completing an occurrence of a recurring task creates the next one. Moving
+     * the due date of an open occurrence needs `due_date_scope` to say whether
+     * the rest of the series moves with it.
      */
     public static updateTask<ThrowOnError extends boolean = true>(options: Options<tasksUpdateTaskData, ThrowOnError>) {
         return (options.client ?? client).patch<tasksUpdateTaskResponses, tasksUpdateTaskErrors, ThrowOnError>({

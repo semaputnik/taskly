@@ -43,21 +43,31 @@ import {
 import useAuth from "@/hooks/useAuth"
 import useCustomToast from "@/hooks/useCustomToast"
 import { handleError } from "@/utils"
+import {
+  checkRecurrence,
+  RecurrenceFields,
+  recurrenceFormValues,
+  recurrenceShape,
+  toRecurrence,
+} from "./recurrence"
 import { TagsField } from "./TagsField"
 
 const NO_PRIORITY = "none"
 const UNASSIGNED = "unassigned"
 const ASSIGNED_TO_ME = "me"
 
-const formSchema = z.object({
-  title: z.string().min(1, { message: "Title is required" }),
-  description: z.string().optional(),
-  project_id: z.string().optional(),
-  due_date: z.string().optional(),
-  priority: z.string().optional(),
-  assignee: z.string().optional(),
-  tags: z.array(z.string()),
-})
+const formSchema = z
+  .object({
+    title: z.string().min(1, { message: "Title is required" }),
+    description: z.string().optional(),
+    project_id: z.string().optional(),
+    due_date: z.string().optional(),
+    priority: z.string().optional(),
+    assignee: z.string().optional(),
+    tags: z.array(z.string()),
+    ...recurrenceShape,
+  })
+  .superRefine(checkRecurrence)
 
 type FormData = z.infer<typeof formSchema>
 
@@ -94,6 +104,7 @@ const AddTask = ({ parent, onSuccess }: AddTaskProps = {}) => {
       priority: NO_PRIORITY,
       assignee: UNASSIGNED,
       tags: [],
+      ...recurrenceFormValues(),
     },
   })
 
@@ -131,6 +142,8 @@ const AddTask = ({ parent, onSuccess }: AddTaskProps = {}) => {
       assignee_id:
         data.assignee === ASSIGNED_TO_ME ? currentUser?.id : undefined,
       tags: data.tags,
+      // Only a task at the top of its tree can recur.
+      recurrence: parent ? undefined : (toRecurrence(data) ?? undefined),
     })
   }
 
@@ -237,6 +250,8 @@ const AddTask = ({ parent, onSuccess }: AddTaskProps = {}) => {
                   </FormItem>
                 )}
               />
+
+              {!parent && <RecurrenceFields control={form.control} />}
 
               <FormField
                 control={form.control}

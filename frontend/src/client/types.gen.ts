@@ -145,6 +145,17 @@ export type CommentsPublic = {
 };
 
 /**
+ * DueDateScope
+ *
+ * What moving the due date of an open recurring occurrence means for the rest
+ * of its series.
+ *
+ * There is no default: a client that changes the date without saying which
+ * one is refused, so a series is never rescheduled by omission (FR-01.17).
+ */
+export type DueDateScope = 'this_occurrence' | 'this_and_following';
+
+/**
  * HTTPValidationError
  */
 export type HTTPValidationError = {
@@ -273,6 +284,25 @@ export type ProjectsPublic = {
 };
 
 /**
+ * Recurrence
+ *
+ * How often a recurring task comes back: a fixed interval, never tied to when
+ * an occurrence happened to be completed (FR-01.13, FR-01.15).
+ */
+export type Recurrence = {
+    frequency: RecurrenceFrequency;
+    /**
+     * Interval Days
+     */
+    interval_days?: number | null;
+};
+
+/**
+ * RecurrenceFrequency
+ */
+export type RecurrenceFrequency = 'daily' | 'weekly' | 'monthly' | 'every_n_days';
+
+/**
  * SortOrder
  */
 export type SortOrder = 'asc' | 'desc';
@@ -349,6 +379,7 @@ export type TaskCreate = {
      * Assignee Id
      */
     assignee_id?: string | null;
+    recurrence?: Recurrence | null;
 };
 
 /**
@@ -397,6 +428,7 @@ export type TaskPublic = {
      * Assignee Id
      */
     assignee_id?: string | null;
+    recurrence?: Recurrence | null;
     /**
      * Created At
      */
@@ -442,6 +474,8 @@ export type TaskUpdate = {
      */
     tags?: Array<string> | null;
     subtasks?: SubtaskCompletion | null;
+    recurrence?: Recurrence | null;
+    due_date_scope?: DueDateScope | null;
 };
 
 /**
