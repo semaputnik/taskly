@@ -86,8 +86,10 @@ has no email or password, cannot log in, register or reset a password, and
 does not appear among the accounts the superuser can list. Creating and
 configuring bot users is a human action in the web UI — a bot user can never
 create or configure another bot user, or itself. A task can be assigned to one
-of its owner's bot users, to show which integration is responsible for it; a
-deleted bot user stays assigned to what it had, and takes nothing new. A bot
+of its owner's bot users, to show which integration is responsible for it. A
+deleted bot user is kept, not removed, and deleting one cannot be undone: its
+token stops working at once, it stays assigned to what it had and takes nothing
+new, and what it did still names it. A bot
 user's comments name it as their author and are append-only: nobody, its owner
 included, can edit or delete them.
 _Avoid_: "service account", "API key", "integration user".
@@ -105,7 +107,10 @@ each named one by one with no "all projects" value, and the permissions it
 holds there — create, read, update and delete on tasks, and adding comments.
 Anything a bot user can never do has no permission to grant at all. An
 archived project is out of reach whatever the scope says, and a subtask is in
-scope exactly when its root task's project is.
+scope exactly when its root task's project is. The user can change a scope at
+any time, and it holds from the bot user's next request. A deleted project
+drops out of every scope while it is deleted and is back where it was if it is
+restored.
 _Avoid_: "role" — a scope is set per bot user, not picked from shared roles.
 
 **Token** (of a bot user):

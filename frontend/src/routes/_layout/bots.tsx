@@ -2,8 +2,9 @@ import { useSuspenseQuery } from "@tanstack/react-query"
 import { createFileRoute } from "@tanstack/react-router"
 import { Suspense } from "react"
 
-import { BotsService, ProjectsService } from "@/client"
+import { BotsService } from "@/client"
 import AddBotUser from "@/components/Bots/AddBotUser"
+import { scopeProjectsQueryOptions } from "@/components/Bots/BotFormFields"
 import { getColumns } from "@/components/Bots/columns"
 import { IssuedTokenProvider } from "@/components/Bots/IssuedToken"
 import { DataTable } from "@/components/Common/DataTable"
@@ -14,15 +15,6 @@ function getBotsQueryOptions() {
     queryFn: async () =>
       (await BotsService.readBotUsers({ query: { skip: 0, limit: 100 } })).data,
     queryKey: ["bots"],
-  }
-}
-
-function getProjectsQueryOptions() {
-  return {
-    queryFn: async () =>
-      (await ProjectsService.readProjects({ query: { skip: 0, limit: 100 } }))
-        .data,
-    queryKey: ["projects"],
   }
 }
 
@@ -39,18 +31,18 @@ export const Route = createFileRoute("/_layout/bots")({
 
 function BotsTableContent() {
   const { data: bots } = useSuspenseQuery(getBotsQueryOptions())
-  const { data: projects } = useSuspenseQuery(getProjectsQueryOptions())
+  const { data: projects } = useSuspenseQuery(scopeProjectsQueryOptions())
 
-  const projectNames = Object.fromEntries(
-    projects.data.map((project) => [project.id, project.name]),
+  const projectsById = Object.fromEntries(
+    projects.map((project) => [project.id, project]),
   )
 
-  return <DataTable columns={getColumns(projectNames)} data={bots.data} />
+  return <DataTable columns={getColumns(projectsById)} data={bots.data} />
 }
 
 /**
- * Bot user management lives here and only here: creating, scoping and issuing
- * tokens takes a signed-in human, and the API refuses a bot user every one of
+ * Bot user management lives here and only here: creating, scoping, issuing
+ * tokens for and deleting bot users takes a signed-in human, and the API refuses a bot user every one of
  * these steps (FR-07.3).
  */
 function Bots() {

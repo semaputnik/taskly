@@ -1,5 +1,4 @@
 import uuid
-from datetime import UTC, datetime
 from typing import Any
 
 import pytest
@@ -34,15 +33,9 @@ def _bot(client: TestClient, headers: Headers, name: str = "Triage bot") -> str:
     return bot_id
 
 
-def _delete_bot(db: Session, bot_id: str) -> None:
-    # Marked deleted directly: the endpoint that deletes a bot user comes with
-    # semaputnik/taskly#49, and all that matters here is the state it leaves.
-    bot = db.get(BotUser, uuid.UUID(bot_id))
-    assert bot is not None
-    db.refresh(bot)
-    bot.deleted_at = datetime.now(UTC)
-    db.add(bot)
-    db.commit()
+def _delete_bot(client: TestClient, headers: Headers, bot_id: str) -> None:
+    r = client.delete(f"{API}/bot-users/{bot_id}", headers=headers)
+    assert r.status_code == 200, r.text
 
 
 def _assign(
@@ -133,7 +126,7 @@ def test_assigning_outside_the_owner_and_their_live_bot_users_is_refused(
         assignee_id = str(uuid.uuid4())
     else:
         assignee_id = _bot(client, owner)
-        _delete_bot(db, assignee_id)
+        _delete_bot(client, owner, assignee_id)
 
     status, body = _assign(client, owner, how, assignee_id)
     assert status == 400, body
@@ -205,7 +198,7 @@ def test_a_deleted_bot_user_stays_on_its_tasks_and_takes_no_new_ones(
         f"{API}/tasks/", headers=owner, json={"title": "Kept", "assignee_id": bot_id}
     ).json()["id"]
 
-    _delete_bot(db, bot_id)
+    _delete_bot(client, owner, bot_id)
 
     r = client.get(f"{API}/tasks/{task_id}", headers=owner)
     assert r.json()["assignee_id"] == bot_id
@@ -282,7 +275,7 @@ def test_assignment_entries_name_a_bot_user_as_it_was_called_then(
     bot.name = "Something else"
     db.add(bot)
     db.commit()
-    _delete_bot(db, bot_id)
+    _delete_bot(client, owner, bot_id)
 
     entries = client.get(f"{API}/activity-log/", headers=owner).json()["data"]
     unassigned, assigned = (
