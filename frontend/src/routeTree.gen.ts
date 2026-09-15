@@ -15,6 +15,7 @@ import { Route as RecoverPasswordRouteImport } from './routes/recover-password'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as LayoutIndexRouteImport } from './routes/_layout/index'
+import { Route as LayoutActivityRouteImport } from './routes/_layout/activity'
 import { Route as LayoutAdminRouteImport } from './routes/_layout/admin'
 import { Route as LayoutArchiveRouteImport } from './routes/_layout/archive'
 import { Route as LayoutProjectsRouteImport } from './routes/_layout/projects'
@@ -50,6 +51,11 @@ const LayoutIndexRoute = LayoutIndexRouteImport.update({
   path: '/',
   getParentRoute: () => LayoutRoute,
 } as any)
+const LayoutActivityRoute = LayoutActivityRouteImport.update({
+  id: '/activity',
+  path: '/activity',
+  getParentRoute: () => LayoutRoute,
+} as any)
 const LayoutAdminRoute = LayoutAdminRouteImport.update({
   id: '/admin',
   path: '/admin',
@@ -82,6 +88,7 @@ export interface FileRoutesByFullPath {
   '/recover-password': typeof RecoverPasswordRoute
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
+  '/activity': typeof LayoutActivityRoute
   '/admin': typeof LayoutAdminRoute
   '/archive': typeof LayoutArchiveRoute
   '/projects': typeof LayoutProjectsRoute
@@ -93,6 +100,7 @@ export interface FileRoutesByTo {
   '/recover-password': typeof RecoverPasswordRoute
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
+  '/activity': typeof LayoutActivityRoute
   '/admin': typeof LayoutAdminRoute
   '/archive': typeof LayoutArchiveRoute
   '/projects': typeof LayoutProjectsRoute
@@ -107,6 +115,7 @@ export interface FileRoutesById {
   '/recover-password': typeof RecoverPasswordRoute
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
+  '/_layout/activity': typeof LayoutActivityRoute
   '/_layout/admin': typeof LayoutAdminRoute
   '/_layout/archive': typeof LayoutArchiveRoute
   '/_layout/projects': typeof LayoutProjectsRoute
@@ -122,6 +131,7 @@ export interface FileRouteTypes {
     | '/recover-password'
     | '/reset-password'
     | '/signup'
+    | '/activity'
     | '/admin'
     | '/archive'
     | '/projects'
@@ -133,6 +143,7 @@ export interface FileRouteTypes {
     | '/recover-password'
     | '/reset-password'
     | '/signup'
+    | '/activity'
     | '/admin'
     | '/archive'
     | '/projects'
@@ -146,6 +157,7 @@ export interface FileRouteTypes {
     | '/recover-password'
     | '/reset-password'
     | '/signup'
+    | '/_layout/activity'
     | '/_layout/admin'
     | '/_layout/archive'
     | '/_layout/projects'
@@ -206,6 +218,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutIndexRouteImport
       parentRoute: typeof LayoutRoute
     }
+    '/_layout/activity': {
+      id: '/_layout/activity'
+      path: '/activity'
+      fullPath: '/activity'
+      preLoaderRoute: typeof LayoutActivityRouteImport
+      parentRoute: typeof LayoutRoute
+    }
     '/_layout/admin': {
       id: '/_layout/admin'
       path: '/admin'
@@ -245,6 +264,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface LayoutRouteChildren {
+  LayoutActivityRoute: typeof LayoutActivityRoute
   LayoutAdminRoute: typeof LayoutAdminRoute
   LayoutArchiveRoute: typeof LayoutArchiveRoute
   LayoutProjectsRoute: typeof LayoutProjectsRoute
@@ -254,6 +274,7 @@ interface LayoutRouteChildren {
 }
 
 const LayoutRouteChildren: LayoutRouteChildren = {
+  LayoutActivityRoute: LayoutActivityRoute,
   LayoutAdminRoute: LayoutAdminRoute,
   LayoutArchiveRoute: LayoutArchiveRoute,
   LayoutProjectsRoute: LayoutProjectsRoute,

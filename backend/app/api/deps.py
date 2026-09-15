@@ -11,7 +11,7 @@ from jwt.exceptions import InvalidTokenError
 from pydantic import ValidationError
 from sqlmodel import Session
 
-from app import crud
+from app import activity, crud
 from app.core import security
 from app.core.config import settings
 from app.core.db import engine
@@ -55,6 +55,9 @@ def get_current_user(session: SessionDep, token: TokenDep) -> User:
         )
     if not user.is_active:
         raise HTTPException(status_code=400, detail="Inactive user")
+    # The request's session is shared with the route it authenticates, so
+    # whatever the route changes is logged as this user's doing (FR-10.2).
+    activity.set_actor(session, user.id)
     return user
 
 
