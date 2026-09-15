@@ -4,7 +4,14 @@ from typing import Annotated, Any
 from fastapi import APIRouter, HTTPException, Query
 
 from app import crud
-from app.api.deps import CurrentUser, SessionDep, get_owned_project, get_owned_task
+from app.api.deps import (
+    CurrentUser,
+    SessionDep,
+    get_owned_project,
+    get_owned_task,
+    require_project_writable,
+    require_task_writable,
+)
 from app.models import (
     Message,
     SubtaskCompletion,
@@ -108,6 +115,7 @@ def create_task(
         # Checks the parent is the user's and still there; the subtask's own
         # project is then derived from it.
         get_owned_task(session, current_user, task_in.parent_id)
+        require_task_writable(session, task_in.parent_id)
         if task_in.project_id is not None:
             raise HTTPException(
                 status_code=400,
@@ -126,6 +134,7 @@ def create_task(
         project = get_owned_project(session, current_user, task_in.project_id)
     else:
         project = crud.get_inbox_project(session=session, owner_id=current_user.id)
+    require_project_writable(project)
 
     task = crud.create_task(
         session=session,
@@ -162,6 +171,7 @@ def update_task(
     request says what happens to them, through `subtasks`.
     """
     task = get_owned_task(session, current_user, task_id)
+    require_task_writable(session, task.id)
     project_id = crud.get_task_project_id(session=session, task=task)
 
     if "project_id" in task_in.model_fields_set:
@@ -177,7 +187,11 @@ def update_task(
                     "the top of the tree instead"
                 ),
             )
-        get_owned_project(session, current_user, task_in.project_id)
+        # Moving a task in is as much a change to the destination as creating
+        # one there.
+        require_project_writable(
+            get_owned_project(session, current_user, task_in.project_id)
+        )
         project_id = task_in.project_id
 
     if "assignee_id" in task_in.model_fields_set:
@@ -235,6 +249,7 @@ def delete_task(
     is only deleted when `delete_subtasks` says so (FR-01.11, FR-01.12).
     """
     task = get_owned_task(session, current_user, task_id)
+    require_task_writable(session, task.id)
 
     if not delete_subtasks and crud.has_subtasks(session=session, task=task):
         raise HTTPException(

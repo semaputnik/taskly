@@ -3,6 +3,7 @@ import type { ColumnDef } from "@tanstack/react-table"
 import type { TaskPublic } from "@/client"
 import type { DataTableFeatures } from "@/components/Common/DataTable"
 import { Badge } from "@/components/ui/badge"
+import { Checkbox } from "@/components/ui/checkbox"
 import { cn } from "@/lib/utils"
 import { CompleteTask } from "./CompleteTask"
 import { TaskActionsMenu } from "./TaskActionsMenu"
@@ -10,15 +11,33 @@ import { TaskActionsMenu } from "./TaskActionsMenu"
 // Each level of nesting shifts a subtask's title right by this much.
 const INDENT_PER_LEVEL_REM = 1.25
 
+interface ColumnOptions {
+  /**
+   * Show the tasks without any way to change them: an archived project's tasks
+   * are read-only until it is unarchived (FR-05.12).
+   */
+  readOnly?: boolean
+}
+
 export function getColumns(
   projectNames: Record<string, string>,
   depths: Record<string, number>,
+  { readOnly = false }: ColumnOptions = {},
 ): ColumnDef<DataTableFeatures, TaskPublic>[] {
-  return [
+  const columns: ColumnDef<DataTableFeatures, TaskPublic>[] = [
     {
       id: "completed",
       header: () => <span className="sr-only">Completed</span>,
-      cell: ({ row }) => <CompleteTask task={row.original} />,
+      cell: ({ row }) =>
+        readOnly ? (
+          <Checkbox
+            checked={row.original.completed}
+            disabled
+            aria-label={row.original.completed ? "Completed" : "Not completed"}
+          />
+        ) : (
+          <CompleteTask task={row.original} />
+        ),
     },
     {
       accessorKey: "title",
@@ -88,7 +107,10 @@ export function getColumns(
         )
       },
     },
-    {
+  ]
+
+  if (!readOnly) {
+    columns.push({
       id: "actions",
       header: () => <span className="sr-only">Actions</span>,
       cell: ({ row }) => (
@@ -96,6 +118,8 @@ export function getColumns(
           <TaskActionsMenu task={row.original} />
         </div>
       ),
-    },
-  ]
+    })
+  }
+
+  return columns
 }

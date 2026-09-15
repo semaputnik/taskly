@@ -4,7 +4,13 @@ from typing import Any
 from fastapi import APIRouter
 
 from app import crud
-from app.api.deps import CurrentUser, SessionDep, get_owned_comment, get_owned_task
+from app.api.deps import (
+    CurrentUser,
+    SessionDep,
+    get_owned_comment,
+    get_owned_task,
+    require_task_writable,
+)
 from app.models import (
     CommentCreate,
     CommentPublic,
@@ -41,6 +47,7 @@ def create_comment(
     Add a comment to a task, including a subtask (FR-03.1).
     """
     get_owned_task(session, current_user, task_id)
+    require_task_writable(session, task_id)
     return crud.create_comment(
         session=session,
         comment_create=comment_in,
@@ -61,6 +68,7 @@ def update_comment(
     Edit a comment. A user can only edit their own (FR-03.2).
     """
     comment = get_owned_comment(session, current_user, comment_id)
+    require_task_writable(session, comment.task_id)
     return crud.update_comment(
         session=session, db_comment=comment, comment_in=comment_in
     )
@@ -74,5 +82,6 @@ def delete_comment(
     Delete a comment. A user can only delete their own (FR-03.2).
     """
     comment = get_owned_comment(session, current_user, comment_id)
+    require_task_writable(session, comment.task_id)
     crud.delete_comment(session=session, comment=comment)
     return Message(message="Comment deleted successfully")

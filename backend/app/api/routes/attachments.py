@@ -12,6 +12,7 @@ from app.api.deps import (
     SessionDep,
     get_owned_attachment,
     get_owned_task,
+    require_task_writable,
 )
 from app.core.config import settings
 from app.models import AttachmentPublic, AttachmentsPublic, Message
@@ -104,6 +105,7 @@ def upload_attachment(
     configured size limit is enforced (FR-04.2).
     """
     get_owned_task(session, current_user, task_id)
+    require_task_writable(session, task_id)
 
     # Checked against Starlette's own accounting first so an oversized upload
     # is turned away without also paying for a full in-memory copy of it.
@@ -164,6 +166,7 @@ def delete_attachment(
     Delete an attachment and release its bytes from storage.
     """
     attachment = get_owned_attachment(session, current_user, attachment_id)
+    require_task_writable(session, attachment.task_id)
     # The bytes go first: if that fails, the row is still there to retry
     # against. The other way round, a failure after the row is gone would
     # leave the bytes orphaned with nothing left to name them.

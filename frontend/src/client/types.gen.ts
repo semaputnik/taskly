@@ -235,6 +235,10 @@ export type ProjectPublic = {
      */
     is_inbox: boolean;
     /**
+     * Is Archived
+     */
+    is_archived: boolean;
+    /**
      * Created At
      */
     created_at?: string | null;
@@ -1032,6 +1036,10 @@ export type projectsReadProjectsData = {
          * Limit
          */
         limit?: number;
+        /**
+         * Archived
+         */
+        archived?: boolean;
     };
     url: '/api/v1/projects/';
 };
@@ -1139,6 +1147,66 @@ export type projectsUpdateProjectResponses = {
 
 export type projectsUpdateProjectResponse = projectsUpdateProjectResponses[keyof projectsUpdateProjectResponses];
 
+export type projectsArchiveProjectData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/archive';
+};
+
+export type projectsArchiveProjectErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type projectsArchiveProjectError = projectsArchiveProjectErrors[keyof projectsArchiveProjectErrors];
+
+export type projectsArchiveProjectResponses = {
+    /**
+     * Successful Response
+     */
+    200: ProjectPublic;
+};
+
+export type projectsArchiveProjectResponse = projectsArchiveProjectResponses[keyof projectsArchiveProjectResponses];
+
+export type projectsUnarchiveProjectData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/unarchive';
+};
+
+export type projectsUnarchiveProjectErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type projectsUnarchiveProjectError = projectsUnarchiveProjectErrors[keyof projectsUnarchiveProjectErrors];
+
+export type projectsUnarchiveProjectResponses = {
+    /**
+     * Successful Response
+     */
+    200: ProjectPublic;
+};
+
+export type projectsUnarchiveProjectResponse = projectsUnarchiveProjectResponses[keyof projectsUnarchiveProjectResponses];
+
 export type tasksReadTasksData = {
     body?: never;
     path?: never;
@@ -1179,6 +1247,10 @@ export type tasksReadTasksData = {
          * Overdue
          */
         overdue?: boolean;
+        /**
+         * Archived
+         */
+        archived?: boolean;
         /**
          * Sort
          */
