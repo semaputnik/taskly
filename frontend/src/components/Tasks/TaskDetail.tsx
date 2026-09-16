@@ -155,8 +155,9 @@ export function TaskDetail({
           <Tabs
             defaultValue="comments"
             className="gap-4 border-t px-6 py-5"
-            // Remounting per task keeps one task's draft comment from
-            // appearing under the next one.
+            // A tab's content is mounted only while it is on screen, so a
+            // collection is fetched only once its tab is opened; each task
+            // starts on its comments.
             key={task.id}
           >
             <TabsList>

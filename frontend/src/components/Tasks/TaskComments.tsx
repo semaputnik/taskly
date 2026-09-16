@@ -10,11 +10,10 @@ import { Textarea } from "@/components/ui/textarea"
 import useCustomToast from "@/hooks/useCustomToast"
 import { handleError } from "@/utils"
 import { useCommentDeletion } from "./commentDeletion"
+import { useCommentDraft } from "./commentDraft"
 
 interface TaskCommentsProps {
   task: TaskPublic
-  /** Hold the request back until the panel is the one on screen. */
-  enabled?: boolean
 }
 
 /**
@@ -22,8 +21,8 @@ interface TaskCommentsProps {
  * replies and an AI agent's status reports read back as one narrative
  * (FR-03.1). A comment a bot user wrote names it.
  */
-export const TaskComments = ({ task, enabled = true }: TaskCommentsProps) => {
-  const [draft, setDraft] = useState("")
+export const TaskComments = ({ task }: TaskCommentsProps) => {
+  const draft = useCommentDraft(task.id)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editDraft, setEditDraft] = useState("")
   const queryClient = useQueryClient()
@@ -35,7 +34,6 @@ export const TaskComments = ({ task, enabled = true }: TaskCommentsProps) => {
     queryKey,
     queryFn: async () =>
       (await CommentsService.readComments({ path: { task_id: task.id } })).data,
-    enabled,
   })
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey })
@@ -46,7 +44,7 @@ export const TaskComments = ({ task, enabled = true }: TaskCommentsProps) => {
         path: { task_id: task.id },
         body: { body },
       }),
-    onSuccess: () => setDraft(""),
+    onSuccess: () => draft.clear(),
     onError: handleError.bind(showErrorToast),
     onSettled: invalidate,
   })
@@ -165,16 +163,12 @@ export const TaskComments = ({ task, enabled = true }: TaskCommentsProps) => {
       </div>
 
       <div className="flex flex-col gap-2">
-        <Textarea
-          placeholder="Add a comment"
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-        />
+        <Textarea placeholder="Add a comment" {...draft.field} />
         <div className="flex justify-end">
           <LoadingButton
             loading={addMutation.isPending}
-            disabled={!draft.trim()}
-            onClick={() => addMutation.mutate(draft.trim())}
+            disabled={!draft.text.trim()}
+            onClick={() => addMutation.mutate(draft.text.trim())}
           >
             Comment
           </LoadingButton>

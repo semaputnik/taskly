@@ -16,8 +16,6 @@ import { DeleteAttachment } from "./DeleteAttachment"
 
 interface TaskAttachmentsProps {
   task: TaskPublic
-  /** Hold the request back until the panel is the one on screen. */
-  enabled?: boolean
 }
 
 function formatSize(bytes: number): string {
@@ -31,10 +29,7 @@ function formatSize(bytes: number): string {
  * behind a swappable backend on the server (ADR-0002); this dialog only ever
  * sees the metadata and the raw bytes it downloads (FR-04.1).
  */
-export const TaskAttachments = ({
-  task,
-  enabled = true,
-}: TaskAttachmentsProps) => {
+export const TaskAttachments = ({ task }: TaskAttachmentsProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const queryClient = useQueryClient()
   const { showErrorToast } = useCustomToast()
@@ -46,7 +41,6 @@ export const TaskAttachments = ({
     queryFn: async () =>
       (await AttachmentsService.readAttachments({ path: { task_id: task.id } }))
         .data,
-    enabled,
   })
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey })
