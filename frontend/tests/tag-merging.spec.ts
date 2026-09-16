@@ -178,3 +178,35 @@ test("The Tags page offers likely duplicates, and merges only on confirmation", 
   expect(names).not.toContain("deploy_bot")
   expect(names).not.toContain("deploy  bot")
 })
+
+test("A tag a bot user created says which one", async ({ page }) => {
+  await newUser(page)
+  const api = await userApi(page)
+  const project = await api.create("/projects/", { name: "Releases" })
+  const bot = await api.create("/bot-users/", {
+    name: "Triage agent",
+    scope: {
+      project_ids: [project.id],
+      permissions: { read_tasks: true, create_tags: true },
+    },
+  })
+  const { token } = await api.create(`/bot-users/${bot.id}/token`)
+  const created = await page.request.post(`${api.url}/tags/`, {
+    headers: { Authorization: `Bearer ${token}` },
+    data: { name: "needs-triage" },
+  })
+  expect(created.ok()).toBe(true)
+  await api.create("/tags/", { name: "mine" })
+
+  await page.goto("/tags")
+  await expect(
+    page.getByRole("row", { name: "Open needs-triage" }),
+  ).toContainText("Triage agent")
+  await expect(page.getByRole("row", { name: "Open mine" })).not.toContainText(
+    "Triage agent",
+  )
+  await page.getByRole("row", { name: "Open needs-triage" }).click()
+  await expect(
+    page.getByRole("dialog", { name: "needs-triage" }),
+  ).toContainText("Created by the bot user Triage agent")
+})

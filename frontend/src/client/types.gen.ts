@@ -706,6 +706,7 @@ export type TagPublic = {
      * Archived Task Count
      */
     archived_task_count?: number;
+    created_by_bot_user?: BotUserRef | null;
 };
 
 /**

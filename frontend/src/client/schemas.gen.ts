@@ -1172,6 +1172,16 @@ export const TagPublicSchema = {
             type: 'integer',
             title: 'Archived Task Count',
             default: 0
+        },
+        created_by_bot_user: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/BotUserRef'
+                },
+                {
+                    type: 'null'
+                }
+            ]
         }
     },
     type: 'object',

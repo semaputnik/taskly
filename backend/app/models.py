@@ -229,6 +229,18 @@ class TaskTag(SQLModel, table=True):
     )
 
 
+class BotUserRef(SQLModel):
+    """
+    A bot user as a task or comment names it: the one it is assigned to, or
+    the one that wrote it. A deleted bot user stays on what it was given and
+    what it wrote (FR-08.19, FR-08.21), marked deleted.
+    """
+
+    id: uuid.UUID
+    name: str
+    deleted: bool
+
+
 class TagCreate(SQLModel):
     name: TagName
 
@@ -245,6 +257,10 @@ class TagPublic(TagBase):
     # The tasks carrying it that are archived with their project. Not in the
     # list, but deleting or merging the tag reaches them too.
     archived_task_count: int = 0
+    # The bot user that brought the tag into being, if one did — through the
+    # API or by typing a new name onto a task — so an agent's vocabulary can
+    # be told from the user's own (semaputnik/taskly#69).
+    created_by_bot_user: BotUserRef | None = None
 
 
 class TagDuplicateDismissal(SQLModel, table=True):
@@ -647,18 +663,6 @@ class Task(TaskBase, table=True):
         default_factory=get_datetime_utc,
         sa_type=DateTime(timezone=True),  # type: ignore
     )
-
-
-class BotUserRef(SQLModel):
-    """
-    A bot user as a task or comment names it: the one it is assigned to, or
-    the one that wrote it. A deleted bot user stays on what it was given and
-    what it wrote (FR-08.19, FR-08.21), marked deleted.
-    """
-
-    id: uuid.UUID
-    name: str
-    deleted: bool
 
 
 # Properties to return via API, id is always required

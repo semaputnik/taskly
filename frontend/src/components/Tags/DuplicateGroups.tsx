@@ -84,6 +84,8 @@ export function DuplicateGroups({
                       {totalTasks(tag) === 0
                         ? "no tasks"
                         : tasks(totalTasks(tag))}
+                      {tag.created_by_bot_user &&
+                        ` · by ${tag.created_by_bot_user.name}`}
                     </span>
                   </button>
                 ))}

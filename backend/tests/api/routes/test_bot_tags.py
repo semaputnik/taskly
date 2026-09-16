@@ -338,3 +338,37 @@ def test_a_tag_a_bot_creates_is_logged_as_the_bots(
         assert entry["actor_bot_user_id"] == bot_user["id"]
         assert entry["actor_bot_user_name"] == "Triage bot"
         assert entry["actor_id"] is None
+
+
+# --- Who made it -------------------------------------------------------------
+
+
+def test_a_tag_a_bot_user_created_names_it(client: TestClient, owner: Headers) -> None:
+    """
+    The owner can tell an agent's vocabulary from their own, by the
+    attribution the activity log already keeps (semaputnik/taskly#69).
+    """
+    project_id = create_project(client, owner)
+    bot = create_bot_user(
+        client, owner, project_ids=[project_id], permissions=ALL_PERMISSIONS
+    )
+    bot_headers = token_headers(client, owner, bot["id"])
+    task_id = create_task(client, owner, project_id=project_id)
+    client.post(f"{API}/tags/", headers=bot_headers, json={"name": "by-api"})
+    _tag_task(client, bot_headers, task_id, ["by-typing"])
+    client.post(f"{API}/tags/", headers=owner, json={"name": "mine"})
+
+    tags = _tags(client, owner)
+    expected = {"id": bot["id"], "name": bot["name"], "deleted": False}
+    assert tags["by-api"]["created_by_bot_user"] == expected
+    assert tags["by-typing"]["created_by_bot_user"] == expected
+    assert tags["mine"]["created_by_bot_user"] is None
+    one = client.get(f"{API}/tags/{tags['by-api']['id']}", headers=owner).json()
+    assert one["created_by_bot_user"] == expected
+
+    # A deleted bot user stays named, marked deleted.
+    client.delete(f"{API}/bot-users/{bot['id']}", headers=owner)
+    assert _tags(client, owner)["by-api"]["created_by_bot_user"] == {
+        **expected,
+        "deleted": True,
+    }

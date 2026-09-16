@@ -17,6 +17,9 @@ from app.core.security import (
     verify_password,
 )
 from app.models import (
+    ActivityAction,
+    ActivityEntityType,
+    ActivityEntry,
     Attachment,
     BotUser,
     BotUserCreate,
@@ -662,12 +665,28 @@ def tag_publics(*, session: Session, tags: Sequence[Tag]) -> list[TagPublic]:
         .group_by(col(TaskTag.tag_id))
     ).all()
     counts = {tag_id: (live, archived_count) for tag_id, live, archived_count in rows}
+    # Who created a tag is what its "created" entry in the activity log says.
+    creators = {
+        tag_id: bot_id
+        for tag_id, bot_id in session.exec(
+            select(ActivityEntry.entity_id, ActivityEntry.actor_bot_user_id).where(
+                ActivityEntry.entity_type == ActivityEntityType.TAG,
+                ActivityEntry.action == ActivityAction.TAG_CREATED,
+                col(ActivityEntry.entity_id).in_(tag_ids),
+            )
+        ).all()
+        if bot_id is not None
+    }
+    bots = get_bot_user_refs(session=session, bot_user_ids=creators.values())
     return [
         TagPublic(
             id=tag.id,
             name=tag.name,
             task_count=counts.get(tag.id, (0, 0))[0],
             archived_task_count=counts.get(tag.id, (0, 0))[1],
+            created_by_bot_user=bots.get(creators[tag.id])
+            if tag.id in creators
+            else None,
         )
         for tag in tags
     ]

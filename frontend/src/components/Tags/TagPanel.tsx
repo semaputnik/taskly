@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Link as RouterLink } from "@tanstack/react-router"
-import { CheckSquare, Merge } from "lucide-react"
+import { Bot, CheckSquare, Merge } from "lucide-react"
 import { useState } from "react"
 
 import { type TagPublic, TagsService } from "@/client"
@@ -26,6 +26,7 @@ import {
 import useCustomToast from "@/hooks/useCustomToast"
 import { cn } from "@/lib/utils"
 import { handleError } from "@/utils"
+import { BotCreator } from "./BotCreator"
 import { archivedNote, tasks } from "./counts"
 import DeleteTag from "./DeleteTag"
 import { MergeTags } from "./MergeTags"
@@ -182,6 +183,13 @@ function TagRecord({
             )}
           </span>
         </PropertyRow>
+        {tag.created_by_bot_user && (
+          <PropertyRow icon={Bot} label="Created by">
+            <span className="px-2">
+              <BotCreator tag={tag} />
+            </span>
+          </PropertyRow>
+        )}
         <PropertyRow icon={Merge} label="Merge" htmlFor={`merge-${tag.id}`}>
           <Select
             value=""

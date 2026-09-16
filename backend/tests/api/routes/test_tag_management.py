@@ -222,6 +222,7 @@ def test_renaming_a_tag_renames_it_on_every_task(
         "name": "housework",
         "task_count": 2,
         "archived_task_count": 0,
+        "created_by_bot_user": None,
     }
 
     assert _task_tags(client, owner, first) == ["housework", "work"]
