@@ -1056,6 +1056,61 @@ export const TagCreateSchema = {
     title: 'TagCreate'
 } as const;
 
+export const TagDuplicateDismissSchema = {
+    properties: {
+        tag_ids: {
+            items: {
+                type: 'string',
+                format: 'uuid'
+            },
+            type: 'array',
+            minItems: 2,
+            title: 'Tag Ids'
+        }
+    },
+    type: 'object',
+    required: [
+        'tag_ids'
+    ],
+    title: 'TagDuplicateDismiss',
+    description: 'Every member of the group to stop offering, and nothing else.'
+} as const;
+
+export const TagDuplicateGroupSchema = {
+    properties: {
+        tags: {
+            items: {
+                $ref: '#/components/schemas/TagPublic'
+            },
+            type: 'array',
+            title: 'Tags'
+        }
+    },
+    type: 'object',
+    required: [
+        'tags'
+    ],
+    title: 'TagDuplicateGroup',
+    description: 'Tags whose names differ only in form: a suggestion to merge them.'
+} as const;
+
+export const TagDuplicateGroupsSchema = {
+    properties: {
+        data: {
+            items: {
+                $ref: '#/components/schemas/TagDuplicateGroup'
+            },
+            type: 'array',
+            title: 'Data'
+        }
+    },
+    type: 'object',
+    required: [
+        'data'
+    ],
+    title: 'TagDuplicateGroups'
+} as const;
+
 export const TagMergeSchema = {
     properties: {
         source_ids: {

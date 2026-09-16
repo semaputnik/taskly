@@ -624,6 +624,40 @@ export type TagCreate = {
 };
 
 /**
+ * TagDuplicateDismiss
+ *
+ * Every member of the group to stop offering, and nothing else.
+ */
+export type TagDuplicateDismiss = {
+    /**
+     * Tag Ids
+     */
+    tag_ids: Array<string>;
+};
+
+/**
+ * TagDuplicateGroup
+ *
+ * Tags whose names differ only in form: a suggestion to merge them.
+ */
+export type TagDuplicateGroup = {
+    /**
+     * Tags
+     */
+    tags: Array<TagPublic>;
+};
+
+/**
+ * TagDuplicateGroups
+ */
+export type TagDuplicateGroups = {
+    /**
+     * Data
+     */
+    data: Array<TagDuplicateGroup>;
+};
+
+/**
  * TagMerge
  *
  * The tags to fold into the one the merge is addressed to.
@@ -2065,6 +2099,47 @@ export type tagsCreateTagResponses = {
 };
 
 export type tagsCreateTagResponse = tagsCreateTagResponses[keyof tagsCreateTagResponses];
+
+export type tagsReadTagDuplicatesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/tags/duplicates';
+};
+
+export type tagsReadTagDuplicatesResponses = {
+    /**
+     * Successful Response
+     */
+    200: TagDuplicateGroups;
+};
+
+export type tagsReadTagDuplicatesResponse = tagsReadTagDuplicatesResponses[keyof tagsReadTagDuplicatesResponses];
+
+export type tagsDismissTagDuplicatesData = {
+    body: TagDuplicateDismiss;
+    path?: never;
+    query?: never;
+    url: '/api/v1/tags/duplicates/dismiss';
+};
+
+export type tagsDismissTagDuplicatesErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type tagsDismissTagDuplicatesError = tagsDismissTagDuplicatesErrors[keyof tagsDismissTagDuplicatesErrors];
+
+export type tagsDismissTagDuplicatesResponses = {
+    /**
+     * Successful Response
+     */
+    200: Message;
+};
+
+export type tagsDismissTagDuplicatesResponse = tagsDismissTagDuplicatesResponses[keyof tagsDismissTagDuplicatesResponses];
 
 export type tagsDeleteTagData = {
     body?: never;

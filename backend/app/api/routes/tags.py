@@ -10,6 +10,9 @@ from app.models import (
     Message,
     Tag,
     TagCreate,
+    TagDuplicateDismiss,
+    TagDuplicateGroup,
+    TagDuplicateGroups,
     TagMerge,
     TagMergePreview,
     TagPublic,
@@ -75,6 +78,53 @@ def read_tags(
         session=session, owner_id=caller.owner_id, q=q, skip=skip, limit=limit
     )
     return TagsPublic(data=tags, count=count)
+
+
+@router.get("/duplicates", response_model=TagDuplicateGroups)
+def read_tag_duplicates(*, session: SessionDep, current_user: CurrentUser) -> Any:
+    """
+    The user's tags grouped where their names differ only in letter case,
+    separators, surrounding or repeated whitespace, or a trailing plural:
+    suggestions to merge, over the whole vocabulary (semaputnik/taskly#69).
+
+    Nothing here merges anything, and a group the user dismissed stays out
+    until one of its members is renamed or another spelling joins it. Like
+    merging, it is a human's tool for repairing their vocabulary.
+    """
+    groups = crud.get_tag_duplicate_groups(session=session, owner_id=current_user.id)
+    return TagDuplicateGroups(
+        data=[
+            TagDuplicateGroup(tags=crud.tag_publics(session=session, tags=group))
+            for group in groups
+        ]
+    )
+
+
+@router.post("/duplicates/dismiss", response_model=Message)
+def dismiss_tag_duplicates(
+    *, session: SessionDep, current_user: CurrentUser, dismiss_in: TagDuplicateDismiss
+) -> Any:
+    """
+    Stop offering one group of likely duplicates. The ids have to be exactly a
+    group currently offered: dismissing is a decision about the group the user
+    was shown, not about any tags that happen to be named alike.
+    """
+    tags = [
+        _get_owned_tag(session, current_user.id, tag_id)
+        for tag_id in dict.fromkeys(dismiss_in.tag_ids)
+    ]
+    wanted = {tag.id for tag in tags}
+    groups = crud.get_tag_duplicate_groups(session=session, owner_id=current_user.id)
+    if not any({tag.id for tag in group} == wanted for group in groups):
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "not_a_duplicate_group",
+                "message": "These tags are not a group of likely duplicates.",
+            },
+        )
+    crud.dismiss_tag_duplicates(session=session, owner_id=current_user.id, tags=tags)
+    return Message(message="The group will not be offered again")
 
 
 @router.get("/{tag_id}", response_model=TagPublic)

@@ -46,6 +46,10 @@ NOT_LOGGED = {
     f"POST {API}/projects/{{project_id}}/unarchive": (
         "Archiving is a toggle outside the log and the restore flow (FR-05.10)"
     ),
+    f"POST {API}/tags/duplicates/dismiss": (
+        "A suggestion withheld, not a change to tags or tasks; the merge the "
+        "suggestion leads to is logged"
+    ),
     f"POST {API}/login/access-token": ACCOUNT,
     f"POST {API}/login/test-token": ACCOUNT,
     f"POST {API}/password-recovery/{{email}}": ACCOUNT,

@@ -112,6 +112,13 @@ function TagRecord({
       (await TagsService.readTags({ query: { skip: 0, limit: 1000 } })).data,
   })
   const others = (vocabulary?.data ?? []).filter((other) => other.id !== tag.id)
+  // The tag holding a name, asked of the server when the vocabulary has not
+  // arrived yet: a refusal can come quicker than the list.
+  const takenBy = async (name: string) =>
+    others.find((other) => other.name === name) ??
+    (
+      await TagsService.readTags({ query: { q: name, skip: 0, limit: 100 } })
+    ).data.data.find((other) => other.name === name && other.id !== tag.id)
 
   const rename = useMutation({
     mutationFn: (name: string) =>
@@ -144,7 +151,7 @@ function TagRecord({
                 // and the toast says which name is taken (FR-01.22). Putting
                 // the two together is a merge, which is offered here as the
                 // separate, confirmed act it is — never done by the rename.
-                const taken = others.find((other) => other.name === trimmed)
+                const taken = await takenBy(trimmed)
                 if (taken) openMerge(taken, taken)
                 return false
               }

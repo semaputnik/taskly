@@ -103,7 +103,6 @@ export function MergeTags({
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["tags"] })
       queryClient.invalidateQueries({ queryKey: ["tag"] })
-      queryClient.invalidateQueries({ queryKey: ["tag-duplicates"] })
       queryClient.invalidateQueries({ queryKey: ["tasks"] })
       queryClient.invalidateQueries({ queryKey: ["task"] })
     },

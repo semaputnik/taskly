@@ -112,3 +112,69 @@ test("A refused rename offers a merge instead, as its own confirmed act", async 
   ])
   expect(tag.name).toBe("deploy")
 })
+
+test("The Tags page offers likely duplicates, and merges only on confirmation", async ({
+  page,
+}) => {
+  await newUser(page)
+  const api = await userApi(page)
+  for (const name of [
+    "Deploy",
+    "deploy",
+    "deploy-bot",
+    "deploy_bot",
+    "deploy  bot",
+    "report",
+    "reports",
+    "release",
+  ]) {
+    await api.create("/tags/", { name })
+  }
+  await api.create("/tasks/", { title: "Ship 1.2", tags: ["deploy", "report"] })
+
+  await page.goto("/tags")
+  const groups = page.getByRole("region", { name: /Likely duplicates/ })
+  const group = (names: string) =>
+    groups.getByRole("listitem", { name: `Likely duplicates: ${names}` })
+  await expect(groups.getByRole("listitem")).toHaveCount(3)
+  await expect(group("deploy, Deploy")).toBeVisible()
+  await expect(group("deploy bot, deploy-bot, deploy_bot")).toBeVisible()
+  await expect(group("report, reports")).toBeVisible()
+
+  // Opening the merge is not merging: cancelling leaves every tag.
+  await group("report, reports").getByRole("button", { name: "Merge…" }).click()
+  const confirm = page.getByRole("dialog", { name: "Merge into report?" })
+  await expect(confirm).toContainText("The tag “reports” is removed.")
+  await confirm.getByRole("button", { name: "Cancel" }).click()
+  expect((await vocabulary(page)).map(([name]: [string]) => name)).toContain(
+    "reports",
+  )
+
+  // Kept apart, a group is not offered again, and nothing was merged.
+  await group("deploy, Deploy")
+    .getByRole("button", { name: "Keep apart" })
+    .click()
+  await expect(group("deploy, Deploy")).toHaveCount(0)
+  await page.reload()
+  await expect(groups.getByRole("listitem")).toHaveCount(2)
+  expect((await vocabulary(page)).map(([name]: [string]) => name)).toEqual(
+    expect.arrayContaining(["Deploy", "deploy"]),
+  )
+
+  // Merging a group of three keeps the chosen spelling and removes the rest.
+  await group("deploy bot, deploy-bot, deploy_bot")
+    .getByRole("button", { name: "Merge…" })
+    .click()
+  const three = page.getByRole("dialog", { name: /^Merge into / })
+  await three.getByRole("radio", { name: /deploy-bot/ }).check()
+  await expect(three).toContainText(
+    "The tags “deploy  bot” and “deploy_bot” are removed.",
+  )
+  await three.getByRole("button", { name: "Merge into deploy-bot" }).click()
+  await expect(three).toBeHidden()
+  await expect(groups.getByRole("listitem")).toHaveCount(1)
+  const names = (await vocabulary(page)).map(([name]: [string]) => name)
+  expect(names).toContain("deploy-bot")
+  expect(names).not.toContain("deploy_bot")
+  expect(names).not.toContain("deploy  bot")
+})

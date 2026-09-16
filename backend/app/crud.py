@@ -1,4 +1,6 @@
 import calendar
+import hashlib
+import re
 import uuid
 from collections.abc import Collection, Iterable, Sequence
 from datetime import UTC, date, datetime, timedelta
@@ -36,6 +38,7 @@ from app.models import (
     SortOrder,
     SubtaskCompletion,
     Tag,
+    TagDuplicateDismissal,
     TagPublic,
     Task,
     TaskBulkUpdate,
@@ -707,6 +710,69 @@ def delete_tag(*, session: Session, tag: Tag) -> None:
     """
     session.delete(tag)
     session.commit()
+
+
+_SEPARATORS = re.compile(r"[\s_-]+")
+
+
+def tag_key(name: str) -> str:
+    """
+    What a tag name reads as, for spotting likely duplicates only: letter case,
+    separators (hyphens, underscores, runs of whitespace), surrounding space
+    and one trailing plural "s" are set aside. Never applied to a stored name —
+    names stay exactly as typed (ADR-0003).
+    """
+    key = _SEPARATORS.sub(" ", name).strip().lower()
+    if key.endswith("s") and not key.endswith("ss") and len(key) > 3:
+        key = key[:-1]
+    return key
+
+
+def _duplicate_signature(tags: Sequence[Tag]) -> str:
+    members = sorted(f"{tag.id}:{tag.name}" for tag in tags)
+    return hashlib.sha256("\n".join(members).encode()).hexdigest()
+
+
+def get_tag_duplicate_groups(
+    *, session: Session, owner_id: uuid.UUID
+) -> list[list[Tag]]:
+    """
+    The user's tags that read as the same name, grouped, over the whole
+    vocabulary. A group the user dismissed is left out for as long as it is
+    exactly the group they dismissed.
+    """
+    tags = session.exec(select(Tag).where(Tag.owner_id == owner_id)).all()
+    by_key: dict[str, list[Tag]] = {}
+    for tag in tags:
+        by_key.setdefault(tag_key(tag.name), []).append(tag)
+    dismissed = set(
+        session.exec(
+            select(TagDuplicateDismissal.signature).where(
+                TagDuplicateDismissal.owner_id == owner_id
+            )
+        ).all()
+    )
+    groups = [
+        sorted(group, key=lambda tag: (tag.name.lower(), tag.name))
+        for group in by_key.values()
+        if len(group) > 1 and _duplicate_signature(group) not in dismissed
+    ]
+    return sorted(groups, key=lambda group: group[0].name.lower())
+
+
+def dismiss_tag_duplicates(
+    *, session: Session, owner_id: uuid.UUID, tags: Sequence[Tag]
+) -> None:
+    signature = _duplicate_signature(tags)
+    exists = session.exec(
+        select(TagDuplicateDismissal).where(
+            TagDuplicateDismissal.owner_id == owner_id,
+            TagDuplicateDismissal.signature == signature,
+        )
+    ).first()
+    if exists is None:
+        session.add(TagDuplicateDismissal(owner_id=owner_id, signature=signature))
+        session.commit()
 
 
 def tag_merge_counts(

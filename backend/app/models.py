@@ -247,6 +247,50 @@ class TagPublic(TagBase):
     archived_task_count: int = 0
 
 
+class TagDuplicateDismissal(SQLModel, table=True):
+    """
+    A group of likely duplicate tags the user said to stop offering
+    (semaputnik/taskly#69).
+
+    The group is remembered by its members exactly as they were — each id with
+    the name it had — so renaming one of them, or a new spelling joining them,
+    makes it a different group, offered again.
+    """
+
+    __table_args__ = (
+        UniqueConstraint(
+            "owner_id", "signature", name="tagduplicatedismissal_owner_signature_key"
+        ),
+    )
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    owner_id: uuid.UUID = Field(
+        foreign_key="user.id", nullable=False, ondelete="CASCADE"
+    )
+    # A digest of the members, ids and names, in a fixed order.
+    signature: str = Field(max_length=64)
+    created_at: datetime | None = Field(
+        default_factory=get_datetime_utc,
+        sa_type=DateTime(timezone=True),  # type: ignore
+    )
+
+
+class TagDuplicateGroup(SQLModel):
+    """Tags whose names differ only in form: a suggestion to merge them."""
+
+    tags: list[TagPublic]
+
+
+class TagDuplicateGroups(SQLModel):
+    data: list[TagDuplicateGroup]
+
+
+class TagDuplicateDismiss(SQLModel):
+    """Every member of the group to stop offering, and nothing else."""
+
+    tag_ids: list[uuid.UUID] = Field(min_length=2)
+
+
 class TagMerge(SQLModel):
     """The tags to fold into the one the merge is addressed to."""
 
