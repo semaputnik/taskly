@@ -1,3 +1,5 @@
+import { formatDate } from "@/lib/dates"
+
 /**
  * Dates the dashboard asks the API about, and the words it puts on them.
  *
@@ -45,7 +47,7 @@ export function timeAgo(timestamp: string): string {
   if (hours < 24) return `${hours}h ago`
   const days = Math.round(hours / 24)
   if (days < 7) return `${days}d ago`
-  return then.toLocaleDateString()
+  return formatDate(timestamp)
 }
 
 /** The half of the day the reader is in, for the greeting. */

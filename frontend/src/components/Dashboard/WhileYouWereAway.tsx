@@ -42,9 +42,9 @@ export function WhileYouWereAway() {
 
   return (
     <div className="bg-card overflow-hidden rounded-lg border">
-      <h3 className="bg-muted/50 border-b px-4 py-2.5 text-xs font-semibold tracking-wider uppercase">
+      <h2 className="bg-muted/50 border-b px-4 py-2.5 text-xs font-semibold tracking-wider uppercase">
         While you were away
-      </h3>
+      </h2>
 
       {isPending ? (
         <Rows />

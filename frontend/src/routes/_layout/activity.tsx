@@ -21,6 +21,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import useAuth from "@/hooks/useAuth"
+import { formatDateTime } from "@/lib/dates"
 
 const PAGE_SIZE = 50
 
@@ -67,7 +68,7 @@ function ActivityRows({
   return entries.map((entry) => (
     <TableRow key={entry.id}>
       <TableCell className="whitespace-nowrap text-muted-foreground">
-        {entry.created_at ? new Date(entry.created_at).toLocaleString() : ""}
+        {entry.created_at ? formatDateTime(entry.created_at) : ""}
       </TableCell>
       <TableCell className="whitespace-nowrap">
         <ActorLabel entry={entry} currentUserId={currentUserId} />

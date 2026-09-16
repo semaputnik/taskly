@@ -5,6 +5,7 @@ import type { TaskPublic } from "@/client"
 import type { DataTableFeatures } from "@/components/Common/DataTable"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
+import { formatDay } from "@/lib/dates"
 import { cn } from "@/lib/utils"
 import { CompleteTask } from "./CompleteTask"
 import { describeRecurrence } from "./recurrence"
@@ -86,7 +87,7 @@ export function getColumns(
         const dueDate = row.original.due_date
         return (
           <span className={cn("text-muted-foreground", !dueDate && "italic")}>
-            {dueDate || "No due date"}
+            {dueDate ? formatDay(dueDate) : "No due date"}
           </span>
         )
       },

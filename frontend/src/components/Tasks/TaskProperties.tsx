@@ -34,6 +34,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import useAuth from "@/hooks/useAuth"
+import { formatDateTime } from "@/lib/dates"
 import { cn } from "@/lib/utils"
 import { AssigneeSelect, assigneeFormValue, toAssigneeId } from "./assignee"
 import {
@@ -46,13 +47,6 @@ import { TagsField } from "./TagsField"
 import { useTaskUpdate } from "./useTaskUpdate"
 
 const NO_PRIORITY = "none"
-
-function formatDateTime(value: string): string {
-  return new Date(value).toLocaleString(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  })
-}
 
 /**
  * A task's fields, edited where they are read.

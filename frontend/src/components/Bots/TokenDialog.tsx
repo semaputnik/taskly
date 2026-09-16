@@ -15,7 +15,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useCopyToClipboard } from "@/hooks/useCopyToClipboard"
-import { formatDateTime } from "./tokens"
+import { formatDateTime } from "@/lib/dates"
 
 interface TokenDialogProps {
   botName: string

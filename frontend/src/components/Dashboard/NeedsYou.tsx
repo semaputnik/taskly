@@ -39,14 +39,14 @@ function Group({
 }) {
   return (
     <section>
-      <h3 className="bg-muted/50 flex items-center gap-2 border-b px-4 py-2.5 text-xs font-semibold tracking-wider uppercase">
+      <h2 className="bg-muted/50 flex items-center gap-2 border-b px-4 py-2.5 text-xs font-semibold tracking-wider uppercase">
         <span className={cn(tone === "alert" && "text-destructive")}>
           {label}
         </span>
         <span className="text-muted-foreground font-normal tabular-nums">
           {count}
         </span>
-      </h3>
+      </h2>
       {children}
     </section>
   )

@@ -30,11 +30,3 @@ export function today(): string {
   const day = String(now.getDate()).padStart(2, "0")
   return `${now.getFullYear()}-${month}-${day}`
 }
-
-export function formatDate(value: string | null | undefined): string {
-  return value ? new Date(value).toLocaleDateString() : ""
-}
-
-export function formatDateTime(value: string | null | undefined): string {
-  return value ? new Date(value).toLocaleString() : ""
-}

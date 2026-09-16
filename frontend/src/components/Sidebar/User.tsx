@@ -71,7 +71,7 @@ export function User({ user }: { user: UserPublic | null | undefined }) {
                 the same centre line as every icon below it, so collapsing the
                 sidebar does not shift the column. */}
             <Avatar className="size-6 shrink-0">
-              <AvatarFallback className="bg-zinc-600 text-[10px] text-white">
+              <AvatarFallback className="bg-zinc-600 text-xs text-white">
                 {getInitials(name)}
               </AvatarFallback>
             </Avatar>
