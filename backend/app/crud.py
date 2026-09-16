@@ -647,6 +647,18 @@ def get_tag_by_name(*, session: Session, owner_id: uuid.UUID, name: str) -> Tag 
     ).first()
 
 
+def get_tag_names(
+    *, session: Session, owner_id: uuid.UUID, names: Sequence[str]
+) -> set[str]:
+    """Which of `names` the user already has a tag for."""
+    if not names:
+        return set()
+    statement = select(Tag.name).where(
+        Tag.owner_id == owner_id, col(Tag.name).in_(names)
+    )
+    return set(session.exec(statement).all())
+
+
 def create_tag(*, session: Session, owner_id: uuid.UUID, name: str) -> Tag:
     tag = Tag(name=name, owner_id=owner_id)
     session.add(tag)

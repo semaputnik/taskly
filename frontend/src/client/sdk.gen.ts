@@ -337,7 +337,9 @@ export class TasksService {
      * A task created with a recurrence is the first occurrence of its series.
      *
      * A bot user creates only where its scope reaches — the Inbox included, which
-     * has to be in its scope like any other project — and sets no tags.
+     * has to be in its scope like any other project. It applies its owner's tags
+     * freely, and needs the permission to create tags for a name that is not one
+     * yet (FR-08.9).
      */
     public static createTask<ThrowOnError extends boolean = true>(options: Options<tasksCreateTaskData, ThrowOnError>) {
         return (options.client ?? client).post<tasksCreateTaskResponses, tasksCreateTaskErrors, ThrowOnError>({
@@ -398,7 +400,8 @@ export class TasksService {
      * the rest of the series moves with it.
      *
      * A bot user needs the task in its scope and, to move it, the destination
-     * too (FR-08.8); it sets no tags.
+     * too (FR-08.8). It applies and removes its owner's tags freely, and needs
+     * the permission to create tags for a name that is not one yet (FR-08.9).
      */
     public static updateTask<ThrowOnError extends boolean = true>(options: Options<tasksUpdateTaskData, ThrowOnError>) {
         return (options.client ?? client).patch<tasksUpdateTaskResponses, tasksUpdateTaskErrors, ThrowOnError>({
@@ -560,8 +563,17 @@ export class TagsService {
     /**
      * Read Tags
      *
-     * Retrieve the current user's tags, each with the number of tasks carrying
-     * it (FR-01.26). Also what autocomplete offers while a tag is typed.
+     * Retrieve the caller's tags, each with the number of tasks carrying it
+     * (FR-01.26). Also what autocomplete offers while a tag is typed.
+     *
+     * A bot user reads its owner's whole vocabulary, counts included, whatever
+     * its scope: tags belong to the user rather than to a project, so a scope
+     * has nothing to narrow them by (ADR-0003). The counts include tasks in
+     * archived projects, for the same reason they include tasks outside the
+     * scope: the count is the owner's, and narrowing it per caller would make
+     * one tag mean two different things — which is the split ADR-0003 refused.
+     * The archive still holds: FR-05.13 is about reaching those tasks, and none
+     * of them is reachable from here.
      */
     public static readTags<ThrowOnError extends boolean = true>(options?: Options<tagsReadTagsData, ThrowOnError>) {
         return (options?.client ?? client).get<tagsReadTagsResponses, tagsReadTagsErrors, ThrowOnError>({
@@ -577,6 +589,8 @@ export class TagsService {
      *
      * Create a tag on its own, before any task carries it (FR-01.20). It stays
      * until it is deleted (FR-01.23).
+     *
+     * A bot user needs the permission to create tags (FR-08.9).
      */
     public static createTag<ThrowOnError extends boolean = true>(options: Options<tagsCreateTagData, ThrowOnError>) {
         return (options.client ?? client).post<tagsCreateTagResponses, tagsCreateTagErrors, ThrowOnError>({

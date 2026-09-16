@@ -47,6 +47,7 @@ def test_a_user_creates_a_bot_user_with_its_scope(
             "update_tasks": False,
             "delete_tasks": False,
             "add_comments": True,
+            "create_tags": False,
         },
     }
     assert bot["has_token"] is False
@@ -167,6 +168,8 @@ BOT_REACHABLE = {
     f"POST {API}/tasks/{{task_id}}/attachments/",
     f"GET {API}/attachments/{{attachment_id}}",
     f"DELETE {API}/attachments/{{attachment_id}}",
+    f"GET {API}/tags/",
+    f"POST {API}/tags/",
 }
 
 

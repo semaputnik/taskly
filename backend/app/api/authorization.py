@@ -9,6 +9,7 @@ the whole rule by calling in, rather than re-deriving part of it.
 """
 
 import uuid
+from collections.abc import Sequence
 from enum import StrEnum
 from typing import Any
 
@@ -32,7 +33,6 @@ from app.models import Attachment, Project, Task
 BOT_REFUSED_STATUS = 403
 OUTSIDE_SCOPE_CODE = "outside_scope"
 PERMISSION_NOT_GRANTED_CODE = "permission_not_granted"
-TAGS_READ_ONLY_CODE = "tags_read_only"
 
 
 class TaskAction(StrEnum):
@@ -110,17 +110,52 @@ def authorize_tasks(
         )
 
 
-def refuse_tag_changes_for_bot(caller: Caller, fields_set: set[str]) -> None:
+def authorize_tag_creation(caller: Caller) -> None:
     """
-    Refuse a bot's request that sends tags, before anything in it is applied.
-
-    What a tag permission would mean is still open (Q-16), so no bot can hold
-    one yet: a bot reads the tags on tasks it can read, and changes none.
+    Refuse a bot that is not allowed to create tags (FR-08.9). Applying tags
+    the owner already has is part of writing the task and needs nothing here;
+    bringing a tag into being is this permission.
     """
-    if caller.bot is not None and "tags" in fields_set:
+    bot = caller.bot
+    if bot is not None and not bot.create_tags:
         raise _refuse(
-            TAGS_READ_ONLY_CODE,
-            "Bot users cannot set or change tags. Send the request without `tags`.",
+            PERMISSION_NOT_GRANTED_CODE,
+            "This bot user is not allowed to create tags.",
+            permission="create_tags",
+        )
+
+
+def authorize_tag_names(
+    session: Session, caller: Caller, names: Sequence[str] | None
+) -> None:
+    """
+    Refuse a bot's request that puts names its owner has no tag for onto a
+    task, before anything in it is applied.
+
+    Which names were new comes back with the refusal, so an integration can
+    send the rest rather than guess at the vocabulary it is allowed to add to
+    (ADR-0003).
+
+    The names are read here and written a moment later, so a tag the owner
+    deletes in between is recreated by the write the check let through. The
+    window is one request and costs one tag name; closing it would mean
+    resolving names to tag ids here and teaching every write path to take
+    ids, which is a lot of machinery for a bot user that was, after all,
+    allowed to put that very name on the task a second earlier.
+    """
+    bot = caller.bot
+    if bot is None or bot.create_tags or not names:
+        return
+    known = crud.get_tag_names(session=session, owner_id=caller.owner_id, names=names)
+    new = [name for name in names if name not in known]
+    if new:
+        raise _refuse(
+            PERMISSION_NOT_GRANTED_CODE,
+            "This bot user is not allowed to create tags, and "
+            + ", ".join(f"“{name}”" for name in new)
+            + (" is not a tag yet." if len(new) == 1 else " are not tags yet."),
+            permission="create_tags",
+            tags=new,
         )
 
 

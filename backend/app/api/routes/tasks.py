@@ -210,7 +210,9 @@ def create_task(*, session: SessionDep, caller: CallerDep, task_in: TaskCreate) 
     A task created with a recurrence is the first occurrence of its series.
 
     A bot user creates only where its scope reaches — the Inbox included, which
-    has to be in its scope like any other project — and sets no tags.
+    has to be in its scope like any other project. It applies its owner's tags
+    freely, and needs the permission to create tags for a name that is not one
+    yet (FR-08.9).
     """
     # Where the task goes is settled first, so a bot user is refused by its
     # scope before anything about the request itself is looked at.
@@ -226,7 +228,8 @@ def create_task(*, session: SessionDep, caller: CallerDep, task_in: TaskCreate) 
     else:
         project = crud.get_inbox_project(session=session, owner_id=caller.owner_id)
         authorization.authorize_tasks(caller, TaskAction.CREATE, project)
-    authorization.refuse_tag_changes_for_bot(caller, task_in.model_fields_set)
+    tag_names = _unique(task_in.tags)
+    authorization.authorize_tag_names(session, caller, tag_names)
 
     assignee = _resolve_assignee(session, caller, task_in.assignee_id)
     _check_recurrence(
@@ -254,7 +257,7 @@ def create_task(*, session: SessionDep, caller: CallerDep, task_in: TaskCreate) 
         project_id=project_id,
         owner_id=caller.owner_id,
         assignee=assignee,
-        tag_names=_unique(task_in.tags),
+        tag_names=tag_names,
     )
     return _read(session, task)
 
@@ -287,10 +290,12 @@ def update_task(
     the rest of the series moves with it.
 
     A bot user needs the task in its scope and, to move it, the destination
-    too (FR-08.8); it sets no tags.
+    too (FR-08.8). It applies and removes its owner's tags freely, and needs
+    the permission to create tags for a name that is not one yet (FR-08.9).
     """
     task = authorization.get_task(session, caller, task_id, TaskAction.UPDATE)
-    authorization.refuse_tag_changes_for_bot(caller, task_in.model_fields_set)
+    tag_names = _unique(task_in.tags) if task_in.tags is not None else None
+    authorization.authorize_tag_names(session, caller, tag_names)
     require_task_writable(session, task.id)
     project_id = crud.get_task_project_id(session=session, task=task)
     _check_recurrence_update(session=session, task=task, task_in=task_in)
@@ -355,7 +360,7 @@ def update_task(
         db_task=task,
         task_in=task_in,
         assignee=assignee,
-        tag_names=_unique(task_in.tags) if task_in.tags is not None else None,
+        tag_names=tag_names,
     )
 
     return _public(

@@ -175,10 +175,11 @@ export type Body_login_login_access_token = {
  * FR-08.10).
  *
  * Only what can be granted is here. What a bot can never do — anything on
- * projects, editing or deleting comments — has no field to set to false:
- * the endpoints for it take a human caller, so a bot cannot reach them at
- * all. Tags have no field yet either, because what a tag permission would
- * mean is still an open question (Q-16); a bot changes no tags meanwhile.
+ * projects, editing or deleting comments, renaming or deleting tags — has no
+ * field to set to false: the endpoints for it take a human caller, so a bot
+ * cannot reach them at all. Reading tags needs no field either: every bot
+ * user reads its owner's whole tag vocabulary, whatever its scope
+ * (ADR-0003).
  */
 export type BotPermissions = {
     /**
@@ -201,6 +202,10 @@ export type BotPermissions = {
      * Add Comments
      */
     add_comments?: boolean;
+    /**
+     * Create Tags
+     */
+    create_tags?: boolean;
 };
 
 /**
