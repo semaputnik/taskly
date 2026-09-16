@@ -22,10 +22,12 @@ test("A tag is created, renamed and deleted on the Tags page", async ({
   await page.goto("/tags")
   await expect(page.getByRole("heading", { name: "Tags" })).toBeVisible()
   await page.getByRole("button", { name: "Add Tag" }).click()
-  await page.getByPlaceholder("Tag name").fill("errnds")
-  await page.getByRole("button", { name: "Save" }).click()
-  await expect(page.getByText("Tag created successfully")).toBeVisible()
-  const row = page.getByRole("row").filter({ hasText: "errnds" })
+  const newName = page.getByRole("textbox", { name: "Tag name" })
+  await newName.fill("errnds")
+  await newName.press("Enter")
+  await expect(page.getByRole("dialog", { name: "errnds" })).toBeVisible()
+  await page.keyboard.press("Escape")
+  const row = page.getByRole("row", { name: "Open errnds" })
   await expect(row).toContainText("No tasks")
 
   // Two tasks carry it; they are created over the API, the task form has its
@@ -40,14 +42,14 @@ test("A tag is created, renamed and deleted on the Tags page", async ({
   await page.reload()
   await expect(row).toContainText("2 tasks")
 
-  await page.getByRole("button", { name: "Actions for errnds" }).click()
-  await page.getByRole("menuitem", { name: "Rename Tag" }).click()
-  const renameDialog = page.getByRole("dialog", { name: "Rename Tag" })
-  await renameDialog.getByPlaceholder("Tag name").fill("errands")
-  await renameDialog.getByRole("button", { name: "Save" }).click()
-  await expect(page.getByText("Tag renamed successfully")).toBeVisible()
+  await row.click()
+  const panel = page.getByRole("dialog", { name: "errnds" })
+  const name = panel.getByRole("textbox", { name: "Tag name" })
+  await name.fill("errands")
+  await name.press("Enter")
+  await page.keyboard.press("Escape")
 
-  const renamed = page.getByRole("row").filter({ hasText: "errands" })
+  const renamed = page.getByRole("row", { name: "Open errands" })
   await expect(renamed).toContainText("2 tasks")
   await renamed.getByRole("link", { name: "2 tasks" }).click()
   await expect(page).toHaveURL(/tag=errands/)
@@ -58,8 +60,11 @@ test("A tag is created, renamed and deleted on the Tags page", async ({
   }
 
   await page.goto("/tags")
-  await page.getByRole("button", { name: "Actions for errands" }).click()
-  await page.getByRole("menuitem", { name: "Delete Tag" }).click()
+  await page.getByRole("row", { name: "Open errands" }).click()
+  await page
+    .getByRole("dialog", { name: "errands" })
+    .getByRole("button", { name: "Delete tag" })
+    .click()
   const deleteDialog = page.getByRole("dialog", {
     name: "Delete the tag errands?",
   })
@@ -67,9 +72,7 @@ test("A tag is created, renamed and deleted on the Tags page", async ({
   await deleteDialog.getByRole("button", { name: "Delete" }).click()
   await expect(page.getByText("“errands” was deleted")).toBeVisible()
   await expect(renamed).toHaveCount(0)
-  await expect(
-    page.getByRole("row").filter({ hasText: "weekend" }),
-  ).toBeVisible()
+  await expect(page.getByRole("row", { name: "Open weekend" })).toBeVisible()
 
   await page.goto("/tasks")
   const task = page.getByRole("row", { name: /Buy stamps/ })

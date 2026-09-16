@@ -46,6 +46,7 @@ const IssueToken = ({ bot }: { bot: BotUserPublic }) => {
         token: data.token,
         expiresAt: data.expires_at,
       })
+      queryClient.invalidateQueries({ queryKey: ["bot", bot.id] })
     },
     onError: (error) => {
       handleError.call(showErrorToast, error)

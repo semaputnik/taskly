@@ -1,14 +1,15 @@
 import { useSuspenseQuery } from "@tanstack/react-query"
 import { createFileRoute } from "@tanstack/react-router"
-import { FolderKanban } from "lucide-react"
+import { FolderKanban, Plus } from "lucide-react"
 import { Suspense } from "react"
 
 import { ProjectsService } from "@/client"
 import { DataTable } from "@/components/Common/DataTable"
 import { EmptyState } from "@/components/Common/EmptyState"
 import PendingProjects from "@/components/Pending/PendingProjects"
-import AddProject from "@/components/Projects/AddProject"
 import { columns } from "@/components/Projects/columns"
+import { useRecordPanels } from "@/components/Records/panels"
+import { Button } from "@/components/ui/button"
 
 function getProjectsQueryOptions() {
   return {
@@ -30,33 +31,36 @@ export const Route = createFileRoute("/_layout/projects")({
   }),
 })
 
-function ProjectsTableContent() {
+function ProjectsTableContent({
+  onOpen,
+  onAdd,
+}: {
+  onOpen: (projectId: string) => void
+  onAdd: () => void
+}) {
   const { data: projects } = useSuspenseQuery(getProjectsQueryOptions())
 
   return (
     <DataTable
       columns={columns}
       data={projects.data}
+      rowLabel={(project) => `Open ${project.name}`}
+      onRowClick={(project) => onOpen(project.id)}
       empty={
         <EmptyState
           icon={FolderKanban}
           title="No projects yet"
           description="A project groups tasks that belong together. Until you make one, every task lands in Inbox."
+          action={<Button onClick={onAdd}>Add a project</Button>}
         />
       }
     />
   )
 }
 
-function ProjectsTable() {
-  return (
-    <Suspense fallback={<PendingProjects />}>
-      <ProjectsTableContent />
-    </Suspense>
-  )
-}
-
 function Projects() {
+  const { openProject, capture } = useRecordPanels()
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
@@ -66,9 +70,17 @@ function Projects() {
             Group your tasks into projects
           </p>
         </div>
-        <AddProject />
+        <Button onClick={() => capture("project")}>
+          <Plus />
+          Add Project
+        </Button>
       </div>
-      <ProjectsTable />
+      <Suspense fallback={<PendingProjects />}>
+        <ProjectsTableContent
+          onOpen={openProject}
+          onAdd={() => capture("project")}
+        />
+      </Suspense>
     </div>
   )
 }

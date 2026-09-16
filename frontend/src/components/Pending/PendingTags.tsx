@@ -14,9 +14,6 @@ const PendingTags = () => (
       <TableRow>
         <TableHead>Name</TableHead>
         <TableHead>Tasks</TableHead>
-        <TableHead>
-          <span className="sr-only">Actions</span>
-        </TableHead>
       </TableRow>
     </TableHeader>
     <TableBody>
@@ -27,11 +24,6 @@ const PendingTags = () => (
           </TableCell>
           <TableCell>
             <Skeleton className="h-4 w-16" />
-          </TableCell>
-          <TableCell>
-            <div className="flex justify-end">
-              <Skeleton className="size-8 rounded-md" />
-            </div>
           </TableCell>
         </TableRow>
       ))}

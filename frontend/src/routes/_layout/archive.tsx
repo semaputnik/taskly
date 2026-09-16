@@ -9,6 +9,7 @@ import { EmptyState } from "@/components/Common/EmptyState"
 import PendingProjects from "@/components/Pending/PendingProjects"
 import PendingTasks from "@/components/Pending/PendingTasks"
 import { archivedColumns } from "@/components/Projects/archivedColumns"
+import { useRecordPanels } from "@/components/Records/panels"
 import { getColumns } from "@/components/Tasks/columns"
 import { buildTaskTree } from "@/components/Tasks/tree"
 
@@ -41,13 +42,19 @@ export const Route = createFileRoute("/_layout/archive")({
   }),
 })
 
-function ArchivedProjectsContent() {
+function ArchivedProjectsContent({
+  onOpen,
+}: {
+  onOpen: (projectId: string) => void
+}) {
   const { data: projects } = useSuspenseQuery(getArchivedProjectsQueryOptions())
 
   return (
     <DataTable
       columns={archivedColumns}
       data={projects.data}
+      rowLabel={(project) => `Open ${project.name}`}
+      onRowClick={(project) => onOpen(project.id)}
       empty={
         <EmptyState
           icon={ArchiveIcon}
@@ -90,6 +97,8 @@ function ArchivedTasksContent() {
  * unarchived (FR-05.12).
  */
 function Archive() {
+  const { openProject } = useRecordPanels()
+
   return (
     <div className="flex flex-col gap-6">
       <div>
@@ -103,7 +112,7 @@ function Archive() {
       <section className="flex flex-col gap-3">
         <h2 className="text-lg font-semibold">Projects</h2>
         <Suspense fallback={<PendingProjects />}>
-          <ArchivedProjectsContent />
+          <ArchivedProjectsContent onOpen={openProject} />
         </Suspense>
       </section>
 

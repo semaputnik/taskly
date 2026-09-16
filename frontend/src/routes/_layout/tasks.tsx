@@ -7,7 +7,7 @@ import { ProjectsService, TasksService } from "@/client"
 import { DataTable } from "@/components/Common/DataTable"
 import { EmptyState } from "@/components/Common/EmptyState"
 import PendingTasks from "@/components/Pending/PendingTasks"
-import { useCapture } from "@/components/Tasks/capture"
+import { useRecordPanels, withoutPanelState } from "@/components/Records/panels"
 import { getColumns } from "@/components/Tasks/columns"
 import {
   clearedFilters,
@@ -22,10 +22,7 @@ import { Button } from "@/components/ui/button"
 import useAuth from "@/hooks/useAuth"
 
 function getTasksQueryOptions(search: TaskListSearch, currentUserId?: string) {
-  // `task` and `capture` name the panel's state, not a filter. Leaving them in
-  // would put them in the query key, so opening a task would refetch the list
-  // and drop the whole table back to its skeleton.
-  const { assignee, task: _open, capture: _capturing, ...filters } = search
+  const { assignee, ...filters } = withoutPanelState(search)
   const query = {
     ...filters,
     // "Me" needs the id the API filters on, a bot user is named by its own
@@ -99,6 +96,7 @@ function TasksTableContent({
     <DataTable
       columns={getColumns(projectNames, depths)}
       data={ordered}
+      rowLabel={(task) => `Open ${task.title}`}
       onRowClick={(task) => onOpenTask(task.id)}
       empty={
         hasActiveFilters(search) ? (
@@ -167,7 +165,7 @@ function TasksTable({
 function Tasks() {
   const search = Route.useSearch()
   const navigate = Route.useNavigate()
-  const { start, openTask } = useCapture()
+  const { capture, openTask } = useRecordPanels()
   const applyFilters = (next: Partial<TaskSearch>) =>
     navigate({ search: (previous) => ({ ...previous, ...next }) })
 
@@ -182,7 +180,7 @@ function Tasks() {
         search={search}
         onClearFilters={() => applyFilters(clearedFilters())}
         onOpenTask={openTask}
-        onCapture={start}
+        onCapture={() => capture("task")}
       />
     </div>
   )

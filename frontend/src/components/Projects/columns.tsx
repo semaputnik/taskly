@@ -4,7 +4,6 @@ import type { ProjectPublic } from "@/client"
 import type { DataTableFeatures } from "@/components/Common/DataTable"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
-import { ProjectActionsMenu } from "./ProjectActionsMenu"
 
 export const columns: ColumnDef<DataTableFeatures, ProjectPublic>[] = [
   {
@@ -34,12 +33,15 @@ export const columns: ColumnDef<DataTableFeatures, ProjectPublic>[] = [
     },
   },
   {
-    id: "actions",
-    header: () => <span className="sr-only">Actions</span>,
-    cell: ({ row }) => (
-      <div className="flex justify-end">
-        <ProjectActionsMenu project={row.original} />
-      </div>
-    ),
+    id: "tasks",
+    header: "Tasks",
+    cell: ({ row }) => {
+      const count = row.original.task_count ?? 0
+      return (
+        <span className={cn("tabular-nums", !count && "text-muted-foreground")}>
+          {count === 0 ? "None" : count}
+        </span>
+      )
+    },
   },
 ]

@@ -383,7 +383,9 @@ def test_restoring_a_project_brings_it_back_with_its_tasks(
 
     r = client.get(f"{API}/projects/", headers=headers)
     [restored] = [p for p in r.json()["data"] if p["id"] == project["id"]]
-    assert restored == project
+    # Back exactly as it was, except for what it now holds again: the project
+    # was created empty and is restored with its three tasks.
+    assert restored == {**project, "task_count": 3}
     assert _visible_titles(client, headers) == {
         "Plant beds",
         "Buy soil",

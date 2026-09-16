@@ -19,11 +19,9 @@ TAG_EXISTS_STATUS = 409
 TAG_EXISTS_CODE = "tag_exists"
 
 
-def _get_owned_tag(
-    session: SessionDep, current_user: CurrentUser, tag_id: uuid.UUID
-) -> Tag:
+def _get_owned_tag(session: SessionDep, owner_id: uuid.UUID, tag_id: uuid.UUID) -> Tag:
     tag = session.get(Tag, tag_id)
-    if not tag or tag.owner_id != current_user.id:
+    if not tag or tag.owner_id != owner_id:
         raise HTTPException(status_code=404, detail="Tag not found")
     return tag
 
@@ -66,6 +64,18 @@ def read_tags(
     return TagsPublic(data=tags, count=count)
 
 
+@router.get("/{tag_id}", response_model=TagPublic)
+def read_tag(*, session: SessionDep, caller: CallerDep, tag_id: uuid.UUID) -> Any:
+    """
+    Retrieve one tag by its id, with the number of tasks carrying it: what the
+    tag's panel is addressed by, so a link opens a tag the list in view would
+    exclude.
+    """
+    tag = _get_owned_tag(session, caller.owner_id, tag_id)
+    task_counts = crud.get_tag_task_counts(session=session, tag_ids=[tag.id])
+    return crud.tag_public(tag, task_counts.get(tag.id, 0))
+
+
 @router.post("/", response_model=TagPublic)
 def create_tag(*, session: SessionDep, caller: CallerDep, tag_in: TagCreate) -> Any:
     """
@@ -93,7 +103,7 @@ def rename_tag(
     are case-sensitive, so changing only the case is a rename like any other.
     Renaming a tag to the name it already has changes nothing.
     """
-    tag = _get_owned_tag(session, current_user, tag_id)
+    tag = _get_owned_tag(session, current_user.id, tag_id)
     if tag_in.name != tag.name:
         _refuse_taken_name(session, current_user.id, tag_in.name)
         tag = crud.rename_tag(session=session, tag=tag, name=tag_in.name)
@@ -111,6 +121,6 @@ def delete_tag(
     There is no undoing it: a tag deletion is not a deletion event, so the
     activity log records it but cannot restore it.
     """
-    tag = _get_owned_tag(session, current_user, tag_id)
+    tag = _get_owned_tag(session, current_user.id, tag_id)
     crud.delete_tag(session=session, tag=tag)
     return Message(message="Tag deleted successfully")

@@ -521,6 +521,10 @@ export type ProjectPublic = {
      */
     is_archived: boolean;
     /**
+     * Task Count
+     */
+    task_count?: number;
+    /**
      * Created At
      */
     created_at?: string | null;
@@ -1280,6 +1284,36 @@ export type projectsDeleteProjectResponses = {
 
 export type projectsDeleteProjectResponse = projectsDeleteProjectResponses[keyof projectsDeleteProjectResponses];
 
+export type projectsReadProjectData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}';
+};
+
+export type projectsReadProjectErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type projectsReadProjectError = projectsReadProjectErrors[keyof projectsReadProjectErrors];
+
+export type projectsReadProjectResponses = {
+    /**
+     * Successful Response
+     */
+    200: ProjectPublic;
+};
+
+export type projectsReadProjectResponse = projectsReadProjectResponses[keyof projectsReadProjectResponses];
+
 export type projectsUpdateProjectData = {
     body: ProjectUpdate;
     path: {
@@ -1900,6 +1934,36 @@ export type tagsDeleteTagResponses = {
 
 export type tagsDeleteTagResponse = tagsDeleteTagResponses[keyof tagsDeleteTagResponses];
 
+export type tagsReadTagData = {
+    body?: never;
+    path: {
+        /**
+         * Tag Id
+         */
+        tag_id: string;
+    };
+    query?: never;
+    url: '/api/v1/tags/{tag_id}';
+};
+
+export type tagsReadTagErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type tagsReadTagError = tagsReadTagErrors[keyof tagsReadTagErrors];
+
+export type tagsReadTagResponses = {
+    /**
+     * Successful Response
+     */
+    200: TagPublic;
+};
+
+export type tagsReadTagResponse = tagsReadTagResponses[keyof tagsReadTagResponses];
+
 export type tagsRenameTagData = {
     body: TagUpdate;
     path: {
@@ -2082,6 +2146,36 @@ export type botsDeleteBotUserResponses = {
 };
 
 export type botsDeleteBotUserResponse = botsDeleteBotUserResponses[keyof botsDeleteBotUserResponses];
+
+export type botsReadBotUserData = {
+    body?: never;
+    path: {
+        /**
+         * Bot User Id
+         */
+        bot_user_id: string;
+    };
+    query?: never;
+    url: '/api/v1/bot-users/{bot_user_id}';
+};
+
+export type botsReadBotUserErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type botsReadBotUserError = botsReadBotUserErrors[keyof botsReadBotUserErrors];
+
+export type botsReadBotUserResponses = {
+    /**
+     * Successful Response
+     */
+    200: BotUserPublic;
+};
+
+export type botsReadBotUserResponse = botsReadBotUserResponses[keyof botsReadBotUserResponses];
 
 export type botsUpdateBotUserData = {
     body: BotUserUpdate;

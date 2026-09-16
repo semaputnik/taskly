@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { Trash2 } from "lucide-react"
 import { useState } from "react"
 
-import { BotsService, type BotUserPublic } from "@/client"
+import { type ProjectPublic, ProjectsService } from "@/client"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -17,46 +17,51 @@ import { LoadingButton } from "@/components/ui/loading-button"
 import useCustomToast from "@/hooks/useCustomToast"
 import { handleError } from "@/utils"
 
-interface DeleteBotUserProps {
-  bot: BotUserPublic
-  onSuccess: () => void
-}
-
 /**
- * Deletes a bot user, behind a confirmation: its token stops working at once
- * and there is no restoring it (FR-08.18, FR-08.20). What it did and what it
- * was assigned keep its name (FR-08.19, FR-08.21).
+ * Deleting a project, behind a confirmation that names the cascade.
+ *
+ * A project takes its tasks down with it, so the count is said before the act,
+ * not discovered after it. Both are restorable from the activity log, which
+ * the confirmation says too: a deletion that can be undone should not be
+ * dressed as one that cannot (FR-05.8, FR-05.9).
  */
-const DeleteBotUser = ({ bot, onSuccess }: DeleteBotUserProps) => {
+export default function DeleteProject({
+  project,
+  onSuccess,
+}: {
+  project: ProjectPublic
+  onSuccess: () => void
+}) {
   const [isOpen, setIsOpen] = useState(false)
   const queryClient = useQueryClient()
   const { showSuccessToast, showErrorToast } = useCustomToast()
 
   const mutation = useMutation({
     mutationFn: () =>
-      BotsService.deleteBotUser({ path: { bot_user_id: bot.id } }),
+      ProjectsService.deleteProject({ path: { project_id: project.id } }),
     onSuccess: () => {
-      showSuccessToast(`“${bot.name}” was deleted`)
+      showSuccessToast(`“${project.name}” was deleted`)
       setIsOpen(false)
       onSuccess()
     },
     onError: handleError.bind(showErrorToast),
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["bots"] })
-      // Tasks assigned to it now show it as deleted.
+      queryClient.invalidateQueries({ queryKey: ["projects"] })
       queryClient.invalidateQueries({ queryKey: ["tasks"] })
     },
   })
 
+  const tasks =
+    project.task_count === 0
+      ? "It holds no tasks."
+      : `Its ${project.task_count === 1 ? "task" : `${project.task_count} tasks`} go with it.`
+
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      {/* The one act with no undo gets the one control in the panel's
-          corner: no menu to open first, and no neighbours to catch a stray
-          click. */}
       <Button
         variant="ghost"
         size="icon"
-        aria-label="Delete bot user"
+        aria-label="Delete project"
         className="text-muted-foreground hover:text-destructive"
         onClick={() => setIsOpen(true)}
       >
@@ -64,11 +69,10 @@ const DeleteBotUser = ({ bot, onSuccess }: DeleteBotUserProps) => {
       </Button>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Delete {bot.name}?</DialogTitle>
+          <DialogTitle>Delete {project.name}?</DialogTitle>
           <DialogDescription>
-            Its token stops working right away, and the bot can't be restored.
-            Tasks assigned to it stay assigned to it, and the activity log still
-            names it.
+            {tasks} The deletion is recorded in your activity log, so the
+            project and its tasks can be restored from there.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
@@ -89,5 +93,3 @@ const DeleteBotUser = ({ bot, onSuccess }: DeleteBotUserProps) => {
     </Dialog>
   )
 }
-
-export default DeleteBotUser

@@ -50,6 +50,11 @@ interface DataTableProps<TData extends RowData> {
   empty?: React.ReactNode
   /** Makes rows open something. Clicks on a row's own controls are ignored. */
   onRowClick?: (row: TData) => void
+  /**
+   * What opening a row does, in words. A row that acts is a control, and a
+   * control without a name is unusable to anyone not looking at the screen.
+   */
+  rowLabel?: (row: TData) => string
 }
 
 /**
@@ -70,6 +75,7 @@ export function DataTable<TData extends RowData>({
   data,
   empty,
   onRowClick,
+  rowLabel,
 }: DataTableProps<TData>) {
   const table = useTable({
     features,
@@ -103,11 +109,31 @@ export function DataTable<TData extends RowData>({
             table.getRowModel().rows.map((row) => (
               <TableRow
                 key={row.id}
-                className={onRowClick ? "cursor-pointer" : undefined}
+                className={
+                  onRowClick
+                    ? "focus-visible:ring-ring cursor-pointer outline-none focus-visible:ring-2"
+                    : undefined
+                }
+                // A row that opens a record takes focus, answers Enter and
+                // Space, and says what it opens. It stays a row: giving it a
+                // button's role would take the table's structure away from
+                // every reader who relies on it.
+                tabIndex={onRowClick ? 0 : undefined}
+                aria-label={rowLabel?.(row.original)}
                 onClick={
                   onRowClick
                     ? (event) => {
                         if (fromRowItself(event)) onRowClick(row.original)
+                      }
+                    : undefined
+                }
+                onKeyDown={
+                  onRowClick
+                    ? (event) => {
+                        if (event.key !== "Enter" && event.key !== " ") return
+                        if (event.target !== event.currentTarget) return
+                        event.preventDefault()
+                        onRowClick(row.original)
                       }
                     : undefined
                 }

@@ -54,7 +54,7 @@ test("Granting a bot user “Create tags” lets it add to the vocabulary", asyn
   await dialog.getByRole("button", { name: "Done" }).click()
   const asBot = { Authorization: `Bearer ${token}` }
 
-  const row = page.getByRole("row").filter({ hasText: "Triage agent" })
+  const row = page.getByRole("row", { name: "Open Triage agent" })
   await expect(row).toContainText("Update tasks")
   await expect(row).not.toContainText("Create tags")
 
@@ -72,13 +72,14 @@ test("Granting a bot user “Create tags” lets it add to the vocabulary", asyn
   expect(refused.status()).toBe(403)
   expect((await refused.json()).detail.permission).toBe("create_tags")
 
-  // Granted on the Bots page, the same request goes through.
-  await page.getByRole("button", { name: "Actions for Triage agent" }).click()
-  await page.getByRole("menuitem", { name: "Edit Bot" }).click()
-  const editDialog = page.getByRole("dialog", { name: "Edit Bot" })
-  await editDialog.getByRole("checkbox", { name: "Create tags" }).check()
-  await editDialog.getByRole("button", { name: "Save" }).click()
-  await expect(page.getByText("Bot updated successfully")).toBeVisible()
+  // Granted in the bot user's panel, the same request goes through.
+  await row.click()
+  const createTags = page
+    .getByRole("dialog", { name: "Triage agent" })
+    .getByRole("checkbox", { name: "Create tags" })
+  await createTags.click()
+  await expect(createTags).toBeChecked()
+  await page.keyboard.press("Escape")
   await expect(row).toContainText("Create tags")
 
   const created = await request.post(`${api}/tags/`, {

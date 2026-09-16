@@ -3,12 +3,18 @@ import type { ColumnDef } from "@tanstack/react-table"
 import type { BotUserPublic } from "@/client"
 import type { DataTableFeatures } from "@/components/Common/DataTable"
 import { Badge } from "@/components/ui/badge"
-import { BotActionsMenu } from "./BotActionsMenu"
 import type { ScopeProject } from "./BotFormFields"
-import IssueToken from "./IssueToken"
 import { PERMISSIONS } from "./permissions"
-import RevokeToken from "./RevokeToken"
-import { formatDate, formatDateTime, tokenStatus } from "./tokens"
+import { tokenStatus } from "./tokens"
+
+// The row says where a token stands; when it was issued, when it expires and
+// when it was last used are properties, read in the bot user's panel.
+const STATUS_TEXT = {
+  none: "No token",
+  active: "Active",
+  revoked: "Revoked",
+  expired: "Expired",
+} as const
 
 export function getColumns(
   projects: Record<string, ScopeProject>,
@@ -75,55 +81,20 @@ export function getColumns(
     {
       id: "token",
       header: "Token",
-      cell: ({ row }) => <TokenCell bot={row.original} />,
-    },
-    {
-      id: "actions",
-      header: () => <span className="sr-only">Actions</span>,
-      cell: ({ row }) => (
-        <div className="flex justify-end">
-          <BotActionsMenu bot={row.original} />
-        </div>
-      ),
+      cell: ({ row }) => {
+        const status = tokenStatus(row.original)
+        return status === "expired" ? (
+          <Badge variant="destructive">Expired</Badge>
+        ) : (
+          <span
+            className={
+              status === "active" ? undefined : "text-muted-foreground"
+            }
+          >
+            {STATUS_TEXT[status]}
+          </span>
+        )
+      },
     },
   ]
-}
-
-function TokenCell({ bot }: { bot: BotUserPublic }) {
-  const status = tokenStatus(bot)
-
-  if (status === "none" || status === "revoked") {
-    return (
-      <div className="flex flex-col items-start gap-1.5">
-        {status === "revoked" && (
-          <span className="text-muted-foreground text-xs">
-            Revoked {formatDate(bot.token_revoked_at)}
-          </span>
-        )}
-        <IssueToken bot={bot} />
-      </div>
-    )
-  }
-
-  return (
-    <div className="flex flex-col items-start gap-1.5 text-xs">
-      {status === "expired" ? (
-        <Badge variant="destructive">
-          Expired {formatDate(bot.token_expires_at)}
-        </Badge>
-      ) : (
-        <span>
-          {bot.token_expires_at
-            ? `Expires ${formatDate(bot.token_expires_at)}`
-            : "Never expires"}
-        </span>
-      )}
-      <span className="text-muted-foreground">
-        {bot.token_last_used_at
-          ? `Last used ${formatDateTime(bot.token_last_used_at)}`
-          : "Never used"}
-      </span>
-      <RevokeToken bot={bot} />
-    </div>
-  )
 }

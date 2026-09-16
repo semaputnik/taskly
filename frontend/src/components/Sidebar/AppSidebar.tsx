@@ -14,7 +14,7 @@ import {
 } from "lucide-react"
 
 import { SidebarAppearance } from "@/components/Common/Appearance"
-import { useCapture } from "@/components/Tasks/capture"
+import { useRecordPanels } from "@/components/Records/panels"
 import { Button } from "@/components/ui/button"
 import {
   Sidebar,
@@ -102,7 +102,7 @@ function IconAction({
  */
 function CaptureAction() {
   const { isMobile, setOpenMobile } = useSidebar()
-  const { start } = useCapture()
+  const { capture } = useRecordPanels()
 
   return (
     <Tooltip>
@@ -111,7 +111,7 @@ function CaptureAction() {
           aria-label="Add Task"
           onClick={() => {
             if (isMobile) setOpenMobile(false)
-            start()
+            capture("task")
           }}
           // px-2 lines the plus up with the navigation icons below, so
           // collapsing the sidebar leaves the column where it was.

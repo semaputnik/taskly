@@ -7,19 +7,25 @@ import { z } from "zod"
  * breaking the page: an unusable value simply drops its filter.
  */
 /**
- * The task whose detail panel is open, and whether capture is open.
+ * Which record has its panel open, and whether one is being created.
  *
- * They live in the URL so the panel can be linked to and so Back closes it,
- * and they are validated by the layout rather than by each screen: the panel
- * is mounted once for the whole app, so every route carries them and a reader
- * who opens a task from the dashboard or the activity log stays where they
+ * They live in the URL so a panel can be linked to and so Back closes it, and
+ * they are validated by the layout rather than by each screen: the panels are
+ * mounted once for the whole app, so every route carries them and a reader
+ * who opens a record from the dashboard or the activity log stays where they
  * were.
  */
 export const panelSearchSchema = z.object({
   task: z.string().uuid().optional().catch(undefined),
-  // Capture: the panel opened on a record that does not exist yet. It is view
-  // state like the open task, so it travels the same way and Back cancels it.
-  capture: z.literal(true).optional().catch(undefined),
+  project: z.string().uuid().optional().catch(undefined),
+  // `tag_id` rather than `tag`: the task list already narrows by tag *name*
+  // under `tag`, and a filter and a panel must not share a key.
+  tag_id: z.string().uuid().optional().catch(undefined),
+  bot: z.string().uuid().optional().catch(undefined),
+  // Capture: a panel opened on a record that does not exist yet, naming which
+  // kind. It is view state like the open record, so it travels the same way
+  // and Back cancels it.
+  capture: z.enum(["task", "project", "tag"]).optional().catch(undefined),
 })
 
 export const taskSearchSchema = z.object({
