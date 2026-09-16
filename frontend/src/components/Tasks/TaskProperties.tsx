@@ -177,8 +177,9 @@ export function TaskProperties({ task }: { task: TaskPublic }) {
           />
         </PropertyRow>
 
-        <PropertyRow icon={Tag} label="Tags">
+        <PropertyRow icon={Tag} label="Tags" htmlFor={`${ids}-tags`}>
           <TagsField
+            id={`${ids}-tags`}
             value={task.tags ?? []}
             onChange={(tags) => save({ tags })}
             className={cn(ghost, "w-full")}
