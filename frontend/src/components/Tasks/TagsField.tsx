@@ -4,7 +4,9 @@ import { useId, useState } from "react"
 
 import { TagsService } from "@/client"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { useDebouncedValue } from "@/hooks/useDebouncedValue"
 import { cn } from "@/lib/utils"
 
 interface TagsFieldProps
@@ -58,6 +60,33 @@ export function TagsField({
       ).data,
   })
 
+  const exists = tags?.data.some((tag) => tag.name === name)
+  // The spellings a new name would read the same as — "Deploys" beside
+  // "deploy" — offered before it is created, each keeping its own casing
+  // (FR-01.28).
+  // Asked once typing pauses rather than on every keystroke.
+  const settledName = useDebouncedValue(name, 250)
+  const { data: near } = useQuery({
+    queryKey: ["tags", "near", settledName],
+    queryFn: async () =>
+      (
+        await TagsService.readTags({
+          query: { near: settledName, skip: 0, limit: 5 },
+        })
+      ).data,
+    enabled:
+      Boolean(settledName) &&
+      settledName === name &&
+      exists === false &&
+      !value.includes(name),
+  })
+  const nearMatches =
+    exists || settledName !== name
+      ? []
+      : (near?.data ?? [])
+          .map((tag) => tag.name)
+          .filter((tagName) => tagName !== name && !value.includes(tagName))
+
   const suggestions = (tags?.data ?? [])
     .map((tag) => tag.name)
     .filter((tagName) => !value.includes(tagName))
@@ -79,7 +108,7 @@ export function TagsField({
       ? `${name} is already on it.`
       : !tags
         ? null
-        : tags.data.some((tag) => tag.name === name)
+        : exists
           ? `Enter adds your tag ${name}.`
           : `Enter creates a new tag, ${name}.`
 
@@ -137,7 +166,28 @@ export function TagsField({
         )}
       >
         {leftUnsent && hint ? `Not added yet. ${hint}` : hint}
+        {hint && nearMatches.length > 0 && (
+          <> You already have {nearMatches.join(", ")}.</>
+        )}
       </p>
+      {hint && nearMatches.length > 0 && (
+        <div className="flex flex-wrap gap-1 px-1">
+          {nearMatches.map((tagName) => (
+            <Button
+              key={tagName}
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 pointer-coarse:h-11"
+              // Picking keeps the reader in the field, ready for the next tag.
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => add(tagName)}
+            >
+              Use {tagName}
+            </Button>
+          ))}
+        </div>
+      )}
 
       {value.length > 0 && (
         <div className="flex flex-wrap gap-1">

@@ -9,7 +9,7 @@ export type ClientOptions = {
  *
  * Everything the activity log records (FR-10.3).
  */
-export type ActivityAction = 'task_created' | 'task_changed' | 'tasks_bulk_changed' | 'task_completed' | 'task_reopened' | 'task_deleted' | 'task_restored' | 'task_moved' | 'task_assigned' | 'task_unassigned' | 'project_created' | 'project_changed' | 'project_deleted' | 'project_restored' | 'comment_added' | 'comment_edited' | 'comment_deleted' | 'attachment_added' | 'attachment_deleted' | 'tag_created' | 'tag_renamed' | 'tag_deleted';
+export type ActivityAction = 'task_created' | 'task_changed' | 'tasks_bulk_changed' | 'task_completed' | 'task_reopened' | 'task_deleted' | 'task_restored' | 'task_moved' | 'task_assigned' | 'task_unassigned' | 'project_created' | 'project_changed' | 'project_deleted' | 'project_restored' | 'comment_added' | 'comment_edited' | 'comment_deleted' | 'attachment_added' | 'attachment_deleted' | 'tag_created' | 'tag_renamed' | 'tag_deleted' | 'tag_merged';
 
 /**
  * ActivityEntityType
@@ -624,6 +624,69 @@ export type TagCreate = {
 };
 
 /**
+ * TagDuplicateDismiss
+ *
+ * Every member of the group to stop offering, and nothing else.
+ */
+export type TagDuplicateDismiss = {
+    /**
+     * Tag Ids
+     */
+    tag_ids: Array<string>;
+};
+
+/**
+ * TagDuplicateGroup
+ *
+ * Tags whose names differ only in form: a suggestion to merge them.
+ */
+export type TagDuplicateGroup = {
+    /**
+     * Tags
+     */
+    tags: Array<TagPublic>;
+};
+
+/**
+ * TagDuplicateGroups
+ */
+export type TagDuplicateGroups = {
+    /**
+     * Data
+     */
+    data: Array<TagDuplicateGroup>;
+};
+
+/**
+ * TagMerge
+ *
+ * The tags to fold into the one the merge is addressed to.
+ */
+export type TagMerge = {
+    /**
+     * Source Ids
+     */
+    source_ids: Array<string>;
+};
+
+/**
+ * TagMergePreview
+ *
+ * What a merge would move: the tasks carrying any of the sources, each
+ * counted once, live and archived apart (FR-01.27).
+ */
+export type TagMergePreview = {
+    /**
+     * Task Count
+     */
+    task_count: number;
+    /**
+     * Archived Task Count
+     */
+    archived_task_count: number;
+};
+
+/**
  * TagPublic
  */
 export type TagPublic = {
@@ -639,6 +702,11 @@ export type TagPublic = {
      * Task Count
      */
     task_count?: number;
+    /**
+     * Archived Task Count
+     */
+    archived_task_count?: number;
+    created_by_bot_user?: BotUserRef | null;
 };
 
 /**
@@ -1979,6 +2047,10 @@ export type tagsReadTagsData = {
          */
         q?: string | null;
         /**
+         * Near
+         */
+        near?: string | null;
+        /**
          * Skip
          */
         skip?: number;
@@ -2032,6 +2104,47 @@ export type tagsCreateTagResponses = {
 };
 
 export type tagsCreateTagResponse = tagsCreateTagResponses[keyof tagsCreateTagResponses];
+
+export type tagsReadTagDuplicatesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/tags/duplicates';
+};
+
+export type tagsReadTagDuplicatesResponses = {
+    /**
+     * Successful Response
+     */
+    200: TagDuplicateGroups;
+};
+
+export type tagsReadTagDuplicatesResponse = tagsReadTagDuplicatesResponses[keyof tagsReadTagDuplicatesResponses];
+
+export type tagsDismissTagDuplicatesData = {
+    body: TagDuplicateDismiss;
+    path?: never;
+    query?: never;
+    url: '/api/v1/tags/duplicates/dismiss';
+};
+
+export type tagsDismissTagDuplicatesErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type tagsDismissTagDuplicatesError = tagsDismissTagDuplicatesErrors[keyof tagsDismissTagDuplicatesErrors];
+
+export type tagsDismissTagDuplicatesResponses = {
+    /**
+     * Successful Response
+     */
+    200: Message;
+};
+
+export type tagsDismissTagDuplicatesResponse = tagsDismissTagDuplicatesResponses[keyof tagsDismissTagDuplicatesResponses];
 
 export type tagsDeleteTagData = {
     body?: never;
@@ -2122,6 +2235,71 @@ export type tagsRenameTagResponses = {
 };
 
 export type tagsRenameTagResponse = tagsRenameTagResponses[keyof tagsRenameTagResponses];
+
+export type tagsPreviewTagMergeData = {
+    body?: never;
+    path: {
+        /**
+         * Tag Id
+         */
+        tag_id: string;
+    };
+    query: {
+        /**
+         * Source Ids
+         */
+        source_ids: Array<string>;
+    };
+    url: '/api/v1/tags/{tag_id}/merge-preview';
+};
+
+export type tagsPreviewTagMergeErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type tagsPreviewTagMergeError = tagsPreviewTagMergeErrors[keyof tagsPreviewTagMergeErrors];
+
+export type tagsPreviewTagMergeResponses = {
+    /**
+     * Successful Response
+     */
+    200: TagMergePreview;
+};
+
+export type tagsPreviewTagMergeResponse = tagsPreviewTagMergeResponses[keyof tagsPreviewTagMergeResponses];
+
+export type tagsMergeTagsData = {
+    body: TagMerge;
+    path: {
+        /**
+         * Tag Id
+         */
+        tag_id: string;
+    };
+    query?: never;
+    url: '/api/v1/tags/{tag_id}/merge';
+};
+
+export type tagsMergeTagsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type tagsMergeTagsError = tagsMergeTagsErrors[keyof tagsMergeTagsErrors];
+
+export type tagsMergeTagsResponses = {
+    /**
+     * Successful Response
+     */
+    200: TagPublic;
+};
+
+export type tagsMergeTagsResponse = tagsMergeTagsResponses[keyof tagsMergeTagsResponses];
 
 export type activityReadActivityLogData = {
     body?: never;

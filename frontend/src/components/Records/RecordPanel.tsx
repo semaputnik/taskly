@@ -118,7 +118,7 @@ export function RecordPanel({
           <>
             {children}
             {destructive && (
-              <div className="mt-auto flex border-t px-6 py-4">
+              <div className="mt-auto flex flex-wrap gap-2 border-t px-6 py-4">
                 {destructive}
               </div>
             )}

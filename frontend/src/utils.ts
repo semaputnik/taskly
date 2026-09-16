@@ -37,6 +37,11 @@ export function isUncompletedSubtasksError(err: Error): boolean {
   return hasErrorCode(err, "task_has_uncompleted_subtasks")
 }
 
+/** The name asked for is already one of the user's tags. */
+export function isTagExistsError(err: Error): boolean {
+  return hasErrorCode(err, "tag_exists")
+}
+
 /** Deleting this task would take its subtasks with it. */
 export function isSubtaskCascadeError(err: Error): boolean {
   return hasErrorCode(err, "task_has_subtasks")

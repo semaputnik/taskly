@@ -229,6 +229,18 @@ class TaskTag(SQLModel, table=True):
     )
 
 
+class BotUserRef(SQLModel):
+    """
+    A bot user as a task or comment names it: the one it is assigned to, or
+    the one that wrote it. A deleted bot user stays on what it was given and
+    what it wrote (FR-08.19, FR-08.21), marked deleted.
+    """
+
+    id: uuid.UUID
+    name: str
+    deleted: bool
+
+
 class TagCreate(SQLModel):
     name: TagName
 
@@ -239,9 +251,76 @@ class TagUpdate(SQLModel):
 
 class TagPublic(TagBase):
     id: uuid.UUID
-    # The tasks carrying it that are not deleted: what the user can see, and
-    # what deleting the tag takes it off (FR-01.26).
+    # The live tasks carrying it — not deleted, not archived with their
+    # project: exactly what the task list filtered by the tag shows (FR-01.26).
     task_count: int = 0
+    # The tasks carrying it that are archived with their project. Not in the
+    # list, but deleting or merging the tag reaches them too.
+    archived_task_count: int = 0
+    # The bot user that brought the tag into being, if one did — through the
+    # API or by typing a new name onto a task — so an agent's vocabulary can
+    # be told from the user's own (FR-01.28).
+    created_by_bot_user: BotUserRef | None = None
+
+
+class TagDuplicateDismissal(SQLModel, table=True):
+    """
+    A group of likely duplicate tags the user said to stop offering
+    (FR-01.28).
+
+    The group is remembered by its members exactly as they were — each id with
+    the name it had — so renaming one of them, or a new spelling joining them,
+    makes it a different group, offered again.
+    """
+
+    __table_args__ = (
+        UniqueConstraint(
+            "owner_id", "signature", name="tagduplicatedismissal_owner_signature_key"
+        ),
+    )
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    owner_id: uuid.UUID = Field(
+        foreign_key="user.id", nullable=False, ondelete="CASCADE"
+    )
+    # A digest of the members, ids and names, in a fixed order.
+    signature: str = Field(max_length=64)
+    created_at: datetime | None = Field(
+        default_factory=get_datetime_utc,
+        sa_type=DateTime(timezone=True),  # type: ignore
+    )
+
+
+class TagDuplicateGroup(SQLModel):
+    """Tags whose names differ only in form: a suggestion to merge them."""
+
+    tags: list[TagPublic]
+
+
+class TagDuplicateGroups(SQLModel):
+    data: list[TagDuplicateGroup]
+
+
+class TagDuplicateDismiss(SQLModel):
+    """Every member of the group to stop offering, and nothing else."""
+
+    tag_ids: list[uuid.UUID] = Field(min_length=2)
+
+
+class TagMerge(SQLModel):
+    """The tags to fold into the one the merge is addressed to."""
+
+    source_ids: list[uuid.UUID] = Field(min_length=1)
+
+
+class TagMergePreview(SQLModel):
+    """
+    What a merge would move: the tasks carrying any of the sources, each
+    counted once, live and archived apart (FR-01.27).
+    """
+
+    task_count: int
+    archived_task_count: int
 
 
 class TagsPublic(SQLModel):
@@ -586,18 +665,6 @@ class Task(TaskBase, table=True):
     )
 
 
-class BotUserRef(SQLModel):
-    """
-    A bot user as a task or comment names it: the one it is assigned to, or
-    the one that wrote it. A deleted bot user stays on what it was given and
-    what it wrote (FR-08.19, FR-08.21), marked deleted.
-    """
-
-    id: uuid.UUID
-    name: str
-    deleted: bool
-
-
 # Properties to return via API, id is always required
 class TaskPublic(TaskBase):
     id: uuid.UUID
@@ -748,6 +815,9 @@ class ActivityAction(StrEnum):
     TAG_CREATED = "tag_created"
     TAG_RENAMED = "tag_renamed"
     TAG_DELETED = "tag_deleted"
+    # Several tags folded into one: one entry naming both sides, not one per
+    # task that changed or per tag that went.
+    TAG_MERGED = "tag_merged"
 
 
 class ActivityEntityType(StrEnum):

@@ -24,7 +24,8 @@ export const ActivityActionSchema = {
         'attachment_deleted',
         'tag_created',
         'tag_renamed',
-        'tag_deleted'
+        'tag_deleted',
+        'tag_merged'
     ],
     title: 'ActivityAction',
     description: 'Everything the activity log records (FR-10.3).'
@@ -1055,6 +1056,101 @@ export const TagCreateSchema = {
     title: 'TagCreate'
 } as const;
 
+export const TagDuplicateDismissSchema = {
+    properties: {
+        tag_ids: {
+            items: {
+                type: 'string',
+                format: 'uuid'
+            },
+            type: 'array',
+            minItems: 2,
+            title: 'Tag Ids'
+        }
+    },
+    type: 'object',
+    required: [
+        'tag_ids'
+    ],
+    title: 'TagDuplicateDismiss',
+    description: 'Every member of the group to stop offering, and nothing else.'
+} as const;
+
+export const TagDuplicateGroupSchema = {
+    properties: {
+        tags: {
+            items: {
+                $ref: '#/components/schemas/TagPublic'
+            },
+            type: 'array',
+            title: 'Tags'
+        }
+    },
+    type: 'object',
+    required: [
+        'tags'
+    ],
+    title: 'TagDuplicateGroup',
+    description: 'Tags whose names differ only in form: a suggestion to merge them.'
+} as const;
+
+export const TagDuplicateGroupsSchema = {
+    properties: {
+        data: {
+            items: {
+                $ref: '#/components/schemas/TagDuplicateGroup'
+            },
+            type: 'array',
+            title: 'Data'
+        }
+    },
+    type: 'object',
+    required: [
+        'data'
+    ],
+    title: 'TagDuplicateGroups'
+} as const;
+
+export const TagMergeSchema = {
+    properties: {
+        source_ids: {
+            items: {
+                type: 'string',
+                format: 'uuid'
+            },
+            type: 'array',
+            minItems: 1,
+            title: 'Source Ids'
+        }
+    },
+    type: 'object',
+    required: [
+        'source_ids'
+    ],
+    title: 'TagMerge',
+    description: 'The tags to fold into the one the merge is addressed to.'
+} as const;
+
+export const TagMergePreviewSchema = {
+    properties: {
+        task_count: {
+            type: 'integer',
+            title: 'Task Count'
+        },
+        archived_task_count: {
+            type: 'integer',
+            title: 'Archived Task Count'
+        }
+    },
+    type: 'object',
+    required: [
+        'task_count',
+        'archived_task_count'
+    ],
+    title: 'TagMergePreview',
+    description: 'What a merge would move: the tasks carrying any of the sources, each\ncounted once, live and archived apart (FR-01.27).'
+} as const;
+
 export const TagPublicSchema = {
     properties: {
         name: {
@@ -1071,6 +1167,21 @@ export const TagPublicSchema = {
             type: 'integer',
             title: 'Task Count',
             default: 0
+        },
+        archived_task_count: {
+            type: 'integer',
+            title: 'Archived Task Count',
+            default: 0
+        },
+        created_by_bot_user: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/BotUserRef'
+                },
+                {
+                    type: 'null'
+                }
+            ]
         }
     },
     type: 'object',

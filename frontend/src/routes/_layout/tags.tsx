@@ -9,6 +9,7 @@ import { EmptyState } from "@/components/Common/EmptyState"
 import PendingTags from "@/components/Pending/PendingTags"
 import { useRecordPanels } from "@/components/Records/panels"
 import { columns } from "@/components/Tags/columns"
+import { DuplicateGroups } from "@/components/Tags/DuplicateGroups"
 import { Button } from "@/components/ui/button"
 
 // Under "tags", so creating, renaming and deleting refresh autocomplete and the
@@ -80,6 +81,7 @@ function Tags() {
           Add Tag
         </Button>
       </div>
+      <DuplicateGroups onOpenTag={openTag} />
       <Suspense fallback={<PendingTags />}>
         <TagsTableContent onOpen={openTag} onAdd={() => capture("tag")} />
       </Suspense>

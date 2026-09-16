@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { Link as RouterLink } from "@tanstack/react-router"
-import { CheckSquare } from "lucide-react"
+import { Bot, CheckSquare, Merge } from "lucide-react"
+import { useState } from "react"
 
 import { type TagPublic, TagsService } from "@/client"
 import { NewRecord } from "@/components/Records/NewRecord"
@@ -8,18 +8,23 @@ import {
   EditableText,
   PropertyList,
   PropertyRow,
-  ReadOnlyValue,
   RecordHeader,
   RecordPanel,
   recordLoad,
   titleFieldClass,
 } from "@/components/Records/RecordPanel"
+import { Button } from "@/components/ui/button"
 import useCustomToast from "@/hooks/useCustomToast"
-import { handleError } from "@/utils"
+import { handleError, isTagExistsError } from "@/utils"
+import { BotCreator } from "./BotCreator"
 import DeleteTag from "./DeleteTag"
+import { MergeTags } from "./MergeTags"
+import { TaskCount } from "./TaskCount"
+import { useVocabulary } from "./vocabulary"
 
 /**
- * A tag as a record: its name, what carries it, and the one way to remove it.
+ * A tag as a record: its name, what carries it, and the two ways to make it
+ * go — merging it with another spelling, or deleting it.
  *
  * A tag is a thin record and its panel is short. The value is that it has an
  * address and the same shape as every other record, not the amount in it.
@@ -29,11 +34,13 @@ export function TagPanel({
   capturing,
   onClose,
   onCreated,
+  onOpenTag,
 }: {
   tagId: string | null
   capturing: boolean
   onClose: () => void
   onCreated: (tag: TagPublic) => void
+  onOpenTag: (tagId: string) => void
 }) {
   const query = useQuery({
     queryKey: ["tag", tagId],
@@ -42,6 +49,9 @@ export function TagPanel({
     enabled: Boolean(tagId),
   })
   const tag = query.data
+  // A merge being considered from this panel, and the tag it was offered with
+  // when a rename ran into that tag's name.
+  const [merging, setMerging] = useState<{ with?: TagPublic } | null>(null)
 
   return (
     <RecordPanel
@@ -51,7 +61,22 @@ export function TagPanel({
       kind="tag"
       {...recordLoad(query, !capturing && Boolean(tagId))}
       destructive={
-        tag ? <DeleteTag tag={tag} onSuccess={onClose} /> : undefined
+        tag ? (
+          <>
+            {/* Merging is at the foot with deleting: both make this tag go,
+                and neither is a property of it. */}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-muted-foreground -ml-2.5 pointer-coarse:h-11"
+              onClick={() => setMerging({})}
+            >
+              <Merge />
+              Merge…
+            </Button>
+            <DeleteTag tag={tag} onSuccess={onClose} />
+          </>
+        ) : undefined
       }
     >
       {capturing ? (
@@ -69,13 +94,59 @@ export function TagPanel({
           onCreated={onCreated}
         />
       ) : tag ? (
-        <TagRecord tag={tag} />
+        <TagRecord
+          tag={tag}
+          onNameTaken={(taken) => setMerging({ with: taken })}
+        />
       ) : null}
+      {tag && merging && (
+        <TagMerge
+          tag={tag}
+          offered={merging.with}
+          onClose={() => setMerging(null)}
+          onMerged={(survivor) => {
+            // A merge that removed this tag moves the panel onto the one
+            // that carries its tasks now.
+            if (survivor.id !== tag.id) onOpenTag(survivor.id)
+          }}
+        />
+      )}
     </RecordPanel>
   )
 }
 
-function TagRecord({ tag }: { tag: TagPublic }) {
+/** The merge dialog as a tag's panel opens it, with the whole vocabulary. */
+function TagMerge({
+  tag,
+  offered,
+  onClose,
+  onMerged,
+}: {
+  tag: TagPublic
+  offered?: TagPublic
+  onClose: () => void
+  onMerged: (survivor: TagPublic) => void
+}) {
+  const { data: vocabulary } = useVocabulary()
+  return (
+    <MergeTags
+      tags={offered ? [tag, offered] : [tag]}
+      // The name the reader just asked for is the one to keep.
+      initialSurvivorId={offered?.id ?? tag.id}
+      candidates={(vocabulary ?? []).filter((other) => other.id !== tag.id)}
+      onClose={onClose}
+      onMerged={onMerged}
+    />
+  )
+}
+
+function TagRecord({
+  tag,
+  onNameTaken,
+}: {
+  tag: TagPublic
+  onNameTaken: (taken: TagPublic) => void
+}) {
   const queryClient = useQueryClient()
   const { showErrorToast } = useCustomToast()
 
@@ -105,9 +176,19 @@ function TagRecord({ tag }: { tag: TagPublic }) {
               try {
                 await rename.mutateAsync(trimmed)
                 return true
-              } catch {
+              } catch (error) {
                 // A name already in use is refused: the reader keeps theirs
-                // and the toast says which name is taken (FR-01.22).
+                // and the toast says which name is taken (FR-01.22). Putting
+                // the two together is a merge, which is offered here as the
+                // separate, confirmed act it is — never done by the rename.
+                if (isTagExistsError(error as Error)) {
+                  const holder = (
+                    await TagsService.readTags({
+                      query: { near: trimmed, skip: 0, limit: 100 },
+                    })
+                  ).data.data.find((other) => other.name === trimmed)
+                  if (holder) onNameTaken(holder)
+                }
                 return false
               }
             }}
@@ -118,18 +199,15 @@ function TagRecord({ tag }: { tag: TagPublic }) {
 
       <PropertyList>
         <PropertyRow icon={CheckSquare} label="Tasks">
-          {(tag.task_count ?? 0) > 0 ? (
-            <RouterLink
-              to="/tasks"
-              search={{ tag: tag.name }}
-              className="px-2 underline-offset-4 hover:underline"
-            >
-              {tag.task_count === 1 ? "1 task" : `${tag.task_count} tasks`}
-            </RouterLink>
-          ) : (
-            <ReadOnlyValue>No tasks</ReadOnlyValue>
-          )}
+          <TaskCount tag={tag} className="px-2" />
         </PropertyRow>
+        {tag.created_by_bot_user && (
+          <PropertyRow icon={Bot} label="Created by">
+            <span className="px-2">
+              <BotCreator tag={tag} />
+            </span>
+          </PropertyRow>
+        )}
       </PropertyList>
     </>
   )

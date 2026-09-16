@@ -34,6 +34,8 @@ LOGGED = {
     f"POST {API}/tags/",
     f"PATCH {API}/tags/{{tag_id}}",
     f"DELETE {API}/tags/{{tag_id}}",
+    # One entry naming both sides, not one per task or tag (semaputnik/taskly#69).
+    f"POST {API}/tags/{{tag_id}}/merge",
 }
 ACCOUNT = "Account and sign-in, not a change to the tasks and projects the log covers"
 
@@ -43,6 +45,10 @@ NOT_LOGGED = {
     ),
     f"POST {API}/projects/{{project_id}}/unarchive": (
         "Archiving is a toggle outside the log and the restore flow (FR-05.10)"
+    ),
+    f"POST {API}/tags/duplicates/dismiss": (
+        "A suggestion withheld, not a change to tags or tasks; the merge the "
+        "suggestion leads to is logged"
     ),
     f"POST {API}/login/access-token": ACCOUNT,
     f"POST {API}/login/test-token": ACCOUNT,

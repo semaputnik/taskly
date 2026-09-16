@@ -2,7 +2,7 @@
 
 import { type Client, formDataBodySerializer, type Options as Options2, type TDataShape, urlSearchParamsBodySerializer } from './client';
 import { client } from './client.gen';
-import type { activityReadActivityLogData, activityReadActivityLogErrors, activityReadActivityLogResponses, activityRestoreFromActivityEntryData, activityRestoreFromActivityEntryErrors, activityRestoreFromActivityEntryResponses, attachmentsDeleteAttachmentData, attachmentsDeleteAttachmentErrors, attachmentsDeleteAttachmentResponses, attachmentsDownloadAttachmentData, attachmentsDownloadAttachmentErrors, attachmentsDownloadAttachmentResponses, attachmentsReadAttachmentsData, attachmentsReadAttachmentsErrors, attachmentsReadAttachmentsResponses, attachmentsUploadAttachmentData, attachmentsUploadAttachmentErrors, attachmentsUploadAttachmentResponses, botsCreateBotUserData, botsCreateBotUserErrors, botsCreateBotUserResponses, botsDeleteBotUserData, botsDeleteBotUserErrors, botsDeleteBotUserResponses, botsIssueBotUserTokenData, botsIssueBotUserTokenErrors, botsIssueBotUserTokenResponses, botsReadBotUserData, botsReadBotUserErrors, botsReadBotUserResponses, botsReadBotUsersData, botsReadBotUsersErrors, botsReadBotUsersResponses, botsRevokeBotUserTokenData, botsRevokeBotUserTokenErrors, botsRevokeBotUserTokenResponses, botsUpdateBotUserData, botsUpdateBotUserErrors, botsUpdateBotUserResponses, commentsCreateCommentData, commentsCreateCommentErrors, commentsCreateCommentResponses, commentsDeleteCommentData, commentsDeleteCommentErrors, commentsDeleteCommentResponses, commentsReadCommentsData, commentsReadCommentsErrors, commentsReadCommentsResponses, commentsUpdateCommentData, commentsUpdateCommentErrors, commentsUpdateCommentResponses, loginLoginAccessTokenData, loginLoginAccessTokenErrors, loginLoginAccessTokenResponses, loginRecoverPasswordData, loginRecoverPasswordErrors, loginRecoverPasswordHtmlContentData, loginRecoverPasswordHtmlContentErrors, loginRecoverPasswordHtmlContentResponses, loginRecoverPasswordResponses, loginResetPasswordData, loginResetPasswordErrors, loginResetPasswordResponses, loginTestTokenData, loginTestTokenResponses, privateCreateUserData, privateCreateUserErrors, privateCreateUserResponses, projectsArchiveProjectData, projectsArchiveProjectErrors, projectsArchiveProjectResponses, projectsCreateProjectData, projectsCreateProjectErrors, projectsCreateProjectResponses, projectsDeleteProjectData, projectsDeleteProjectErrors, projectsDeleteProjectResponses, projectsReadProjectData, projectsReadProjectErrors, projectsReadProjectResponses, projectsReadProjectsData, projectsReadProjectsErrors, projectsReadProjectsResponses, projectsUnarchiveProjectData, projectsUnarchiveProjectErrors, projectsUnarchiveProjectResponses, projectsUpdateProjectData, projectsUpdateProjectErrors, projectsUpdateProjectResponses, tagsCreateTagData, tagsCreateTagErrors, tagsCreateTagResponses, tagsDeleteTagData, tagsDeleteTagErrors, tagsDeleteTagResponses, tagsReadTagData, tagsReadTagErrors, tagsReadTagResponses, tagsReadTagsData, tagsReadTagsErrors, tagsReadTagsResponses, tagsRenameTagData, tagsRenameTagErrors, tagsRenameTagResponses, tasksBulkDeleteTasksData, tasksBulkDeleteTasksErrors, tasksBulkDeleteTasksResponses, tasksBulkUpdateTasksData, tasksBulkUpdateTasksErrors, tasksBulkUpdateTasksResponses, tasksCreateTaskData, tasksCreateTaskErrors, tasksCreateTaskResponses, tasksDeleteTaskData, tasksDeleteTaskErrors, tasksDeleteTaskResponses, tasksReadTaskData, tasksReadTaskErrors, tasksReadTaskResponses, tasksReadTasksData, tasksReadTasksErrors, tasksReadTasksResponses, tasksUpdateTaskData, tasksUpdateTaskErrors, tasksUpdateTaskResponses, usersDeleteUserMeData, usersDeleteUserMeResponses, usersReadUserMeData, usersReadUserMeResponses, usersReadUsersData, usersReadUsersErrors, usersReadUsersResponses, usersRegisterUserData, usersRegisterUserErrors, usersRegisterUserResponses, usersUpdatePasswordMeData, usersUpdatePasswordMeErrors, usersUpdatePasswordMeResponses, usersUpdateUserMeData, usersUpdateUserMeErrors, usersUpdateUserMeResponses, utilsHealthCheckData, utilsHealthCheckResponses, utilsTestEmailData, utilsTestEmailErrors, utilsTestEmailResponses } from './types.gen';
+import type { activityReadActivityLogData, activityReadActivityLogErrors, activityReadActivityLogResponses, activityRestoreFromActivityEntryData, activityRestoreFromActivityEntryErrors, activityRestoreFromActivityEntryResponses, attachmentsDeleteAttachmentData, attachmentsDeleteAttachmentErrors, attachmentsDeleteAttachmentResponses, attachmentsDownloadAttachmentData, attachmentsDownloadAttachmentErrors, attachmentsDownloadAttachmentResponses, attachmentsReadAttachmentsData, attachmentsReadAttachmentsErrors, attachmentsReadAttachmentsResponses, attachmentsUploadAttachmentData, attachmentsUploadAttachmentErrors, attachmentsUploadAttachmentResponses, botsCreateBotUserData, botsCreateBotUserErrors, botsCreateBotUserResponses, botsDeleteBotUserData, botsDeleteBotUserErrors, botsDeleteBotUserResponses, botsIssueBotUserTokenData, botsIssueBotUserTokenErrors, botsIssueBotUserTokenResponses, botsReadBotUserData, botsReadBotUserErrors, botsReadBotUserResponses, botsReadBotUsersData, botsReadBotUsersErrors, botsReadBotUsersResponses, botsRevokeBotUserTokenData, botsRevokeBotUserTokenErrors, botsRevokeBotUserTokenResponses, botsUpdateBotUserData, botsUpdateBotUserErrors, botsUpdateBotUserResponses, commentsCreateCommentData, commentsCreateCommentErrors, commentsCreateCommentResponses, commentsDeleteCommentData, commentsDeleteCommentErrors, commentsDeleteCommentResponses, commentsReadCommentsData, commentsReadCommentsErrors, commentsReadCommentsResponses, commentsUpdateCommentData, commentsUpdateCommentErrors, commentsUpdateCommentResponses, loginLoginAccessTokenData, loginLoginAccessTokenErrors, loginLoginAccessTokenResponses, loginRecoverPasswordData, loginRecoverPasswordErrors, loginRecoverPasswordHtmlContentData, loginRecoverPasswordHtmlContentErrors, loginRecoverPasswordHtmlContentResponses, loginRecoverPasswordResponses, loginResetPasswordData, loginResetPasswordErrors, loginResetPasswordResponses, loginTestTokenData, loginTestTokenResponses, privateCreateUserData, privateCreateUserErrors, privateCreateUserResponses, projectsArchiveProjectData, projectsArchiveProjectErrors, projectsArchiveProjectResponses, projectsCreateProjectData, projectsCreateProjectErrors, projectsCreateProjectResponses, projectsDeleteProjectData, projectsDeleteProjectErrors, projectsDeleteProjectResponses, projectsReadProjectData, projectsReadProjectErrors, projectsReadProjectResponses, projectsReadProjectsData, projectsReadProjectsErrors, projectsReadProjectsResponses, projectsUnarchiveProjectData, projectsUnarchiveProjectErrors, projectsUnarchiveProjectResponses, projectsUpdateProjectData, projectsUpdateProjectErrors, projectsUpdateProjectResponses, tagsCreateTagData, tagsCreateTagErrors, tagsCreateTagResponses, tagsDeleteTagData, tagsDeleteTagErrors, tagsDeleteTagResponses, tagsDismissTagDuplicatesData, tagsDismissTagDuplicatesErrors, tagsDismissTagDuplicatesResponses, tagsMergeTagsData, tagsMergeTagsErrors, tagsMergeTagsResponses, tagsPreviewTagMergeData, tagsPreviewTagMergeErrors, tagsPreviewTagMergeResponses, tagsReadTagData, tagsReadTagDuplicatesData, tagsReadTagDuplicatesResponses, tagsReadTagErrors, tagsReadTagResponses, tagsReadTagsData, tagsReadTagsErrors, tagsReadTagsResponses, tagsRenameTagData, tagsRenameTagErrors, tagsRenameTagResponses, tasksBulkDeleteTasksData, tasksBulkDeleteTasksErrors, tasksBulkDeleteTasksResponses, tasksBulkUpdateTasksData, tasksBulkUpdateTasksErrors, tasksBulkUpdateTasksResponses, tasksCreateTaskData, tasksCreateTaskErrors, tasksCreateTaskResponses, tasksDeleteTaskData, tasksDeleteTaskErrors, tasksDeleteTaskResponses, tasksReadTaskData, tasksReadTaskErrors, tasksReadTaskResponses, tasksReadTasksData, tasksReadTasksErrors, tasksReadTasksResponses, tasksUpdateTaskData, tasksUpdateTaskErrors, tasksUpdateTaskResponses, usersDeleteUserMeData, usersDeleteUserMeResponses, usersReadUserMeData, usersReadUserMeResponses, usersReadUsersData, usersReadUsersErrors, usersReadUsersResponses, usersRegisterUserData, usersRegisterUserErrors, usersRegisterUserResponses, usersUpdatePasswordMeData, usersUpdatePasswordMeErrors, usersUpdatePasswordMeResponses, usersUpdateUserMeData, usersUpdateUserMeErrors, usersUpdateUserMeResponses, utilsHealthCheckData, utilsHealthCheckResponses, utilsTestEmailData, utilsTestEmailErrors, utilsTestEmailResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -632,16 +632,17 @@ export class TagsService {
      * Read Tags
      *
      * Retrieve the caller's tags, each with the number of tasks carrying it
-     * (FR-01.26). Also what autocomplete offers while a tag is typed.
+     * (FR-01.26). Also what autocomplete offers while a tag is typed: `q` by
+     * the start of the name, `near` by the names it would read the same as.
      *
      * A bot user reads its owner's whole vocabulary, counts included, whatever
      * its scope: tags belong to the user rather than to a project, so a scope
-     * has nothing to narrow them by (ADR-0003). The counts include tasks in
-     * archived projects, for the same reason they include tasks outside the
-     * scope: the count is the owner's, and narrowing it per caller would make
-     * one tag mean two different things — which is the split ADR-0003 refused.
-     * The archive still holds: FR-05.13 is about reaching those tasks, and none
-     * of them is reachable from here.
+     * has nothing to narrow them by (ADR-0003). The counts are the owner's for
+     * every caller — narrowing them per caller would make one tag mean two
+     * different things, which is the split ADR-0003 refused. `task_count` is
+     * the live tasks, as the task list filtered by the tag shows them;
+     * `archived_task_count` is those archived with their project, which are
+     * counted but not reachable from here (FR-05.13).
      */
     public static readTags<ThrowOnError extends boolean = true>(options?: Options<tagsReadTagsData, ThrowOnError>) {
         return (options?.client ?? client).get<tagsReadTagsResponses, tagsReadTagsErrors, ThrowOnError>({
@@ -665,6 +666,46 @@ export class TagsService {
             responseType: 'json',
             security: [{ scheme: 'bearer', type: 'http' }],
             url: '/api/v1/tags/',
+            ...options,
+            headers: {
+                'Content-Type': 'application/json',
+                ...options.headers
+            }
+        });
+    }
+    
+    /**
+     * Read Tag Duplicates
+     *
+     * The user's tags grouped where their names differ only in letter case,
+     * separators, surrounding or repeated whitespace, or a trailing plural:
+     * suggestions to merge, over the whole vocabulary (FR-01.28).
+     *
+     * Nothing here merges anything, and a group the user dismissed stays out
+     * until one of its members is renamed or another spelling joins it. Like
+     * merging, it is a human's tool for repairing their vocabulary.
+     */
+    public static readTagDuplicates<ThrowOnError extends boolean = true>(options?: Options<tagsReadTagDuplicatesData, ThrowOnError>) {
+        return (options?.client ?? client).get<tagsReadTagDuplicatesResponses, unknown, ThrowOnError>({
+            responseType: 'json',
+            security: [{ scheme: 'bearer', type: 'http' }],
+            url: '/api/v1/tags/duplicates',
+            ...options
+        });
+    }
+    
+    /**
+     * Dismiss Tag Duplicates
+     *
+     * Stop offering one group of likely duplicates. The ids have to be exactly a
+     * group currently offered: dismissing is a decision about the group the user
+     * was shown, not about any tags that happen to be named alike.
+     */
+    public static dismissTagDuplicates<ThrowOnError extends boolean = true>(options: Options<tagsDismissTagDuplicatesData, ThrowOnError>) {
+        return (options.client ?? client).post<tagsDismissTagDuplicatesResponses, tagsDismissTagDuplicatesErrors, ThrowOnError>({
+            responseType: 'json',
+            security: [{ scheme: 'bearer', type: 'http' }],
+            url: '/api/v1/tags/duplicates/dismiss',
             ...options,
             headers: {
                 'Content-Type': 'application/json',
@@ -718,6 +759,48 @@ export class TagsService {
             responseType: 'json',
             security: [{ scheme: 'bearer', type: 'http' }],
             url: '/api/v1/tags/{tag_id}',
+            ...options,
+            headers: {
+                'Content-Type': 'application/json',
+                ...options.headers
+            }
+        });
+    }
+    
+    /**
+     * Preview Tag Merge
+     *
+     * How many tasks merging `source_ids` into this tag would change, each
+     * counted once, with those archived with their project apart: what the
+     * merge confirmation says before anything happens (FR-01.27).
+     */
+    public static previewTagMerge<ThrowOnError extends boolean = true>(options: Options<tagsPreviewTagMergeData, ThrowOnError>) {
+        return (options.client ?? client).get<tagsPreviewTagMergeResponses, tagsPreviewTagMergeErrors, ThrowOnError>({
+            responseType: 'json',
+            security: [{ scheme: 'bearer', type: 'http' }],
+            url: '/api/v1/tags/{tag_id}/merge-preview',
+            ...options
+        });
+    }
+    
+    /**
+     * Merge Tags
+     *
+     * Fold other tags into this one: every task carrying one of them carries
+     * this tag instead, once, and they are deleted (FR-01.27).
+     *
+     * Renaming a tag to a name in use stays refused; this is the separate,
+     * deliberate act for putting two spellings together. It keeps names as they
+     * are — case-sensitive and unique per user — and, like deleting a tag,
+     * cannot be undone: the activity log records it without being able to
+     * restore it. Only a human merges, as only a human renames or deletes a tag
+     * (ADR-0003).
+     */
+    public static mergeTags<ThrowOnError extends boolean = true>(options: Options<tagsMergeTagsData, ThrowOnError>) {
+        return (options.client ?? client).post<tagsMergeTagsResponses, tagsMergeTagsErrors, ThrowOnError>({
+            responseType: 'json',
+            security: [{ scheme: 'bearer', type: 'http' }],
+            url: '/api/v1/tags/{tag_id}/merge',
             ...options,
             headers: {
                 'Content-Type': 'application/json',

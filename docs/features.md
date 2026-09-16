@@ -88,6 +88,23 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
 - **FR-01.26** The Tags page lists the user's tags with the number of tasks
   each is on, and lets the user create, rename and delete them. Before a tag is
   deleted, the page asks for confirmation and says how many tasks will lose it.
+  The number is the live tasks, as the task list filtered by the tag shows them;
+  tasks archived with their project are counted beside it, and deleting the tag
+  reaches them too.
+- **FR-01.27** A user can merge tags: every task carrying the merged tags
+  carries the surviving one instead, once, and the merged tags are deleted,
+  archived tasks included. The user chooses which name survives and confirms
+  after being told how many tasks change — the tasks the user can see, deleted
+  ones left out as a tag's own count leaves them out, though their tag moves
+  too. A merge is one activity log entry and cannot be restored. Renaming into
+  a taken name stays refused.
+- **FR-01.28** The Tags page offers groups of tags whose names differ only in
+  letter case, separators, whitespace or a trailing plural "s" (not for a name
+  of three letters or fewer, nor one ending in "ss"), for merging. A group
+  is never merged without confirmation, and a group the user keeps apart is not
+  offered again until one of its tags is renamed or another joins it. Typing a
+  new name onto a task names the existing tags it would duplicate and offers
+  them instead. A tag a bot user created names that bot user, to the user.
 
 #### Deletion
 
