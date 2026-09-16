@@ -1,27 +1,19 @@
 import {
   type ColumnDef,
-  createPaginatedRowModel,
   flexRender,
   type RowData,
-  rowPaginationFeature,
   tableFeatures,
   useTable,
 } from "@tanstack/react-table"
 import {
-  ChevronLeft,
-  ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
+  ArrowDown,
+  ArrowUp,
+  ChevronsUpDown,
+  MoveHorizontal,
 } from "lucide-react"
 
-import { Button } from "@/components/ui/button"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Skeleton } from "@/components/ui/skeleton"
 import {
   Table,
   TableBody,
@@ -30,14 +22,34 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { cn } from "@/lib/utils"
 
-// The core row model is implicit in v9; pagination is opt-in per feature slot.
-const features = tableFeatures({
-  rowPaginationFeature,
-  paginatedRowModel: createPaginatedRowModel(),
-})
+// v9's core row model is implicit. Paging is the server's: a table that pages
+// an array it was handed can only ever page what it was handed, and would
+// report that window as the total.
+const features = tableFeatures({})
 
 export type DataTableFeatures = typeof features
+
+/** Selecting rows, for a table whose rows can be acted on as a batch. */
+export interface DataTableSelection<TData> {
+  /** The selected ids, which may reach beyond the page on screen. */
+  ids: ReadonlySet<string>
+  idOf: (row: TData) => string
+  label: (row: TData) => string
+  onToggle: (id: string, selected: boolean) => void
+  /** Select or clear every row on this page. */
+  onTogglePage: (ids: string[], selected: boolean) => void
+}
+
+/** Sorting a table by its headers, applied by the server. */
+export interface DataTableSorting {
+  /** Column id → the field the API sorts by. */
+  fields: Record<string, string>
+  field?: string
+  descending?: boolean
+  onSort: (field: string) => void
+}
 
 interface DataTableProps<TData extends RowData> {
   columns: ColumnDef<DataTableFeatures, TData, unknown>[]
@@ -55,6 +67,18 @@ interface DataTableProps<TData extends RowData> {
    * control without a name is unusable to anyone not looking at the screen.
    */
   rowLabel?: (row: TData) => string
+  /**
+   * Draw the table's own skeleton while the data is on its way. It is built
+   * from these columns, so it cannot describe a table that is not coming, and
+   * the page does not jump when the rows land.
+   */
+  pending?: boolean
+  /** How many rows to expect, so the skeleton reserves the right height. */
+  pendingRows?: number
+  selection?: DataTableSelection<TData>
+  sorting?: DataTableSorting
+  /** Names the sideways scroll, for a table too wide for a narrow screen. */
+  scrollLabel?: string
 }
 
 /**
@@ -76,28 +100,85 @@ export function DataTable<TData extends RowData>({
   empty,
   onRowClick,
   rowLabel,
+  pending = false,
+  pendingRows = 5,
+  selection,
+  sorting,
+  scrollLabel,
 }: DataTableProps<TData>) {
-  const table = useTable({
-    features,
-    data,
-    columns,
-  })
+  const table = useTable({ features, data, columns })
+  const pageIds = selection ? data.map(selection.idOf) : []
+  const wholePage =
+    pageIds.length > 0 && pageIds.every((id) => selection?.ids.has(id))
+  const columnCount = columns.length + (selection ? 1 : 0)
 
   return (
-    <div className="flex flex-col gap-4">
-      <Table>
+    <>
+      {/* The row is wider than a phone, and a table that simply stops at the
+          screen edge looks like a table that ends there. Naming the scroll
+          makes it a region the keyboard can reach, and the container's edge
+          shadows say there is more where it came from. */}
+      <Table scrollLabel={scrollLabel}>
         <TableHeader>
           {table.getHeaderGroups().map((headerGroup) => (
             <TableRow key={headerGroup.id} className="hover:bg-transparent">
+              {selection && (
+                <TableHead className="w-10">
+                  <Checkbox
+                    checked={wholePage}
+                    disabled={pageIds.length === 0}
+                    aria-label="Select every task on this page"
+                    onCheckedChange={(checked) =>
+                      selection.onTogglePage(pageIds, checked === true)
+                    }
+                  />
+                </TableHead>
+              )}
               {headerGroup.headers.map((header) => {
+                const field = sorting?.fields[header.column.id]
+                const active = field !== undefined && sorting?.field === field
+                const content = header.isPlaceholder
+                  ? null
+                  : flexRender(
+                      header.column.columnDef.header,
+                      header.getContext(),
+                    )
                 return (
-                  <TableHead key={header.id}>
-                    {header.isPlaceholder
-                      ? null
-                      : flexRender(
-                          header.column.columnDef.header,
-                          header.getContext(),
+                  <TableHead
+                    key={header.id}
+                    aria-sort={
+                      active
+                        ? sorting?.descending
+                          ? "descending"
+                          : "ascending"
+                        : field
+                          ? "none"
+                          : undefined
+                    }
+                  >
+                    {field && sorting ? (
+                      <button
+                        type="button"
+                        onClick={() => sorting.onSort(field)}
+                        className="hover:text-foreground focus-visible:ring-ring -mx-1 flex items-center gap-1 rounded px-1 outline-none focus-visible:ring-2"
+                      >
+                        {content}
+                        {active ? (
+                          sorting.descending ? (
+                            <ArrowDown className="size-3.5" aria-hidden />
+                          ) : (
+                            <ArrowUp className="size-3.5" aria-hidden />
+                          )
+                        ) : (
+                          <ChevronsUpDown
+                            className="size-3.5 opacity-50"
+                            aria-hidden
+                          />
                         )}
+                      </button>
+                    ) : (
+                      content
+                    )}
                   </TableHead>
                 )
               })}
@@ -105,49 +186,75 @@ export function DataTable<TData extends RowData>({
           ))}
         </TableHeader>
         <TableBody>
-          {table.getRowModel().rows.length ? (
-            table.getRowModel().rows.map((row) => (
-              <TableRow
-                key={row.id}
-                className={
-                  onRowClick
-                    ? "focus-visible:ring-ring cursor-pointer outline-none focus-visible:ring-2"
-                    : undefined
-                }
-                // A row that opens a record takes focus, answers Enter and
-                // Space, and says what it opens. It stays a row: giving it a
-                // button's role would take the table's structure away from
-                // every reader who relies on it.
-                tabIndex={onRowClick ? 0 : undefined}
-                aria-label={rowLabel?.(row.original)}
-                onClick={
-                  onRowClick
-                    ? (event) => {
-                        if (fromRowItself(event)) onRowClick(row.original)
-                      }
-                    : undefined
-                }
-                onKeyDown={
-                  onRowClick
-                    ? (event) => {
-                        if (event.key !== "Enter" && event.key !== " ") return
-                        if (event.target !== event.currentTarget) return
-                        event.preventDefault()
-                        onRowClick(row.original)
-                      }
-                    : undefined
-                }
-              >
-                {row.getAllCells().map((cell) => (
-                  <TableCell key={cell.id}>
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </TableCell>
-                ))}
-              </TableRow>
-            ))
+          {pending ? (
+            <PendingRows
+              rows={pendingRows}
+              columns={columnCount}
+              key="pending"
+            />
+          ) : table.getRowModel().rows.length ? (
+            table.getRowModel().rows.map((row) => {
+              const id = selection?.idOf(row.original)
+              const selected =
+                id !== undefined && Boolean(selection?.ids.has(id))
+              return (
+                <TableRow
+                  key={row.id}
+                  data-state={selected ? "selected" : undefined}
+                  className={
+                    onRowClick
+                      ? "focus-visible:ring-ring cursor-pointer outline-none focus-visible:ring-2"
+                      : undefined
+                  }
+                  // A row that opens a record takes focus, answers Enter and
+                  // Space, and says what it opens. It stays a row: giving it a
+                  // button's role would take the table's structure away from
+                  // every reader who relies on it.
+                  tabIndex={onRowClick ? 0 : undefined}
+                  aria-label={rowLabel?.(row.original)}
+                  onClick={
+                    onRowClick
+                      ? (event) => {
+                          if (fromRowItself(event)) onRowClick(row.original)
+                        }
+                      : undefined
+                  }
+                  onKeyDown={
+                    onRowClick
+                      ? (event) => {
+                          if (event.key !== "Enter" && event.key !== " ") return
+                          if (event.target !== event.currentTarget) return
+                          event.preventDefault()
+                          onRowClick(row.original)
+                        }
+                      : undefined
+                  }
+                >
+                  {selection && id !== undefined && (
+                    <TableCell className="w-10">
+                      <Checkbox
+                        checked={selected}
+                        aria-label={selection.label(row.original)}
+                        onCheckedChange={(checked) =>
+                          selection.onToggle(id, checked === true)
+                        }
+                      />
+                    </TableCell>
+                  )}
+                  {row.getAllCells().map((cell) => (
+                    <TableCell key={cell.id}>
+                      {flexRender(
+                        cell.column.columnDef.cell,
+                        cell.getContext(),
+                      )}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              )
+            })
           ) : (
             <TableRow className="hover:bg-transparent">
-              <TableCell colSpan={columns.length} className="p-0">
+              <TableCell colSpan={columnCount} className="p-0">
                 {empty ?? (
                   <p className="text-muted-foreground py-16 text-center">
                     No results found.
@@ -159,103 +266,32 @@ export function DataTable<TData extends RowData>({
         </TableBody>
       </Table>
 
-      {table.getPageCount() > 1 && (
-        <div className="bg-card flex flex-col items-start justify-between gap-4 rounded-lg border p-4 sm:flex-row sm:items-center">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-            <div className="text-sm text-muted-foreground">
-              Showing{" "}
-              {table.state.pagination.pageIndex *
-                table.state.pagination.pageSize +
-                1}{" "}
-              to{" "}
-              {Math.min(
-                (table.state.pagination.pageIndex + 1) *
-                  table.state.pagination.pageSize,
-                data.length,
-              )}{" "}
-              of{" "}
-              <span className="font-medium text-foreground">{data.length}</span>{" "}
-              entries
-            </div>
-            <div className="flex items-center gap-x-2">
-              <p className="text-sm text-muted-foreground">Rows per page</p>
-              <Select
-                value={`${table.state.pagination.pageSize}`}
-                onValueChange={(value) => {
-                  table.setPageSize(Number(value))
-                }}
-              >
-                <SelectTrigger className="h-8 w-[70px]">
-                  <SelectValue placeholder={table.state.pagination.pageSize} />
-                </SelectTrigger>
-                <SelectContent side="top">
-                  {[5, 10, 25, 50].map((pageSize) => (
-                    <SelectItem key={pageSize} value={`${pageSize}`}>
-                      {pageSize}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-x-6">
-            <div className="flex items-center gap-x-1 text-sm text-muted-foreground">
-              <span>Page</span>
-              <span className="font-medium text-foreground">
-                {table.state.pagination.pageIndex + 1}
-              </span>
-              <span>of</span>
-              <span className="font-medium text-foreground">
-                {table.getPageCount()}
-              </span>
-            </div>
-
-            <div className="flex items-center gap-x-1">
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8 w-8 p-0"
-                onClick={() => table.setPageIndex(0)}
-                disabled={!table.getCanPreviousPage()}
-              >
-                <span className="sr-only">Go to first page</span>
-                <ChevronsLeft className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8 w-8 p-0"
-                onClick={() => table.previousPage()}
-                disabled={!table.getCanPreviousPage()}
-              >
-                <span className="sr-only">Go to previous page</span>
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8 w-8 p-0"
-                onClick={() => table.nextPage()}
-                disabled={!table.getCanNextPage()}
-              >
-                <span className="sr-only">Go to next page</span>
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8 w-8 p-0"
-                onClick={() => table.setPageIndex(table.getPageCount() - 1)}
-                disabled={!table.getCanNextPage()}
-              >
-                <span className="sr-only">Go to last page</span>
-                <ChevronsRight className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        </div>
+      {scrollLabel && (
+        // Said in words as well as drawn: on a phone the row is wider than
+        // the screen, and a table that appears to end at the edge is the one
+        // thing this must not be.
+        <p className="text-muted-foreground flex items-center gap-1 text-xs md:hidden">
+          <MoveHorizontal className="size-3.5" aria-hidden />
+          Swipe sideways for the rest of each row
+        </p>
       )}
-    </div>
+    </>
   )
+}
+
+/**
+ * The table's own loading state, with as many rows as are expected: a
+ * skeleton that describes a different table makes the page jump when the real
+ * one lands, which is the largest layout shift a list can produce.
+ */
+function PendingRows({ rows, columns }: { rows: number; columns: number }) {
+  return Array.from({ length: rows }).map((_, rowIndex) => (
+    <TableRow key={rowIndex} className="hover:bg-transparent">
+      {Array.from({ length: columns }).map((_, cellIndex) => (
+        <TableCell key={cellIndex}>
+          <Skeleton className={cn("h-4", cellIndex === 0 ? "w-4" : "w-24")} />
+        </TableCell>
+      ))}
+    </TableRow>
+  ))
 }

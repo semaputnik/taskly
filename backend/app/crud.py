@@ -34,9 +34,11 @@ from app.models import (
     RecurrenceFrequency,
     Series,
     SortOrder,
+    SubtaskCompletion,
     Tag,
     TagPublic,
     Task,
+    TaskBulkUpdate,
     TaskCreate,
     TaskPriority,
     TaskQuery,
@@ -905,6 +907,98 @@ def has_subtasks(*, session: Session, task: Task) -> bool:
         select(Task.id).where(Task.parent_id == task.id, not_deleted(Task)).limit(1)
     )
     return session.exec(statement).first() is not None
+
+
+def bulk_update_tasks(
+    *,
+    session: Session,
+    tasks: Sequence[Task],
+    changes: TaskBulkUpdate,
+    assignee: Assignee | None = None,
+) -> None:
+    """
+    Apply one set of changes to every task, in one transaction.
+
+    Staged task by task and committed once: a batch either lands whole or not
+    at all, so a refusal anywhere leaves the selection exactly as it was.
+    """
+    fields = changes.model_dump(
+        exclude_unset=True,
+        exclude={
+            "task_ids",
+            "subtasks",
+            "add_tags",
+            "remove_tags",
+            "assignee_id",
+        },
+    )
+    if "assignee_id" in changes.model_fields_set:
+        if assignee is None:
+            raise ValueError("A batch that sets the assignee needs it resolved")
+        fields["assignee_id"] = assignee.user_id
+        fields["assignee_bot_user_id"] = assignee.bot_user_id
+
+    for task in tasks:
+        if changes.completed is True and changes.subtasks is SubtaskCompletion.COMPLETE:
+            complete_subtasks(session=session, task=task)
+        was_completed = task.completed
+        task.sqlmodel_update(fields)
+        session.add(task)
+        # Completing an occurrence of a recurring task creates the next one,
+        # in the same transaction, so a series is never left with no open
+        # occurrence — a batch completes exactly as a single task does
+        # (FR-01.14).
+        if task.completed and not was_completed and task.series_id is not None:
+            _stage_next_occurrence(session=session, task=task)
+        if changes.add_tags or changes.remove_tags:
+            _stage_tag_changes(
+                session=session,
+                task=task,
+                add=changes.add_tags,
+                remove=changes.remove_tags,
+            )
+    session.commit()
+
+
+def _stage_tag_changes(
+    *, session: Session, task: Task, add: Sequence[str], remove: Sequence[str]
+) -> None:
+    """
+    Put tags on a task and take tags off it, leaving the rest alone.
+
+    A batch labels a selection; it does not replace what each task carried,
+    which is why this adds and removes rather than setting the whole set.
+    """
+    current = get_task_tags(session=session, task_ids=[task.id])[task.id]
+    wanted = [name for name in current if name not in remove]
+    wanted.extend(name for name in add if name not in wanted)
+    if wanted != current:
+        _stage_task_tags(session=session, task=task, names=wanted)
+
+
+def bulk_delete_tasks(*, session: Session, tasks: Sequence[Task]) -> int:
+    """
+    Soft-delete several tasks and their subtrees as one event, so that one act
+    is one thing to undo (FR-10.4).
+
+    The event names no single task: the user pointed at a selection, and the
+    rows carrying the event are the whole of what went down.
+    """
+    deletion = Deletion(owner_id=tasks[0].owner_id)
+    session.add(deletion)
+    session.flush()
+
+    for task in tasks:
+        subtree = _subtree_cte(task.id)
+        _mark_deleted(session=session, task_ids=select(subtree.c.id), deletion=deletion)
+        task.deletion_id = deletion.id
+        session.add(task)
+    session.flush()
+    deleted = session.exec(
+        select(func.count()).select_from(Task).where(Task.deletion_id == deletion.id)
+    ).one()
+    session.commit()
+    return deleted
 
 
 def delete_task(*, session: Session, task: Task) -> None:

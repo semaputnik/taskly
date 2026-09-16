@@ -129,6 +129,35 @@
 
 @layer components {
   /*
+   * Scroll shadows: the shadow on an edge shows only while there is content
+   * past it, because the covering gradients scroll with the content and the
+   * shadows do not. A phone-width table otherwise appears to end at the
+   * screen edge, with no fade, no arrow and no scrollbar to say otherwise.
+   */
+  .scroll-shadows {
+    background:
+      linear-gradient(to right, var(--card) 30%, transparent) left center /
+      2.5rem 100% no-repeat local,
+      linear-gradient(to left, var(--card) 30%, transparent) right center /
+      2.5rem 100% no-repeat local,
+      radial-gradient(
+        farthest-side at 0 50%,
+        color-mix(in oklab, var(--foreground) 30%, transparent),
+        transparent
+      )
+      left center / 1rem 100% no-repeat scroll,
+      radial-gradient(
+        farthest-side at 100% 50%,
+        color-mix(in oklab, var(--foreground) 30%, transparent),
+        transparent
+      )
+      right center / 1rem 100% no-repeat scroll,
+      /* The surface itself, last: the shorthand would otherwise leave the
+         container transparent and the covers would have nothing to cover. */
+      var(--card);
+  }
+
+  /*
    * A panel's controls rest flat and take their affordance from hover, which
    * a touch screen does not have: without this, an editable select and a
    * read-only value are the same flat row under a thumb. Where the pointer is

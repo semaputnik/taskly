@@ -43,6 +43,9 @@ export const taskSearchSchema = z.object({
   overdue: z.literal(true).optional().catch(undefined),
   sort: z.enum(["due_date", "priority"]).optional().catch(undefined),
   order: z.literal("desc").optional().catch(undefined),
+  // The page of results being read. Like the sort, it is not a filter: it is
+  // where in the results the reader is.
+  page: z.number().int().min(1).optional().catch(undefined),
 })
 
 export type TaskSearch = z.infer<typeof taskSearchSchema>

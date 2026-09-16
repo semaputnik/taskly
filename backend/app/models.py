@@ -94,9 +94,11 @@ class Deletion(SQLModel, table=True):
 
     __table_args__ = (
         # The event names the one thing the user pointed at; everything else
-        # went down as a cascade.
+        # went down as a cascade. A batch points at nothing in particular —
+        # the user pointed at a selection — so both are empty there, and the
+        # rows that carry the event are the whole of what it took down.
         CheckConstraint(
-            "(task_id IS NULL) <> (project_id IS NULL)",
+            "NOT (task_id IS NOT NULL AND project_id IS NOT NULL)",
             name="deletion_targets_one_thing",
         ),
     )
@@ -262,6 +264,51 @@ class TaskSort(StrEnum):
 class SortOrder(StrEnum):
     ASC = "asc"
     DESC = "desc"
+
+
+class TaskBulkUpdate(SQLModel):
+    """
+    One set of changes for many tasks: the single-task update, plus the tasks
+    it applies to.
+
+    `add_tags` and `remove_tags` rather than `tags`: a batch adds a label to a
+    selection or takes one off it, and replacing every task's tags wholesale
+    would destroy what each of them already carried.
+    """
+
+    task_ids: list[uuid.UUID] = Field(min_length=1, max_length=500)
+    completed: bool | None = None
+    subtasks: SubtaskCompletion | None = None
+    priority: TaskPriority | None = None
+    due_date: date | None = None
+    project_id: uuid.UUID | None = None
+    assignee_id: uuid.UUID | None = None
+    add_tags: list[TagName] = []
+    remove_tags: list[TagName] = []
+
+
+class TaskBulkDelete(SQLModel):
+    """
+    One deletion event over several tasks, restorable as the one act it was.
+    """
+
+    task_ids: list[uuid.UUID] = Field(min_length=1, max_length=500)
+    delete_subtasks: bool = False
+
+
+class TaskRefusal(SQLModel):
+    """One task a batch could not change, and what stood in the way."""
+
+    task_id: uuid.UUID
+    code: str
+    message: str
+
+
+class BulkResult(SQLModel):
+    """How many tasks one act changed."""
+
+    updated: int = 0
+    deleted: int = 0
 
 
 class TaskQuery(SQLModel):
@@ -670,6 +717,8 @@ class ActivityAction(StrEnum):
 
     TASK_CREATED = "task_created"
     TASK_CHANGED = "task_changed"
+    # Many tasks changed by one act: one entry for the batch, not one per task.
+    TASKS_BULK_CHANGED = "tasks_bulk_changed"
     TASK_COMPLETED = "task_completed"
     TASK_REOPENED = "task_reopened"
     TASK_DELETED = "task_deleted"

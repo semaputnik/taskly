@@ -53,6 +53,9 @@ export function CompleteTask({ task }: CompleteTaskProps) {
   return (
     <>
       <Checkbox
+        // Round: a square check in this table selects a row, and completion
+        // is neither a selection nor a value — it is the state of the task.
+        className="rounded-full"
         checked={task.completed}
         disabled={mutation.isPending}
         onCheckedChange={(checked) =>

@@ -3,27 +3,37 @@ from datetime import date
 from typing import Annotated, Any
 
 from fastapi import APIRouter, HTTPException, Query
+from sqlmodel import col, select
 
-from app import crud
+from app import activity, crud
 from app.api import authorization
 from app.api.authorization import TaskAction
 from app.api.deps import (
+    PROJECT_ARCHIVED_CODE,
     Caller,
     CallerDep,
+    CurrentUser,
     SessionDep,
+    get_owned_project,
     require_project_writable,
     require_task_writable,
 )
 from app.models import (
+    ActivityAction,
     BotUser,
     BotUserRef,
+    BulkResult,
     Message,
+    Project,
     Recurrence,
     SubtaskCompletion,
     Task,
+    TaskBulkDelete,
+    TaskBulkUpdate,
     TaskCreate,
     TaskPublic,
     TaskQuery,
+    TaskRefusal,
     TasksPublic,
     TaskUpdate,
 )
@@ -260,6 +270,249 @@ def create_task(*, session: SessionDep, caller: CallerDep, task_in: TaskCreate) 
         tag_names=tag_names,
     )
     return _read(session, task)
+
+
+# A batch is one act over a selection, and it lands whole or not at all: the
+# refusals say which tasks stood in the way and why, so the rest can be sent
+# again without them (story 29).
+BULK_REFUSED_STATUS = 409
+BULK_REFUSED_CODE = "bulk_refused"
+
+
+def _bulk_refusal(refusals: list[TaskRefusal]) -> HTTPException:
+    return HTTPException(
+        status_code=BULK_REFUSED_STATUS,
+        detail={
+            "code": BULK_REFUSED_CODE,
+            "message": (
+                f"{len(refusals)} of the tasks could not be changed, so none "
+                "of them were."
+            ),
+            "refusals": [refusal.model_dump(mode="json") for refusal in refusals],
+        },
+    )
+
+
+def _projects_of(
+    session: SessionDep, current_user: CurrentUser, tasks: list[Task]
+) -> dict[uuid.UUID, Project]:
+    """
+    The project each task resolves to, in one walk down the user's trees
+    rather than one per task: a batch may name hundreds.
+    """
+    if not tasks:
+        return {}
+    project_ids = crud.get_task_project_ids(session=session, owner_id=current_user.id)
+    projects = {
+        project.id: project
+        for project in session.exec(
+            select(Project).where(
+                col(Project.id).in_({project_ids[task.id] for task in tasks})
+            )
+        ).all()
+    }
+    return {task.id: projects[project_ids[task.id]] for task in tasks}
+
+
+def _archived_refusal(task: Task, project: Project) -> TaskRefusal:
+    return TaskRefusal(
+        task_id=task.id,
+        code=PROJECT_ARCHIVED_CODE,
+        message=(
+            f"“{task.title}” is in the archived project “{project.name}”, "
+            "which is read-only."
+        ),
+    )
+
+
+def _owned_tasks(
+    session: SessionDep,
+    current_user: CurrentUser,
+    task_ids: list[uuid.UUID],
+) -> tuple[list[Task], list[TaskRefusal]]:
+    """
+    The caller's own tasks among those named, and a refusal for each of the
+    rest. A task somebody else owns is refused exactly like one that does not
+    exist: the batch says nothing about whose it is.
+    """
+    tasks: list[Task] = []
+    refusals: list[TaskRefusal] = []
+    for task_id in dict.fromkeys(task_ids):
+        task = session.get(Task, task_id)
+        if not task or task.owner_id != current_user.id or task.deletion_id:
+            refusals.append(
+                TaskRefusal(
+                    task_id=task_id,
+                    code="not_found",
+                    message="This task is not there any more.",
+                )
+            )
+            continue
+        tasks.append(task)
+    return tasks, refusals
+
+
+@router.post("/bulk", response_model=BulkResult)
+def bulk_update_tasks(
+    *, session: SessionDep, current_user: CurrentUser, changes: TaskBulkUpdate
+) -> Any:
+    """
+    Apply one set of changes to many tasks (semaputnik/taskly#66).
+
+    Human-only, deliberately: a batch gives an integration far more leverage
+    than the per-task endpoint it already has, and this product chooses a
+    structural impossibility over a permission wherever the choice exists
+    (semaputnik/taskly#7). Opening it to bot users would be its own decision.
+
+    All-or-nothing: every task is checked before any of them is written, so a
+    selection that cannot be changed whole is not changed at all.
+    """
+    tasks, refusals = _owned_tasks(session, current_user, changes.task_ids)
+
+    destination = None
+    if "project_id" in changes.model_fields_set:
+        if changes.project_id is None:
+            raise HTTPException(
+                status_code=400, detail="A task must belong to a project"
+            )
+        destination = get_owned_project(session, current_user, changes.project_id)
+        require_project_writable(destination)
+    moving = destination is not None
+
+    projects = _projects_of(session, current_user, tasks)
+    for task in tasks:
+        project = projects[task.id]
+        if project.is_archived:
+            refusals.append(_archived_refusal(task, project))
+            continue
+        if moving and task.parent_id is not None:
+            refusals.append(
+                TaskRefusal(
+                    task_id=task.id,
+                    code="subtask_follows_parent",
+                    message=(
+                        "A subtask follows the project of the task at the top "
+                        "of its tree."
+                    ),
+                )
+            )
+            continue
+        if (
+            changes.completed is True
+            and changes.subtasks is None
+            and crud.has_uncompleted_subtasks(session=session, task=task)
+        ):
+            refusals.append(
+                TaskRefusal(
+                    task_id=task.id,
+                    code=UNCOMPLETED_SUBTASKS_CODE,
+                    message=(
+                        f"“{task.title}” has uncompleted subtasks. Say whether "
+                        "they are completed too."
+                    ),
+                )
+            )
+            continue
+        if "due_date" in changes.model_fields_set and task.series_id is not None:
+            # Moving one occurrence of a series asks how far the move reaches
+            # (FR-01.17), which is a question for that task's own panel.
+            refusals.append(
+                TaskRefusal(
+                    task_id=task.id,
+                    code="task_repeats",
+                    message=(
+                        f"“{task.title}” repeats. Move its due date from the "
+                        "task itself, where the rest of the series can be "
+                        "settled."
+                    ),
+                )
+            )
+            continue
+
+    if refusals:
+        raise _bulk_refusal(refusals)
+
+    assignee = None
+    if "assignee_id" in changes.model_fields_set:
+        assignee = _resolve_assignee(
+            session, Caller(owner_id=current_user.id), changes.assignee_id
+        )
+
+    activity.set_batch(
+        session,
+        ActivityAction.TASKS_BULK_CHANGED,
+        [task.id for task in tasks],
+        {"changes": _batch_summary(changes, destination)},
+    )
+    crud.bulk_update_tasks(
+        session=session, tasks=tasks, changes=changes, assignee=assignee
+    )
+    return BulkResult(updated=len(tasks))
+
+
+def _batch_summary(
+    changes: TaskBulkUpdate, destination: Project | None
+) -> dict[str, Any]:
+    """What the log says a batch did, in the words the reader will see."""
+    summary: dict[str, Any] = {}
+    fields_set = changes.model_fields_set
+    if "completed" in fields_set:
+        summary["completed"] = changes.completed
+    if "priority" in fields_set:
+        summary["priority"] = changes.priority
+    if "due_date" in fields_set:
+        summary["due_date"] = changes.due_date
+    if destination is not None:
+        summary["project"] = {"id": str(destination.id), "name": destination.name}
+    if changes.add_tags:
+        summary["added_tags"] = list(changes.add_tags)
+    if changes.remove_tags:
+        summary["removed_tags"] = list(changes.remove_tags)
+    if "assignee_id" in fields_set:
+        summary["assignee_id"] = (
+            str(changes.assignee_id) if changes.assignee_id else None
+        )
+    return summary
+
+
+@router.post("/bulk-delete", response_model=BulkResult)
+def bulk_delete_tasks(
+    *, session: SessionDep, current_user: CurrentUser, request: TaskBulkDelete
+) -> Any:
+    """
+    Delete several tasks as one event, restorable as the one act it was
+    (FR-01.11, FR-10.4).
+
+    A task with subtasks takes its whole subtree down, so the batch is refused
+    until the request says it may — the same confirmation the single-task
+    delete asks for (FR-01.12).
+    """
+    tasks, refusals = _owned_tasks(session, current_user, request.task_ids)
+    projects = _projects_of(session, current_user, tasks)
+    for task in tasks:
+        project = projects[task.id]
+        if project.is_archived:
+            # Collected like every other refusal: a batch says which tasks
+            # stood in the way, rather than stopping at the first one.
+            refusals.append(_archived_refusal(task, project))
+        elif not request.delete_subtasks and crud.has_subtasks(
+            session=session, task=task
+        ):
+            refusals.append(
+                TaskRefusal(
+                    task_id=task.id,
+                    code=HAS_SUBTASKS_CODE,
+                    message=(
+                        f"“{task.title}” has subtasks, which would be deleted with it."
+                    ),
+                )
+            )
+
+    if refusals:
+        raise _bulk_refusal(refusals)
+
+    deleted = crud.bulk_delete_tasks(session=session, tasks=tasks)
+    return BulkResult(deleted=deleted)
 
 
 @router.get("/{task_id}", response_model=TaskPublic)

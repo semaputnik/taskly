@@ -18,6 +18,29 @@ const FIELD_LABELS: Record<string, string> = {
   recurrence: "repeat",
 }
 
+/** What a batch did, in the words the reader will recognise. */
+function describeBatch(changes: Record<string, unknown>): string {
+  const said: string[] = []
+  if ("completed" in changes) {
+    said.push(changes.completed ? "completed" : "reopened")
+  }
+  if ("priority" in changes) {
+    said.push(
+      changes.priority ? `priority ${changes.priority}` : "priority cleared",
+    )
+  }
+  if ("due_date" in changes) {
+    said.push(changes.due_date ? `due ${changes.due_date}` : "due date cleared")
+  }
+  const project = changes.project as { name?: string } | undefined
+  if (project?.name) said.push(`moved to ${project.name}`)
+  const added = changes.added_tags as string[] | undefined
+  if (added?.length) said.push(`tagged ${added.join(", ")}`)
+  const removed = changes.removed_tags as string[] | undefined
+  if (removed?.length) said.push(`untagged ${removed.join(", ")}`)
+  return said.join(", ")
+}
+
 function detail<T>(entry: ActivityEntryPublic, key: string): T | undefined {
   return entry.details[key] as T | undefined
 }
@@ -131,12 +154,28 @@ export function ActivityDescription({
     case "task_reopened":
       return <>Marked {subject} as not completed</>
     case "task_deleted": {
+      // A batch names no single task: what it deleted is the selection, and
+      // the count is what the entry has to say.
+      const batch = detail<number>(entry, "task_count")
+      if (batch !== undefined) {
+        return <>Deleted {batch === 1 ? "1 task" : `${batch} tasks`}</>
+      }
       const subtasks = detail<number>(entry, "subtask_count") ?? 0
       return (
         <>
           Deleted {subject}
           {subtasks > 0 &&
             ` and ${subtasks} ${subtasks === 1 ? "subtask" : "subtasks"}`}
+        </>
+      )
+    }
+    case "tasks_bulk_changed": {
+      const count = detail<number>(entry, "task_count") ?? 0
+      const changes = detail<Record<string, unknown>>(entry, "changes") ?? {}
+      return (
+        <>
+          Changed {count === 1 ? "1 task" : `${count} tasks`}
+          {describeBatch(changes) && `: ${describeBatch(changes)}`}
         </>
       )
     }

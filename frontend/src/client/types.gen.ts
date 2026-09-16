@@ -9,7 +9,7 @@ export type ClientOptions = {
  *
  * Everything the activity log records (FR-10.3).
  */
-export type ActivityAction = 'task_created' | 'task_changed' | 'task_completed' | 'task_reopened' | 'task_deleted' | 'task_restored' | 'task_moved' | 'task_assigned' | 'task_unassigned' | 'project_created' | 'project_changed' | 'project_deleted' | 'project_restored' | 'comment_added' | 'comment_edited' | 'comment_deleted' | 'attachment_added' | 'attachment_deleted' | 'tag_created' | 'tag_renamed' | 'tag_deleted';
+export type ActivityAction = 'task_created' | 'task_changed' | 'tasks_bulk_changed' | 'task_completed' | 'task_reopened' | 'task_deleted' | 'task_restored' | 'task_moved' | 'task_assigned' | 'task_unassigned' | 'project_created' | 'project_changed' | 'project_deleted' | 'project_restored' | 'comment_added' | 'comment_edited' | 'comment_deleted' | 'attachment_added' | 'attachment_deleted' | 'tag_created' | 'tag_renamed' | 'tag_deleted';
 
 /**
  * ActivityEntityType
@@ -363,6 +363,22 @@ export type BotUsersPublic = {
 };
 
 /**
+ * BulkResult
+ *
+ * How many tasks one act changed.
+ */
+export type BulkResult = {
+    /**
+     * Updated
+     */
+    updated?: number;
+    /**
+     * Deleted
+     */
+    deleted?: number;
+};
+
+/**
  * CommentCreate
  */
 export type CommentCreate = {
@@ -647,6 +663,65 @@ export type TagsPublic = {
      * Count
      */
     count: number;
+};
+
+/**
+ * TaskBulkDelete
+ *
+ * One deletion event over several tasks, restorable as the one act it was.
+ */
+export type TaskBulkDelete = {
+    /**
+     * Task Ids
+     */
+    task_ids: Array<string>;
+    /**
+     * Delete Subtasks
+     */
+    delete_subtasks?: boolean;
+};
+
+/**
+ * TaskBulkUpdate
+ *
+ * One set of changes for many tasks: the single-task update, plus the tasks
+ * it applies to.
+ *
+ * `add_tags` and `remove_tags` rather than `tags`: a batch adds a label to a
+ * selection or takes one off it, and replacing every task's tags wholesale
+ * would destroy what each of them already carried.
+ */
+export type TaskBulkUpdate = {
+    /**
+     * Task Ids
+     */
+    task_ids: Array<string>;
+    /**
+     * Completed
+     */
+    completed?: boolean | null;
+    subtasks?: SubtaskCompletion | null;
+    priority?: TaskPriority | null;
+    /**
+     * Due Date
+     */
+    due_date?: string | null;
+    /**
+     * Project Id
+     */
+    project_id?: string | null;
+    /**
+     * Assignee Id
+     */
+    assignee_id?: string | null;
+    /**
+     * Add Tags
+     */
+    add_tags?: Array<string>;
+    /**
+     * Remove Tags
+     */
+    remove_tags?: Array<string>;
 };
 
 /**
@@ -1511,6 +1586,56 @@ export type tasksCreateTaskResponses = {
 };
 
 export type tasksCreateTaskResponse = tasksCreateTaskResponses[keyof tasksCreateTaskResponses];
+
+export type tasksBulkUpdateTasksData = {
+    body: TaskBulkUpdate;
+    path?: never;
+    query?: never;
+    url: '/api/v1/tasks/bulk';
+};
+
+export type tasksBulkUpdateTasksErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type tasksBulkUpdateTasksError = tasksBulkUpdateTasksErrors[keyof tasksBulkUpdateTasksErrors];
+
+export type tasksBulkUpdateTasksResponses = {
+    /**
+     * Successful Response
+     */
+    200: BulkResult;
+};
+
+export type tasksBulkUpdateTasksResponse = tasksBulkUpdateTasksResponses[keyof tasksBulkUpdateTasksResponses];
+
+export type tasksBulkDeleteTasksData = {
+    body: TaskBulkDelete;
+    path?: never;
+    query?: never;
+    url: '/api/v1/tasks/bulk-delete';
+};
+
+export type tasksBulkDeleteTasksErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type tasksBulkDeleteTasksError = tasksBulkDeleteTasksErrors[keyof tasksBulkDeleteTasksErrors];
+
+export type tasksBulkDeleteTasksResponses = {
+    /**
+     * Successful Response
+     */
+    200: BulkResult;
+};
+
+export type tasksBulkDeleteTasksResponse = tasksBulkDeleteTasksResponses[keyof tasksBulkDeleteTasksResponses];
 
 export type tasksDeleteTaskData = {
     body?: never;

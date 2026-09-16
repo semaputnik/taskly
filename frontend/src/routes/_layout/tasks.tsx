@@ -1,28 +1,43 @@
-import { useSuspenseQuery } from "@tanstack/react-query"
+import { useQuery } from "@tanstack/react-query"
 import { createFileRoute, Link as RouterLink } from "@tanstack/react-router"
 import { CheckSquare, SearchX } from "lucide-react"
-import { Suspense } from "react"
+import { useState } from "react"
 
-import { ProjectsService, TasksService } from "@/client"
+import { ProjectsService, type TaskPublic, TasksService } from "@/client"
 import { DataTable } from "@/components/Common/DataTable"
 import { EmptyState } from "@/components/Common/EmptyState"
-import PendingTasks from "@/components/Pending/PendingTasks"
 import { useRecordPanels, withoutPanelState } from "@/components/Records/panels"
 import { getColumns } from "@/components/Tasks/columns"
 import {
   clearedFilters,
+  FILTER_KEYS,
   hasActiveFilters,
   type TaskListSearch,
   type TaskSearch,
   taskSearchSchema,
 } from "@/components/Tasks/search"
+import { TaskBulkActions } from "@/components/Tasks/TaskBulkActions"
 import { TaskFilters } from "@/components/Tasks/TaskFilters"
 import { buildTaskTree } from "@/components/Tasks/tree"
 import { Button } from "@/components/ui/button"
 import useAuth from "@/hooks/useAuth"
+import useCustomToast from "@/hooks/useCustomToast"
+import { handleError } from "@/utils"
+
+const PAGE_SIZE = 25
+
+// What one batch can carry, matching the API's own limit on a batch's ids.
+const MAX_BATCH = 500
+
+// One empty set, so a cleared selection is the same value every render.
+const EMPTY: ReadonlySet<string> = new Set()
+
+// Which column sorts by what. Only these two order the list; the rest are
+// read, not scanned in order.
+const SORT_FIELDS = { due_date: "due_date", priority: "priority" }
 
 function getTasksQueryOptions(search: TaskListSearch, currentUserId?: string) {
-  const { assignee, ...filters } = withoutPanelState(search)
+  const { assignee, page = 1, ...filters } = withoutPanelState(search)
   const query = {
     ...filters,
     // "Me" needs the id the API filters on, a bot user is named by its own
@@ -34,8 +49,11 @@ function getTasksQueryOptions(search: TaskListSearch, currentUserId?: string) {
           ? undefined
           : assignee,
     unassigned: assignee === "unassigned" ? true : undefined,
-    skip: 0,
-    limit: 100,
+    // The page the reader is on, asked for as such: a table that fetches a
+    // window and then pages it in the browser can only page what it fetched,
+    // and would report that window as the total.
+    skip: (page - 1) * PAGE_SIZE,
+    limit: PAGE_SIZE,
   }
   return {
     queryFn: async () => (await TasksService.readTasks({ query })).data,
@@ -64,110 +82,93 @@ export const Route = createFileRoute("/_layout/tasks")({
   }),
 })
 
-function TasksTableContent({
-  search,
-  currentUserId,
-  onClearFilters,
-  onOpenTask,
-  onCapture,
-}: {
-  search: TaskListSearch
-  currentUserId?: string
-  onClearFilters: () => void
-  onOpenTask: (taskId: string) => void
-  onCapture: () => void
-}) {
-  const { data: tasks } = useSuspenseQuery(
-    getTasksQueryOptions(search, currentUserId),
-  )
-  const { data: projects } = useSuspenseQuery(getProjectsQueryOptions())
-
-  const projectNames = Object.fromEntries(
-    projects.data.map((project) => [project.id, project.name]),
-  )
-  // Nesting subtasks under their parents would reorder what the server just
-  // sorted, so an explicit sort gets a flat list: the user asked for that
-  // order, not for the tree.
-  const { tasks: ordered, depths } = search.sort
-    ? { tasks: tasks.data, depths: {} }
-    : buildTaskTree(tasks.data)
-
-  return (
-    <DataTable
-      columns={getColumns(projectNames, depths)}
-      data={ordered}
-      rowLabel={(task) => `Open ${task.title}`}
-      onRowClick={(task) => onOpenTask(task.id)}
-      empty={
-        hasActiveFilters(search) ? (
-          <EmptyState
-            icon={SearchX}
-            title="No tasks match these filters"
-            description="Every filter narrows the list further. Widen one, or start over."
-            action={
-              <Button variant="outline" onClick={onClearFilters}>
-                Clear filters
-              </Button>
-            }
-          />
-        ) : (
-          <EmptyState
-            icon={CheckSquare}
-            title="No tasks yet"
-            description="Writing one down takes a title — or let a bot user file them for you through the REST API."
-            action={
-              <div className="flex flex-wrap items-center justify-center gap-2">
-                <Button onClick={onCapture}>Add a task</Button>
-                <Button variant="outline" asChild>
-                  <RouterLink to="/bots">Set up a bot user</RouterLink>
-                </Button>
-              </div>
-            }
-          />
-        )
-      }
-    />
-  )
-}
-
-function TasksTable({
-  search,
-  onClearFilters,
-  onOpenTask,
-  onCapture,
-}: {
-  search: TaskListSearch
-  onClearFilters: () => void
-  onOpenTask: (taskId: string) => void
-  onCapture: () => void
-}) {
-  const { user: currentUser } = useAuth()
-
-  // Filtering by "me" needs the id to filter on: listing before it arrives
-  // would show everything, which is the opposite of what was asked for.
-  if (search.assignee === "me" && !currentUser) {
-    return <PendingTasks />
-  }
-
-  return (
-    <Suspense fallback={<PendingTasks />}>
-      <TasksTableContent
-        search={search}
-        currentUserId={currentUser?.id}
-        onClearFilters={onClearFilters}
-        onOpenTask={onOpenTask}
-        onCapture={onCapture}
-      />
-    </Suspense>
-  )
-}
-
+/**
+ * The task list: the product's triage surface.
+ *
+ * The dashboard answers "what needs me now". This answers the question only a
+ * table can — working through many tasks at once — so it pages and sorts on
+ * the server, where the truth about "many" lives, and its rows can be selected
+ * and acted on as a batch.
+ */
 function Tasks() {
   const search = Route.useSearch()
   const navigate = Route.useNavigate()
-  const { capture, openTask } = useRecordPanels()
+  const { openTask, capture } = useRecordPanels()
+  const { user: currentUser } = useAuth()
+  const { showErrorToast } = useCustomToast()
+  const page = search.page ?? 1
+
+  // Which tasks are selected, gathered across pages of one filter set. A
+  // selection outlives paging, because a batch is often collected page by
+  // page — and it is dropped the moment the filters change, because nobody
+  // should act on tasks they can no longer see (stories 16, 17). The filters
+  // it belongs to are held with it, and compared while rendering, so there is
+  // no window in which the bar offers to act on tasks that are gone.
+  const filterKey = JSON.stringify(FILTER_KEYS.map((key) => search[key]))
+  const [selection, setSelection] = useState({
+    filters: filterKey,
+    ids: new Set<string>(),
+  })
+  const selected = selection.filters === filterKey ? selection.ids : EMPTY
+  const setSelected = (next: (ids: Set<string>) => Set<string>) =>
+    setSelection((previous) => ({
+      filters: filterKey,
+      ids: next(previous.filters === filterKey ? previous.ids : new Set()),
+    }))
+  const clearSelection = () =>
+    setSelection({ filters: filterKey, ids: new Set() })
+
+  // Filtering by "me" needs the id to filter on: listing before it arrives
+  // would show everything, which is the opposite of what was asked for.
+  const waitingForMe = search.assignee === "me" && !currentUser
+  const { data: tasks, isPending } = useQuery({
+    ...getTasksQueryOptions(search, currentUser?.id),
+    enabled: !waitingForMe,
+  })
+  const { data: projects } = useQuery(getProjectsQueryOptions())
+
   const applyFilters = (next: Partial<TaskSearch>) =>
-    navigate({ search: (previous) => ({ ...previous, ...next }) })
+    // Any change to what is being shown returns to the first page: the page
+    // a reader was on may not exist under the new filters (story 10).
+    navigate({
+      search: (previous) => ({ ...previous, ...next, page: undefined }),
+    })
+  const goToPage = (next: number) =>
+    navigate({
+      search: (previous) => ({
+        ...previous,
+        page: next === 1 ? undefined : next,
+      }),
+    })
+  const sortBy = (field: string) =>
+    navigate({
+      search: (previous) => ({
+        ...previous,
+        sort: field as TaskSearch["sort"],
+        // The same header again reverses it: direction costs no control of
+        // its own (story 6).
+        order:
+          previous.sort === field && previous.order !== "desc"
+            ? ("desc" as const)
+            : undefined,
+        page: undefined,
+      }),
+    })
+
+  const count = tasks?.count ?? 0
+  const lastPage = Math.max(1, Math.ceil(count / PAGE_SIZE))
+  const projectNames = Object.fromEntries(
+    (projects?.data ?? []).map((project) => [project.id, project.name]),
+  )
+  // Nesting subtasks under their parents would reorder what the server just
+  // sorted, so an explicit sort gets a flat list: the reader asked for that
+  // order, not for the tree.
+  const rows: TaskPublic[] = tasks
+    ? search.sort
+      ? tasks.data
+      : buildTaskTree(tasks.data).tasks
+    : []
+  const depths = tasks && !search.sort ? buildTaskTree(tasks.data).depths : {}
 
   return (
     <div className="flex flex-col gap-6">
@@ -175,13 +176,139 @@ function Tasks() {
         <h1 className="text-2xl font-bold tracking-tight">Tasks</h1>
         <p className="text-muted-foreground">Everything you need to get done</p>
       </div>
+
       <TaskFilters search={search} onChange={applyFilters} />
-      <TasksTable
-        search={search}
-        onClearFilters={() => applyFilters(clearedFilters())}
-        onOpenTask={openTask}
-        onCapture={() => capture("task")}
+
+      {selected.size > 0 && (
+        <TaskBulkActions
+          selected={[...selected]}
+          projects={projects?.data ?? []}
+          onDone={clearSelection}
+          onClear={clearSelection}
+          // "Everything on this page" and "everything that matches" are
+          // different acts, so the bar says which one is in force and offers
+          // the other rather than guessing (story 13).
+          matching={count}
+          pageIsWhollySelected={
+            rows.length > 0 && rows.every((task) => selected.has(task.id))
+          }
+          onSelectAllMatching={async () => {
+            const { assignee: _assignee, ...rest } = getTasksQueryOptions(
+              search,
+              currentUser?.id,
+            ).queryKey[1] as Record<string, unknown>
+            try {
+              const all = await TasksService.readTasks({
+                query: { ...rest, skip: 0, limit: MAX_BATCH },
+              })
+              setSelected(
+                () => new Set((all.data?.data ?? []).map((task) => task.id)),
+              )
+            } catch (error) {
+              handleError.call(showErrorToast, error as Error)
+            }
+          }}
+        />
+      )}
+
+      <DataTable
+        scrollLabel="Tasks, scrollable sideways"
+        columns={getColumns(projectNames, depths)}
+        data={rows}
+        pending={isPending || waitingForMe}
+        pendingRows={Math.min(PAGE_SIZE, Math.max(count, 5)) || 5}
+        rowLabel={(task) => `Open ${task.title}`}
+        onRowClick={(task) => openTask(task.id)}
+        selection={{
+          ids: selected,
+          idOf: (task) => task.id,
+          label: (task) => `Select ${task.title}`,
+          onToggle: (id, isSelected) =>
+            setSelected((previous) => {
+              const next = new Set(previous)
+              if (isSelected) next.add(id)
+              else next.delete(id)
+              return next
+            }),
+          onTogglePage: (ids, isSelected) =>
+            setSelected((previous) => {
+              const next = new Set(previous)
+              for (const id of ids) {
+                if (isSelected) next.add(id)
+                else next.delete(id)
+              }
+              return next
+            }),
+        }}
+        sorting={{
+          fields: SORT_FIELDS,
+          field: search.sort,
+          descending: search.order === "desc",
+          onSort: sortBy,
+        }}
+        empty={
+          hasActiveFilters(search) ? (
+            <EmptyState
+              icon={SearchX}
+              title="No tasks match these filters"
+              description="Every filter narrows the list further. Widen one, or start over."
+              action={
+                <Button
+                  variant="outline"
+                  onClick={() => applyFilters(clearedFilters())}
+                >
+                  Clear filters
+                </Button>
+              }
+            />
+          ) : (
+            <EmptyState
+              icon={CheckSquare}
+              title="No tasks yet"
+              description="Writing one down takes a title — or let a bot user file them for you through the REST API."
+              action={
+                <div className="flex flex-wrap items-center justify-center gap-2">
+                  <Button onClick={() => capture("task")}>Add a task</Button>
+                  <Button variant="outline" asChild>
+                    <RouterLink to="/bots">Set up a bot user</RouterLink>
+                  </Button>
+                </div>
+              }
+            />
+          )
+        }
       />
+
+      {count > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          {/* The number the server counted under these filters, not the size
+              of the window that was fetched (story 1). */}
+          <p aria-live="polite" className="text-muted-foreground text-sm">
+            {count === 1 ? "1 task" : `${count} tasks`}
+            {count > PAGE_SIZE && ` · page ${page} of ${lastPage}`}
+          </p>
+          {count > PAGE_SIZE && (
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={page <= 1}
+                onClick={() => goToPage(page - 1)}
+              >
+                Previous
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={page >= lastPage}
+                onClick={() => goToPage(page + 1)}
+              >
+                Next
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }

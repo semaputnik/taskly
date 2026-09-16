@@ -1,10 +1,5 @@
 import { useQuery } from "@tanstack/react-query"
-import {
-  ArrowDownWideNarrow,
-  ArrowUpNarrowWide,
-  SlidersHorizontal,
-  X,
-} from "lucide-react"
+import { SlidersHorizontal, X } from "lucide-react"
 import { useState } from "react"
 
 import { ProjectsService, TagsService } from "@/client"
@@ -118,7 +113,11 @@ function ActiveChip({
 }
 
 /**
- * The filter and sort bar over the task list.
+ * The filter bar over the task list.
+ *
+ * Sorting is not here: it belongs to the column it orders, where the reader
+ * is already looking, and it is not a filter — clearing the filters must not
+ * disturb the order.
  *
  * Every filter that is set narrows the list further — they combine with AND,
  * never OR (FR-06.3) — and each one lives in the URL, so a view can be shared
@@ -250,46 +249,6 @@ export function TaskFilters({ search, onChange }: TaskFiltersProps) {
         >
           Overdue
         </Button>
-
-        <div className="ml-auto flex items-center gap-2">
-          <Label className="text-muted-foreground text-xs" htmlFor="task-sort">
-            Sort
-          </Label>
-          <Select
-            value={search.sort ?? ANY}
-            onValueChange={(value) =>
-              onChange({
-                sort: value === ANY ? undefined : (value as TaskSearch["sort"]),
-              })
-            }
-          >
-            <SelectTrigger id="task-sort" className="w-36" aria-label="Sort by">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ANY}>Default</SelectItem>
-              <SelectItem value="due_date">Due date</SelectItem>
-              <SelectItem value="priority">Priority</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button
-            variant="outline"
-            size="icon"
-            disabled={!search.sort}
-            aria-label={
-              search.order === "desc" ? "Sort ascending" : "Sort descending"
-            }
-            onClick={() =>
-              onChange({ order: search.order === "desc" ? undefined : "desc" })
-            }
-          >
-            {search.order === "desc" ? (
-              <ArrowDownWideNarrow />
-            ) : (
-              <ArrowUpNarrowWide />
-            )}
-          </Button>
-        </div>
       </div>
 
       {isOpen && (
