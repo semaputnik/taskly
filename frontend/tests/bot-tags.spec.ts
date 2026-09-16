@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test"
 import { createUser } from "./utils/privateApi.ts"
 import { randomEmail, randomPassword } from "./utils/random"
+import { storeTokenAndClose } from "./utils/tokenDialog"
 import { logInUser } from "./utils/user"
 
 test.use({ storageState: { cookies: [], origins: [] } })
@@ -51,7 +52,7 @@ test("Granting a bot user “Create tags” lets it add to the vocabulary", asyn
   const token = await dialog
     .getByRole("textbox", { name: "Bot token" })
     .inputValue()
-  await dialog.getByRole("button", { name: "Done" }).click()
+  await storeTokenAndClose(dialog)
   const asBot = { Authorization: `Bearer ${token}` }
 
   const row = page.getByRole("row", { name: "Open Triage agent" })
@@ -75,7 +76,7 @@ test("Granting a bot user “Create tags” lets it add to the vocabulary", asyn
   // Granted in the bot user's panel, the same request goes through.
   await row.click()
   const createTags = page
-    .getByRole("dialog", { name: "Triage agent" })
+    .getByRole("dialog", { name: "Triage agent", exact: true })
     .getByRole("checkbox", { name: "Create tags" })
   await createTags.click()
   await expect(createTags).toBeChecked()
