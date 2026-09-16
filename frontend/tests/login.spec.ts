@@ -115,3 +115,22 @@ test("Redirects to /login when token is wrong", async ({ page }) => {
   await page.waitForURL("/login")
   await expect(page).toHaveURL("/login")
 })
+
+test("A refused credential sends the reader on at once, not after retries", async ({
+  page,
+}) => {
+  await page.goto("/login")
+  await page.evaluate(() => {
+    localStorage.setItem("access_token", "stale_token")
+  })
+
+  const started = Date.now()
+  await page.goto("/tasks")
+  await page.waitForURL("/login", { timeout: 5000 })
+  // Retried like any other failure, a refused credential costs four refusals
+  // and about eight seconds of a screen that neither loads nor moves on.
+  expect(Date.now() - started).toBeLessThan(5000)
+  await expect(
+    page.evaluate(() => localStorage.getItem("access_token")),
+  ).resolves.toBeNull()
+})
