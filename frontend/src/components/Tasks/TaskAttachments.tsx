@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { Download, Trash2, Upload } from "lucide-react"
+import { Download, Upload } from "lucide-react"
 import { useRef } from "react"
 
 import {
@@ -9,8 +9,10 @@ import {
 } from "@/client"
 import { Button } from "@/components/ui/button"
 import { LoadingButton } from "@/components/ui/loading-button"
+import { Separator } from "@/components/ui/separator"
 import useCustomToast from "@/hooks/useCustomToast"
 import { handleError } from "@/utils"
+import { DeleteAttachment } from "./DeleteAttachment"
 
 interface TaskAttachmentsProps {
   task: TaskPublic
@@ -59,15 +61,6 @@ export const TaskAttachments = ({
     onSettled: invalidate,
   })
 
-  const deleteMutation = useMutation({
-    mutationFn: (attachmentId: string) =>
-      AttachmentsService.deleteAttachment({
-        path: { attachment_id: attachmentId },
-      }),
-    onError: handleError.bind(showErrorToast),
-    onSettled: invalidate,
-  })
-
   const download = async (attachment: AttachmentPublic) => {
     try {
       const response = await AttachmentsService.downloadAttachment({
@@ -110,23 +103,24 @@ export const TaskAttachments = ({
                   {formatSize(attachment.size)}
                 </span>
               </div>
-              <div className="flex shrink-0 gap-1">
+              {/* Download sits beside the file it fetches; delete is set
+                  apart past a rule, so reaching for one never lands on the
+                  other, and both are thumb-sized where there is no mouse. */}
+              <div className="flex shrink-0 items-center gap-3">
                 <Button
                   variant="ghost"
                   size="icon"
                   aria-label={`Download ${attachment.filename}`}
+                  className="pointer-coarse:size-11"
                   onClick={() => download(attachment)}
                 >
-                  <Download className="size-3.5" />
+                  <Download />
                 </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  aria-label={`Delete ${attachment.filename}`}
-                  onClick={() => deleteMutation.mutate(attachment.id)}
-                >
-                  <Trash2 className="size-3.5" />
-                </Button>
+                <Separator orientation="vertical" className="h-6!" />
+                <DeleteAttachment
+                  attachment={attachment}
+                  className="pointer-coarse:size-11"
+                />
               </div>
             </div>
           ))
