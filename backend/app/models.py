@@ -374,6 +374,12 @@ class RecurrenceFrequency(StrEnum):
     EVERY_N_DAYS = "every_n_days"
 
 
+# The shortest "every N days" rule. Every one day is the daily rule spelt a
+# second way, and one rule gets one spelling. Published in the API schema, which
+# is where the web client reads it from.
+MIN_INTERVAL_DAYS = 2
+
+
 class Recurrence(SQLModel):
     """
     How often a recurring task comes back: a fixed interval, never tied to when
@@ -382,7 +388,7 @@ class Recurrence(SQLModel):
 
     frequency: RecurrenceFrequency
     # The N of "every N days"; no other frequency takes one.
-    interval_days: int | None = Field(default=None, ge=1)
+    interval_days: int | None = Field(default=None, ge=MIN_INTERVAL_DAYS)
 
     @model_validator(mode="after")
     def check_interval_days(self) -> Recurrence:
@@ -426,6 +432,10 @@ class Series(SQLModel, table=True):
         CheckConstraint(
             "(frequency = 'every_n_days') = (interval_days IS NOT NULL)",
             name="series_interval_days_for_every_n_days",
+        ),
+        CheckConstraint(
+            f"interval_days >= {MIN_INTERVAL_DAYS}",
+            name="series_interval_days_minimum",
         ),
     )
 

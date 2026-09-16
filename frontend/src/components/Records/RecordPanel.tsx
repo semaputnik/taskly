@@ -1,5 +1,5 @@
-import type { LucideIcon } from "lucide-react"
-import { useEffect, useState } from "react"
+import { type LucideIcon, Trash2 } from "lucide-react"
+import { useEffect, useRef, useState } from "react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -11,7 +11,10 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Toaster } from "@/components/ui/sonner"
 import { Textarea } from "@/components/ui/textarea"
+import { isRefusal } from "@/lib/apiErrors"
+import { PANEL_TOASTER_ID, settlePanelNotices } from "@/lib/panelNotices"
 import { cn } from "@/lib/utils"
 
 /**
@@ -21,7 +24,8 @@ import { cn } from "@/lib/utils"
  * family of single-purpose dialogs — rename in one, archive in another,
  * delete in a third. A menu is what a surface reaches for when it has not
  * decided where its actions belong. Here every action has a home: a field is
- * changed in the field, and delete is one destructive control in the corner.
+ * changed in the field, and delete is one destructive control at the foot of
+ * the panel, as far from the close control as the panel allows.
  *
  * Everything that makes a panel a panel lives here, so a record type adopts
  * the pattern rather than reimplementing it (The One Address Rule).
@@ -45,16 +49,16 @@ export function RecordPanel({
   onClose,
   /** What the panel is called when it is announced. */
   name,
-  /** The one destructive act, in the corner beside close. */
+  /**
+   * The one destructive act. It sits at the foot of the panel, never in the
+   * corner: that corner is where a hand goes to dismiss, and a stray click
+   * there must close the panel rather than start a deletion.
+   */
   destructive,
   pending,
-  /**
-   * The record could not be read — it was deleted, or it belongs to somebody
-   * else. A link that fails has to say so; a skeleton that never resolves
-   * leaves the reader waiting for something that is never coming.
-   */
-  missing,
-  /** What that record is called in the sentence saying it is gone. */
+  failure,
+  onRetry,
+  /** What the record is called in the sentence saying it cannot be shown. */
   kind = "record",
   children,
 }: {
@@ -62,29 +66,47 @@ export function RecordPanel({
   onClose: () => void
   name: string
   destructive?: React.ReactNode
-  pending?: boolean
-  missing?: boolean
   kind?: string
   children?: React.ReactNode
-}) {
+} & RecordLoad) {
   return (
     <Sheet open={open} onOpenChange={(next) => !next && onClose()}>
       <SheetContent
         side="right"
-        className="w-full gap-0 overflow-y-auto p-0 sm:max-w-xl"
+        className="w-full gap-0 overflow-y-auto p-0 outline-none sm:max-w-xl"
+        // Opening a record puts focus on the panel itself, not on its first
+        // control: that would be the name field, which a reader who only came
+        // to look must not find already in their hands. Tab starts from here,
+        // and capture claims its own field once the panel is open.
+        onOpenAutoFocus={(event) => {
+          event.preventDefault()
+          ;(event.target as HTMLElement).focus({ preventScroll: true })
+        }}
       >
         {/* The record the panel is showing, announced on arrival. */}
         <SheetTitle className="sr-only">{name}</SheetTitle>
-        {missing ? (
-          <div className="flex flex-col items-start gap-3 p-6">
-            <p className="font-medium">This {kind} could not be opened</p>
-            <p className="text-muted-foreground text-sm text-pretty">
-              It has been deleted, or the link points at something that is not
-              yours. Deleted records can be restored from the activity log.
+        {failure ? (
+          <div role="alert" className="flex flex-col items-start gap-3 p-6">
+            <p className="font-medium">
+              {failure === "missing"
+                ? `This ${kind} could not be opened`
+                : `This ${kind} could not be loaded`}
             </p>
-            <Button variant="outline" size="sm" onClick={onClose}>
-              Close
-            </Button>
+            <p className="text-muted-foreground text-sm text-pretty">
+              {failure === "missing"
+                ? "It may have been deleted, or the link points at something that is not yours. Deleted records can be restored from the activity log."
+                : `The server did not answer this time. Nothing about the ${kind} has changed.`}
+            </p>
+            <div className="flex gap-2">
+              {failure === "unavailable" && onRetry && (
+                <Button size="sm" onClick={onRetry}>
+                  Try again
+                </Button>
+              )}
+              <Button variant="outline" size="sm" onClick={onClose}>
+                Close
+              </Button>
+            </div>
           </div>
         ) : pending ? (
           <div className="flex flex-col gap-4 p-6">
@@ -94,18 +116,112 @@ export function RecordPanel({
           </div>
         ) : (
           <>
-            {/* Delete is a corner control like the close button, on the same
-                line as one rather than floating in the header's flow beneath
-                it. It is alone there: every other change to a record is made
-                in the field it belongs to. */}
-            {destructive && (
-              <div className="absolute top-1.5 right-9 z-10">{destructive}</div>
-            )}
             {children}
+            {destructive && (
+              <div className="mt-auto flex border-t px-6 py-4">
+                {destructive}
+              </div>
+            )}
           </>
         )}
+        <PanelNotices />
       </SheetContent>
     </Sheet>
+  )
+}
+
+/** How far a panel has got with reading its record. */
+export interface RecordLoad {
+  /** A request for the record is in flight and nothing is known yet. */
+  pending?: boolean
+  /**
+   * The record cannot be shown. `missing`: the API refused it — deleted, not
+   * the reader's, or not an id at all, which it answers alike so that nothing
+   * is revealed. `unavailable`: the API did not answer, and it may yet.
+   */
+  failure?: "missing" | "unavailable"
+  /** Ask again now, cutting short any retry already waiting. */
+  onRetry?: () => void
+}
+
+/**
+ * A panel's load state from its record query, for a panel that is `reading`
+ * a record rather than capturing one.
+ *
+ * A failed read has to say so: a skeleton is shown only while a request is
+ * really on its way, never for a request that has already failed. A record
+ * already on screen stays there through a background refetch that fails.
+ */
+export function recordLoad(
+  query: {
+    data: unknown
+    isLoading: boolean
+    failureCount: number
+    failureReason: Error | null
+    refetch: () => unknown
+  },
+  reading: boolean,
+): RecordLoad {
+  if (!reading) return {}
+  // A failure is said as soon as the first attempt fails, even while a
+  // failure that may pass is still being retried behind it: the skeleton is
+  // only for the first request, genuinely on its way.
+  const failed = query.failureCount > 0 && query.data === undefined
+  return {
+    pending: query.isLoading && !failed,
+    failure: !failed
+      ? undefined
+      : isRefusal(query.failureReason)
+        ? "missing"
+        : "unavailable",
+    onRetry: () => void query.refetch(),
+  }
+}
+
+/**
+ * The toaster for notices that offer an action, inside the panel where the
+ * modal sheet still lets the reader reach them — by pointer, by Tab, and by
+ * its Alt+T hotkey.
+ */
+function PanelNotices() {
+  useEffect(() => settlePanelNotices, [])
+  // No close button: Undo is the first stop inside a notice, and a notice that
+  // is left alone runs out on its own.
+  return (
+    <Toaster
+      id={PANEL_TOASTER_ID}
+      toastOptions={{
+        classNames: {
+          actionButton: "pointer-coarse:h-11! pointer-coarse:px-4!",
+        },
+      }}
+    />
+  )
+}
+
+/**
+ * The control that opens a record's delete confirmation.
+ *
+ * It says what it does in words rather than as a bare icon: it is the one
+ * control on the panel whose consequence reaches past the panel.
+ */
+export function DeleteTrigger({
+  label,
+  onClick,
+}: {
+  label: string
+  onClick: () => void
+}) {
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      className="text-muted-foreground hover:text-destructive -ml-2.5 pointer-coarse:h-11"
+      onClick={onClick}
+    >
+      <Trash2 />
+      {label}
+    </Button>
   )
 }
 
@@ -122,7 +238,7 @@ export function RecordHeader({
 }) {
   return (
     <SheetHeader className="gap-3 border-b p-6">
-      <SheetDescription className="flex min-w-0 items-center gap-1 pr-20 text-sm">
+      <SheetDescription className="flex min-w-0 items-center gap-1 pr-10 text-sm pointer-coarse:pr-14">
         {breadcrumb}
       </SheetDescription>
       {title}
@@ -199,20 +315,36 @@ export function EditableText({
   ariaLabel?: string
 }) {
   const [draft, setDraft] = useState(value)
-  // The field is fed by the server after every save, and by a bot editing the
-  // same record; re-sync unless the reader is the one holding the value.
-  const [editing, setEditing] = useState(false)
+  // Whether the field holds words the reader typed and has not yet saved or
+  // abandoned. Only those are ever sent: focus alone is not an edit, so a
+  // field that was merely visited keeps following the server — a save made a
+  // moment ago, or a bot editing the same record — and leaving it sends
+  // nothing. A ref, because Escape and the blur it causes happen within one
+  // event, before a re-render could tell the blur that the edit was dropped.
+  const typed = useRef(false)
   useEffect(() => {
-    if (!editing) setDraft(value)
-  }, [value, editing])
+    if (!typed.current) setDraft(value)
+  }, [value])
+
+  const type = (next: string) => {
+    typed.current = true
+    setDraft(next)
+  }
+
+  const abandon = () => {
+    typed.current = false
+    setDraft(value)
+  }
 
   const commit = async () => {
+    if (!typed.current) return
     if (draft === value) {
-      setEditing(false)
+      typed.current = false
       return
     }
     const saved = await onCommit(draft)
-    setEditing(saved === false)
+    // A refused save keeps the typed words in the field, still unsaved.
+    typed.current = saved === false
   }
 
   const shared = {
@@ -220,7 +352,6 @@ export function EditableText({
     "aria-label": ariaLabel,
     value: draft,
     placeholder,
-    onFocus: () => setEditing(true),
     onBlur: () => void commit(),
     className: cn(ghost, className),
   }
@@ -229,26 +360,18 @@ export function EditableText({
     <Textarea
       {...shared}
       rows={3}
-      onChange={(e) => setDraft(e.target.value)}
+      onChange={(e) => type(e.target.value)}
       onKeyDown={(e) => {
-        if (e.key === "Escape") {
-          setDraft(value)
-          setEditing(false)
-          e.currentTarget.blur()
-        }
+        if (e.key === "Escape") abandon()
       }}
     />
   ) : (
     <Input
       {...shared}
-      onChange={(e) => setDraft(e.target.value)}
+      onChange={(e) => type(e.target.value)}
       onKeyDown={(e) => {
         if (e.key === "Enter") e.currentTarget.blur()
-        if (e.key === "Escape") {
-          setDraft(value)
-          setEditing(false)
-          e.currentTarget.blur()
-        }
+        if (e.key === "Escape") abandon()
       }}
     />
   )

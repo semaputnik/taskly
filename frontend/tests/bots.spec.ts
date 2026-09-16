@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test"
 import { createUser } from "./utils/privateApi.ts"
 import { randomEmail, randomPassword } from "./utils/random"
+import { storeTokenAndClose } from "./utils/tokenDialog"
 import { logInUser } from "./utils/user"
 
 test.use({ storageState: { cookies: [], origins: [] } })
@@ -52,8 +53,7 @@ test("A bot user is created on the Bots page and its token is shown once", async
     "Support queue",
   ])
 
-  await dialog.getByRole("button", { name: "Done" }).click()
-  await expect(dialog).toBeHidden()
+  await storeTokenAndClose(dialog)
 
   const row = page.getByRole("row", { name: "Open Triage agent" })
   await expect(row).toContainText("Support queue")
@@ -64,7 +64,7 @@ test("A bot user is created on the Bots page and its token is shown once", async
   // above used it, which the bot user's panel reports.
   await page.reload()
   await row.click()
-  const panel = page.getByRole("dialog", { name: "Triage agent" })
+  const panel = page.getByRole("dialog", { name: "Triage agent", exact: true })
   await expect(panel).toContainText("Never — it works until revoked")
   await expect(panel).not.toContainText("Never used")
   expect(await page.content()).not.toContain(token)
@@ -90,11 +90,11 @@ test("A token is revoked and a new one issued with an expiry", async ({
   const first = await firstDialog
     .getByRole("textbox", { name: "Bot token" })
     .inputValue()
-  await firstDialog.getByRole("button", { name: "Done" }).click()
+  await storeTokenAndClose(firstDialog)
 
   const row = page.getByRole("row", { name: "Open Nightly sync" })
   await row.click()
-  const panel = page.getByRole("dialog", { name: "Nightly sync" })
+  const panel = page.getByRole("dialog", { name: "Nightly sync", exact: true })
   await panel.getByRole("button", { name: "Revoke" }).click()
   await page
     .getByRole("dialog", { name: "Revoke the token for Nightly sync?" })
@@ -127,7 +127,7 @@ test("A token is revoked and a new one issued with an expiry", async ({
     .getByRole("textbox", { name: "Bot token" })
     .inputValue()
   expect(second).not.toBe(first)
-  await secondDialog.getByRole("button", { name: "Done" }).click()
+  await storeTokenAndClose(secondDialog)
 
   await expect(panel).toContainText("Working")
   await expect(panel).toContainText("Never used")
@@ -171,7 +171,7 @@ test("A bot's scope is narrowed and the bot is deleted from the Bots page", asyn
   const token = await tokenDialog
     .getByRole("textbox", { name: "Bot token" })
     .inputValue()
-  await tokenDialog.getByRole("button", { name: "Done" }).click()
+  await storeTokenAndClose(tokenDialog)
   const asBot = { Authorization: `Bearer ${token}` }
 
   // The bot works in Billing while Billing is still in its scope.
@@ -221,7 +221,7 @@ test("A bot's scope is narrowed and the bot is deleted from the Bots page", asyn
 
   await row.click()
   await page
-    .getByRole("dialog", { name: "Docs agent" })
+    .getByRole("dialog", { name: "Docs agent", exact: true })
     .getByRole("button", { name: "Delete bot user" })
     .click()
   await page

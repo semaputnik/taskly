@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { Download, Trash2, Upload } from "lucide-react"
+import { Download, Upload } from "lucide-react"
 import { useRef } from "react"
 
 import {
@@ -9,13 +9,13 @@ import {
 } from "@/client"
 import { Button } from "@/components/ui/button"
 import { LoadingButton } from "@/components/ui/loading-button"
+import { Separator } from "@/components/ui/separator"
 import useCustomToast from "@/hooks/useCustomToast"
 import { handleError } from "@/utils"
+import { DeleteAttachment } from "./DeleteAttachment"
 
 interface TaskAttachmentsProps {
   task: TaskPublic
-  /** Hold the request back until the panel is the one on screen. */
-  enabled?: boolean
 }
 
 function formatSize(bytes: number): string {
@@ -29,10 +29,7 @@ function formatSize(bytes: number): string {
  * behind a swappable backend on the server (ADR-0002); this dialog only ever
  * sees the metadata and the raw bytes it downloads (FR-04.1).
  */
-export const TaskAttachments = ({
-  task,
-  enabled = true,
-}: TaskAttachmentsProps) => {
+export const TaskAttachments = ({ task }: TaskAttachmentsProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const queryClient = useQueryClient()
   const { showErrorToast } = useCustomToast()
@@ -44,7 +41,6 @@ export const TaskAttachments = ({
     queryFn: async () =>
       (await AttachmentsService.readAttachments({ path: { task_id: task.id } }))
         .data,
-    enabled,
   })
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey })
@@ -54,15 +50,6 @@ export const TaskAttachments = ({
       AttachmentsService.uploadAttachment({
         path: { task_id: task.id },
         body: { file },
-      }),
-    onError: handleError.bind(showErrorToast),
-    onSettled: invalidate,
-  })
-
-  const deleteMutation = useMutation({
-    mutationFn: (attachmentId: string) =>
-      AttachmentsService.deleteAttachment({
-        path: { attachment_id: attachmentId },
       }),
     onError: handleError.bind(showErrorToast),
     onSettled: invalidate,
@@ -110,23 +97,24 @@ export const TaskAttachments = ({
                   {formatSize(attachment.size)}
                 </span>
               </div>
-              <div className="flex shrink-0 gap-1">
+              {/* Download sits beside the file it fetches; delete is set
+                  apart past a rule, so reaching for one never lands on the
+                  other, and both are thumb-sized where there is no mouse. */}
+              <div className="flex shrink-0 items-center gap-3">
                 <Button
                   variant="ghost"
                   size="icon"
                   aria-label={`Download ${attachment.filename}`}
+                  className="pointer-coarse:size-11"
                   onClick={() => download(attachment)}
                 >
-                  <Download className="size-3.5" />
+                  <Download />
                 </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  aria-label={`Delete ${attachment.filename}`}
-                  onClick={() => deleteMutation.mutate(attachment.id)}
-                >
-                  <Trash2 className="size-3.5" />
-                </Button>
+                <Separator orientation="vertical" className="h-6!" />
+                <DeleteAttachment
+                  attachment={attachment}
+                  className="pointer-coarse:size-11"
+                />
               </div>
             </div>
           ))

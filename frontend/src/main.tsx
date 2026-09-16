@@ -11,6 +11,7 @@ import ReactDOM from "react-dom/client"
 import { client } from "./client/client.gen"
 import { ThemeProvider } from "./components/theme-provider"
 import { Toaster } from "./components/ui/sonner"
+import { isRefusal } from "./lib/apiErrors"
 import "./index.css"
 import { routeTree } from "./routeTree.gen"
 
@@ -38,13 +39,14 @@ const handleApiError = (error: Error) => {
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      // A credential the API has turned away will be turned away again: it is
-      // the one failure that retrying cannot mend. Retried like any other, it
-      // costs four refusals and about eight seconds of a screen that neither
-      // loads nor sends the reader to the login it needs — which is exactly
-      // the stranding this handler exists to prevent.
-      retry: (failureCount, error) =>
-        !isCredentialError(error as Error) && failureCount < 3,
+      // A request the API has refused for what it asked — a credential it
+      // turned away, a record that is not there or not yours — will be
+      // refused again: retrying cannot mend it. Retried like any other
+      // failure, it costs four refusals and about eight seconds of a screen
+      // that neither shows anything nor says why, which is exactly the
+      // stranding a failure message exists to prevent. Only a failure that
+      // may pass is tried again.
+      retry: (failureCount, error) => !isRefusal(error) && failureCount < 3,
     },
     mutations: { retry: false },
   },

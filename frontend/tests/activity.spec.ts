@@ -74,7 +74,9 @@ test("A deleted task can be restored from the Activity page", async ({
     .getByRole("dialog")
     .getByRole("button", { name: "Delete", exact: true })
     .click()
-  await expect(page.getByText("Task deleted successfully")).toBeVisible()
+  await expect(
+    page.getByText("It can be restored from the activity log"),
+  ).toBeVisible()
   await expect(taskRow).toHaveCount(0)
 
   await page.goto("/activity")

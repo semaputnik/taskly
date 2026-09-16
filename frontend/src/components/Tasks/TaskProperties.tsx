@@ -36,7 +36,12 @@ import {
 import useAuth from "@/hooks/useAuth"
 import { cn } from "@/lib/utils"
 import { AssigneeSelect, assigneeFormValue, toAssigneeId } from "./assignee"
-import { DueDateScopeDialog, NO_RECURRENCE } from "./recurrence"
+import {
+  DueDateScopeDialog,
+  IntervalDaysField,
+  MIN_INTERVAL_DAYS,
+  NO_RECURRENCE,
+} from "./recurrence"
 import { TagsField } from "./TagsField"
 import { useTaskUpdate } from "./useTaskUpdate"
 
@@ -172,8 +177,9 @@ export function TaskProperties({ task }: { task: TaskPublic }) {
           />
         </PropertyRow>
 
-        <PropertyRow icon={Tag} label="Tags">
+        <PropertyRow icon={Tag} label="Tags" htmlFor={`${ids}-tags`}>
           <TagsField
+            id={`${ids}-tags`}
             value={task.tags ?? []}
             onChange={(tags) => save({ tags })}
             className={cn(ghost, "w-full")}
@@ -200,7 +206,8 @@ export function TaskProperties({ task }: { task: TaskPublic }) {
                             // be a rule at all; it starts at the shortest one.
                             interval_days:
                               value === "every_n_days"
-                                ? (task.recurrence?.interval_days ?? 2)
+                                ? (task.recurrence?.interval_days ??
+                                  MIN_INTERVAL_DAYS)
                                 : null,
                           },
                   })
@@ -221,22 +228,13 @@ export function TaskProperties({ task }: { task: TaskPublic }) {
                 </SelectContent>
               </Select>
               {task.recurrence?.frequency === "every_n_days" && (
-                <Input
-                  type="number"
-                  min={2}
-                  aria-label="Days between repeats"
-                  defaultValue={task.recurrence.interval_days ?? 2}
-                  onBlur={(e) => {
-                    const days = Number(e.target.value)
-                    if (days >= 2 && days !== task.recurrence?.interval_days) {
-                      save({
-                        recurrence: {
-                          frequency: "every_n_days",
-                          interval_days: days,
-                        },
-                      })
-                    }
-                  }}
+                <IntervalDaysField
+                  value={task.recurrence.interval_days ?? MIN_INTERVAL_DAYS}
+                  onCommit={(interval_days) =>
+                    save({
+                      recurrence: { frequency: "every_n_days", interval_days },
+                    })
+                  }
                   className={cn(ghost, "w-20 shrink-0")}
                 />
               )}

@@ -1,6 +1,7 @@
 import { expect, type Page, test } from "@playwright/test"
 import { createUser } from "./utils/privateApi.ts"
 import { randomEmail, randomPassword } from "./utils/random"
+import { storeTokenAndClose } from "./utils/tokenDialog"
 import { logInUser } from "./utils/user"
 
 test.use({ storageState: { cookies: [], origins: [] } })
@@ -151,7 +152,9 @@ test("A tag is renamed and deleted from its panel", async ({ page }) => {
     .getByRole("button", { name: "Delete tag" })
     .click()
   const confirm = page.getByRole("dialog", { name: /Delete the tag/ })
-  await expect(confirm).toContainText("It will be taken off 1 task.")
+  await expect(confirm).toContainText(
+    "It will be taken off 1 task; the task stays as it is.",
+  )
   await confirm.getByRole("button", { name: "Delete", exact: true }).click()
   await expect(page.getByText("was deleted")).toBeVisible()
   await expect(row(page, "errands")).toHaveCount(0)
@@ -230,7 +233,7 @@ test("A token is issued and revoked from the bot user's panel", async ({
 
   await page.goto("/bots")
   await row(page, "Nightly sync").click()
-  const panel = page.getByRole("dialog", { name: "Nightly sync" })
+  const panel = page.getByRole("dialog", { name: "Nightly sync", exact: true })
   await expect(panel).toContainText("No token")
 
   await panel.getByRole("button", { name: "Issue token" }).click()
@@ -240,8 +243,7 @@ test("A token is issued and revoked from the bot user's panel", async ({
     .click()
 
   // The reveal is its own deliberate step, opened over the panel: it shows
-  // the token once and says so. (Guarding it against a stray dismissal is
-  // semaputnik/taskly#77, which is still open.)
+  // the token once and says so.
   const reveal = page.getByRole("dialog", { name: "Token for Nightly sync" })
   await expect(reveal).toContainText("It won't be shown again")
   const token = await reveal
@@ -249,8 +251,7 @@ test("A token is issued and revoked from the bot user's panel", async ({
     .inputValue()
   expect(token).toMatch(/^taskly_bot_/)
   await expect(reveal.getByRole("button", { name: "Copy" })).toBeVisible()
-  await reveal.getByRole("button", { name: "Done" }).click()
-  await expect(reveal).toBeHidden()
+  await storeTokenAndClose(reveal)
 
   await expect(panel).toContainText("Working")
   await panel.getByRole("button", { name: "Revoke" }).click()
@@ -308,10 +309,9 @@ test("Creating a bot user still asks for its scope up front", async ({
   await dialog.getByRole("checkbox", { name: "Releases" }).check()
   await dialog.getByRole("button", { name: "Create and issue token" }).click()
 
-  await page
-    .getByRole("dialog", { name: "Token for Release agent" })
-    .getByRole("button", { name: "Done" })
-    .click()
+  await storeTokenAndClose(
+    page.getByRole("dialog", { name: "Token for Release agent" }),
+  )
   await expect(row(page, "Release agent")).toContainText("Releases")
 })
 

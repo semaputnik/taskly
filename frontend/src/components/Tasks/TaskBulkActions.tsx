@@ -157,6 +157,7 @@ export function TaskBulkActions({
         <div className="w-48">
           <TagsField
             value={[]}
+            floatingHint
             aria-label="Add a tag to the selection"
             onChange={(tags) =>
               tags.length > 0 && change.mutate({ add_tags: tags })
