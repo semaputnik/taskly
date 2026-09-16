@@ -254,7 +254,8 @@ only saturated things a screen can contain.
 answers one of three questions: *what do I press*, *where am I*, or *what am I
 typing in*. A teal fill that answers none of those is decoration and must be
 removed. Status, category, priority, and tag are communicated with neutrals and
-shape — never by spending the accent.
+shape — never by spending the accent, and never by a second hue: an active
+account is a filled ink dot, an inactive one a hollow muted ring.
 
 **The Chroma Zero Rule.** Every structural token — surface, border, text,
 skeleton, divider — has chroma exactly `0`. There are no warm greys and no cool
@@ -312,6 +313,17 @@ inside a list sheet — the dashboard's "Overdue" and "Due today" bands, and the
 because they are the same device. It is the system's one micro-typographic
 signature and it holds only while nothing else borrows it: page headings,
 buttons, tabs, and badges are all sentence case.
+
+**The Descending Outline Rule.** Headings step down one level at a time: the
+page title is the one `h1`, the bands and sections under it are `h2`, and a
+dialog or panel title is an `h2` under whatever opened it. Size is set by the
+role above, not by the level, so a small uppercase band header is still an
+`h2`.
+
+**One Way to Write a Date.** Every date goes through `src/lib/dates.ts`: a day
+is numeric in the reader's locale — the way the browser's own date field
+writes it, so a table cell and the panel field beside it agree — and a moment
+adds the time to the minute. A call site never formats a date itself.
 
 **The Two-Weight Rule.** Text is 400 or 500 in the body of the interface; 600
 and 700 are reserved for the four headline roles above. A third weight inside a
