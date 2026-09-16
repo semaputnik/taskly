@@ -564,6 +564,10 @@ for.
 - Enter and exit both animate: fade plus a 95%→100% zoom over 200ms.
 - A close affordance sits at 0.75rem from the top-right at 70% opacity,
   reaching full opacity on hover — a 32px target, 44px on a touch pointer.
+- Escape and a click outside dismiss a dialog, with one exception: a dialog
+  whose dismissal cannot be taken back — the one-time token reveal — has no
+  close affordance, ignores both, and closes only once the reader confirms
+  what they are leaving behind.
 - Title at 1.125rem/600, description beneath in 0.875rem Ink Muted. Footer
   actions align right on desktop and reverse into a stack on mobile, so the
   primary action is thumb-nearest on a phone and rightmost on a desktop.
@@ -609,7 +613,8 @@ record type the product has: tasks, projects, tags and bot users. A right-hand
   while a request is on its way. A record the API refuses — deleted, not the
   reader's — reads "could not be opened", identically for both, with Close; a
   request the server did not answer reads "could not be loaded", with Try
-  again beside Close. Neither is retried behind a skeleton first.
+  again beside Close, said after the first failed attempt even while retries
+  carry on behind it. A refusal is never retried.
 - **Description** in its own banded section, so an empty one is visibly empty
   rather than merged into the properties above.
 - **Tabs** for the collections that hang off the record: comments, subtasks,
@@ -691,7 +696,7 @@ already edits, and the reader would have to learn both.
   thought, so a burst of them costs one gesture each.
 - **Escape before the commit cancels silently** — no request, no record, no
   toast. After it, the task exists and dismissal only closes the panel:
-  deleting is the corner control, never a side effect of leaving.
+  deleting is the control at the panel's foot, never a side effect of leaving.
 - **The rest of the record waits for the record.** The new-record state carries
   the title and the destination project, and the properties appear the moment
   there is something to hang them on. Controls that quietly buffer their values

@@ -52,18 +52,18 @@ function TokenReveal({
   // "Copied" on the button fades after a moment; having copied does not.
   const [everCopied, setEverCopied] = useState(false)
   const [stored, setStored] = useState(false)
-  const [warning, setWarning] = useState(false)
-  const [held, setHeld] = useState(false)
+  const [confirmingUncopied, setConfirmingUncopied] = useState(false)
+  const [dismissalRefused, setDismissalRefused] = useState(false)
   const storedId = useId()
 
-  const hold = (event: Event) => {
+  const refuseDismissal = (event: Event) => {
     event.preventDefault()
-    setHeld(true)
+    setDismissalRefused(true)
   }
 
   const leave = () => {
-    if (!everCopied && !warning) {
-      setWarning(true)
+    if (!everCopied && !confirmingUncopied) {
+      setConfirmingUncopied(true)
       return
     }
     onClose()
@@ -73,8 +73,8 @@ function TokenReveal({
     <DialogContent
       className="sm:max-w-lg"
       showCloseButton={false}
-      onEscapeKeyDown={hold}
-      onInteractOutside={hold}
+      onEscapeKeyDown={refuseDismissal}
+      onInteractOutside={refuseDismissal}
     >
       <DialogHeader>
         <DialogTitle>Token for {botName}</DialogTitle>
@@ -124,7 +124,7 @@ function TokenReveal({
           checked={stored}
           onCheckedChange={(checked) => {
             setStored(checked === true)
-            setWarning(false)
+            setConfirmingUncopied(false)
           }}
         />
         <Label htmlFor={storedId} className="font-normal">
@@ -133,7 +133,7 @@ function TokenReveal({
       </div>
 
       <div aria-live="polite" className="empty:hidden">
-        {warning ? (
+        {confirmingUncopied ? (
           <Alert variant="destructive">
             <TriangleAlert />
             <AlertDescription>
@@ -141,7 +141,7 @@ function TokenReveal({
               shown again and the bot user needs a new one.
             </AlertDescription>
           </Alert>
-        ) : held && !stored ? (
+        ) : dismissalRefused && !stored ? (
           <p className="text-muted-foreground text-sm">
             This stays open until you confirm the token is stored.
           </p>
@@ -149,12 +149,12 @@ function TokenReveal({
       </div>
 
       <DialogFooter>
-        {warning ? (
+        {confirmingUncopied ? (
           <>
             <Button
               type="button"
               variant="outline"
-              onClick={() => setWarning(false)}
+              onClick={() => setConfirmingUncopied(false)}
             >
               Back to the token
             </Button>

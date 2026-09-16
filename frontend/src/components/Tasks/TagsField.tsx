@@ -46,12 +46,14 @@ export function TagsField({
 
   // Let the server narrow the list: with many tags, fetching a page and
   // filtering it here would quietly stop offering the match further down.
+  // Asked by the name as it will be saved, so a trailing space does not hide
+  // the tag it would attach.
   const { data: tags } = useQuery({
-    queryKey: ["tags", draft],
+    queryKey: ["tags", name],
     queryFn: async () =>
       (
         await TagsService.readTags({
-          query: { q: draft || undefined, skip: 0, limit: 100 },
+          query: { q: name || undefined, skip: 0, limit: 100 },
         })
       ).data,
   })
@@ -71,7 +73,7 @@ export function TagsField({
 
   // Tag names match exactly, as the server matches them. Until the answer for
   // this very name is in, the field says nothing rather than guess.
-  const effect = !name
+  const hint = !name
     ? null
     : value.includes(name)
       ? `${name} is already on it.`
@@ -134,7 +136,7 @@ export function TagsField({
           floatingHint && "absolute top-full left-0 mt-1 whitespace-nowrap",
         )}
       >
-        {leftUnsent && effect ? `Not added yet. ${effect}` : effect}
+        {leftUnsent && hint ? `Not added yet. ${hint}` : hint}
       </p>
 
       {value.length > 0 && (
@@ -145,7 +147,7 @@ export function TagsField({
               <button
                 type="button"
                 aria-label={`Remove tag ${tagName}`}
-                className="cursor-pointer opacity-60 hover:opacity-100"
+                className="-my-1 -mr-1 inline-flex cursor-pointer items-center justify-center rounded-sm p-1 opacity-60 hover:opacity-100 pointer-coarse:-my-3 pointer-coarse:size-11"
                 onClick={() => onChange(value.filter((tag) => tag !== tagName))}
               >
                 <X className="size-3" />

@@ -23,7 +23,7 @@ import { handleError } from "@/utils"
  *
  * Unlike a task, an attachment has no way back: its bytes are gone the moment
  * the server acts, so an undo window would have nothing to restore. The
- * confirmation says so, and says what is not affected (FR-04.1, FR-04.2).
+ * confirmation says so, and says what is not affected (FR-04.1).
  */
 export function DeleteAttachment({
   attachment,

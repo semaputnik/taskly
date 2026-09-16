@@ -136,6 +136,7 @@ export const TaskComments = ({ task }: TaskCommentsProps) => {
                           variant="ghost"
                           size="icon"
                           aria-label="Edit comment"
+                          className="pointer-coarse:size-11"
                           onClick={() => startEditing(comment.id, comment.body)}
                         >
                           <Pencil className="size-3.5" />
@@ -144,6 +145,7 @@ export const TaskComments = ({ task }: TaskCommentsProps) => {
                           variant="ghost"
                           size="icon"
                           aria-label="Delete comment"
+                          className="pointer-coarse:size-11"
                           onClick={() => deletion.remove(comment)}
                         >
                           <Trash2 className="size-3.5" />

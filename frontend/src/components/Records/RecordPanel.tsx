@@ -1,10 +1,8 @@
-import { AxiosError } from "axios"
 import { type LucideIcon, Trash2 } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { LoadingButton } from "@/components/ui/loading-button"
 import {
   Sheet,
   SheetContent,
@@ -15,6 +13,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton"
 import { Toaster } from "@/components/ui/sonner"
 import { Textarea } from "@/components/ui/textarea"
+import { isRefusal } from "@/lib/apiErrors"
 import { PANEL_TOASTER_ID, settlePanelNotices } from "@/lib/panelNotices"
 import { cn } from "@/lib/utils"
 
@@ -59,7 +58,6 @@ export function RecordPanel({
   pending,
   failure,
   onRetry,
-  retrying,
   /** What the record is called in the sentence saying it cannot be shown. */
   kind = "record",
   children,
@@ -101,9 +99,9 @@ export function RecordPanel({
             </p>
             <div className="flex gap-2">
               {failure === "unavailable" && onRetry && (
-                <LoadingButton size="sm" loading={retrying} onClick={onRetry}>
+                <Button size="sm" onClick={onRetry}>
                   Try again
-                </LoadingButton>
+                </Button>
               )}
               <Button variant="outline" size="sm" onClick={onClose}>
                 Close
@@ -142,8 +140,8 @@ export interface RecordLoad {
    * is revealed. `unavailable`: the API did not answer, and it may yet.
    */
   failure?: "missing" | "unavailable"
+  /** Ask again now, cutting short any retry already waiting. */
   onRetry?: () => void
-  retrying?: boolean
 }
 
 /**
@@ -152,38 +150,31 @@ export interface RecordLoad {
  *
  * A failed read has to say so: a skeleton is shown only while a request is
  * really on its way, never for a request that has already failed. A record
- * already on screen stays there through a background refetch that fails for a
- * reason that may pass.
+ * already on screen stays there through a background refetch that fails.
  */
 export function recordLoad(
   query: {
     data: unknown
     isLoading: boolean
-    isError: boolean
-    isFetching: boolean
-    error: Error | null
+    failureCount: number
+    failureReason: Error | null
     refetch: () => unknown
   },
   reading: boolean,
 ): RecordLoad {
   if (!reading) return {}
-  const refused =
-    query.error instanceof AxiosError &&
-    (query.error.response?.status ?? 0) >= 400 &&
-    (query.error.response?.status ?? 0) < 500
-  const failure =
-    !query.isError || query.isLoading
-      ? undefined
-      : refused
-        ? "missing"
-        : query.data === undefined
-          ? "unavailable"
-          : undefined
+  // A failure is said as soon as the first attempt fails, even while a
+  // failure that may pass is still being retried behind it: the skeleton is
+  // only for the first request, genuinely on its way.
+  const failed = query.failureCount > 0 && query.data === undefined
   return {
-    pending: query.isLoading,
-    failure,
+    pending: query.isLoading && !failed,
+    failure: !failed
+      ? undefined
+      : isRefusal(query.failureReason)
+        ? "missing"
+        : "unavailable",
     onRetry: () => void query.refetch(),
-    retrying: query.isFetching,
   }
 }
 

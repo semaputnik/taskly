@@ -22,8 +22,12 @@ export const NO_RECURRENCE = "none"
  * restated: the server enforces it for every client, bot users included, and
  * a second copy here would be free to drift (FR-01.13).
  */
-export const MIN_INTERVAL_DAYS =
-  RecurrenceSchema.properties.interval_days.anyOf[0].minimum
+export const MIN_INTERVAL_DAYS = (() => {
+  for (const option of RecurrenceSchema.properties.interval_days.anyOf) {
+    if ("minimum" in option) return option.minimum
+  }
+  throw new Error("The API schema no longer bounds interval_days")
+})()
 
 const FREQUENCY_LABELS: Record<RecurrenceFrequency, string> = {
   daily: "Daily",

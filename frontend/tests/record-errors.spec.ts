@@ -73,7 +73,9 @@ test("A failure that may pass offers to try again", async ({ page }) => {
   )
   await page.goto(`/tasks?task=${task.id}`)
   const panel = page.getByRole("dialog")
-  await expect(panel).toContainText("could not be loaded", { timeout: 15_000 })
+  // Said after the first failed attempt, while retries carry on behind it.
+  await expect(panel).toContainText("could not be loaded", { timeout: 3_000 })
+  await expect(panel.locator("[data-slot=skeleton]")).toHaveCount(0)
 
   failing = false
   await panel.getByRole("button", { name: "Try again" }).click()

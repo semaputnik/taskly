@@ -11,6 +11,7 @@ import ReactDOM from "react-dom/client"
 import { client } from "./client/client.gen"
 import { ThemeProvider } from "./components/theme-provider"
 import { Toaster } from "./components/ui/sonner"
+import { isRefusal } from "./lib/apiErrors"
 import "./index.css"
 import { routeTree } from "./routeTree.gen"
 
@@ -23,20 +24,6 @@ client.setConfig({
 const isCredentialError = (error: Error): boolean =>
   error instanceof AxiosError &&
   [401, 403].includes(error.response?.status ?? 0)
-
-/**
- * Whether the API refused the request as asked (a 4xx), as opposed to failing
- * to answer it. A timeout and a rate limit are the exceptions: they may pass.
- */
-const isRefusal = (error: Error): boolean => {
-  const status = error instanceof AxiosError ? error.response?.status : 0
-  return (
-    status !== undefined &&
-    status >= 400 &&
-    status < 500 &&
-    ![408, 429].includes(status)
-  )
-}
 
 // Every query on a screen is refused at once, and each fresh assignment to
 // `location.href` aborts the navigation the previous one started.
@@ -59,8 +46,7 @@ const queryClient = new QueryClient({
       // that neither shows anything nor says why, which is exactly the
       // stranding a failure message exists to prevent. Only a failure that
       // may pass is tried again.
-      retry: (failureCount, error) =>
-        !isRefusal(error as Error) && failureCount < 3,
+      retry: (failureCount, error) => !isRefusal(error) && failureCount < 3,
     },
     mutations: { retry: false },
   },

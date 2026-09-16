@@ -17,7 +17,7 @@ export function useCopyToClipboard(): [CopiedValue, CopyFn] {
         .then(() => true)
         .catch(() => false)
       if (!written && !copyBySelection(text)) {
-        console.warn("Clipboard not supported")
+        console.warn("Copy failed: the clipboard refused it both ways")
         return false
       }
       setCopiedText(text)
