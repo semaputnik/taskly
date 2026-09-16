@@ -11,7 +11,9 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Toaster } from "@/components/ui/sonner"
 import { Textarea } from "@/components/ui/textarea"
+import { PANEL_TOASTER_ID, settlePanelNotices } from "@/lib/panelNotices"
 import { cn } from "@/lib/utils"
 
 /**
@@ -115,8 +117,30 @@ export function RecordPanel({
             )}
           </>
         )}
+        <PanelNotices />
       </SheetContent>
     </Sheet>
+  )
+}
+
+/**
+ * The toaster for notices that offer an action, inside the panel where the
+ * modal sheet still lets the reader reach them — by pointer, by Tab, and by
+ * its Alt+T hotkey.
+ */
+function PanelNotices() {
+  useEffect(() => settlePanelNotices, [])
+  // No close button: Undo is the first stop inside a notice, and a notice that
+  // is left alone runs out on its own.
+  return (
+    <Toaster
+      id={PANEL_TOASTER_ID}
+      toastOptions={{
+        classNames: {
+          actionButton: "pointer-coarse:h-11! pointer-coarse:px-4!",
+        },
+      }}
+    />
   )
 }
 

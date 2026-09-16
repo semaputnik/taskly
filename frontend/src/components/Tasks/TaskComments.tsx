@@ -9,6 +9,7 @@ import { LoadingButton } from "@/components/ui/loading-button"
 import { Textarea } from "@/components/ui/textarea"
 import useCustomToast from "@/hooks/useCustomToast"
 import { handleError } from "@/utils"
+import { useCommentDeletion } from "./commentDeletion"
 
 interface TaskCommentsProps {
   task: TaskPublic
@@ -61,12 +62,8 @@ export const TaskComments = ({ task, enabled = true }: TaskCommentsProps) => {
     onSettled: invalidate,
   })
 
-  const deleteMutation = useMutation({
-    mutationFn: (id: string) =>
-      CommentsService.deleteComment({ path: { comment_id: id } }),
-    onError: handleError.bind(showErrorToast),
-    onSettled: invalidate,
-  })
+  const deletion = useCommentDeletion(task.id)
+  const shown = comments?.data.filter((comment) => !deletion.isHidden(comment))
 
   const startEditing = (id: string, body: string) => {
     setEditingId(id)
@@ -78,8 +75,8 @@ export const TaskComments = ({ task, enabled = true }: TaskCommentsProps) => {
       <div className="flex flex-col gap-3">
         {isLoading ? (
           <p className="text-muted-foreground text-sm italic">Loading…</p>
-        ) : comments?.data.length ? (
-          comments.data.map((comment) => (
+        ) : shown?.length ? (
+          shown.map((comment) => (
             <div key={comment.id} className="rounded-md border p-3 text-sm">
               {editingId === comment.id ? (
                 <div className="flex flex-col gap-2">
@@ -149,7 +146,7 @@ export const TaskComments = ({ task, enabled = true }: TaskCommentsProps) => {
                           variant="ghost"
                           size="icon"
                           aria-label="Delete comment"
-                          onClick={() => deleteMutation.mutate(comment.id)}
+                          onClick={() => deletion.remove(comment)}
                         >
                           <Trash2 className="size-3.5" />
                         </Button>

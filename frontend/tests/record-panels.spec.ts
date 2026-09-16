@@ -230,7 +230,7 @@ test("A token is issued and revoked from the bot user's panel", async ({
 
   await page.goto("/bots")
   await row(page, "Nightly sync").click()
-  const panel = page.getByRole("dialog", { name: "Nightly sync" })
+  const panel = page.getByRole("dialog", { name: "Nightly sync", exact: true })
   await expect(panel).toContainText("No token")
 
   await panel.getByRole("button", { name: "Issue token" }).click()
