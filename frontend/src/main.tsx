@@ -24,11 +24,15 @@ const isCredentialError = (error: Error): boolean =>
   error instanceof AxiosError &&
   [401, 403].includes(error.response?.status ?? 0)
 
+// Every query on a screen is refused at once, and each fresh assignment to
+// `location.href` aborts the navigation the previous one started.
+let redirectingToLogin = false
+
 const handleApiError = (error: Error) => {
-  if (isCredentialError(error)) {
-    localStorage.removeItem("access_token")
-    window.location.href = "/login"
-  }
+  if (!isCredentialError(error) || redirectingToLogin) return
+  redirectingToLogin = true
+  localStorage.removeItem("access_token")
+  window.location.href = "/login"
 }
 
 const queryClient = new QueryClient({

@@ -125,7 +125,9 @@ test("A refused credential sends the reader on at once, not after retries", asyn
   })
 
   const started = Date.now()
-  await page.goto("/tasks")
+  // The redirect can land before /tasks finishes loading, so waiting for its
+  // load event would abort the navigation under test.
+  await page.goto("/tasks", { waitUntil: "commit" })
   await page.waitForURL("/login", { timeout: 5000 })
   // Retried like any other failure, a refused credential costs four refusals
   // and about eight seconds of a screen that neither loads nor moves on.
