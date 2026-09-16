@@ -12,6 +12,7 @@ from app.core.config import settings
 from app.main import app
 from app.models import Task, UserCreate
 from tests.api.routes.test_attachments import InMemoryAttachmentStorage
+from tests.utils.bot import create_project, create_user_headers, issue_bot_headers
 from tests.utils.utils import random_email, random_lower_string
 
 API = settings.API_V1_STR
@@ -148,6 +149,63 @@ def test_a_malformed_recurrence_is_rejected(
         json={"title": "Bad", "due_date": "2026-03-02", "recurrence": recurrence},
     )
     assert r.status_code == 422
+
+
+@pytest.mark.parametrize(("days", "accepted"), [(1, False), (2, True)])
+def test_every_n_days_starts_at_two_days(
+    client: TestClient, db: Session, days: int, accepted: bool
+) -> None:
+    # Every one day is the daily rule spelt a second way; one rule has one
+    # spelling, so the shortest "every N days" is two.
+    headers = _headers_for_new_user(client, db)
+    recurrence = {"frequency": "every_n_days", "interval_days": days}
+
+    created = client.post(
+        f"{API}/tasks/",
+        headers=headers,
+        json={"title": "Created", "due_date": "2026-03-02", "recurrence": recurrence},
+    )
+    task = _create_task(client, headers, "Updated", due_date="2026-03-02")
+    updated = _patch(client, headers, task["id"], recurrence=recurrence)
+
+    assert (created.status_code == 200) is accepted, created.text
+    assert (updated.status_code == 200) is accepted, updated.text
+
+
+@pytest.mark.parametrize(("days", "accepted"), [(1, False), (2, True)])
+def test_a_bot_user_is_held_to_the_same_minimum(
+    client: TestClient, db: Session, days: int, accepted: bool
+) -> None:
+    headers = create_user_headers(client, db)
+    project = create_project(client, headers)
+    bot = issue_bot_headers(
+        client,
+        headers,
+        project_ids=[project],
+        permissions={"read_tasks": True, "create_tasks": True},
+    )
+
+    r = client.post(
+        f"{API}/tasks/",
+        headers=bot,
+        json={
+            "title": "By the bot",
+            "project_id": project,
+            "due_date": "2026-03-02",
+            "recurrence": {"frequency": "every_n_days", "interval_days": days},
+        },
+    )
+
+    assert (r.status_code == 200) is accepted, r.text
+
+
+def test_the_minimum_is_published_in_the_api_schema(client: TestClient) -> None:
+    # The web client reads the minimum from here rather than restating it.
+    schema = client.get(f"{API}/openapi.json").json()
+    interval = schema["components"]["schemas"]["Recurrence"]["properties"][
+        "interval_days"
+    ]
+    assert {"type": "integer", "minimum": 2} in interval["anyOf"]
 
 
 def test_a_task_cannot_recur_without_a_due_date(
