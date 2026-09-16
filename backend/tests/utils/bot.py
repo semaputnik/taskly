@@ -18,6 +18,7 @@ ALL_PERMISSIONS = {
     "update_tasks": True,
     "delete_tasks": True,
     "add_comments": True,
+    "create_tags": True,
 }
 READ_ONLY = {"read_tasks": True}
 

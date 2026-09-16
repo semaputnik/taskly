@@ -305,58 +305,6 @@ def test_no_project_write_is_open_to_a_bot_with_every_permission(
     assert sorted(p["name"] for p in projects) == ["Inbox", "Mine"]
 
 
-# --- Tags ---------------------------------------------------------------------
-
-
-@pytest.mark.parametrize("tags", [["urgent"], []], ids=["some tags", "empty list"])
-def test_a_bot_create_that_sends_tags_is_refused_whole(
-    client: TestClient, db: Session, tags: list[str]
-) -> None:
-    owner = create_user_headers(client, db)
-    project_id = create_project(client, owner)
-    bot = issue_bot_headers(
-        client, owner, project_ids=[project_id], permissions=ALL_PERMISSIONS
-    )
-
-    r = client.post(
-        f"{API}/tasks/",
-        headers=bot,
-        json={"title": "Tagged", "project_id": project_id, "tags": tags},
-    )
-    assert r.status_code == 403
-    assert error_code(r) == "tags_read_only"
-    assert _task_count(client, owner) == 0
-
-
-def test_a_bot_update_that_sends_tags_changes_nothing(
-    client: TestClient, db: Session
-) -> None:
-    owner = create_user_headers(client, db)
-    project_id = create_project(client, owner)
-    r = client.post(
-        f"{API}/tasks/",
-        headers=owner,
-        json={"title": "Original", "project_id": project_id, "tags": ["home"]},
-    )
-    task_id = r.json()["id"]
-    bot = issue_bot_headers(
-        client, owner, project_ids=[project_id], permissions=ALL_PERMISSIONS
-    )
-
-    r = client.patch(
-        f"{API}/tasks/{task_id}",
-        headers=bot,
-        json={"title": "Changed", "tags": ["work"]},
-    )
-    assert r.status_code == 403
-    assert error_code(r) == "tags_read_only"
-
-    # The bot still sees the owner's tags, untouched, and the title with them.
-    r = client.get(f"{API}/tasks/{task_id}", headers=bot)
-    assert r.json()["title"] == "Original"
-    assert r.json()["tags"] == ["home"]
-
-
 # --- Attribution --------------------------------------------------------------
 
 

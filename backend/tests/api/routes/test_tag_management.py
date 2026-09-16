@@ -306,9 +306,12 @@ def test_one_users_tags_cannot_be_renamed_or_deleted_by_another(
     assert _tags(client, other) == {}
 
 
-def test_a_bot_cannot_create_rename_or_delete_tags(
-    client: TestClient, owner: Headers
-) -> None:
+def test_a_bot_cannot_rename_or_delete_tags(client: TestClient, owner: Headers) -> None:
+    """
+    Renaming and deleting change tasks in every project, so no scope could
+    allow them (ADR-0003). Creating tags is a bot user's to be granted, and
+    lives in `test_bot_tags.py`.
+    """
     project_id = create_project(client, owner)
     bot_headers = issue_bot_headers(
         client, owner, project_ids=[project_id], permissions=ALL_PERMISSIONS
@@ -316,7 +319,6 @@ def test_a_bot_cannot_create_rename_or_delete_tags(
     tag = _create_tag(client, owner, "home").json()
 
     for r in (
-        _create_tag(client, bot_headers, "bot-made"),
         _rename(client, bot_headers, tag["id"], "renamed"),
         _delete(client, bot_headers, tag["id"]),
     ):

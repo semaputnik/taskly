@@ -788,10 +788,11 @@ class BotPermissions(SQLModel):
     FR-08.10).
 
     Only what can be granted is here. What a bot can never do — anything on
-    projects, editing or deleting comments — has no field to set to false:
-    the endpoints for it take a human caller, so a bot cannot reach them at
-    all. Tags have no field yet either, because what a tag permission would
-    mean is still an open question (Q-16); a bot changes no tags meanwhile.
+    projects, editing or deleting comments, renaming or deleting tags — has no
+    field to set to false: the endpoints for it take a human caller, so a bot
+    cannot reach them at all. Reading tags needs no field either: every bot
+    user reads its owner's whole tag vocabulary, whatever its scope
+    (ADR-0003).
     """
 
     create_tasks: bool = False
@@ -799,6 +800,9 @@ class BotPermissions(SQLModel):
     update_tasks: bool = False
     delete_tasks: bool = False
     add_comments: bool = False
+    # Covers both creating a tag on its own and typing a name that is not a
+    # tag yet onto a task (FR-08.9).
+    create_tags: bool = False
 
 
 class BotScope(SQLModel):
@@ -851,6 +855,7 @@ class BotUser(SQLModel, table=True):
     update_tasks: bool = False
     delete_tasks: bool = False
     add_comments: bool = False
+    create_tags: bool = False
     # A SHA-256 of the token, never the token itself, so the token cannot be
     # read back from anywhere once the response that issued it is gone
     # (FR-08.13). One column, so a bot user holds at most one token
