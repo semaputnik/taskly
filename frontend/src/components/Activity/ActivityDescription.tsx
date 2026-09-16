@@ -276,6 +276,17 @@ export function ActivityDescription({
         </>
       )
     }
+    case "tag_merged": {
+      const sources = detail<string[]>(entry, "sources") ?? []
+      const tasks = detail<number>(entry, "task_count") ?? 0
+      return (
+        <>
+          Merged {sources.map((name) => `“${name}”`).join(", ")} into {subject}
+          {tasks > 0 &&
+            `, moving ${tasks} ${tasks === 1 ? "task" : "tasks"} onto it`}
+        </>
+      )
+    }
     case "tag_deleted": {
       const tasks = detail<number>(entry, "task_count") ?? 0
       return (

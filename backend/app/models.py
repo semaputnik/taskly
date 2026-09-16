@@ -247,6 +247,22 @@ class TagPublic(TagBase):
     archived_task_count: int = 0
 
 
+class TagMerge(SQLModel):
+    """The tags to fold into the one the merge is addressed to."""
+
+    source_ids: list[uuid.UUID] = Field(min_length=1)
+
+
+class TagMergePreview(SQLModel):
+    """
+    What a merge would move: the tasks carrying any of the sources, each
+    counted once, live and archived apart (semaputnik/taskly#69).
+    """
+
+    task_count: int
+    archived_task_count: int
+
+
 class TagsPublic(SQLModel):
     data: list[TagPublic]
     count: int
@@ -751,6 +767,9 @@ class ActivityAction(StrEnum):
     TAG_CREATED = "tag_created"
     TAG_RENAMED = "tag_renamed"
     TAG_DELETED = "tag_deleted"
+    # Several tags folded into one: one entry naming both sides, not one per
+    # task that changed or per tag that went.
+    TAG_MERGED = "tag_merged"
 
 
 class ActivityEntityType(StrEnum):

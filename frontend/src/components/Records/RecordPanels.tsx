@@ -79,6 +79,7 @@ export function RecordPanels() {
         capturing={capturing === "tag"}
         onClose={panels.close}
         onCreated={(tag) => panels.openTag(tag.id)}
+        onOpenTag={panels.openTag}
       />
       <BotPanel botId={panels.botId} onClose={panels.close} />
     </IssuedTokenProvider>

@@ -34,6 +34,8 @@ LOGGED = {
     f"POST {API}/tags/",
     f"PATCH {API}/tags/{{tag_id}}",
     f"DELETE {API}/tags/{{tag_id}}",
+    # One entry naming both sides, not one per task or tag (semaputnik/taskly#69).
+    f"POST {API}/tags/{{tag_id}}/merge",
 }
 ACCOUNT = "Account and sign-in, not a change to the tasks and projects the log covers"
 

@@ -24,7 +24,8 @@ export const ActivityActionSchema = {
         'attachment_deleted',
         'tag_created',
         'tag_renamed',
-        'tag_deleted'
+        'tag_deleted',
+        'tag_merged'
     ],
     title: 'ActivityAction',
     description: 'Everything the activity log records (FR-10.3).'
@@ -1053,6 +1054,46 @@ export const TagCreateSchema = {
         'name'
     ],
     title: 'TagCreate'
+} as const;
+
+export const TagMergeSchema = {
+    properties: {
+        source_ids: {
+            items: {
+                type: 'string',
+                format: 'uuid'
+            },
+            type: 'array',
+            minItems: 1,
+            title: 'Source Ids'
+        }
+    },
+    type: 'object',
+    required: [
+        'source_ids'
+    ],
+    title: 'TagMerge',
+    description: 'The tags to fold into the one the merge is addressed to.'
+} as const;
+
+export const TagMergePreviewSchema = {
+    properties: {
+        task_count: {
+            type: 'integer',
+            title: 'Task Count'
+        },
+        archived_task_count: {
+            type: 'integer',
+            title: 'Archived Task Count'
+        }
+    },
+    type: 'object',
+    required: [
+        'task_count',
+        'archived_task_count'
+    ],
+    title: 'TagMergePreview',
+    description: 'What a merge would move: the tasks carrying any of the sources, each\ncounted once, live and archived apart (semaputnik/taskly#69).'
 } as const;
 
 export const TagPublicSchema = {

@@ -709,6 +709,60 @@ def delete_tag(*, session: Session, tag: Tag) -> None:
     session.commit()
 
 
+def tag_merge_counts(
+    *, session: Session, owner_id: uuid.UUID, source_ids: Sequence[uuid.UUID]
+) -> tuple[int, int]:
+    """
+    How many tasks carry any of `source_ids`, each counted once, as (live,
+    archived). Deleted tasks are not counted, as a tag's own count leaves
+    them out, though a merge moves them too.
+    """
+    archived = col(Task.id).in_(archived_task_ids(owner_id))
+    carrying = (
+        select(TaskTag.task_id)
+        .where(col(TaskTag.tag_id).in_(source_ids))
+        .distinct()
+        .subquery()
+    )
+    live, archived_count = session.exec(
+        select(func.count().filter(~archived), func.count().filter(archived)).where(
+            Task.id == carrying.c.task_id,
+            not_deleted(Task),
+        )
+    ).one()
+    return live, archived_count
+
+
+def merge_tags(*, session: Session, target: Tag, sources: Sequence[Tag]) -> None:
+    """
+    Fold `sources` into `target`: every task carrying a source carries the
+    target instead — once, however many of the tags it had — and the sources
+    are deleted. Deleted and archived tasks move too, so neither comes back
+    later under a name that no longer exists.
+
+    One commit, so a merge either happens whole or not at all
+    (semaputnik/taskly#69).
+    """
+    source_ids = [source.id for source in sources]
+    carrying_target = set(
+        session.exec(select(TaskTag.task_id).where(TaskTag.tag_id == target.id)).all()
+    )
+    links = session.exec(
+        select(TaskTag).where(col(TaskTag.tag_id).in_(source_ids))
+    ).all()
+    for link in links:
+        session.delete(link)
+        if link.task_id not in carrying_target:
+            session.add(TaskTag(task_id=link.task_id, tag_id=target.id))
+            carrying_target.add(link.task_id)
+    # The links go first: removing a tag takes its links with it in the
+    # database, and the unit of work does not know to order them.
+    session.flush()
+    for source in sources:
+        session.delete(source)
+    session.commit()
+
+
 def get_task_tags(
     *, session: Session, task_ids: Sequence[uuid.UUID]
 ) -> dict[uuid.UUID, list[str]]:

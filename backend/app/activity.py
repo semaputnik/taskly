@@ -83,6 +83,42 @@ def set_batch(
     session.info[_BATCH_KEY] = (action, set(task_ids), details)
 
 
+_TAG_MERGE_KEY = "activity_tag_merge"
+
+
+def set_tag_merge(
+    session: Session,
+    *,
+    target: Tag,
+    source_ids: list[uuid.UUID],
+    sources: list[str],
+    task_count: int,
+) -> None:
+    """
+    Log this transaction as one merge of `sources` into `target`, rather than
+    as every task whose tags it rewrote and every source tag it removed: the
+    user made one decision, and the log records that (semaputnik/taskly#69).
+    """
+    session.info[_TAG_MERGE_KEY] = _TagMerge(
+        entry=_entry(
+            target.owner_id,
+            ActivityAction.TAG_MERGED,
+            ActivityEntityType.TAG,
+            target.id,
+            name=target.name,
+            sources=sources,
+            task_count=task_count,
+        ),
+        source_ids=set(source_ids),
+    )
+
+
+@dataclass(frozen=True)
+class _TagMerge:
+    entry: ActivityEntry
+    source_ids: set[uuid.UUID]
+
+
 def set_bot_actor(session: Session, bot_user_id: uuid.UUID) -> None:
     """
     Attribute every change this session commits to the bot user
@@ -242,6 +278,7 @@ def _write(session: Session) -> None:
     batch: tuple[ActivityAction, set[uuid.UUID], dict[str, Any]] | None = (
         session.info.pop(_BATCH_KEY, None)
     )
+    merge: _TagMerge | None = session.info.pop(_TAG_MERGE_KEY, None)
     if _PENDING_KEY not in session.info:
         return
     pending: _Pending = session.info.pop(_PENDING_KEY)
@@ -266,6 +303,9 @@ def _write(session: Session) -> None:
         # Restoring is logged the same way: once for the event, not per row.
         if before is not None and before.deletion_id is not None:
             restored[before.deletion_id] = restored.get(before.deletion_id, 0) + 1
+        if merge is not None:
+            # A merge rewrites tags and nothing else; its entry says so once.
+            continue
         if batch is not None:
             # The subtasks a completion swept along are part of the same act,
             # and are not counted as tasks the reader picked.
@@ -304,7 +344,15 @@ def _write(session: Session) -> None:
         attachment = session.get(Attachment, attachment_id)
         if attachment is not None:
             entries.append(_attachment_added_entry(session, attachment))
-    entries.extend(pending.removed)
+    if merge is None:
+        entries.extend(pending.removed)
+    else:
+        entries.extend(
+            entry
+            for entry in pending.removed
+            if entry.entity_id not in merge.source_ids
+        )
+        entries.append(merge.entry)
 
     actor: _Actor | None = session.info.get(_ACTOR_KEY)
     for entry in entries:
@@ -325,6 +373,7 @@ def _discard(session: Session, transaction: Any) -> None:
     if transaction.parent is None:
         session.info.pop(_PENDING_KEY, None)
         session.info.pop(_BATCH_KEY, None)
+        session.info.pop(_TAG_MERGE_KEY, None)
 
 
 class _Refs:
