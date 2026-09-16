@@ -231,7 +231,7 @@ test("A token is issued and revoked from the bot user's panel", async ({
   await page.goto("/bots")
   await row(page, "Nightly sync").click()
   const panel = page.getByRole("dialog", { name: "Nightly sync" })
-  await expect(panel).toContainText("No token issued")
+  await expect(panel).toContainText("No token")
 
   await panel.getByRole("button", { name: "Issue token" }).click()
   await page
@@ -252,14 +252,14 @@ test("A token is issued and revoked from the bot user's panel", async ({
   await reveal.getByRole("button", { name: "Done" }).click()
   await expect(reveal).toBeHidden()
 
-  await expect(panel).toContainText("Active")
+  await expect(panel).toContainText("Working")
   await panel.getByRole("button", { name: "Revoke" }).click()
   await page
     .getByRole("dialog", { name: /Revoke the token/ })
     .getByRole("button", { name: "Revoke", exact: true })
     .click()
   await expect(page.getByText("was revoked")).toBeVisible()
-  await expect(panel).toContainText("Revoked")
+  await expect(panel).toContainText("Revoked — its requests are refused")
   // The bot user itself is untouched.
   await expect(panel.getByRole("textbox", { name: "Bot name" })).toHaveValue(
     "Nightly sync",

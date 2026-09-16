@@ -580,7 +580,11 @@ record type the product has: tasks, projects, tags and bot users. A right-hand
 - **Description** in its own banded section, so an empty one is visibly empty
   rather than merged into the properties above.
 - **Tabs** for the collections that hang off the record: comments, subtasks,
-  files. Each tab's request waits until that tab is the one on screen.
+  files for a task; activity and assigned tasks for a bot user. Each tab's
+  request waits until that tab is the one on screen, and each collection shows
+  a bounded preview that ends in a row handing off to the surface built for the
+  long version, filtered to this record — the same move the dashboard's list
+  sheet makes.
 
 **The One Address Rule.** A record has exactly one place to be read and acted
 on: its panel. Rows carry no menu of their own, and there is no edit screen —
@@ -594,6 +598,14 @@ action here has a home: a field is changed in the field, a subtask is added
 from the Subtasks tab beneath the subtasks, and delete — the one act with no
 field and no undo — is a single destructive icon in the panel's corner, with no
 neighbours to catch a stray click and no menu to open first.
+
+**State is said, not timestamped.** A record's health is written the way an
+operator would say it: "Working", "No token — this bot user cannot reach the
+API", "Silent since 9 days ago". An exact moment follows in Ink Muted where it
+is worth having, but it never stands alone — a bare timestamp answers a
+question nobody asked, and an empty one is indistinguishable from a failed
+render. A list of agents carries the same reading, in weight and words rather
+than in a colour: teal is for action, location and focus, and nothing else.
 
 **Edit in place, save per field.** Every property is its own control, and each
 one saves alone: a select the moment it changes, text when focus leaves it. The

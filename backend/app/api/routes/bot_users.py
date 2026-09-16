@@ -35,6 +35,7 @@ def _public(bot: BotUser, project_ids: list[uuid.UUID]) -> BotUserPublic:
     return BotUserPublic(
         id=bot.id,
         name=bot.name,
+        deleted=bot.deleted_at is not None,
         scope=BotScope(
             project_ids=project_ids,
             permissions=BotPermissions.model_validate(bot, from_attributes=True),
@@ -49,10 +50,20 @@ def _public(bot: BotUser, project_ids: list[uuid.UUID]) -> BotUserPublic:
 
 
 def _get_owned_bot_user(
-    session: SessionDep, current_user: CurrentUser, bot_user_id: uuid.UUID
+    session: SessionDep,
+    current_user: CurrentUser,
+    bot_user_id: uuid.UUID,
+    deleted: bool = False,
 ) -> BotUser:
+    """
+    One of the user's bot users. Deleted ones are out of reach unless the
+    caller is reading rather than changing: nothing can be done to a deleted
+    bot user, but its record still opens (FR-08.19).
+    """
     bot = session.get(BotUser, bot_user_id)
-    if not bot or bot.owner_id != current_user.id or bot.deleted_at is not None:
+    if not bot or bot.owner_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Bot user not found")
+    if bot.deleted_at is not None and not deleted:
         raise HTTPException(status_code=404, detail="Bot user not found")
     return bot
 
@@ -91,10 +102,15 @@ def read_bot_user(
 ) -> Any:
     """
     Retrieve one bot user by its id, with its scope: what the bot user's panel
-    is addressed by. A deleted bot user is gone from here like it is from the
-    list (FR-08.19).
+    is addressed by.
+
+    A deleted bot user reads here too, marked deleted. It is kept rather than
+    removed precisely so that what it did still names it (FR-08.19), and a
+    reader following one of those references has to land on a record that
+    says what it now is — while every endpoint that would change it still
+    refuses, and the list still leaves it out.
     """
-    bot = _get_owned_bot_user(session, current_user, bot_user_id)
+    bot = _get_owned_bot_user(session, current_user, bot_user_id, deleted=True)
     return _public(
         bot, crud.get_bot_user_project_ids(session=session, bot_ids=[bot.id])[bot.id]
     )
@@ -153,8 +169,10 @@ def delete_bot_user(
     what it did and what it was assigned still name it (FR-08.19, FR-08.21),
     and its token is refused from the next request on (FR-08.20).
 
-    There is no undoing it: a deleted bot user is gone from every endpoint
-    here, as if it did not exist.
+    There is no undoing it, and nothing here acts on it again: every endpoint
+    that would change a bot user refuses a deleted one, and the list leaves it
+    out. Reading it by its id still works, so what it did can still be read
+    back to the bot user that did it.
     """
     bot = _get_owned_bot_user(session, current_user, bot_user_id)
     crud.delete_bot_user(session=session, bot=bot)

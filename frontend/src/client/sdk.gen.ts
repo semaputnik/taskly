@@ -684,9 +684,17 @@ export class ActivityService {
      *
      * Retrieve the current user's activity log, newest first.
      *
+     * `actor_bot_user_id` narrows it to one bot user's own changes — what an
+     * operator asks when they want to read an integration rather than their
+     * whole account (FR-10.2). A deleted bot user's entries stay readable under
+     * it (FR-08.19).
+     *
      * Always the requesting user's own entries and nothing wider: there is no
      * parameter or role that reaches another user's log, the superuser's
-     * included (FR-10.7).
+     * included (FR-10.7). Narrowing by a bot user somebody else owns is
+     * therefore an empty feed rather than a refusal — the caller's own entries,
+     * of which that actor made none — so the filter says nothing about whose
+     * bot user it is, or whether it exists at all.
      */
     public static readActivityLog<ThrowOnError extends boolean = true>(options?: Options<activityReadActivityLogData, ThrowOnError>) {
         return (options?.client ?? client).get<activityReadActivityLogResponses, activityReadActivityLogErrors, ThrowOnError>({
@@ -763,8 +771,10 @@ export class BotsService {
      * what it did and what it was assigned still name it (FR-08.19, FR-08.21),
      * and its token is refused from the next request on (FR-08.20).
      *
-     * There is no undoing it: a deleted bot user is gone from every endpoint
-     * here, as if it did not exist.
+     * There is no undoing it, and nothing here acts on it again: every endpoint
+     * that would change a bot user refuses a deleted one, and the list leaves it
+     * out. Reading it by its id still works, so what it did can still be read
+     * back to the bot user that did it.
      */
     public static deleteBotUser<ThrowOnError extends boolean = true>(options: Options<botsDeleteBotUserData, ThrowOnError>) {
         return (options.client ?? client).delete<botsDeleteBotUserResponses, botsDeleteBotUserErrors, ThrowOnError>({
@@ -779,8 +789,13 @@ export class BotsService {
      * Read Bot User
      *
      * Retrieve one bot user by its id, with its scope: what the bot user's panel
-     * is addressed by. A deleted bot user is gone from here like it is from the
-     * list (FR-08.19).
+     * is addressed by.
+     *
+     * A deleted bot user reads here too, marked deleted. It is kept rather than
+     * removed precisely so that what it did still names it (FR-08.19), and a
+     * reader following one of those references has to land on a record that
+     * says what it now is — while every endpoint that would change it still
+     * refuses, and the list still leaves it out.
      */
     public static readBotUser<ThrowOnError extends boolean = true>(options: Options<botsReadBotUserData, ThrowOnError>) {
         return (options.client ?? client).get<botsReadBotUserResponses, botsReadBotUserErrors, ThrowOnError>({

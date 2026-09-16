@@ -100,7 +100,7 @@ test("A token is revoked and a new one issued with an expiry", async ({
     .getByRole("dialog", { name: "Revoke the token for Nightly sync?" })
     .getByRole("button", { name: "Revoke", exact: true })
     .click()
-  await expect(panel).toContainText("Revoked")
+  await expect(panel).toContainText("Revoked — its requests are refused")
 
   const refused = await request.get(`${api}/tasks/`, {
     headers: { Authorization: `Bearer ${first}` },
@@ -129,7 +129,7 @@ test("A token is revoked and a new one issued with an expiry", async ({
   expect(second).not.toBe(first)
   await secondDialog.getByRole("button", { name: "Done" }).click()
 
-  await expect(panel).toContainText("Active")
+  await expect(panel).toContainText("Working")
   await expect(panel).toContainText("Never used")
   const accepted = await request.get(`${api}/tasks/`, {
     headers: { Authorization: `Bearer ${second}` },

@@ -27,6 +27,19 @@ const NONE: PanelSearch = {
 }
 
 /**
+ * A link's search, with one record open and the others closed.
+ *
+ * The panels are mounted independently, so a URL carrying two of these keys
+ * would stack two sheets. Anything that links to a record goes through here.
+ */
+export function panelLink(
+  previous: Record<string, unknown>,
+  next: PanelSearch,
+): Record<string, unknown> {
+  return { ...previous, ...NONE, ...next }
+}
+
+/**
  * The view state to leave behind when a screen's search becomes an API query.
  *
  * Which panel is open is not a filter. Left in, it lands in the query key, and
@@ -57,11 +70,8 @@ export function useRecordPanels() {
     (next: PanelSearch) =>
       navigate({
         to: ".",
-        search: (previous: Record<string, unknown>) => ({
-          ...previous,
-          ...NONE,
-          ...next,
-        }),
+        search: (previous: Record<string, unknown>) =>
+          panelLink(previous, next),
       }),
     [navigate],
   )

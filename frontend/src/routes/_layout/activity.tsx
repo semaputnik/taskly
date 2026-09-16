@@ -2,7 +2,11 @@ import { useQuery } from "@tanstack/react-query"
 import { createFileRoute } from "@tanstack/react-router"
 import { z } from "zod"
 
-import { type ActivityEntryPublic, ActivityService } from "@/client"
+import {
+  type ActivityEntryPublic,
+  ActivityService,
+  BotsService,
+} from "@/client"
 import { ActivityDescription } from "@/components/Activity/ActivityDescription"
 import { ActorLabel } from "@/components/Activity/ActorLabel"
 import { RestoreDeletion } from "@/components/Activity/RestoreDeletion"
@@ -22,6 +26,9 @@ const PAGE_SIZE = 50
 
 const activitySearchSchema = z.object({
   page: z.number().int().min(1).optional().catch(undefined),
+  // The log narrowed to one bot user: what its panel hands off to when its
+  // feed runs past the preview.
+  actor: z.string().uuid().optional().catch(undefined),
 })
 
 export const Route = createFileRoute("/_layout/activity")({
@@ -39,9 +46,11 @@ export const Route = createFileRoute("/_layout/activity")({
 function ActivityRows({
   entries,
   currentUserId,
+  empty,
 }: {
   entries: ActivityEntryPublic[]
   currentUserId?: string
+  empty: string
 }) {
   if (entries.length === 0) {
     return (
@@ -50,7 +59,7 @@ function ActivityRows({
           colSpan={4}
           className="h-32 text-center text-muted-foreground"
         >
-          Nothing has happened in your account yet.
+          {empty}
         </TableCell>
       </TableRow>
     )
@@ -95,15 +104,32 @@ function PendingRows() {
  * entries: the API offers no way to ask for anyone else's (FR-10.7).
  */
 function Activity() {
-  const { page = 1 } = Route.useSearch()
+  const { page = 1, actor } = Route.useSearch()
   const navigate = Route.useNavigate()
   const { user: currentUser } = useAuth()
 
-  const query = { skip: (page - 1) * PAGE_SIZE, limit: PAGE_SIZE }
+  const query = {
+    skip: (page - 1) * PAGE_SIZE,
+    limit: PAGE_SIZE,
+    actor_bot_user_id: actor,
+  }
   const { data, isPending } = useQuery({
     queryKey: ["activity", query],
     queryFn: async () =>
       (await ActivityService.readActivityLog({ query })).data,
+  })
+  // Named from the bot user itself rather than from the feed: a filter that
+  // matches nothing still has to say whose nothing it is. A deleted bot user
+  // reads here too (FR-08.19).
+  const { data: actorBot } = useQuery({
+    queryKey: ["bot", actor],
+    queryFn: async () =>
+      (
+        await BotsService.readBotUser({
+          path: { bot_user_id: actor as string },
+        })
+      ).data,
+    enabled: Boolean(actor),
   })
 
   const count = data?.count ?? 0
@@ -125,6 +151,35 @@ function Activity() {
         </p>
       </div>
 
+      {actor && (
+        // A narrowed log says so where it is read, and offers the way back:
+        // a filter that is not visible is a log that looks wrong.
+        <div className="bg-card flex flex-wrap items-center gap-3 rounded-lg border px-4 py-3">
+          <span className="text-sm">
+            Showing only what{" "}
+            <span className="font-medium">
+              {actorBot?.name ?? "this bot user"}
+            </span>{" "}
+            did
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() =>
+              navigate({
+                search: (previous) => ({
+                  ...previous,
+                  actor: undefined,
+                  page: undefined,
+                }),
+              })
+            }
+          >
+            Show everything
+          </Button>
+        </div>
+      )}
+
       <Table>
         <TableHeader>
           <TableRow className="hover:bg-transparent">
@@ -140,7 +195,15 @@ function Activity() {
           {isPending || !data ? (
             <PendingRows />
           ) : (
-            <ActivityRows entries={data.data} currentUserId={currentUser?.id} />
+            <ActivityRows
+              entries={data.data}
+              currentUserId={currentUser?.id}
+              empty={
+                actor
+                  ? "This bot user has not changed anything yet."
+                  : "Nothing has happened in your account yet."
+              }
+            />
           )}
         </TableBody>
       </Table>

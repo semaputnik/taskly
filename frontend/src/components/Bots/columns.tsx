@@ -4,6 +4,7 @@ import type { BotUserPublic } from "@/client"
 import type { DataTableFeatures } from "@/components/Common/DataTable"
 import { Badge } from "@/components/ui/badge"
 import type { ScopeProject } from "./BotFormFields"
+import { liveness, livenessText } from "./health"
 import { PERMISSIONS } from "./permissions"
 import { tokenStatus } from "./tokens"
 
@@ -95,6 +96,24 @@ export function getColumns(
           </span>
         )
       },
+    },
+    {
+      id: "liveness",
+      header: "Last used",
+      // Whether an integration is alive is the question a list of agents is
+      // scanned for. It is said in words and weight rather than in a colour:
+      // teal is for action, location and focus, and nothing else.
+      cell: ({ row }) => (
+        <span
+          className={
+            liveness(row.original) === "working"
+              ? undefined
+              : "text-muted-foreground"
+          }
+        >
+          {livenessText(row.original)}
+        </span>
+      ),
     },
   ]
 }
