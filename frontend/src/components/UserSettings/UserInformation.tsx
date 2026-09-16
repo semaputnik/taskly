@@ -106,10 +106,10 @@ const UserInformation = () => {
                   <p
                     className={cn(
                       "py-2 truncate max-w-sm",
-                      !field.value && "text-muted-foreground",
+                      !field.value && "text-muted-foreground italic",
                     )}
                   >
-                    {field.value || "N/A"}
+                    {field.value || "Not set"}
                   </p>
                 </FormItem>
               )

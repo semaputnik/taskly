@@ -22,9 +22,12 @@ export const columns: ColumnDef<DataTableFeatures, UserTableData>[] = [
       return (
         <div className="flex items-center gap-2">
           <span
-            className={cn("font-medium", !fullName && "text-muted-foreground")}
+            className={cn(
+              "font-medium",
+              !fullName && "text-muted-foreground font-normal italic",
+            )}
           >
-            {fullName || "N/A"}
+            {fullName || "Not set"}
           </span>
           {row.original.isCurrentUser && (
             <Badge variant="outline" className="text-xs">

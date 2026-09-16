@@ -14,7 +14,7 @@ function extractErrorMessage(err: Error): string {
     }
     return err.message
   }
-  return "Something went wrong."
+  return "That did not go through. Please try again."
 }
 
 export const handleError = function (this: (msg: string) => void, err: Error) {
