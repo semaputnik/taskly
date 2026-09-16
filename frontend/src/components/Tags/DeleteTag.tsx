@@ -26,7 +26,7 @@ function tasksLosingIt(count: number): string {
   if (count === 0) {
     return "No task carries it."
   }
-  return `It will be taken off ${count} ${count === 1 ? "task" : "tasks"}.`
+  return `It will be taken off ${count} ${count === 1 ? "task" : "tasks"}; the ${count === 1 ? "task stays" : "tasks stay"} as ${count === 1 ? "it is" : "they are"}.`
 }
 
 /**

@@ -152,7 +152,9 @@ test("A tag is renamed and deleted from its panel", async ({ page }) => {
     .getByRole("button", { name: "Delete tag" })
     .click()
   const confirm = page.getByRole("dialog", { name: /Delete the tag/ })
-  await expect(confirm).toContainText("It will be taken off 1 task.")
+  await expect(confirm).toContainText(
+    "It will be taken off 1 task; the task stays as it is.",
+  )
   await confirm.getByRole("button", { name: "Delete", exact: true }).click()
   await expect(page.getByText("was deleted")).toBeVisible()
   await expect(row(page, "errands")).toHaveCount(0)
