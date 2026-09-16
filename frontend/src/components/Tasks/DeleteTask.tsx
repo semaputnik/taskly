@@ -1,8 +1,8 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query"
-import { Trash2 } from "lucide-react"
 import { useState } from "react"
 
 import { type TaskPublic, TasksService } from "@/client"
+import { DeleteTrigger } from "@/components/Records/RecordPanel"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -44,7 +44,9 @@ const DeleteTask = ({ task, onSuccess }: DeleteTaskProps) => {
         query: { delete_subtasks: confirmCascade },
       }),
     onSuccess: () => {
-      showSuccessToast("Task deleted successfully")
+      showSuccessToast(
+        `“${task.title}” was deleted. It can be restored from the activity log.`,
+      )
       setIsOpen(false)
       onSuccess()
     },
@@ -69,26 +71,22 @@ const DeleteTask = ({ task, onSuccess }: DeleteTaskProps) => {
 
   return (
     <Dialog open={isOpen} onOpenChange={openDialog}>
-      {/* The one thing that cannot be undone gets the one control in the
-          panel's corner: no menu to open first, and no neighbours to catch a stray click. */}
-      <Button
-        variant="ghost"
-        size="icon"
-        aria-label="Delete task"
-        className="text-muted-foreground hover:text-destructive"
-        onClick={() => openDialog(true)}
-      >
-        <Trash2 />
-      </Button>
+      <DeleteTrigger label="Delete task" onClick={() => openDialog(true)} />
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>
             {cascadeWarned ? "This task has subtasks" : "Delete task"}
           </DialogTitle>
+          {/* The way back is said at the moment the hand hesitates: a
+              deletion is recorded in the activity log, and restoring it there
+              brings back everything it took, as it was (FR-10.4). */}
           <DialogDescription>
             {cascadeWarned
               ? `Deleting “${task.title}” deletes its subtasks too, however deep they go. Nothing was deleted yet.`
-              : `“${task.title}” will be deleted.`}
+              : `“${task.title}” will be deleted.`}{" "}
+            {cascadeWarned
+              ? "The task and its subtasks are recorded in your activity log as one deletion, and can be restored from there together."
+              : "The deletion is recorded in your activity log, and the task can be restored from there."}
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>

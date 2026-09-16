@@ -1,5 +1,5 @@
-import type { LucideIcon } from "lucide-react"
-import { useEffect, useState } from "react"
+import { type LucideIcon, Trash2 } from "lucide-react"
+import { useEffect, useRef, useState } from "react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -21,7 +21,8 @@ import { cn } from "@/lib/utils"
  * family of single-purpose dialogs — rename in one, archive in another,
  * delete in a third. A menu is what a surface reaches for when it has not
  * decided where its actions belong. Here every action has a home: a field is
- * changed in the field, and delete is one destructive control in the corner.
+ * changed in the field, and delete is one destructive control at the foot of
+ * the panel, as far from the close control as the panel allows.
  *
  * Everything that makes a panel a panel lives here, so a record type adopts
  * the pattern rather than reimplementing it (The One Address Rule).
@@ -45,7 +46,11 @@ export function RecordPanel({
   onClose,
   /** What the panel is called when it is announced. */
   name,
-  /** The one destructive act, in the corner beside close. */
+  /**
+   * The one destructive act. It sits at the foot of the panel, never in the
+   * corner: that corner is where a hand goes to dismiss, and a stray click
+   * there must close the panel rather than start a deletion.
+   */
   destructive,
   pending,
   /**
@@ -71,7 +76,15 @@ export function RecordPanel({
     <Sheet open={open} onOpenChange={(next) => !next && onClose()}>
       <SheetContent
         side="right"
-        className="w-full gap-0 overflow-y-auto p-0 sm:max-w-xl"
+        className="w-full gap-0 overflow-y-auto p-0 outline-none sm:max-w-xl"
+        // Opening a record puts focus on the panel itself, not on its first
+        // control: that would be the name field, which a reader who only came
+        // to look must not find already in their hands. Tab starts from here,
+        // and capture claims its own field once the panel is open.
+        onOpenAutoFocus={(event) => {
+          event.preventDefault()
+          ;(event.target as HTMLElement).focus({ preventScroll: true })
+        }}
       >
         {/* The record the panel is showing, announced on arrival. */}
         <SheetTitle className="sr-only">{name}</SheetTitle>
@@ -94,18 +107,42 @@ export function RecordPanel({
           </div>
         ) : (
           <>
-            {/* Delete is a corner control like the close button, on the same
-                line as one rather than floating in the header's flow beneath
-                it. It is alone there: every other change to a record is made
-                in the field it belongs to. */}
-            {destructive && (
-              <div className="absolute top-1.5 right-9 z-10">{destructive}</div>
-            )}
             {children}
+            {destructive && (
+              <div className="mt-auto flex border-t px-6 py-4">
+                {destructive}
+              </div>
+            )}
           </>
         )}
       </SheetContent>
     </Sheet>
+  )
+}
+
+/**
+ * The control that opens a record's delete confirmation.
+ *
+ * It says what it does in words rather than as a bare icon: it is the one
+ * control on the panel whose consequence reaches past the panel.
+ */
+export function DeleteTrigger({
+  label,
+  onClick,
+}: {
+  label: string
+  onClick: () => void
+}) {
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      className="text-muted-foreground hover:text-destructive -ml-2.5 pointer-coarse:h-11"
+      onClick={onClick}
+    >
+      <Trash2 />
+      {label}
+    </Button>
   )
 }
 
@@ -122,7 +159,7 @@ export function RecordHeader({
 }) {
   return (
     <SheetHeader className="gap-3 border-b p-6">
-      <SheetDescription className="flex min-w-0 items-center gap-1 pr-20 text-sm">
+      <SheetDescription className="flex min-w-0 items-center gap-1 pr-10 text-sm pointer-coarse:pr-14">
         {breadcrumb}
       </SheetDescription>
       {title}
@@ -199,20 +236,36 @@ export function EditableText({
   ariaLabel?: string
 }) {
   const [draft, setDraft] = useState(value)
-  // The field is fed by the server after every save, and by a bot editing the
-  // same record; re-sync unless the reader is the one holding the value.
-  const [editing, setEditing] = useState(false)
+  // Whether the field holds words the reader typed and has not yet saved or
+  // abandoned. Only those are ever sent: focus alone is not an edit, so a
+  // field that was merely visited keeps following the server — a save made a
+  // moment ago, or a bot editing the same record — and leaving it sends
+  // nothing. A ref, because Escape and the blur it causes happen within one
+  // event, before a re-render could tell the blur that the edit was dropped.
+  const typed = useRef(false)
   useEffect(() => {
-    if (!editing) setDraft(value)
-  }, [value, editing])
+    if (!typed.current) setDraft(value)
+  }, [value])
+
+  const type = (next: string) => {
+    typed.current = true
+    setDraft(next)
+  }
+
+  const abandon = () => {
+    typed.current = false
+    setDraft(value)
+  }
 
   const commit = async () => {
+    if (!typed.current) return
     if (draft === value) {
-      setEditing(false)
+      typed.current = false
       return
     }
     const saved = await onCommit(draft)
-    setEditing(saved === false)
+    // A refused save keeps the typed words in the field, still unsaved.
+    typed.current = saved === false
   }
 
   const shared = {
@@ -220,7 +273,6 @@ export function EditableText({
     "aria-label": ariaLabel,
     value: draft,
     placeholder,
-    onFocus: () => setEditing(true),
     onBlur: () => void commit(),
     className: cn(ghost, className),
   }
@@ -229,26 +281,18 @@ export function EditableText({
     <Textarea
       {...shared}
       rows={3}
-      onChange={(e) => setDraft(e.target.value)}
+      onChange={(e) => type(e.target.value)}
       onKeyDown={(e) => {
-        if (e.key === "Escape") {
-          setDraft(value)
-          setEditing(false)
-          e.currentTarget.blur()
-        }
+        if (e.key === "Escape") abandon()
       }}
     />
   ) : (
     <Input
       {...shared}
-      onChange={(e) => setDraft(e.target.value)}
+      onChange={(e) => type(e.target.value)}
       onKeyDown={(e) => {
         if (e.key === "Enter") e.currentTarget.blur()
-        if (e.key === "Escape") {
-          setDraft(value)
-          setEditing(false)
-          e.currentTarget.blur()
-        }
+        if (e.key === "Escape") abandon()
       }}
     />
   )

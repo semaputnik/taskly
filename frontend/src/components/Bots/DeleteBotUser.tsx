@@ -1,8 +1,8 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query"
-import { Trash2 } from "lucide-react"
 import { useState } from "react"
 
 import { BotsService, type BotUserPublic } from "@/client"
+import { DeleteTrigger } from "@/components/Records/RecordPanel"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -53,18 +53,7 @@ const DeleteBotUser = ({ bot, onSuccess }: DeleteBotUserProps) => {
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      {/* The one act with no undo gets the one control in the panel's
-          corner: no menu to open first, and no neighbours to catch a stray
-          click. */}
-      <Button
-        variant="ghost"
-        size="icon"
-        aria-label="Delete bot user"
-        className="text-muted-foreground hover:text-destructive"
-        onClick={() => setIsOpen(true)}
-      >
-        <Trash2 />
-      </Button>
+      <DeleteTrigger label="Delete bot user" onClick={() => setIsOpen(true)} />
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Delete {bot.name}?</DialogTitle>

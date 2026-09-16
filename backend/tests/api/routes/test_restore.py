@@ -134,6 +134,32 @@ def test_restoring_a_task_brings_back_the_subtasks_deleted_with_it(
     assert _visible_titles(client, headers) == {"Move house", "Pack", "Books"}
 
 
+def test_a_task_deleted_the_way_the_dialog_does_it_comes_back_whole(
+    client: TestClient, db: Session
+) -> None:
+    # The delete dialog promises that a task and its subtasks go into the
+    # activity log as one deletion and come back from there together. It asks
+    # without the cascade first, and confirms it only once warned.
+    headers = _headers_for_new_user(client, db)
+    root = _create_task(client, headers, "Plan the trip")
+    _create_task(client, headers, "Book the train", parent_id=root["id"])
+
+    refused = client.delete(f"{API}/tasks/{root['id']}", headers=headers)
+    assert refused.status_code == 409, refused.text
+    assert refused.json()["detail"]["code"] == "task_has_subtasks"
+    assert _visible_titles(client, headers) == {"Plan the trip", "Book the train"}
+
+    entry = _delete_task(client, headers, root["id"])
+    log = client.get(f"{API}/activity-log/", headers=headers, params={"limit": 200})
+    deletions = [e for e in log.json()["data"] if e["action"] == "task_deleted"]
+    assert deletions == [entry]
+    assert entry["restorable"] is True
+
+    r = _restore(client, headers, entry)
+    assert r.status_code == 200, r.text
+    assert _visible_titles(client, headers) == {"Plan the trip", "Book the train"}
+
+
 def test_a_subtask_deleted_on_its_own_first_stays_deleted(
     client: TestClient, db: Session
 ) -> None:

@@ -1,8 +1,8 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query"
-import { Trash2 } from "lucide-react"
 import { useState } from "react"
 
 import { type ProjectPublic, ProjectsService } from "@/client"
+import { DeleteTrigger } from "@/components/Records/RecordPanel"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -58,15 +58,7 @@ export default function DeleteProject({
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <Button
-        variant="ghost"
-        size="icon"
-        aria-label="Delete project"
-        className="text-muted-foreground hover:text-destructive"
-        onClick={() => setIsOpen(true)}
-      >
-        <Trash2 />
-      </Button>
+      <DeleteTrigger label="Delete project" onClick={() => setIsOpen(true)} />
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Delete {project.name}?</DialogTitle>

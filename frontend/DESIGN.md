@@ -562,8 +562,8 @@ for.
 - Centred, `max-w-lg` (32rem) capped at `calc(100% - 2rem)`, 0.625rem radius,
   1.5rem padding, 1rem gaps, float shadow over a 50% black scrim.
 - Enter and exit both animate: fade plus a 95%→100% zoom over 200ms.
-- A close affordance sits at 1rem from the top-right at 70% opacity, reaching
-  full opacity on hover.
+- A close affordance sits at 0.75rem from the top-right at 70% opacity,
+  reaching full opacity on hover — a 32px target, 44px on a touch pointer.
 - Title at 1.125rem/600, description beneath in 0.875rem Ink Muted. Footer
   actions align right on desktop and reverse into a stack on mobile, so the
   primary action is thumb-nearest on a phone and rightmost on a desktop.
@@ -599,10 +599,12 @@ record type the product has: tasks, projects, tags and bot users. A right-hand
   row. An unset value reads *Not set* in italic Ink Muted, never blank. The
   record's own history belongs here too: when it was created is a property, not
   a footnote.
-- **Corner controls** — close, actions — sit on one line in the top-right. A
-  second control placed in the header's flow lands under the close button and
-  reads as a mistake; anything that acts on the panel as a whole is positioned
-  beside it instead.
+- **The corner is for dismissal only.** Close sits alone in the top-right, a
+  32px target under a mouse and 44px under a thumb, like every dismiss control
+  in the product. The corner of a sheet is muscle memory for *dismiss*, so
+  nothing that destroys is ever placed beside it.
+- **Delete sits at the foot**, below everything else, as one labelled control
+  — "Delete task", not a bare icon — separated by a hairline.
 - **Description** in its own banded section, so an empty one is visibly empty
   rather than merged into the properties above.
 - **Tabs** for the collections that hang off the record: comments, subtasks,
@@ -622,8 +624,8 @@ restates the record you are already looking at.
 surface reaches for when it has not decided where its actions belong, and every
 action here has a home: a field is changed in the field, a subtask is added
 from the Subtasks tab beneath the subtasks, and delete — the one act with no
-field and no undo — is a single destructive icon in the panel's corner, with no
-neighbours to catch a stray click and no menu to open first.
+field — is a single labelled control at the panel's foot, with no menu to
+open first and nothing beside it that a hand reaches for to dismiss.
 
 **State is said, not timestamped.** A record's health is written the way an
 operator would say it: "Working", "No token — this bot user cannot reach the
