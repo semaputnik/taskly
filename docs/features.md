@@ -220,9 +220,11 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
 ### F-07. REST API
 
 - **FR-07.1** Taskly exposes a REST API.
-- **FR-07.2** Everything a bot user needs to do its own work — tasks,
-  comments, attachments, within its scope (see [F-08](#f-08-bot-users)) —
-  is available through the REST API.
+- **FR-07.2** Everything a bot user needs to do its own work is available
+  through the REST API: tasks, comments and attachments within its scope (see
+  [F-08](#f-08-bot-users)), and its owner's tags, which belong to the user
+  rather than to a project and so are not narrowed by the scope at all
+  (FR-08.9, ADR-0003).
 - **FR-07.3** Creating, scoping, and issuing tokens for bot users is a human
   action available only in the web UI, not through the REST API. A bot cannot
   create or configure itself or another bot.
