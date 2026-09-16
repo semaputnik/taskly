@@ -11,6 +11,7 @@ import {
   ReadOnlyValue,
   RecordHeader,
   RecordPanel,
+  recordLoad,
   titleFieldClass,
 } from "@/components/Records/RecordPanel"
 import useCustomToast from "@/hooks/useCustomToast"
@@ -34,16 +35,13 @@ export function TagPanel({
   onClose: () => void
   onCreated: (tag: TagPublic) => void
 }) {
-  const {
-    data: tag,
-    isPending,
-    isError,
-  } = useQuery({
+  const query = useQuery({
     queryKey: ["tag", tagId],
     queryFn: async () =>
       (await TagsService.readTag({ path: { tag_id: tagId as string } })).data,
     enabled: Boolean(tagId),
   })
+  const tag = query.data
 
   return (
     <RecordPanel
@@ -51,8 +49,7 @@ export function TagPanel({
       onClose={onClose}
       name={capturing ? "New tag" : (tag?.name ?? "Tag")}
       kind="tag"
-      missing={!capturing && Boolean(tagId) && isError}
-      pending={!capturing && Boolean(tagId) && isPending}
+      {...recordLoad(query, !capturing && Boolean(tagId))}
       destructive={
         tag ? <DeleteTag tag={tag} onSuccess={onClose} /> : undefined
       }

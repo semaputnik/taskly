@@ -605,6 +605,11 @@ record type the product has: tasks, projects, tags and bot users. A right-hand
   nothing that destroys is ever placed beside it.
 - **Delete sits at the foot**, below everything else, as one labelled control
   — "Delete task", not a bare icon — separated by a hairline.
+- **A record that cannot be read says so at once.** A skeleton stands only
+  while a request is on its way. A record the API refuses — deleted, not the
+  reader's — reads "could not be opened", identically for both, with Close; a
+  request the server did not answer reads "could not be loaded", with Try
+  again beside Close. Neither is retried behind a skeleton first.
 - **Description** in its own banded section, so an empty one is visibly empty
   rather than merged into the properties above.
 - **Tabs** for the collections that hang off the record: comments, subtasks,

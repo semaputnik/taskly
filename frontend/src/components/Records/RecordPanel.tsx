@@ -1,8 +1,10 @@
+import { AxiosError } from "axios"
 import { type LucideIcon, Trash2 } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { LoadingButton } from "@/components/ui/loading-button"
 import {
   Sheet,
   SheetContent,
@@ -55,13 +57,10 @@ export function RecordPanel({
    */
   destructive,
   pending,
-  /**
-   * The record could not be read — it was deleted, or it belongs to somebody
-   * else. A link that fails has to say so; a skeleton that never resolves
-   * leaves the reader waiting for something that is never coming.
-   */
-  missing,
-  /** What that record is called in the sentence saying it is gone. */
+  failure,
+  onRetry,
+  retrying,
+  /** What the record is called in the sentence saying it cannot be shown. */
   kind = "record",
   children,
 }: {
@@ -69,11 +68,9 @@ export function RecordPanel({
   onClose: () => void
   name: string
   destructive?: React.ReactNode
-  pending?: boolean
-  missing?: boolean
   kind?: string
   children?: React.ReactNode
-}) {
+} & RecordLoad) {
   return (
     <Sheet open={open} onOpenChange={(next) => !next && onClose()}>
       <SheetContent
@@ -90,16 +87,28 @@ export function RecordPanel({
       >
         {/* The record the panel is showing, announced on arrival. */}
         <SheetTitle className="sr-only">{name}</SheetTitle>
-        {missing ? (
-          <div className="flex flex-col items-start gap-3 p-6">
-            <p className="font-medium">This {kind} could not be opened</p>
-            <p className="text-muted-foreground text-sm text-pretty">
-              It has been deleted, or the link points at something that is not
-              yours. Deleted records can be restored from the activity log.
+        {failure ? (
+          <div role="alert" className="flex flex-col items-start gap-3 p-6">
+            <p className="font-medium">
+              {failure === "missing"
+                ? `This ${kind} could not be opened`
+                : `This ${kind} could not be loaded`}
             </p>
-            <Button variant="outline" size="sm" onClick={onClose}>
-              Close
-            </Button>
+            <p className="text-muted-foreground text-sm text-pretty">
+              {failure === "missing"
+                ? "It may have been deleted, or the link points at something that is not yours. Deleted records can be restored from the activity log."
+                : `The server did not answer this time. Nothing about the ${kind} has changed.`}
+            </p>
+            <div className="flex gap-2">
+              {failure === "unavailable" && onRetry && (
+                <LoadingButton size="sm" loading={retrying} onClick={onRetry}>
+                  Try again
+                </LoadingButton>
+              )}
+              <Button variant="outline" size="sm" onClick={onClose}>
+                Close
+              </Button>
+            </div>
           </div>
         ) : pending ? (
           <div className="flex flex-col gap-4 p-6">
@@ -121,6 +130,61 @@ export function RecordPanel({
       </SheetContent>
     </Sheet>
   )
+}
+
+/** How far a panel has got with reading its record. */
+export interface RecordLoad {
+  /** A request for the record is in flight and nothing is known yet. */
+  pending?: boolean
+  /**
+   * The record cannot be shown. `missing`: the API refused it — deleted, not
+   * the reader's, or not an id at all, which it answers alike so that nothing
+   * is revealed. `unavailable`: the API did not answer, and it may yet.
+   */
+  failure?: "missing" | "unavailable"
+  onRetry?: () => void
+  retrying?: boolean
+}
+
+/**
+ * A panel's load state from its record query, for a panel that is `reading`
+ * a record rather than capturing one.
+ *
+ * A failed read has to say so: a skeleton is shown only while a request is
+ * really on its way, never for a request that has already failed. A record
+ * already on screen stays there through a background refetch that fails for a
+ * reason that may pass.
+ */
+export function recordLoad(
+  query: {
+    data: unknown
+    isLoading: boolean
+    isError: boolean
+    isFetching: boolean
+    error: Error | null
+    refetch: () => unknown
+  },
+  reading: boolean,
+): RecordLoad {
+  if (!reading) return {}
+  const refused =
+    query.error instanceof AxiosError &&
+    (query.error.response?.status ?? 0) >= 400 &&
+    (query.error.response?.status ?? 0) < 500
+  const failure =
+    !query.isError || query.isLoading
+      ? undefined
+      : refused
+        ? "missing"
+        : query.data === undefined
+          ? "unavailable"
+          : undefined
+  return {
+    pending: query.isLoading,
+    failure,
+    onRetry: () => void query.refetch(),
+    retrying: query.isFetching,
+  }
 }
 
 /**

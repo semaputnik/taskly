@@ -6,6 +6,7 @@ import {
   EditableText,
   RecordHeader,
   RecordPanel,
+  recordLoad,
   titleFieldClass,
 } from "@/components/Records/RecordPanel"
 import { Badge } from "@/components/ui/badge"
@@ -61,17 +62,14 @@ export function TaskDetail({
 
   // Fetched by id rather than read out of the table: a link may point at a
   // task the current filters exclude, and it must still open.
-  const {
-    data: task,
-    isPending,
-    isError,
-  } = useQuery({
+  const query = useQuery({
     queryKey: ["task", taskId],
     queryFn: async () =>
       (await TasksService.readTask({ path: { task_id: taskId as string } }))
         .data,
     enabled: Boolean(taskId),
   })
+  const task = query.data
 
   const { data: projects } = useQuery({
     queryKey: ["projects"],
@@ -105,10 +103,7 @@ export function TaskDetail({
       onClose={onClose}
       name={isCapturing ? "New task" : (task?.title ?? "Task")}
       kind="task"
-      missing={!isCapturing && Boolean(taskId) && isError}
-      // On the way out there is no record left to draw, and a skeleton would
-      // read as one loading.
-      pending={!isCapturing && Boolean(taskId) && isPending}
+      {...recordLoad(query, !isCapturing && Boolean(taskId))}
       destructive={
         task && !isCapturing ? (
           <DeleteTask task={task} onSuccess={onClose} />

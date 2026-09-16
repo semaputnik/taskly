@@ -24,6 +24,20 @@ const isCredentialError = (error: Error): boolean =>
   error instanceof AxiosError &&
   [401, 403].includes(error.response?.status ?? 0)
 
+/**
+ * Whether the API refused the request as asked (a 4xx), as opposed to failing
+ * to answer it. A timeout and a rate limit are the exceptions: they may pass.
+ */
+const isRefusal = (error: Error): boolean => {
+  const status = error instanceof AxiosError ? error.response?.status : 0
+  return (
+    status !== undefined &&
+    status >= 400 &&
+    status < 500 &&
+    ![408, 429].includes(status)
+  )
+}
+
 // Every query on a screen is refused at once, and each fresh assignment to
 // `location.href` aborts the navigation the previous one started.
 let redirectingToLogin = false
@@ -38,13 +52,15 @@ const handleApiError = (error: Error) => {
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      // A credential the API has turned away will be turned away again: it is
-      // the one failure that retrying cannot mend. Retried like any other, it
-      // costs four refusals and about eight seconds of a screen that neither
-      // loads nor sends the reader to the login it needs — which is exactly
-      // the stranding this handler exists to prevent.
+      // A request the API has refused for what it asked — a credential it
+      // turned away, a record that is not there or not yours — will be
+      // refused again: retrying cannot mend it. Retried like any other
+      // failure, it costs four refusals and about eight seconds of a screen
+      // that neither shows anything nor says why, which is exactly the
+      // stranding a failure message exists to prevent. Only a failure that
+      // may pass is tried again.
       retry: (failureCount, error) =>
-        !isCredentialError(error as Error) && failureCount < 3,
+        !isRefusal(error as Error) && failureCount < 3,
     },
     mutations: { retry: false },
   },

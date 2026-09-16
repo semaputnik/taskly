@@ -17,6 +17,7 @@ import {
   ReadOnlyValue,
   RecordHeader,
   RecordPanel,
+  recordLoad,
   titleFieldClass,
 } from "@/components/Records/RecordPanel"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -55,11 +56,7 @@ export function BotPanel({
   botId: string | null
   onClose: () => void
 }) {
-  const {
-    data: bot,
-    isPending,
-    isError,
-  } = useQuery({
+  const query = useQuery({
     queryKey: ["bot", botId],
     queryFn: async () =>
       (
@@ -69,6 +66,7 @@ export function BotPanel({
       ).data,
     enabled: Boolean(botId),
   })
+  const bot = query.data
 
   return (
     <RecordPanel
@@ -76,8 +74,7 @@ export function BotPanel({
       onClose={onClose}
       name={bot?.name ?? "Bot user"}
       kind="bot user"
-      missing={Boolean(botId) && isError}
-      pending={Boolean(botId) && isPending}
+      {...recordLoad(query, Boolean(botId))}
       destructive={
         bot && !bot.deleted ? (
           <DeleteBotUser bot={bot} onSuccess={onClose} />

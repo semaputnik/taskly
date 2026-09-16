@@ -15,6 +15,7 @@ import {
   ReadOnlyValue,
   RecordHeader,
   RecordPanel,
+  recordLoad,
   titleFieldClass,
 } from "@/components/Records/RecordPanel"
 import { LoadingButton } from "@/components/ui/loading-button"
@@ -42,11 +43,7 @@ export function ProjectPanel({
 }) {
   // Fetched by id rather than read out of the table: a link may point at a
   // project the list in view excludes — an archived one, most of all.
-  const {
-    data: project,
-    isPending,
-    isError,
-  } = useQuery({
+  const query = useQuery({
     queryKey: ["project", projectId],
     queryFn: async () =>
       (
@@ -56,6 +53,7 @@ export function ProjectPanel({
       ).data,
     enabled: Boolean(projectId),
   })
+  const project = query.data
 
   return (
     <RecordPanel
@@ -63,8 +61,7 @@ export function ProjectPanel({
       onClose={onClose}
       name={capturing ? "New project" : (project?.name ?? "Project")}
       kind="project"
-      missing={!capturing && Boolean(projectId) && isError}
-      pending={!capturing && Boolean(projectId) && isPending}
+      {...recordLoad(query, !capturing && Boolean(projectId))}
       destructive={
         project && !project.is_inbox ? (
           <DeleteProject project={project} onSuccess={onClose} />
