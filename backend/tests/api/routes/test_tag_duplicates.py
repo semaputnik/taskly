@@ -114,7 +114,9 @@ def test_a_dismissed_group_stops_being_offered(
 
     assert _groups(client, owner) == [["Release", "release"]]
     # Nothing was merged: dismissing only stops the suggestion.
-    names = {t["name"] for t in client.get(f"{API}/tags/", headers=owner).json()["data"]}
+    names = {
+        t["name"] for t in client.get(f"{API}/tags/", headers=owner).json()["data"]
+    }
     assert {"deploy", "deploys"} <= names
 
 
@@ -125,9 +127,7 @@ def test_a_dismissed_group_is_offered_again_once_a_member_is_renamed(
     deploys = _tag(client, owner, "deploys")
     _dismiss(client, owner, [deploy["id"], deploys["id"]])
 
-    client.patch(
-        f"{API}/tags/{deploys['id']}", headers=owner, json={"name": "Deploys"}
-    )
+    client.patch(f"{API}/tags/{deploys['id']}", headers=owner, json={"name": "Deploys"})
 
     assert _groups(client, owner) == [["Deploys", "deploy"]]
 
@@ -162,9 +162,10 @@ def test_only_a_whole_current_group_can_be_dismissed(
         assert _dismiss(client, owner, tag_ids).status_code in (404, 422), tag_ids
 
     assert _groups(client, owner) == [["Deploy", "deploy", "deploys"]]
-    assert _dismiss(
-        client, owner, [Deploy["id"], deploys["id"], deploy["id"]]
-    ).status_code == 200
+    assert (
+        _dismiss(client, owner, [Deploy["id"], deploys["id"], deploy["id"]]).status_code
+        == 200
+    )
     assert _groups(client, owner) == []
 
 
@@ -196,3 +197,37 @@ def test_a_bot_user_neither_reads_nor_dismisses_groups(
         assert r.status_code == 403
         assert error_code(r) == "human_only"
     assert _groups(client, owner) == [["deploy", "deploys"]]
+
+
+# --- Near matches while typing ------------------------------------------------
+
+
+def _near(client: TestClient, headers: Headers, name: str) -> list[str]:
+    r = client.get(f"{API}/tags/", headers=headers, params={"near": name})
+    assert r.status_code == 200, r.text
+    return [tag["name"] for tag in r.json()["data"]]
+
+
+def test_near_finds_the_spellings_a_new_name_would_duplicate(
+    client: TestClient, owner: Headers
+) -> None:
+    for name in ("deploy", "Deploy-Bot", "release", "deployment"):
+        _tag(client, owner, name)
+
+    assert _near(client, owner, "Deploys") == ["deploy"]
+    assert _near(client, owner, "deploy_bot") == ["Deploy-Bot"]
+    # An exact name is found too; the field tells it apart itself.
+    assert _near(client, owner, "deploy") == ["deploy"]
+    assert _near(client, owner, "ship") == []
+
+
+def test_a_bot_user_is_offered_the_same_near_matches(
+    client: TestClient, owner: Headers
+) -> None:
+    project_id = create_project(client, owner)
+    bot = issue_bot_headers(
+        client, owner, project_ids=[project_id], permissions={"read_tasks": True}
+    )
+    _tag(client, owner, "deploy")
+
+    assert _near(client, bot, "Deploys") == ["deploy"]

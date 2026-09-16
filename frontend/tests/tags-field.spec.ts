@@ -61,3 +61,22 @@ test("The field says whether Enter attaches a tag or creates one", async ({
   expect((await vocabulary()).sort()).toEqual(["Errands", "errands"])
   await expect(field).toHaveValue("")
 })
+
+test("A near-duplicate name is steered to the tag the user already has", async ({
+  page,
+}) => {
+  const { panel, field, vocabulary, onTask } = await openTask(page)
+
+  await field.fill("Errand")
+  // Said before anything is created, with the existing spelling on offer.
+  await expect(
+    panel.getByText("Enter creates a new tag, Errand."),
+  ).toBeVisible()
+  await expect(panel.getByText("You already have errands.")).toBeVisible()
+  await panel.getByRole("button", { name: "Use errands" }).click()
+
+  // The pick keeps its own casing, and nothing new is minted.
+  await expect.poll(onTask).toEqual(["errands"])
+  await expect(field).toHaveValue("")
+  expect(await vocabulary()).toEqual(["errands"])
+})

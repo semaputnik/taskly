@@ -632,7 +632,8 @@ export class TagsService {
      * Read Tags
      *
      * Retrieve the caller's tags, each with the number of tasks carrying it
-     * (FR-01.26). Also what autocomplete offers while a tag is typed.
+     * (FR-01.26). Also what autocomplete offers while a tag is typed: `q` by
+     * the start of the name, `near` by the names it would read the same as.
      *
      * A bot user reads its owner's whole vocabulary, counts included, whatever
      * its scope: tags belong to the user rather than to a project, so a scope

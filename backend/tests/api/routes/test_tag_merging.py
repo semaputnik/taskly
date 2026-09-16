@@ -223,9 +223,7 @@ def test_a_refused_merge_leaves_everything_as_it_was(
     log_before = client.get(f"{API}/activity-log/", headers=owner).json()["count"]
 
     # One good source and one that is not a tag at all.
-    r = _merge(
-        client, owner, before["a"]["id"], [before["b"]["id"], str(uuid.uuid4())]
-    )
+    r = _merge(client, owner, before["a"]["id"], [before["b"]["id"], str(uuid.uuid4())])
     assert r.status_code == 404
 
     assert _tags(client, owner) == before

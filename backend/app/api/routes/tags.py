@@ -58,12 +58,14 @@ def read_tags(
     session: SessionDep,
     caller: CallerDep,
     q: str | None = None,
+    near: str | None = None,
     skip: int = 0,
     limit: int = 100,
 ) -> Any:
     """
     Retrieve the caller's tags, each with the number of tasks carrying it
-    (FR-01.26). Also what autocomplete offers while a tag is typed.
+    (FR-01.26). Also what autocomplete offers while a tag is typed: `q` by
+    the start of the name, `near` by the names it would read the same as.
 
     A bot user reads its owner's whole vocabulary, counts included, whatever
     its scope: tags belong to the user rather than to a project, so a scope
@@ -75,7 +77,12 @@ def read_tags(
     counted but not reachable from here (FR-05.13).
     """
     tags, count = crud.get_tags(
-        session=session, owner_id=caller.owner_id, q=q, skip=skip, limit=limit
+        session=session,
+        owner_id=caller.owner_id,
+        q=q,
+        near=near,
+        skip=skip,
+        limit=limit,
     )
     return TagsPublic(data=tags, count=count)
 

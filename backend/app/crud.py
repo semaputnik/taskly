@@ -593,6 +593,7 @@ def get_tags(
     session: Session,
     owner_id: uuid.UUID,
     q: str | None = None,
+    near: str | None = None,
     skip: int = 0,
     limit: int = 100,
 ) -> tuple[list[TagPublic], int]:
@@ -600,11 +601,19 @@ def get_tags(
     The user's tags, each with the number of tasks carrying it. `q` matches
     from the start of the name, ignoring case, so what they type narrows to
     what they typed before rather than to every tag with those letters
-    somewhere inside.
+    somewhere inside. `near` finds the tags a name would read the same as
+    (`tag_key`), over the whole vocabulary: what a name about to become a new
+    tag would duplicate (semaputnik/taskly#69).
     """
     where: list[Any] = [Tag.owner_id == owner_id]
     if q:
         where.append(col(Tag.name).ilike(f"{q}%"))
+    if near is not None:
+        key = tag_key(near)
+        names = session.exec(select(Tag.name).where(Tag.owner_id == owner_id)).all()
+        where.append(
+            col(Tag.name).in_([name for name in names if tag_key(name) == key])
+        )
 
     count = session.exec(select(func.count()).select_from(Tag).where(*where)).one()
     statement = (

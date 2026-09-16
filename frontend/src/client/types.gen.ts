@@ -2046,6 +2046,10 @@ export type tagsReadTagsData = {
          */
         q?: string | null;
         /**
+         * Near
+         */
+        near?: string | null;
+        /**
          * Skip
          */
         skip?: number;
