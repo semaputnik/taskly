@@ -18,6 +18,9 @@ import useAuth from "@/hooks/useAuth"
 import useCustomToast from "@/hooks/useCustomToast"
 import { handleError } from "@/utils"
 
+// What the confirming button says, and what the instruction above it names.
+const CONFIRM = "Delete my account"
+
 const DeleteConfirmation = () => {
   const queryClient = useQueryClient()
   const { showSuccessToast, showErrorToast } = useCustomToast()
@@ -27,7 +30,7 @@ const DeleteConfirmation = () => {
   const mutation = useMutation({
     mutationFn: () => UsersService.deleteUserMe(),
     onSuccess: () => {
-      showSuccessToast("Your account has been successfully deleted")
+      showSuccessToast("Your account was deleted")
       logout()
     },
     onError: handleError.bind(showErrorToast),
@@ -50,12 +53,14 @@ const DeleteConfirmation = () => {
       <DialogContent>
         <form onSubmit={handleSubmit(onSubmit)}>
           <DialogHeader>
-            <DialogTitle>Confirmation Required</DialogTitle>
+            <DialogTitle>Delete your account?</DialogTitle>
+            {/* The one act in the product with no way back at all: it says
+                everything that goes, and names the button that does it. */}
             <DialogDescription>
-              All your account data will be{" "}
-              <strong>permanently deleted.</strong> If you are sure, please
-              click <strong>"Confirm"</strong> to proceed. This action cannot be
-              undone.
+              Everything in it is deleted with it: your tasks with their
+              comments and files, your projects, your tags, your bot users and
+              their live tokens, and your activity log. This cannot be undone.
+              Press “{CONFIRM}” only if that is what you want.
             </DialogDescription>
           </DialogHeader>
 
@@ -70,7 +75,7 @@ const DeleteConfirmation = () => {
               type="submit"
               loading={mutation.isPending}
             >
-              Delete
+              {CONFIRM}
             </LoadingButton>
           </DialogFooter>
         </form>

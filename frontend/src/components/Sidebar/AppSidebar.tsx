@@ -124,7 +124,7 @@ function CaptureAction() {
       <TooltipContent side="right" align="center" className="flex gap-2">
         Add Task
         {/* The key is only discoverable where the action is. */}
-        <kbd className="text-primary-foreground/70 font-sans">C</kbd>
+        <kbd className="text-background/70 font-sans">C</kbd>
       </TooltipContent>
     </Tooltip>
   )

@@ -23,6 +23,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import useCustomToast from "@/hooks/useCustomToast"
+import { formatDateTime, formatDayOf } from "@/lib/dates"
 import { handleError } from "@/utils"
 import { BotConsole } from "./BotConsole"
 import { scopeProjectsQueryOptions } from "./BotFormFields"
@@ -31,7 +32,7 @@ import { ago, until } from "./health"
 import IssueToken from "./IssueToken"
 import { PERMISSION_GROUPS } from "./permissions"
 import RevokeToken from "./RevokeToken"
-import { formatDate, formatDateTime, tokenStatus } from "./tokens"
+import { tokenStatus } from "./tokens"
 
 // What the token state means for the integration, rather than what it is.
 const STATUS_TEXT = {
@@ -181,8 +182,8 @@ function BotRecord({ bot }: { bot: BotUserPublic }) {
                 ? "Never — it works until revoked"
                 : "—"
               : status === "active"
-                ? `${until(bot.token_expires_at)} — ${formatDate(bot.token_expires_at)}`
-                : formatDate(bot.token_expires_at)}
+                ? `${until(bot.token_expires_at)} — ${formatDayOf(bot.token_expires_at)}`
+                : formatDayOf(bot.token_expires_at)}
           </ReadOnlyValue>
         </PropertyRow>
 
@@ -275,7 +276,7 @@ function BotRecord({ bot }: { bot: BotUserPublic }) {
 
         <PropertyRow icon={Clock} label="Created">
           <ReadOnlyValue>
-            {bot.created_at ? formatDate(bot.created_at) : "Unknown"}
+            {bot.created_at ? formatDayOf(bot.created_at) : "Unknown"}
           </ReadOnlyValue>
         </PropertyRow>
       </PropertyList>

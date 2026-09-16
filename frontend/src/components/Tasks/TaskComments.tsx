@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { LoadingButton } from "@/components/ui/loading-button"
 import { Textarea } from "@/components/ui/textarea"
 import useCustomToast from "@/hooks/useCustomToast"
+import { formatDateTime } from "@/lib/dates"
 import { handleError } from "@/utils"
 import { useCommentDeletion } from "./commentDeletion"
 import { useCommentDraft } from "./commentDraft"
@@ -125,8 +126,7 @@ export const TaskComments = ({ task }: TaskCommentsProps) => {
                   <p className="whitespace-pre-wrap">{comment.body}</p>
                   <div className="mt-2 flex items-center justify-between">
                     <span className="text-muted-foreground text-xs">
-                      {comment.created_at &&
-                        new Date(comment.created_at).toLocaleString()}
+                      {comment.created_at && formatDateTime(comment.created_at)}
                     </span>
                     {/* A bot user's comments are append-only, for everyone
                           (FR-03.2, FR-08.10). */}

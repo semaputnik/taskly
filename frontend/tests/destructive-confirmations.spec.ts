@@ -98,7 +98,7 @@ test("Every destructive confirmation names its consequence before its button", a
   await page.getByRole("button", { name: "Delete Account" }).click()
   await expectConsequenceFirst(
     page.getByRole("dialog"),
-    "Delete",
-    "permanently deleted",
+    "Delete my account",
+    "This cannot be undone",
   )
 })

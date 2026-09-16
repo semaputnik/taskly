@@ -18,6 +18,7 @@ import {
   type TaskPublic,
   type TaskUpdate,
 } from "@/client"
+import { DayField } from "@/components/Common/DayField"
 import {
   EditableText,
   ghost,
@@ -25,7 +26,6 @@ import {
   PropertyRow,
   ReadOnlyValue,
 } from "@/components/Records/RecordPanel"
-import { Input } from "@/components/ui/input"
 import {
   Select,
   SelectContent,
@@ -34,6 +34,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import useAuth from "@/hooks/useAuth"
+import { formatDateTime } from "@/lib/dates"
 import { cn } from "@/lib/utils"
 import { AssigneeSelect, assigneeFormValue, toAssigneeId } from "./assignee"
 import {
@@ -46,13 +47,6 @@ import { TagsField } from "./TagsField"
 import { useTaskUpdate } from "./useTaskUpdate"
 
 const NO_PRIORITY = "none"
-
-function formatDateTime(value: string): string {
-  return new Date(value).toLocaleString(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  })
-}
 
 /**
  * A task's fields, edited where they are read.
@@ -90,7 +84,7 @@ export function TaskProperties({ task }: { task: TaskPublic }) {
         >
           <span className="px-2">
             {task.completed ? (
-              <span className="text-primary font-medium">Completed</span>
+              <span className="font-medium">Completed</span>
             ) : (
               "Not completed"
             )}
@@ -127,12 +121,12 @@ export function TaskProperties({ task }: { task: TaskPublic }) {
         </PropertyRow>
 
         <PropertyRow icon={Calendar} label="Due date" htmlFor={`${ids}-due`}>
-          <Input
+          <DayField
             id={`${ids}-due`}
-            type="date"
-            value={task.due_date ?? ""}
-            onChange={(e) => save({ due_date: e.target.value || null })}
-            className={cn(ghost, "w-full")}
+            label="Due date"
+            value={task.due_date}
+            onChange={(due_date) => save({ due_date })}
+            className={ghost}
           />
         </PropertyRow>
 

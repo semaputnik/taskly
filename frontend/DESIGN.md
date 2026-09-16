@@ -2,8 +2,9 @@
 name: Taskly
 description: A neutral, instrument-grade task surface where one teal signal marks every action worth taking.
 colors:
-  signal-teal: "oklch(0.5982 0.10687 182.4689)"
-  signal-teal-lifted: "oklch(0.65 0.10687 182.4689)"
+  signal-teal: "oklch(0.52 0.10687 182.4689)"
+  signal-text: "oklch(0.52 0.10687 182.4689)"
+  signal-text-night: "oklch(0.7 0.10687 182.4689)"
   on-signal: "oklch(0.985 0 0)"
   ground: "oklch(0.97 0 0)"
   paper: "oklch(1 0 0)"
@@ -11,17 +12,19 @@ colors:
   surface-quiet: "oklch(0.97 0 0)"
   ink: "oklch(0.145 0 0)"
   ink-strong: "oklch(0.205 0 0)"
-  ink-muted: "oklch(0.556 0 0)"
+  ink-muted: "oklch(0.52 0 0)"
   hairline: "oklch(0.922 0 0)"
   focus-ring: "oklch(0.708 0 0)"
   alert-red: "oklch(0.577 0.245 27.325)"
   alert-red-lifted: "oklch(0.704 0.191 22.216)"
-  night-ground: "oklch(0.145 0 0)"
-  night-panel: "oklch(0.205 0 0)"
-  night-quiet: "oklch(0.269 0 0)"
+  night-ground: "oklch(0.21 0 0)"
+  night-panel: "oklch(0.26 0 0)"
+  night-quiet: "oklch(0.32 0 0)"
   night-ink: "oklch(0.985 0 0)"
   night-ink-muted: "oklch(0.708 0 0)"
   night-hairline: "oklch(1 0 0 / 10%)"
+  scrim: "oklch(0 0 0 / 50%)"
+  night-scrim: "oklch(0 0 0 / 80%)"
 typography:
   display:
     fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', 'Noto Sans', Arial, sans-serif"
@@ -163,6 +166,8 @@ no decorative weight, no ornament. Hierarchy comes from weight and colour
 temperature (ink versus muted ink), not from size jumps. The system is
 dual-theme by construction: light and dark are two calibrations of the same
 room, not two designs, and every token has a counterpart on the other side.
+Each theme also declares its `color-scheme`, so native controls, date pickers
+and scrollbars follow it rather than staying light.
 
 Depth is the one place the system is deliberately opinionated. Structure is
 built from ground, hairlines, and tonal steps; a real shadow is reserved for
@@ -186,20 +191,27 @@ only saturated things a screen can contain.
 ### Primary
 - **Signal Teal** — the sole accent. It marks the primary button (including the
   app-wide Add Task action in the sidebar), the checked state of a task
-  checkbox, the brand mark, text links, and the text-selection highlight. Note
+  checkbox, the brand mark, and the text-selection highlight — and, as Signal
+  Text, text links. Note
   that the active navigation item does *not* take it: location is marked with
-  Surface Quiet, and the `sidebar-primary` token is defined but unused. It is
-  the descendant of the teal in the inherited FastAPI mark, retuned in OKLCH.
-  In dark mode it lifts to
-  `signal-teal-lifted` so it keeps the same apparent weight against a dark
-  ground rather than the same numeric lightness.
+  Surface Quiet, and the `sidebar-primary` token is defined but unused. As a
+  fill it has one value in both themes, dark enough that On Signal on it reads
+  at 4.9:1: it once lifted in dark mode to keep its weight against the dark
+  ground, and that took its own label down to 2.9:1.
+- **Signal Text** (`--link`, `text-link`) — the teal as *text*: links, and
+  nothing that is a status. In light it is Signal Teal itself (4.7:1 on Ground,
+  5.1:1 on Paper). In dark it lifts to `signal-text-night` (7.0:1 on Night
+  Ground, 6.1:1 on Night Panel), because here the teal is what is laid on the dark
+  ground, not what carries a label. A link never uses `text-primary`.
 - **On Signal** — the near-white laid on top of teal and red fills. Never pure
   white; it stays one step below paper so a teal button does not vibrate.
 
 ### Tertiary
-- **Alert Red** — destructive intent only: the delete/revoke/archive
-  confirmation button, invalid field borders and rings, error text. It is never
-  a status colour and never decorates. In dark mode it shifts to
+- **Alert Red** — destructive intent, and one status: the delete/revoke/archive
+  confirmation button, invalid field borders and rings, error text — and
+  *overdue*, the one state a task tracker is right to raise its voice about (the
+  dashboard's overdue band and its days-late counts). It is no other status and
+  never decorates. In dark mode it shifts to
   `alert-red-lifted`, which is lighter and noticeably less saturated, because
   full-chroma red on a dark ground reads as an emergency rather than a warning.
 
@@ -223,16 +235,20 @@ only saturated things a screen can contain.
   read heavier than plain text.
 - **Ink Muted** — supporting text: page subtitles, column headers, empty-state
   copy, project and due-date cells, placeholder text, footer, inactive icons.
-  Roughly half the working text on any screen is this tone by design.
+  Roughly half the working text on any screen is this tone by design, so it
+  clears AA everywhere it is laid: 5.1:1 on Ground and Surface Quiet, 5.5:1 on
+  Paper; in dark, 6.8:1 on Night Ground and 4.9:1 on Night Quiet.
 - **Hairline** — every border and input stroke in light mode. It is the primary
   structural device of the whole system.
 - **Focus Ring** — the neutral ring colour, rendered as a 3px halo at 50% alpha.
 - **Night Ground / Night Panel / Night Quiet / Night Ink / Night Ink Muted /
-  Night Hairline** — the dark calibration. Note that Night Ground is the same
-  value as Ink and Night Ink is the same value as On Signal: the two themes are
-  a deliberate inversion around the same neutral axis, and the dark hairline
-  becomes a 10% white overlay rather than a solid grey so it survives on top of
-  differently-lit panels.
+  Night Hairline** — the dark calibration. Night Ink is the same value as On
+  Signal, and the dark hairline is a 10% white overlay rather than a solid grey
+  so it survives on top of differently-lit panels. Night Ground sits at 0.21,
+  deliberately off the near-black floor: below it no scrim can visibly darken
+  the page (see the Scrim Rule).
+- **Scrim / Night Scrim** — the veil a modal layer lays over the page: 50% black
+  in light, 80% in dark.
 
 ### Named Rules
 
@@ -240,7 +256,8 @@ only saturated things a screen can contain.
 answers one of three questions: *what do I press*, *where am I*, or *what am I
 typing in*. A teal fill that answers none of those is decoration and must be
 removed. Status, category, priority, and tag are communicated with neutrals and
-shape — never by spending the accent.
+shape — never by spending the accent, and never by a second hue: an active
+account is a filled ink dot, an inactive one a hollow muted ring.
 
 **The Chroma Zero Rule.** Every structural token — surface, border, text,
 skeleton, divider — has chroma exactly `0`. There are no warm greys and no cool
@@ -248,8 +265,17 @@ greys. If a neutral in this system carries chroma, it is a bug, not a mood.
 
 **The Mirrored Theme Rule.** No colour may be introduced in one theme without
 its counterpart in the other, and the two are tuned for equal apparent weight
-rather than equal numeric lightness. The teal and the red both lighten in dark
-mode for exactly this reason.
+rather than equal numeric lightness — until that costs a pair its contrast,
+which always wins: Signal Teal keeps one value as a fill in both themes
+because the lifted dark fill left its label unreadable.
+
+A colour is never defined alone. Every colour token records what is laid on it
+or what it is laid on, and the contrast that pair yields — 4.5:1 at least for
+text — in the token's comment in `index.css`. A recalibration re-checks *both*
+sides of every pair it touches: lifting the teal fill for weight on a dark
+ground once lowered its own label to 2.9:1, because only the ground was checked.
+Where one value cannot serve as both a fill and a text colour, the two become
+two tokens (Signal Teal and Signal Text), not a compromise.
 
 ## Typography
 
@@ -266,7 +292,7 @@ letterforms.
 
 ### Hierarchy
 - **Display** (700, 1.5rem / 24px, line-height 1.333, tracking `-0.025em`): the
-  single page title at the top of each route — "Tasks", "User Settings". Exactly
+  single page title at the top of each route — "Tasks", "Settings". Exactly
   one per screen, always paired with a muted subtitle line beneath it.
 - **Title** (600, 1.125rem / 18px, line-height 1): dialog titles. The tight
   line-height is intentional: a dialog title is a label for the dialog, not a
@@ -291,6 +317,20 @@ inside a list sheet — the dashboard's "Overdue" and "Due today" bands, and the
 because they are the same device. It is the system's one micro-typographic
 signature and it holds only while nothing else borrows it: page headings,
 buttons, tabs, and badges are all sentence case.
+
+**The Descending Outline Rule.** Headings step down one level at a time: the
+page title is the one `h1`, the bands and sections under it are `h2`, and a
+dialog or panel title is an `h2` under whatever opened it. Size is set by the
+role above, not by the level, so a small uppercase band header is still an
+`h2`.
+
+**One Way to Write a Date.** Every date goes through `src/lib/dates.ts`: a day
+is numeric in the reader's locale and a moment adds the time to the minute. A
+call site never formats a date itself. A stored day that can be edited is
+shown by the product (`DayField`), with the browser's picker only doing the
+picking: a native date field writes its value in the browser's interface
+language, which need not match the page, so the same day would read two ways
+side by side.
 
 **The Two-Weight Rule.** Text is 400 or 500 in the body of the interface; 600
 and 700 are reserved for the four headline roles above. A third weight inside a
@@ -340,8 +380,8 @@ and a table header from its rows. In-page surfaces are flat — they carry no
 shadow at all, because a shadow on something that has not moved is a lie about
 the space. **Float** is reserved for the layers that genuinely sit above the
 page: dialogs, sheets, dropdowns, popovers, selects, and toasts. Those get a
-real, soft, wide shadow, and the modal ones get a 50% black scrim underneath so
-the page visibly recedes.
+real, soft, wide shadow, and the modal ones get the scrim underneath so the
+page visibly recedes.
 
 The `shadow-xs` present on inputs, checkboxes, and outline buttons is not a
 fourth tier — it is a sub-pixel seat that keeps a control from looking pasted
@@ -373,8 +413,12 @@ left the page plane: dialog, sheet, popover, dropdown, select, toast. Tables,
 filter bars, headers, sidebars, and content containers are flat and are separated
 by a hairline and a tonal step. A card-with-shadow is not a Taskly surface.
 
-**The Scrim Rule.** Anything modal brings a `rgb(0 0 0 / 0.5)` overlay with it.
-A floating layer that traps focus must also visibly demote what it covers.
+**The Scrim Rule.** Anything modal brings the scrim (`bg-scrim`) with it. A
+floating layer that traps focus must visibly demote what it covers, and
+"visibly" is measured: the page ground has to fall at least 0.06 in OKLab
+lightness under the veil. A fixed alpha does not guarantee that — 50% black
+moved the old near-black dark ground by 0.03 — so the dark theme uses a denser
+veil over a raised ground (0.096), and light keeps 50% (0.39).
 
 ## Shapes
 
@@ -549,7 +593,7 @@ The signature component of the system.
 - **Mobile:** below `md` the sidebar becomes an 18rem sheet, and tapping any item
   closes it.
 - **Account block:** the first thing in the sidebar. A 1.75rem avatar with
-  initials on a fixed zinc fill, the user's name at 0.875rem/500 truncating
+  initials on Surface Quiet, the user's name at 0.875rem/500 truncating
   beside it, and a `ChevronDown` affordance. It opens a dropdown that repeats
   the block at full size with the email beneath — the menu confirms whose
   account it is acting on. Collapsed to the icon rail it keeps the avatar alone,
@@ -560,7 +604,7 @@ The system's only heavy surface. It confirms, and it edits the records that
 have no panel of their own; it never creates a task, which is what capture is
 for.
 - Centred, `max-w-lg` (32rem) capped at `calc(100% - 2rem)`, 0.625rem radius,
-  1.5rem padding, 1rem gaps, float shadow over a 50% black scrim.
+  1.5rem padding, 1rem gaps, float shadow over the scrim.
 - Enter and exit both animate: fade plus a 95%→100% zoom over 200ms.
 - A close affordance sits at 0.75rem from the top-right at 70% opacity,
   reaching full opacity on hover — a 32px target, 44px on a touch pointer.

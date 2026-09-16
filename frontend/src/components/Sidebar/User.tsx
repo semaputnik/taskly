@@ -29,7 +29,7 @@ function UserInfo({ fullName, email }: UserInfoProps) {
   return (
     <div className="flex w-full min-w-0 items-center gap-2.5">
       <Avatar className="size-8">
-        <AvatarFallback className="bg-zinc-600 text-white">
+        <AvatarFallback className="bg-secondary text-secondary-foreground">
           {getInitials(fullName || "User")}
         </AvatarFallback>
       </Avatar>
@@ -71,7 +71,7 @@ export function User({ user }: { user: UserPublic | null | undefined }) {
                 the same centre line as every icon below it, so collapsing the
                 sidebar does not shift the column. */}
             <Avatar className="size-6 shrink-0">
-              <AvatarFallback className="bg-zinc-600 text-[10px] text-white">
+              <AvatarFallback className="bg-secondary text-secondary-foreground text-xs">
                 {getInitials(name)}
               </AvatarFallback>
             </Avatar>

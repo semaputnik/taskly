@@ -20,6 +20,7 @@ import {
 } from "@/components/Records/RecordPanel"
 import { LoadingButton } from "@/components/ui/loading-button"
 import useCustomToast from "@/hooks/useCustomToast"
+import { formatDayOf } from "@/lib/dates"
 import { handleError } from "@/utils"
 import DeleteProject from "./DeleteProject"
 
@@ -151,7 +152,7 @@ function ProjectRecord({ project }: { project: ProjectPublic }) {
           <ReadOnlyValue>
             {project.created_at ? (
               <time dateTime={project.created_at}>
-                {new Date(project.created_at).toLocaleDateString()}
+                {formatDayOf(project.created_at)}
               </time>
             ) : (
               "Unknown"

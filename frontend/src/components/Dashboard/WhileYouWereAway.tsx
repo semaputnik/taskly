@@ -42,9 +42,9 @@ export function WhileYouWereAway() {
 
   return (
     <div className="bg-card overflow-hidden rounded-lg border">
-      <h3 className="bg-muted/50 border-b px-4 py-2.5 text-xs font-semibold tracking-wider uppercase">
+      <h2 className="bg-muted/50 border-b px-4 py-2.5 text-xs font-semibold tracking-wider uppercase">
         While you were away
-      </h3>
+      </h2>
 
       {isPending ? (
         <Rows />
@@ -58,7 +58,7 @@ export function WhileYouWereAway() {
           </p>
           <RouterLink
             to="/bots"
-            className="text-primary mt-1 text-sm underline-offset-4 hover:underline"
+            className="text-link mt-1 text-sm underline-offset-4 hover:underline"
           >
             Connect a bot user
           </RouterLink>

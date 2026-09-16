@@ -22,9 +22,12 @@ export const columns: ColumnDef<DataTableFeatures, UserTableData>[] = [
       return (
         <div className="flex items-center gap-2">
           <span
-            className={cn("font-medium", !fullName && "text-muted-foreground")}
+            className={cn(
+              "font-medium",
+              !fullName && "text-muted-foreground font-normal italic",
+            )}
           >
-            {fullName || "N/A"}
+            {fullName || "Not set"}
           </span>
           {row.original.isCurrentUser && (
             <Badge variant="outline" className="text-xs">
@@ -55,11 +58,16 @@ export const columns: ColumnDef<DataTableFeatures, UserTableData>[] = [
     accessorKey: "is_active",
     header: "Status",
     cell: ({ row }) => (
+      // Status is said in neutrals and shape, never a second hue: a filled
+      // dot for an account in use, a hollow one for one that is not.
       <div className="flex items-center gap-2">
         <span
+          aria-hidden
           className={cn(
-            "size-2 rounded-full",
-            row.original.is_active ? "bg-green-500" : "bg-gray-400",
+            "size-2 rounded-full border",
+            row.original.is_active
+              ? "border-foreground bg-foreground"
+              : "border-muted-foreground",
           )}
         />
         <span className={row.original.is_active ? "" : "text-muted-foreground"}>

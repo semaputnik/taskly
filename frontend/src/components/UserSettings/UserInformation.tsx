@@ -82,7 +82,7 @@ const UserInformation = () => {
 
   return (
     <div className="bg-card max-w-md rounded-lg border p-6">
-      <h3 className="text-lg font-semibold mb-4">User Information</h3>
+      <h2 className="text-lg font-semibold mb-4">Your profile</h2>
       <Form {...form}>
         <form
           onSubmit={form.handleSubmit(onSubmit)}
@@ -106,10 +106,10 @@ const UserInformation = () => {
                   <p
                     className={cn(
                       "py-2 truncate max-w-sm",
-                      !field.value && "text-muted-foreground",
+                      !field.value && "text-muted-foreground italic",
                     )}
                   >
-                    {field.value || "N/A"}
+                    {field.value || "Not set"}
                   </p>
                 </FormItem>
               )

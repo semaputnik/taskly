@@ -12,6 +12,7 @@ import { useRecordPanels } from "@/components/Records/panels"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import useAuth from "@/hooks/useAuth"
+import { formatDay } from "@/lib/dates"
 import { ago } from "./health"
 
 /**
@@ -153,7 +154,7 @@ function BotTasks({ bot }: { bot: BotUserPublic }) {
               </span>
               {task.due_date && (
                 <span className="text-muted-foreground shrink-0 text-xs">
-                  {task.due_date}
+                  {formatDay(task.due_date)}
                 </span>
               )}
             </button>
