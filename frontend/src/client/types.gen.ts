@@ -282,6 +282,10 @@ export type BotUserPublic = {
     name: string;
     scope: BotScope;
     /**
+     * Deleted
+     */
+    deleted?: boolean;
+    /**
      * Has Token
      */
     has_token: boolean;
@@ -2006,6 +2010,10 @@ export type activityReadActivityLogData = {
          * Limit
          */
         limit?: number;
+        /**
+         * Actor Bot User Id
+         */
+        actor_bot_user_id?: string | null;
     };
     url: '/api/v1/activity-log/';
 };

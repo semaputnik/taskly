@@ -43,6 +43,9 @@ const DeleteBotUser = ({ bot, onSuccess }: DeleteBotUserProps) => {
     onError: handleError.bind(showErrorToast),
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["bots"] })
+      // Its own record still reads — marked deleted now (FR-08.19) — so the
+      // panel must not be left holding the copy from before.
+      queryClient.invalidateQueries({ queryKey: ["bot", bot.id] })
       // Tasks assigned to it now show it as deleted.
       queryClient.invalidateQueries({ queryKey: ["tasks"] })
     },

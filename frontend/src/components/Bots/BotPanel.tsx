@@ -23,18 +23,21 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import useCustomToast from "@/hooks/useCustomToast"
 import { handleError } from "@/utils"
+import { BotConsole } from "./BotConsole"
 import { scopeProjectsQueryOptions } from "./BotFormFields"
 import DeleteBotUser from "./DeleteBotUser"
+import { ago, until } from "./health"
 import IssueToken from "./IssueToken"
 import { PERMISSION_GROUPS } from "./permissions"
 import RevokeToken from "./RevokeToken"
 import { formatDate, formatDateTime, tokenStatus } from "./tokens"
 
+// What the token state means for the integration, rather than what it is.
 const STATUS_TEXT = {
-  none: "No token issued",
-  active: "Active",
-  revoked: "Revoked",
-  expired: "Expired",
+  none: "No token — this bot user cannot reach the API",
+  active: "Working",
+  revoked: "Revoked — its requests are refused",
+  expired: "Expired — its requests are refused",
 } as const
 
 /**
@@ -76,7 +79,9 @@ export function BotPanel({
       missing={Boolean(botId) && isError}
       pending={Boolean(botId) && isPending}
       destructive={
-        bot ? <DeleteBotUser bot={bot} onSuccess={onClose} /> : undefined
+        bot && !bot.deleted ? (
+          <DeleteBotUser bot={bot} onSuccess={onClose} />
+        ) : undefined
       }
     >
       {bot ? <BotRecord bot={bot} /> : null}
@@ -116,18 +121,44 @@ function BotRecord({ bot }: { bot: BotUserPublic }) {
   return (
     <>
       <RecordHeader
-        breadcrumb="Bot user"
+        breadcrumb={
+          <>
+            <span className="shrink-0">Bot user</span>
+            {bot.deleted && (
+              <>
+                <span aria-hidden>·</span>
+                <span className="shrink-0">Deleted</span>
+              </>
+            )}
+          </>
+        }
         title={
-          <EditableText
-            value={bot.name}
-            ariaLabel="Bot name"
-            onCommit={async (name) =>
-              name.trim() ? save(undefined, name.trim()) : false
-            }
-            className={titleFieldClass}
-          />
+          // A deleted bot user is kept so that what it did still names it
+          // (FR-08.19). Nothing about it changes again, so its name is prose.
+          bot.deleted ? (
+            <p className="px-2 py-1.5 text-xl leading-snug font-semibold">
+              {bot.name}
+            </p>
+          ) : (
+            <EditableText
+              value={bot.name}
+              ariaLabel="Bot name"
+              onCommit={async (name) =>
+                name.trim() ? save(undefined, name.trim()) : false
+              }
+              className={titleFieldClass}
+            />
+          )
         }
       />
+
+      {bot.deleted && (
+        <p className="text-muted-foreground border-b px-6 pb-5 text-sm text-pretty">
+          This bot user was deleted, and deleting cannot be undone. Its token
+          stopped working at once, it takes no new tasks, and everything below —
+          what it did and what it was assigned — still names it.
+        </p>
+      )}
 
       <PropertyList>
         <PropertyRow icon={KeyRound} label="Token">
@@ -135,7 +166,7 @@ function BotRecord({ bot }: { bot: BotUserPublic }) {
             <span>{STATUS_TEXT[status]}</span>
             {/* Issuing keeps its dialog: the token is shown once and cannot be
                 read back, so it is a deliberate step, not a click (FR-08.13). */}
-            {bot.has_token ? (
+            {bot.deleted ? null : bot.has_token ? (
               <RevokeToken bot={bot} />
             ) : (
               <IssueToken bot={bot} />
@@ -143,29 +174,36 @@ function BotRecord({ bot }: { bot: BotUserPublic }) {
           </div>
         </PropertyRow>
 
-        <PropertyRow icon={Clock} label="Issued">
-          <ReadOnlyValue>
-            {bot.token_issued_at
-              ? formatDateTime(bot.token_issued_at)
-              : "Never"}
-          </ReadOnlyValue>
-        </PropertyRow>
-
         <PropertyRow icon={CalendarClock} label="Expires">
           <ReadOnlyValue>
-            {bot.token_expires_at
-              ? formatDate(bot.token_expires_at)
-              : bot.has_token
+            {/* Only a token that still works has an expiry worth counting
+                down to; a revoked one stopped before its date, and an expired
+                one is past it. */}
+            {!bot.token_expires_at
+              ? bot.has_token
                 ? "Never — it works until revoked"
-                : "—"}
+                : "—"
+              : status === "active"
+                ? `${until(bot.token_expires_at)} — ${formatDate(bot.token_expires_at)}`
+                : formatDate(bot.token_expires_at)}
           </ReadOnlyValue>
         </PropertyRow>
 
         <PropertyRow icon={Activity} label="Last used">
+          {/* An empty timestamp and a never-used integration are different
+              facts, so the second one is said in words. */}
           <ReadOnlyValue>
-            {bot.token_last_used_at
-              ? formatDateTime(bot.token_last_used_at)
-              : "Never used"}
+            {bot.token_last_used_at ? (
+              <>
+                {ago(bot.token_last_used_at)}
+                <span className="text-xs">
+                  {" "}
+                  ({formatDateTime(bot.token_last_used_at)})
+                </span>
+              </>
+            ) : (
+              "Never used"
+            )}
           </ReadOnlyValue>
         </PropertyRow>
 
@@ -177,6 +215,7 @@ function BotRecord({ bot }: { bot: BotUserPublic }) {
                 <div key={project.id} className="flex items-center gap-2">
                   <Checkbox
                     id={id}
+                    disabled={bot.deleted}
                     checked={scope.project_ids.includes(project.id)}
                     onCheckedChange={(checked) =>
                       toggleProject(project.id, checked === true)
@@ -214,6 +253,7 @@ function BotRecord({ bot }: { bot: BotUserPublic }) {
                     <div key={key} className="flex items-center gap-2">
                       <Checkbox
                         id={id}
+                        disabled={bot.deleted}
                         checked={Boolean(scope.permissions[key])}
                         onCheckedChange={(checked) =>
                           change({
@@ -242,6 +282,8 @@ function BotRecord({ bot }: { bot: BotUserPublic }) {
           </ReadOnlyValue>
         </PropertyRow>
       </PropertyList>
+
+      <BotConsole bot={bot} />
     </>
   )
 }

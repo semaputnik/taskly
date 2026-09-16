@@ -14,6 +14,18 @@ from tests.utils.utils import get_superuser_token_headers
 
 @pytest.fixture(scope="session", autouse=True)
 def db() -> Generator[Session]:
+    # This fixture deletes every user when the session ends, and a user takes
+    # their projects, tasks, tags and bot users with them. `scripts/test.sh`
+    # is what points the engine at the test database; run without it, the
+    # suite empties the development one instead. The check is here rather than
+    # in the script because the script is the thing that gets skipped.
+    if engine.url.database != settings.TEST_DB_NAME:
+        pytest.exit(
+            f"Refusing to run: the tests delete every user, and this session "
+            f"is pointed at “{engine.url.database}” rather than at "
+            f"“{settings.TEST_DB_NAME}”. Run `bash scripts/test.sh`.",
+            returncode=1,
+        )
     with Session(engine) as session:
         init_db(session)
         yield session

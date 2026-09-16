@@ -83,6 +83,7 @@ def test_a_bot_user_is_read_by_its_id(client: TestClient, owner: Headers) -> Non
     r = _bot(client, owner, bot["id"])
     assert r.status_code == 200, r.text
     assert r.json() == bot
+    assert r.json()["deleted"] is False
 
 
 def test_an_archived_project_is_still_read_by_its_id(
@@ -119,15 +120,49 @@ def test_another_users_records_are_not_found(
 def test_a_deleted_record_is_not_found(client: TestClient, owner: Headers) -> None:
     project_id = create_project(client, owner, "Gone")
     tag = _create_tag(client, owner, "gone")
-    bot = create_bot_user(client, owner, project_ids=[], permissions=READ_ONLY)
 
     assert client.delete(f"{API}/projects/{project_id}", headers=owner).status_code
     assert client.delete(f"{API}/tags/{tag['id']}", headers=owner).status_code == 200
-    assert client.delete(f"{API}/bot-users/{bot['id']}", headers=owner).status_code
 
     assert _project(client, owner, project_id).status_code == 404
     assert _tag(client, owner, tag["id"]).status_code == 404
-    assert _bot(client, owner, bot["id"]).status_code == 404
+
+
+def test_a_deleted_bot_user_is_still_read_by_its_id(
+    client: TestClient, owner: Headers
+) -> None:
+    """
+    A bot user is kept rather than removed so that what it did still names it
+    (FR-08.19), so its panel has to open and say what it now is.
+    """
+    bot = create_bot_user(
+        client, owner, project_ids=[], permissions=READ_ONLY, name="Retired agent"
+    )
+    assert (
+        client.delete(f"{API}/bot-users/{bot['id']}", headers=owner).status_code == 200
+    )
+
+    r = _bot(client, owner, bot["id"])
+    assert r.status_code == 200, r.text
+    assert r.json()["name"] == "Retired agent"
+    assert r.json()["deleted"] is True
+
+    # It is gone from the list, and takes nothing new.
+    listed = client.get(f"{API}/bot-users/", headers=owner).json()["data"]
+    assert bot["id"] not in [row["id"] for row in listed]
+    assert (
+        client.patch(
+            f"{API}/bot-users/{bot['id']}", headers=owner, json={"name": "Back"}
+        ).status_code
+        == 404
+    )
+    assert (
+        client.post(f"{API}/bot-users/{bot['id']}/token", headers=owner).status_code
+        == 404
+    )
+    assert (
+        client.delete(f"{API}/bot-users/{bot['id']}", headers=owner).status_code == 404
+    )
 
 
 # --- What a bot user may read --------------------------------------------------

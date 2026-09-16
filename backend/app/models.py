@@ -711,6 +711,15 @@ class ActivityEntry(SQLModel, table=True):
     __table_args__ = (
         # A user's log, newest first, is the only way entries are read.
         Index("ix_activityentry_owner_id_position", "owner_id", "position"),
+        # One bot user's own feed, newest first. Without it, reading a quiet
+        # bot user means walking a log that is kept for ever (FR-10.5) until
+        # its few entries turn up.
+        Index(
+            "ix_activityentry_owner_id_actor_bot_user_id_position",
+            "owner_id",
+            "actor_bot_user_id",
+            "position",
+        ),
         # A change is made by exactly one actor: a user, or a bot user.
         CheckConstraint(
             "(actor_id IS NULL) <> (actor_bot_user_id IS NULL)",
@@ -916,6 +925,9 @@ class BotUserPublic(SQLModel):
     id: uuid.UUID
     name: str
     scope: BotScope
+    # A deleted bot user is kept, so its record still opens and still says
+    # what it now is (FR-08.19). It is gone from the list either way.
+    deleted: bool = False
     # Whether a token is out, revoked or not; the token itself is never
     # reported again. One that has expired is still out until it is revoked.
     has_token: bool

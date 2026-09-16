@@ -16,6 +16,7 @@ const PendingBots = () => (
         <TableHead>Projects</TableHead>
         <TableHead>Permissions</TableHead>
         <TableHead>Token</TableHead>
+        <TableHead>Last used</TableHead>
       </TableRow>
     </TableHeader>
     <TableBody>
@@ -32,6 +33,9 @@ const PendingBots = () => (
           </TableCell>
           <TableCell>
             <Skeleton className="h-4 w-20" />
+          </TableCell>
+          <TableCell>
+            <Skeleton className="h-4 w-24" />
           </TableCell>
         </TableRow>
       ))}

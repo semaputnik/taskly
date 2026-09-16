@@ -49,22 +49,33 @@ def read_activity_log(
     current_user: CurrentUser,
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=50, ge=1, le=200),
+    actor_bot_user_id: uuid.UUID | None = Query(default=None),
 ) -> Any:
     """
     Retrieve the current user's activity log, newest first.
 
+    `actor_bot_user_id` narrows it to one bot user's own changes — what an
+    operator asks when they want to read an integration rather than their
+    whole account (FR-10.2). A deleted bot user's entries stay readable under
+    it (FR-08.19).
+
     Always the requesting user's own entries and nothing wider: there is no
     parameter or role that reaches another user's log, the superuser's
-    included (FR-10.7).
+    included (FR-10.7). Narrowing by a bot user somebody else owns is
+    therefore an empty feed rather than a refusal — the caller's own entries,
+    of which that actor made none — so the filter says nothing about whose
+    bot user it is, or whether it exists at all.
     """
+    where: list[Any] = [ActivityEntry.owner_id == current_user.id]
+    if actor_bot_user_id is not None:
+        where.append(ActivityEntry.actor_bot_user_id == actor_bot_user_id)
+
     count = session.exec(
-        select(func.count())
-        .select_from(ActivityEntry)
-        .where(ActivityEntry.owner_id == current_user.id)
+        select(func.count()).select_from(ActivityEntry).where(*where)
     ).one()
     entries = session.exec(
         select(ActivityEntry)
-        .where(ActivityEntry.owner_id == current_user.id)
+        .where(*where)
         .order_by(col(ActivityEntry.position).desc())
         .offset(skip)
         .limit(limit)
