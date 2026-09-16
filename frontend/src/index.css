@@ -16,6 +16,8 @@
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
+  --color-link: var(--link);
+  --color-scrim: var(--scrim);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
@@ -42,6 +44,7 @@
 }
 
 :root {
+  color-scheme: light;
   --radius: 0.625rem;
   /* The ground the work area sits on. It is a step below --card on purpose:
      tables, dialogs and popovers are sheets laid on it, and without the step
@@ -53,12 +56,21 @@
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.5982 0.10687 182.4689);
+  /* Every colour is defined with what is laid on it and the contrast of that
+     pair, and a recalibration re-checks both sides (the Mirrored Theme Rule).
+     Signal Teal under --primary-foreground: 4.9:1. */
+  --primary: oklch(0.52 0.10687 182.4689);
   --primary-foreground: oklch(0.985 0 0);
+  /* Signal Teal as text: 4.7:1 on --background, 5.1:1 on --card. */
+  --link: oklch(0.52 0.10687 182.4689);
+  /* What a modal layer lays over the page: the ground falls 0.39 in OKLab
+     lightness under it (the Scrim Rule asks for at least 0.06). */
+  --scrim: oklch(0 0 0 / 50%);
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
   --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
+  /* 5.1:1 on --background and --muted, 5.5:1 on --card. */
+  --muted-foreground: oklch(0.52 0 0);
   --accent: oklch(0.97 0 0);
   --accent-foreground: oklch(0.205 0 0);
   --destructive: oklch(0.577 0.245 27.325);
@@ -72,7 +84,7 @@
   --chart-5: oklch(0.769 0.188 70.08);
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.5982 0.10687 182.4689);
+  --sidebar-primary: oklch(0.52 0.10687 182.4689);
   --sidebar-primary-foreground: oklch(0.985 0 0);
   --sidebar-accent: oklch(0.97 0 0);
   --sidebar-accent-foreground: oklch(0.205 0 0);
@@ -81,19 +93,30 @@
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
+  color-scheme: dark;
+  /* Raised off the floor so a modal veil can still visibly darken it: at
+     0.145 no veil moved it more than 0.05. */
+  --background: oklch(0.18 0 0);
   --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
+  --card: oklch(0.23 0 0);
   --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
+  --popover: oklch(0.23 0 0);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.65 0.10687 182.4689);
+  /* The fill keeps the light theme's value: lifting it for weight against the
+     dark ground took its label down to 2.9:1. Label on fill: 4.9:1. */
+  --primary: oklch(0.52 0.10687 182.4689);
   --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.269 0 0);
+  /* As text the teal does lift, since its ground is dark: 7.4:1 on
+     --background, 6.6:1 on --card. */
+  --link: oklch(0.7 0.10687 182.4689);
+  /* Denser than in light: the ground falls 0.063 in OKLab lightness. */
+  --scrim: oklch(0 0 0 / 70%);
+  --secondary: oklch(0.29 0 0);
   --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
+  --muted: oklch(0.29 0 0);
+  /* 7.3:1 on --background, 6.5:1 on --card, 5.4:1 on --muted. */
   --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
+  --accent: oklch(0.29 0 0);
   --accent-foreground: oklch(0.985 0 0);
   --destructive: oklch(0.704 0.191 22.216);
   --border: oklch(1 0 0 / 10%);
@@ -104,11 +127,11 @@
   --chart-3: oklch(0.769 0.188 70.08);
   --chart-4: oklch(0.627 0.265 303.9);
   --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
+  --sidebar: oklch(0.23 0 0);
   --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.65 0.10687 182.4689);
+  --sidebar-primary: oklch(0.52 0.10687 182.4689);
   --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent: oklch(0.29 0 0);
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);

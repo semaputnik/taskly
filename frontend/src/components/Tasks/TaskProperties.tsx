@@ -90,7 +90,7 @@ export function TaskProperties({ task }: { task: TaskPublic }) {
         >
           <span className="px-2">
             {task.completed ? (
-              <span className="text-primary font-medium">Completed</span>
+              <span className="text-link font-medium">Completed</span>
             ) : (
               "Not completed"
             )}
