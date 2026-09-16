@@ -17,7 +17,7 @@ const ErrorComponent = () => {
       </div>
 
       <p className="text-lg text-muted-foreground mb-4 text-center z-10">
-        Something went wrong. Please try again.
+        This screen could not be shown. Reloading usually brings it back.
       </p>
       <Link to="/">
         <Button>Go Home</Button>

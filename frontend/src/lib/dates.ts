@@ -26,15 +26,32 @@ const MOMENT: Intl.DateTimeFormatOptions = {
  */
 export function formatDay(day: string): string {
   const [year, month, date] = day.split("-").map(Number)
-  return new Date(year, month - 1, date).toLocaleDateString(undefined, DAY)
+  const local = new Date(year, month - 1, date)
+  // Something that is not a day is shown as it came rather than as
+  // "Invalid Date".
+  return Number.isNaN(local.getTime())
+    ? day
+    : local.toLocaleDateString(undefined, DAY)
 }
 
 /** The local day a timestamp falls on. */
-export function formatDate(timestamp: string): string {
+export function formatDayOf(timestamp: string): string {
   return new Date(timestamp).toLocaleDateString(undefined, DAY)
 }
 
 /** A timestamp to the minute. */
 export function formatDateTime(timestamp: string): string {
   return new Date(timestamp).toLocaleString(undefined, MOMENT)
+}
+
+/**
+ * A local date as the API and date fields write a day (`YYYY-MM-DD`). Built
+ * from local parts: `toISOString()` would shift the day for anyone west of
+ * UTC after their afternoon.
+ */
+export function isoDay(date: Date): string {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, "0")
+  const day = String(date.getDate()).padStart(2, "0")
+  return `${year}-${month}-${day}`
 }

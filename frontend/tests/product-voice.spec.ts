@@ -93,18 +93,17 @@ test("A date reads the same in the table and in the panel's date field", async (
   })
   await api.create(`/tasks/${task.id}/comments/`, { body: "Signed" })
 
-  await page.goto("/tasks")
-  // The panel edits the day in the browser's own date field, which writes it
-  // numerically in the reader's locale; the table says it the same way.
-  const native = await page.evaluate(() =>
-    new Date(2026, 8, 1).toLocaleDateString(undefined, {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    }),
-  )
+  // The panel shows the day the same way the table does, whatever language
+  // the browser's own date picker speaks.
+  await page.goto(`/tasks?task=${task.id}`)
+  const field = page
+    .getByRole("dialog", { name: "Renew the lease" })
+    .getByRole("button", { name: /^Due date:/ })
+  const shown = ((await field.textContent()) ?? "").trim()
+  expect(shown).toMatch(/2026/)
+  await page.keyboard.press("Escape")
   const row = page.getByRole("row", { name: /Renew the lease/ })
-  await expect(row).toContainText(native)
+  await expect(row).toContainText(shown)
   await expect(row).not.toContainText("2026-09-01")
 
   // Moments in the panel share one format, to the minute and no further.
@@ -151,6 +150,21 @@ test("Heading levels descend without skipping on every screen", async ({
   const api = await userApi(page)
   await api.create("/tasks/", { title: "Overdue", due_date: "2026-01-01" })
   for (const path of SIGNED_IN) await check(path)
+  // A panel's title is the h2 under whatever opened it.
+  const task = (await (await api.get("/tasks/")).json()).data[0]
+  await page.goto(`/tasks?task=${task.id}`)
+  const panel = page.getByRole("dialog")
+  await expect(panel).toBeVisible()
+  const inPanel = await panel.evaluate((node) =>
+    Array.from(node.querySelectorAll("h1, h2, h3, h4, h5, h6")).map((h) =>
+      Number(h.tagName[1]),
+    ),
+  )
+  expect(inPanel[0]).toBe(2)
+  inPanel.forEach((level, index) => {
+    if (index > 0) expect(level).toBeLessThanOrEqual(inPanel[index - 1] + 1)
+  })
+
   await page.goto("/settings")
   for (const tab of ["Password", "Danger zone"]) {
     await page.getByRole("tab", { name: tab }).click()

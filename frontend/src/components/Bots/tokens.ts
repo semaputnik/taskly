@@ -1,4 +1,5 @@
 import type { BotUserPublic } from "@/client"
+import { isoDay } from "@/lib/dates"
 
 export type TokenStatus = "none" | "revoked" | "expired" | "active"
 
@@ -25,8 +26,5 @@ export function expiryFromDate(date: string | undefined): string | undefined {
 
 /** Today as a date input's `min`: a token cannot be issued already expired. */
 export function today(): string {
-  const now = new Date()
-  const month = String(now.getMonth() + 1).padStart(2, "0")
-  const day = String(now.getDate()).padStart(2, "0")
-  return `${now.getFullYear()}-${month}-${day}`
+  return isoDay(new Date())
 }

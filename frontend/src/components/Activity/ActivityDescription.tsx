@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router"
 import type { ReactNode } from "react"
 
 import type { ActivityEntryPublic } from "@/client"
+import { formatDay } from "@/lib/dates"
 
 interface ProjectRef {
   id: string
@@ -30,7 +31,11 @@ function describeBatch(changes: Record<string, unknown>): string {
     )
   }
   if ("due_date" in changes) {
-    said.push(changes.due_date ? `due ${changes.due_date}` : "due date cleared")
+    said.push(
+      changes.due_date
+        ? `due ${formatDay(changes.due_date as string)}`
+        : "due date cleared",
+    )
   }
   const project = changes.project as { name?: string } | undefined
   if (project?.name) said.push(`moved to ${project.name}`)

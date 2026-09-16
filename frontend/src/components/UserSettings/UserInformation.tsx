@@ -82,7 +82,7 @@ const UserInformation = () => {
 
   return (
     <div className="bg-card max-w-md rounded-lg border p-6">
-      <h2 className="text-lg font-semibold mb-4">User Information</h2>
+      <h2 className="text-lg font-semibold mb-4">Your profile</h2>
       <Form {...form}>
         <form
           onSubmit={form.handleSubmit(onSubmit)}

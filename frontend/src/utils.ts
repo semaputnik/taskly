@@ -14,7 +14,8 @@ function extractErrorMessage(err: Error): string {
     }
     return err.message
   }
-  return "That did not go through. Please try again."
+  // Not an answer from the API: say what the browser knows.
+  return err.message || "The request did not reach the server."
 }
 
 export const handleError = function (this: (msg: string) => void, err: Error) {
