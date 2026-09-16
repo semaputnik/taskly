@@ -17,6 +17,9 @@ LOGGED = {
     f"POST {API}/tasks/",
     f"PATCH {API}/tasks/{{task_id}}",
     f"DELETE {API}/tasks/{{task_id}}",
+    # A batch is logged once, as the one act it was (semaputnik/taskly#66).
+    f"POST {API}/tasks/bulk",
+    f"POST {API}/tasks/bulk-delete",
     f"POST {API}/activity-log/{{entry_id}}/restore",
     f"POST {API}/projects/",
     f"PATCH {API}/projects/{{project_id}}",

@@ -63,6 +63,26 @@ def set_actor(session: Session, user_id: uuid.UUID) -> None:
     session.info[_ACTOR_KEY] = _Actor(user_id=user_id)
 
 
+_BATCH_KEY = "activity_batch"
+
+
+def set_batch(
+    session: Session,
+    action: ActivityAction,
+    task_ids: list[uuid.UUID],
+    details: dict[str, Any],
+) -> None:
+    """
+    Log this transaction as one act over many tasks, rather than as each task
+    it touched.
+
+    The user pressed one control over a selection; a log that reported the
+    tasks one by one would be a record of how the request was implemented
+    rather than of what they did (semaputnik/taskly#66, story 27).
+    """
+    session.info[_BATCH_KEY] = (action, set(task_ids), details)
+
+
 def set_bot_actor(session: Session, bot_user_id: uuid.UUID) -> None:
     """
     Attribute every change this session commits to the bot user
@@ -134,10 +154,12 @@ def _collect(session: Session, _flush_context: Any, _instances: Any) -> None:
             )
             if isinstance(obj, Task):
                 pending.before.setdefault(obj.id, None)
-            elif isinstance(obj, Deletion) and obj.task_id is not None:
-                pending.deletions.append(obj.id)
             elif isinstance(obj, Deletion) and obj.project_id is not None:
                 pending.project_deletions.append(obj.id)
+            elif isinstance(obj, Deletion):
+                # A task's deletion, or a batch's — which names no single task
+                # and is logged by what it took down.
+                pending.deletions.append(obj.id)
             elif isinstance(obj, TaskTag):
                 touched.append(obj.task_id)
             # The Inbox comes with the account rather than being made by
@@ -217,6 +239,9 @@ def _write(session: Session) -> None:
     # committed without a flush of its own is logged like any other.
     if session.new or session.dirty or session.deleted:
         session.flush()
+    batch: tuple[ActivityAction, set[uuid.UUID], dict[str, Any]] | None = (
+        session.info.pop(_BATCH_KEY, None)
+    )
     if _PENDING_KEY not in session.info:
         return
     pending: _Pending = session.info.pop(_PENDING_KEY)
@@ -230,6 +255,8 @@ def _write(session: Session) -> None:
     # many of its rows came back.
     restored: dict[uuid.UUID, int] = {}
 
+    batched: list[uuid.UUID] = []
+
     for task_id, before in pending.before.items():
         state = after.get(task_id)
         # A task deleted in this transaction is logged once, by its deletion
@@ -239,15 +266,36 @@ def _write(session: Session) -> None:
         # Restoring is logged the same way: once for the event, not per row.
         if before is not None and before.deletion_id is not None:
             restored[before.deletion_id] = restored.get(before.deletion_id, 0) + 1
+        if batch is not None:
+            # The subtasks a completion swept along are part of the same act,
+            # and are not counted as tasks the reader picked.
+            if task_id in batch[1]:
+                batched.append(task_id)
+            continue
         entries.extend(_task_entries(task_id, before, state, refs))
+
+    if batch is not None and batched:
+        action, _selected, details = batch
+        entries.append(
+            _entry(
+                after[batched[0]].owner_id,
+                action,
+                ActivityEntityType.TASK,
+                batched[0],
+                task_count=len(batched),
+                task_ids=[str(task_id) for task_id in batched],
+                **details,
+            )
+        )
 
     for deletion_id in pending.deletions:
         entries.append(_deletion_entry(session, deletion_id, refs))
 
     for deletion_id, count in restored.items():
         # A project's tasks coming back are part of the project's restore,
-        # which is logged with the project below.
-        if session.get_one(Deletion, deletion_id).task_id is not None:
+        # which is logged with the project below. A batch's are not: the batch
+        # is the act, and its undo is an act of its own.
+        if session.get_one(Deletion, deletion_id).project_id is None:
             entries.append(_restore_entry(session, deletion_id, count, refs))
 
     entries.extend(_project_entries(session, pending, restored))
@@ -276,6 +324,7 @@ def _discard(session: Session, transaction: Any) -> None:
     # and must not leave them to be logged by the next one.
     if transaction.parent is None:
         session.info.pop(_PENDING_KEY, None)
+        session.info.pop(_BATCH_KEY, None)
 
 
 class _Refs:
@@ -398,11 +447,23 @@ def _deletion_entry(
     refs: _Refs,
 ) -> ActivityEntry:
     deletion = session.get_one(Deletion, deletion_id)
-    assert deletion.task_id is not None
-    task = session.get_one(Task, deletion.task_id)
     went_down = session.execute(
         select(col(Task.id)).where(Task.deletion_id == deletion_id)
     ).all()
+    if deletion.task_id is None:
+        # A batch names no single task: it is the selection that went down,
+        # and the count is what the entry has to say (story 27).
+        return ActivityEntry(
+            owner_id=deletion.owner_id,
+            action=ActivityAction.TASK_DELETED,
+            entity_type=ActivityEntityType.TASK,
+            # An entry points at something; for a batch the first row it took
+            # is as good a handle as any, and the restore goes by the event.
+            entity_id=went_down[0][0],
+            deletion_id=deletion.id,
+            details=to_jsonable_python({"task_count": len(went_down)}),
+        )
+    task = session.get_one(Task, deletion.task_id)
     return ActivityEntry(
         owner_id=deletion.owner_id,
         action=ActivityAction.TASK_DELETED,
@@ -428,7 +489,17 @@ def _restore_entry(
     refs: _Refs,
 ) -> ActivityEntry:
     deletion = session.get_one(Deletion, deletion_id)
-    assert deletion.task_id is not None
+    if deletion.task_id is None:
+        # A batch coming back: what was restored is the selection that went
+        # down, said as the count it is.
+        return ActivityEntry(
+            owner_id=deletion.owner_id,
+            action=ActivityAction.TASK_RESTORED,
+            entity_type=ActivityEntityType.TASK,
+            entity_id=deletion_id,
+            deletion_id=deletion_id,
+            details=to_jsonable_python({"task_count": count}),
+        )
     task = session.get_one(Task, deletion.task_id)
     return ActivityEntry(
         owner_id=deletion.owner_id,

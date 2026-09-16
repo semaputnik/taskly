@@ -39,7 +39,18 @@ function describe(entry: ActivityEntryPublic) {
           : "",
     }
   }
-  const name = (entry.details.title as string | undefined) ?? "this task"
+  const title = entry.details.title as string | undefined
+  if (title === undefined) {
+    // A batch deletion names no single task; what comes back is the selection
+    // it took down, and it comes back as the one act it was.
+    const tasks = (entry.details.task_count as number | undefined) ?? 0
+    return {
+      heading: "Restore tasks",
+      name: plural(tasks, "1 task", "tasks"),
+      comesBack: ", together, as they went",
+    }
+  }
+  const name = title
   const subtasks = (entry.details.subtask_count as number | undefined) ?? 0
   return {
     heading: "Restore task",

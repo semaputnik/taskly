@@ -201,7 +201,20 @@ def restore_from_activity_entry(
         crud.restore_deletion(session=session, tasks=tasks, project=project)
         return Message(message="Project restored")
 
-    assert deletion.task_id is not None
+    if deletion.task_id is None:
+        # A batch: the event names no single task, so every task it took down
+        # on its own account is checked, and they come back together or not at
+        # all — the act being undone was one act (semaputnik/taskly#66).
+        if not tasks:
+            return Message(message="Already restored")
+        for restored in tasks:
+            if restored.parent_id is None or restored.parent_id not in {
+                task.id for task in tasks
+            }:
+                _check_task_restore(session, restored, tasks)
+        crud.restore_deletion(session=session, tasks=tasks)
+        return Message(message="Tasks restored")
+
     task = session.get_one(Task, deletion.task_id)
     if not tasks:
         if task.deletion_id is None:

@@ -398,6 +398,12 @@ emphasis is achieved by changing the border's colour to `signal-teal` or
 
 ### Named Rules
 
+**The Round-Check Rule.** A round check is completion, and completion only: it
+is the one place the product toggles a record's own state from a list, and it
+sits beside the thing it is about. A square check selects a row for a batch.
+The two live in the same row and must never be confused, which is why they are
+different shapes rather than two identical boxes in different columns.
+
 **The Pill-Means-Data Rule.** Fully-round is reserved for badges — values
 attached to a record. If it is pressable and pill-shaped, it is miscommunicating.
 
@@ -480,14 +486,34 @@ The signature component of the system.
 - **Empty state:** an icon, a title, one line of Ink Muted copy capped at 24rem,
   and where there is one, the way out. It fills the table body rather than
   sitting in a cell, so the sheet keeps its header and its height.
-- **Loading:** a skeleton table with real column headers and five placeholder
-  rows whose blocks match the width of the content they stand in for. The
-  skeleton is `Surface Quiet` with `animate-pulse`.
-- **Pagination:** appears only when there is more than one page. Bordered top
-  strip on a `muted/20` fill, holding a range readout, a rows-per-page select,
-  a page readout, and four 2rem square outline buttons (first/prev/next/last).
-  Counts inside the readouts are Ink at 500 weight, their surrounding words Ink
-  Muted — the numbers are what you are scanning for.
+- **Loading:** the table draws its own skeleton from the same column
+  definition it will render, so the two can never disagree and the page does
+  not jump when the rows land. Its row count is what is expected, not a fixed
+  five.
+- **Paging and sorting belong to the server.** The page and the order ride in
+  the URL, the request carries them, and the footer prints the count the API
+  returned — the number of rows that match, not the size of the window that was
+  fetched. A table that pages an array it was handed can only page what it was
+  handed, and reports that window as the total.
+- **Sorting lives on the column header.** A sortable header is a button inside
+  its `th`: it toggles the field, the same header again reverses it, the
+  direction shows as an arrow, and the `th` carries `aria-sort`. Sorting is not
+  a filter and is never cleared with them.
+- **Selection is the first column**, a square check with a select-the-page
+  control in the header. A selection outlives paging within one filter set and
+  is dropped when the filters change; when a whole page is selected and more
+  match, the surface says so and offers to extend — the two are different acts
+  and the difference is stated, never implied.
+- **Batch actions appear only with a selection**, as a bar above the table
+  stating the count, offering only what applies, and carrying its own clear
+  control. A destructive batch keeps a confirmation naming the count.
+- **Footer:** the matching count, and the page position when there is more than
+  one page, with Previous and Next. Counts are Ink at 500 weight, their
+  surrounding words Ink Muted — the numbers are what you are scanning for.
+- **Narrow screens:** the table scrolls sideways as a named region the keyboard
+  can reach, with edge shadows and, below `md`, a line in words saying the row
+  continues. A table that appears to end at the screen edge is the one thing
+  this must not be.
 
 ### Inputs / Fields
 - **Style:** transparent fill, 1px hairline border, 0.5rem (8px) radius, 2.25rem

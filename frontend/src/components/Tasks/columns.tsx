@@ -24,24 +24,25 @@ export function getColumns(
 ): ColumnDef<DataTableFeatures, TaskPublic>[] {
   const columns: ColumnDef<DataTableFeatures, TaskPublic>[] = [
     {
-      id: "completed",
-      header: () => <span className="sr-only">Completed</span>,
-      cell: ({ row }) =>
-        readOnly ? (
-          <Checkbox
-            checked={row.original.completed}
-            disabled
-            aria-label={row.original.completed ? "Completed" : "Not completed"}
-          />
-        ) : (
-          <CompleteTask task={row.original} />
-        ),
-    },
-    {
       accessorKey: "title",
       header: "Title",
       cell: ({ row }) => (
         <div className="flex items-center gap-2">
+          {/* Completion sits with the task it is about. The checkbox in the
+              first column selects the row for a batch, which is what a square
+              check means in a list that can act on many rows at once. */}
+          {readOnly ? (
+            <Checkbox
+              className="rounded-full"
+              checked={row.original.completed}
+              disabled
+              aria-label={
+                row.original.completed ? "Completed" : "Not completed"
+              }
+            />
+          ) : (
+            <CompleteTask task={row.original} />
+          )}
           {/* A subtask says so for itself. Indenting it instead would claim a
               parent–child relationship the row above may not have: sorting or
               filtering can put any two rows next to each other, and the parent
