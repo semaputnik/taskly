@@ -32,8 +32,16 @@ test("Merging from a tag's panel moves its tasks and removes it", async ({
   await page.goto("/tags")
   await page.getByRole("row", { name: "Open Deploy", exact: true }).click()
   const panel = page.getByRole("dialog", { name: "Deploy", exact: true })
-  await panel.getByRole("combobox", { name: "Merge" }).click()
-  await page.getByRole("option", { name: "deploy", exact: true }).click()
+  const startMerge = async () => {
+    await panel.getByRole("button", { name: "Merge…" }).click()
+    const start = page.getByRole("dialog", { name: "Merge with Deploy" })
+    await expect(start).toContainText("Add the tags to fold into this one.")
+    await start.getByRole("combobox", { name: "Add a tag to merge" }).click()
+    await page.getByRole("option", { name: "deploy", exact: true }).click()
+    // The reader picks which name survives.
+    await page.getByRole("radio", { name: /^deploy 2 tasks/ }).check()
+  }
+  await startMerge()
 
   // The confirmation says what goes, what survives and how many tasks change,
   // archived ones included, before the button that does it.
@@ -44,9 +52,6 @@ test("Merging from a tag's panel moves its tasks and removes it", async ({
     "3 tasks change to carry “deploy” instead, 1 of them in an archived project.",
   )
   await expect(description).toContainText("can't be undone")
-  await expect(
-    confirm.getByRole("radio", { name: /deploy 2 tasks/ }),
-  ).toBeChecked()
 
   // Nothing happens until it is confirmed.
   await confirm.getByRole("button", { name: "Cancel" }).click()
@@ -55,8 +60,7 @@ test("Merging from a tag's panel moves its tasks and removes it", async ({
     ["deploy", 2],
   ])
 
-  await panel.getByRole("combobox", { name: "Merge" }).click()
-  await page.getByRole("option", { name: "deploy", exact: true }).click()
+  await startMerge()
   await confirm.getByRole("button", { name: "Merge into deploy" }).click()
 
   // The panel moves onto the tag that now carries the tasks.
@@ -209,4 +213,46 @@ test("A tag a bot user created says which one", async ({ page }) => {
   await expect(
     page.getByRole("dialog", { name: "needs-triage" }),
   ).toContainText("Created by the bot user Triage agent")
+})
+
+test.describe("on a phone", () => {
+  test.use({
+    viewport: { width: 375, height: 812 },
+    hasTouch: true,
+    isMobile: true,
+  })
+
+  test("Several spellings are merged from a tag's panel in one act", async ({
+    page,
+  }) => {
+    await newUser(page)
+    const api = await userApi(page)
+    for (const name of ["ship", "Ship", "shipping", "ships"]) {
+      await api.create("/tasks/", { title: `About ${name}`, tags: [name] })
+    }
+    const ship = (await (await api.get("/tags/?near=ship")).json()).data.find(
+      (tag: { name: string }) => tag.name === "ship",
+    )
+
+    await page.goto(`/tags?tag_id=${ship.id}`)
+    const panel = page.getByRole("dialog", { name: "ship", exact: true })
+    await panel.getByRole("button", { name: "Merge…" }).click()
+    const dialog = page.getByRole("dialog", { name: /^Merge / })
+    for (const name of ["Ship", "ships", "shipping"]) {
+      await dialog.getByRole("combobox", { name: "Add a tag to merge" }).click()
+      await page.getByRole("option", { name, exact: true }).click()
+    }
+    // One added by mistake is taken out again before confirming.
+    await dialog.getByRole("button", { name: "Leave shipping out" }).click()
+
+    await expect(dialog).toContainText(
+      "The tags “Ship” and “ships” are removed. 2 tasks change to carry “ship” instead.",
+    )
+    await dialog.getByRole("button", { name: "Merge into ship" }).click()
+    await expect(dialog).toBeHidden()
+    expect(await vocabulary(page)).toEqual([
+      ["ship", 3],
+      ["shipping", 1],
+    ])
+  })
 })

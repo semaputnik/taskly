@@ -599,6 +599,7 @@ def get_tags(
     near: str | None = None,
     skip: int = 0,
     limit: int = 100,
+    name_creators: bool = True,
 ) -> tuple[list[TagPublic], int]:
     """
     The user's tags, each with the number of tasks carrying it. `q` matches
@@ -606,16 +607,26 @@ def get_tags(
     what they typed before rather than to every tag with those letters
     somewhere inside. `near` finds the tags a name would read the same as
     (`tag_key`), over the whole vocabulary: what a name about to become a new
-    tag would duplicate (semaputnik/taskly#69).
+    tag would duplicate (FR-01.28).
     """
     where: list[Any] = [Tag.owner_id == owner_id]
     if q:
         where.append(col(Tag.name).ilike(f"{q}%"))
     if near is not None:
+        # Narrowed in the database to names that fold to the key with or
+        # without a trailing "s", then held to `tag_key` exactly: this runs as
+        # a name is typed, so it must not read the whole vocabulary each time.
         key = tag_key(near)
-        names = session.exec(select(Tag.name).where(Tag.owner_id == owner_id)).all()
+        folded = func.lower(
+            func.regexp_replace(func.trim(col(Tag.name)), r"[\s_-]+", " ", "g")
+        )
+        candidates = session.exec(
+            select(Tag.name).where(
+                Tag.owner_id == owner_id, folded.in_([key, f"{key}s"])
+            )
+        ).all()
         where.append(
-            col(Tag.name).in_([name for name in names if tag_key(name) == key])
+            col(Tag.name).in_([name for name in candidates if tag_key(name) == key])
         )
 
     count = session.exec(select(func.count()).select_from(Tag).where(*where)).one()
@@ -629,22 +640,25 @@ def get_tags(
         .limit(limit)
     )
     tags = session.exec(statement).all()
-    return tag_publics(session=session, tags=tags), count
+    return tag_publics(session=session, tags=tags, name_creators=name_creators), count
 
 
-def tag_publics(*, session: Session, tags: Sequence[Tag]) -> list[TagPublic]:
+def tag_publics(
+    *, session: Session, tags: Sequence[Tag], name_creators: bool = True
+) -> list[TagPublic]:
     """
     Tags as the API reports them, with how many tasks carry each.
 
     `task_count` is the live tasks carrying the tag — neither deleted nor
     archived with their project — because that is exactly what the task list
     filtered by the tag shows, and the count is read as a promise about that
-    list (semaputnik/taskly#85). The tasks archived with their project are
+    list (FR-01.26). The tasks archived with their project are
     reported beside it rather than dropped: deleting or merging the tag still
     reaches them, and those confirmations have to say so.
 
     The counts are the owner's whoever asks, a bot user included, so one tag
-    never means two things (ADR-0003).
+    never means two things (ADR-0003). Which bot user created a tag is the
+    owner's to know: `name_creators` is off for a bot user reading.
     """
     if not tags:
         return []
@@ -666,17 +680,21 @@ def tag_publics(*, session: Session, tags: Sequence[Tag]) -> list[TagPublic]:
     ).all()
     counts = {tag_id: (live, archived_count) for tag_id, live, archived_count in rows}
     # Who created a tag is what its "created" entry in the activity log says.
-    creators = {
-        tag_id: bot_id
-        for tag_id, bot_id in session.exec(
-            select(ActivityEntry.entity_id, ActivityEntry.actor_bot_user_id).where(
-                ActivityEntry.entity_type == ActivityEntityType.TAG,
-                ActivityEntry.action == ActivityAction.TAG_CREATED,
-                col(ActivityEntry.entity_id).in_(tag_ids),
-            )
-        ).all()
-        if bot_id is not None
-    }
+    creators = (
+        {}
+        if not name_creators
+        else {
+            tag_id: bot_id
+            for tag_id, bot_id in session.exec(
+                select(ActivityEntry.entity_id, ActivityEntry.actor_bot_user_id).where(
+                    ActivityEntry.entity_type == ActivityEntityType.TAG,
+                    ActivityEntry.action == ActivityAction.TAG_CREATED,
+                    col(ActivityEntry.entity_id).in_(tag_ids),
+                )
+            ).all()
+            if bot_id is not None
+        }
+    )
     bots = get_bot_user_refs(session=session, bot_user_ids=creators.values())
     return [
         TagPublic(
@@ -835,7 +853,7 @@ def merge_tags(*, session: Session, target: Tag, sources: Sequence[Tag]) -> None
     later under a name that no longer exists.
 
     One commit, so a merge either happens whole or not at all
-    (semaputnik/taskly#69).
+    (FR-01.27).
     """
     source_ids = [source.id for source in sources]
     carrying_target = set(

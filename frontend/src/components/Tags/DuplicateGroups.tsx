@@ -6,12 +6,12 @@ import { type TagPublic, TagsService } from "@/client"
 import { Button } from "@/components/ui/button"
 import useCustomToast from "@/hooks/useCustomToast"
 import { handleError } from "@/utils"
-import { tasks, totalTasks } from "./counts"
+import { taskCountLabel, totalTasks } from "./counts"
 import { MergeTags } from "./MergeTags"
 
 /**
  * Tags whose names read as the same word, offered for merging
- * (semaputnik/taskly#69).
+ * (FR-01.28).
  *
  * A group is only ever a suggestion: merging it goes through the same
  * confirmation as any merge, and "Keep apart" stops offering it until one of
@@ -83,7 +83,7 @@ export function DuplicateGroups({
                       {" · "}
                       {totalTasks(tag) === 0
                         ? "no tasks"
-                        : tasks(totalTasks(tag))}
+                        : taskCountLabel(totalTasks(tag))}
                       {tag.created_by_bot_user &&
                         ` · by ${tag.created_by_bot_user.name}`}
                     </span>
@@ -115,8 +115,7 @@ export function DuplicateGroups({
 
       {merging && (
         <MergeTags
-          open
-          onOpenChange={(open) => !open && setMerging(null)}
+          onClose={() => setMerging(null)}
           tags={merging}
           initialSurvivorId={
             [...merging].sort((a, b) => totalTasks(b) - totalTasks(a))[0].id

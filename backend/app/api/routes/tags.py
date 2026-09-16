@@ -83,6 +83,7 @@ def read_tags(
         near=near,
         skip=skip,
         limit=limit,
+        name_creators=caller.bot is None,
     )
     return TagsPublic(data=tags, count=count)
 
@@ -92,7 +93,7 @@ def read_tag_duplicates(*, session: SessionDep, current_user: CurrentUser) -> An
     """
     The user's tags grouped where their names differ only in letter case,
     separators, surrounding or repeated whitespace, or a trailing plural:
-    suggestions to merge, over the whole vocabulary (semaputnik/taskly#69).
+    suggestions to merge, over the whole vocabulary (FR-01.28).
 
     Nothing here merges anything, and a group the user dismissed stays out
     until one of its members is renamed or another spelling joins it. Like
@@ -142,7 +143,9 @@ def read_tag(*, session: SessionDep, caller: CallerDep, tag_id: uuid.UUID) -> An
     exclude.
     """
     tag = _get_owned_tag(session, caller.owner_id, tag_id)
-    return crud.tag_publics(session=session, tags=[tag])[0]
+    return crud.tag_publics(
+        session=session, tags=[tag], name_creators=caller.bot is None
+    )[0]
 
 
 @router.post("/", response_model=TagPublic)
@@ -156,7 +159,9 @@ def create_tag(*, session: SessionDep, caller: CallerDep, tag_in: TagCreate) -> 
     authorization.authorize_tag_creation(caller)
     _refuse_taken_name(session, caller.owner_id, tag_in.name)
     tag = crud.create_tag(session=session, owner_id=caller.owner_id, name=tag_in.name)
-    return crud.tag_publics(session=session, tags=[tag])[0]
+    return crud.tag_publics(
+        session=session, tags=[tag], name_creators=caller.bot is None
+    )[0]
 
 
 @router.patch("/{tag_id}", response_model=TagPublic)
@@ -224,7 +229,7 @@ def preview_tag_merge(
     """
     How many tasks merging `source_ids` into this tag would change, each
     counted once, with those archived with their project apart: what the
-    merge confirmation says before anything happens (semaputnik/taskly#69).
+    merge confirmation says before anything happens (FR-01.27).
     """
     target = _get_owned_tag(session, current_user.id, tag_id)
     sources = _merge_sources(session, target, source_ids)
@@ -246,7 +251,7 @@ def merge_tags(
 ) -> Any:
     """
     Fold other tags into this one: every task carrying one of them carries
-    this tag instead, once, and they are deleted (semaputnik/taskly#69).
+    this tag instead, once, and they are deleted (FR-01.27).
 
     Renaming a tag to a name in use stays refused; this is the separate,
     deliberate act for putting two spellings together. It keeps names as they

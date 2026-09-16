@@ -6,6 +6,7 @@ import { TagsService } from "@/client"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { useDebouncedValue } from "@/hooks/useDebouncedValue"
 import { cn } from "@/lib/utils"
 
 interface TagsFieldProps
@@ -62,19 +63,29 @@ export function TagsField({
   const exists = tags?.data.some((tag) => tag.name === name)
   // The spellings a new name would read the same as — "Deploys" beside
   // "deploy" — offered before it is created, each keeping its own casing
-  // (semaputnik/taskly#69).
+  // (FR-01.28).
+  // Asked once typing pauses rather than on every keystroke.
+  const settledName = useDebouncedValue(name, 250)
   const { data: near } = useQuery({
-    queryKey: ["tags", "near", name],
+    queryKey: ["tags", "near", settledName],
     queryFn: async () =>
-      (await TagsService.readTags({ query: { near: name, skip: 0, limit: 5 } }))
-        .data,
-    enabled: Boolean(name) && exists === false && !value.includes(name),
+      (
+        await TagsService.readTags({
+          query: { near: settledName, skip: 0, limit: 5 },
+        })
+      ).data,
+    enabled:
+      Boolean(settledName) &&
+      settledName === name &&
+      exists === false &&
+      !value.includes(name),
   })
-  const nearMatches = exists
-    ? []
-    : (near?.data ?? [])
-        .map((tag) => tag.name)
-        .filter((tagName) => tagName !== name && !value.includes(tagName))
+  const nearMatches =
+    exists || settledName !== name
+      ? []
+      : (near?.data ?? [])
+          .map((tag) => tag.name)
+          .filter((tagName) => tagName !== name && !value.includes(tagName))
 
   const suggestions = (tags?.data ?? [])
     .map((tag) => tag.name)

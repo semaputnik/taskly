@@ -1,5 +1,4 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { Link as RouterLink } from "@tanstack/react-router"
 import { Bot, CheckSquare, Merge } from "lucide-react"
 import { useState } from "react"
 
@@ -7,32 +6,25 @@ import { type TagPublic, TagsService } from "@/client"
 import { NewRecord } from "@/components/Records/NewRecord"
 import {
   EditableText,
-  ghost,
   PropertyList,
   PropertyRow,
-  ReadOnlyValue,
   RecordHeader,
   RecordPanel,
   recordLoad,
   titleFieldClass,
 } from "@/components/Records/RecordPanel"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+import { Button } from "@/components/ui/button"
 import useCustomToast from "@/hooks/useCustomToast"
-import { cn } from "@/lib/utils"
-import { handleError } from "@/utils"
+import { handleError, isTagExistsError } from "@/utils"
 import { BotCreator } from "./BotCreator"
-import { archivedNote, tasks } from "./counts"
 import DeleteTag from "./DeleteTag"
 import { MergeTags } from "./MergeTags"
+import { TaskCount } from "./TaskCount"
+import { useVocabulary } from "./vocabulary"
 
 /**
- * A tag as a record: its name, what carries it, and the one way to remove it.
+ * A tag as a record: its name, what carries it, and the two ways to make it
+ * go — merging it with another spelling, or deleting it.
  *
  * A tag is a thin record and its panel is short. The value is that it has an
  * address and the same shape as every other record, not the amount in it.
@@ -57,6 +49,9 @@ export function TagPanel({
     enabled: Boolean(tagId),
   })
   const tag = query.data
+  // A merge being considered from this panel, and the tag it was offered with
+  // when a rename ran into that tag's name.
+  const [merging, setMerging] = useState<{ with?: TagPublic } | null>(null)
 
   return (
     <RecordPanel
@@ -66,7 +61,22 @@ export function TagPanel({
       kind="tag"
       {...recordLoad(query, !capturing && Boolean(tagId))}
       destructive={
-        tag ? <DeleteTag tag={tag} onSuccess={onClose} /> : undefined
+        tag ? (
+          <>
+            {/* Merging is at the foot with deleting: both make this tag go,
+                and neither is a property of it. */}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-muted-foreground -ml-2.5 pointer-coarse:h-11"
+              onClick={() => setMerging({})}
+            >
+              <Merge />
+              Merge…
+            </Button>
+            <DeleteTag tag={tag} onSuccess={onClose} />
+          </>
+        ) : undefined
       }
     >
       {capturing ? (
@@ -84,42 +94,61 @@ export function TagPanel({
           onCreated={onCreated}
         />
       ) : tag ? (
-        <TagRecord tag={tag} openTag={onOpenTag} />
+        <TagRecord
+          tag={tag}
+          onNameTaken={(taken) => setMerging({ with: taken })}
+        />
       ) : null}
+      {tag && merging && (
+        <TagMerge
+          tag={tag}
+          offered={merging.with}
+          onClose={() => setMerging(null)}
+          onMerged={(survivor) => {
+            // A merge that removed this tag moves the panel onto the one
+            // that carries its tasks now.
+            if (survivor.id !== tag.id) onOpenTag(survivor.id)
+          }}
+        />
+      )}
     </RecordPanel>
+  )
+}
+
+/** The merge dialog as a tag's panel opens it, with the whole vocabulary. */
+function TagMerge({
+  tag,
+  offered,
+  onClose,
+  onMerged,
+}: {
+  tag: TagPublic
+  offered?: TagPublic
+  onClose: () => void
+  onMerged: (survivor: TagPublic) => void
+}) {
+  const { data: vocabulary } = useVocabulary()
+  return (
+    <MergeTags
+      tags={offered ? [tag, offered] : [tag]}
+      // The name the reader just asked for is the one to keep.
+      initialSurvivorId={offered?.id ?? tag.id}
+      candidates={(vocabulary ?? []).filter((other) => other.id !== tag.id)}
+      onClose={onClose}
+      onMerged={onMerged}
+    />
   )
 }
 
 function TagRecord({
   tag,
-  openTag,
+  onNameTaken,
 }: {
   tag: TagPublic
-  openTag: (tagId: string) => void
+  onNameTaken: (taken: TagPublic) => void
 }) {
   const queryClient = useQueryClient()
   const { showErrorToast } = useCustomToast()
-  // The other tag a merge is being considered with, and which name it keeps.
-  const [mergeWith, setMergeWith] = useState<TagPublic | null>(null)
-  const [survivorId, setSurvivorId] = useState<string>()
-  const openMerge = (other: TagPublic, keep: TagPublic) => {
-    setMergeWith(other)
-    setSurvivorId(keep.id)
-  }
-
-  const { data: vocabulary } = useQuery({
-    queryKey: ["tags", "all", { skip: 0, limit: 1000 }],
-    queryFn: async () =>
-      (await TagsService.readTags({ query: { skip: 0, limit: 1000 } })).data,
-  })
-  const others = (vocabulary?.data ?? []).filter((other) => other.id !== tag.id)
-  // The tag holding a name, asked of the server when the vocabulary has not
-  // arrived yet: a refusal can come quicker than the list.
-  const takenBy = async (name: string) =>
-    others.find((other) => other.name === name) ??
-    (
-      await TagsService.readTags({ query: { q: name, skip: 0, limit: 100 } })
-    ).data.data.find((other) => other.name === name && other.id !== tag.id)
 
   const rename = useMutation({
     mutationFn: (name: string) =>
@@ -147,13 +176,19 @@ function TagRecord({
               try {
                 await rename.mutateAsync(trimmed)
                 return true
-              } catch {
+              } catch (error) {
                 // A name already in use is refused: the reader keeps theirs
                 // and the toast says which name is taken (FR-01.22). Putting
                 // the two together is a merge, which is offered here as the
                 // separate, confirmed act it is — never done by the rename.
-                const taken = await takenBy(trimmed)
-                if (taken) openMerge(taken, taken)
+                if (isTagExistsError(error as Error)) {
+                  const holder = (
+                    await TagsService.readTags({
+                      query: { near: trimmed, skip: 0, limit: 100 },
+                    })
+                  ).data.data.find((other) => other.name === trimmed)
+                  if (holder) onNameTaken(holder)
+                }
                 return false
               }
             }}
@@ -164,24 +199,7 @@ function TagRecord({
 
       <PropertyList>
         <PropertyRow icon={CheckSquare} label="Tasks">
-          <span className="flex flex-wrap items-baseline gap-x-2">
-            {(tag.task_count ?? 0) > 0 ? (
-              <RouterLink
-                to="/tasks"
-                search={{ tag: tag.name }}
-                className="px-2 underline-offset-4 hover:underline"
-              >
-                {tasks(tag.task_count ?? 0)}
-              </RouterLink>
-            ) : (
-              <ReadOnlyValue>No tasks</ReadOnlyValue>
-            )}
-            {archivedNote(tag) && (
-              <span className="text-muted-foreground text-xs">
-                {archivedNote(tag)}
-              </span>
-            )}
-          </span>
+          <TaskCount tag={tag} className="px-2" />
         </PropertyRow>
         {tag.created_by_bot_user && (
           <PropertyRow icon={Bot} label="Created by">
@@ -190,51 +208,7 @@ function TagRecord({
             </span>
           </PropertyRow>
         )}
-        <PropertyRow icon={Merge} label="Merge" htmlFor={`merge-${tag.id}`}>
-          <Select
-            value=""
-            disabled={others.length === 0}
-            onValueChange={(otherId) => {
-              const other = others.find((candidate) => candidate.id === otherId)
-              if (other) openMerge(other, other)
-            }}
-          >
-            <SelectTrigger
-              id={`merge-${tag.id}`}
-              className={cn(ghost, "w-full")}
-            >
-              <SelectValue
-                placeholder={
-                  others.length === 0
-                    ? "No other tag to merge with"
-                    : "Merge with another tag…"
-                }
-              />
-            </SelectTrigger>
-            <SelectContent>
-              {others.map((other) => (
-                <SelectItem key={other.id} value={other.id}>
-                  {other.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </PropertyRow>
       </PropertyList>
-
-      {mergeWith && (
-        <MergeTags
-          open={Boolean(mergeWith)}
-          onOpenChange={(open) => !open && setMergeWith(null)}
-          tags={[tag, mergeWith]}
-          initialSurvivorId={survivorId}
-          onMerged={(survivor) => {
-            // A merge that removed this tag moves the panel onto the one
-            // that carries its tasks now.
-            if (survivor.id !== tag.id) openTag(survivor.id)
-          }}
-        />
-      )}
     </>
   )
 }

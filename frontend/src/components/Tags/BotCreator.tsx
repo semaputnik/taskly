@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge"
 
 /**
  * Which bot user brought a tag into being, where one did: an agent's
- * vocabulary, told apart from the user's own (semaputnik/taskly#69).
+ * vocabulary, told apart from the user's own (FR-01.28).
  */
 export function BotCreator({ tag }: { tag: TagPublic }) {
   const bot = tag.created_by_bot_user

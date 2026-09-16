@@ -29,3 +29,20 @@ a bot user reads its owner's whole tag vocabulary, with the number of tasks
 each tag is on. Hiding tags that live only outside the scope would make the
 same tag exist for one caller and not another, and the user preferred an
 integration that can reuse their vocabulary to one that has to guess at it.
+
+## Amendment (2026-09-16): counts split, merging, and who made a tag
+
+The count a bot user reads is now two numbers rather than one: the live tasks
+carrying a tag, which is what the task list filtered by it shows, and those
+archived with their project (FR-01.26). The split tells a bot user nothing it
+can act on — archived tasks stay out of its reach (FR-05.13) — and keeping one
+answer for every caller mattered more than hiding it.
+
+Merging tags (FR-01.27) joins renaming and deleting as an act only the user
+performs, for the same reason: it rewrites tasks in every project. Names stay
+case-sensitive and unique; merging is an operation over that model, not a
+loosening of it.
+
+Which bot user created a tag (FR-01.28) is reported to the user only. A bot
+user reading the vocabulary gets no word about which of its owner's other
+integrations added what.

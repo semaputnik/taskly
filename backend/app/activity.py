@@ -97,7 +97,7 @@ def set_tag_merge(
     """
     Log this transaction as one merge of `sources` into `target`, rather than
     as every task whose tags it rewrote and every source tag it removed: the
-    user made one decision, and the log records that (semaputnik/taskly#69).
+    user made one decision, and the log records that (FR-01.27).
     """
     session.info[_TAG_MERGE_KEY] = _TagMerge(
         entry=_entry(

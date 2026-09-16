@@ -366,6 +366,11 @@ def test_a_tag_a_bot_user_created_names_it(client: TestClient, owner: Headers) -
     one = client.get(f"{API}/tags/{tags['by-api']['id']}", headers=owner).json()
     assert one["created_by_bot_user"] == expected
 
+    # Which bot made what is the owner's to know, not another bot user's.
+    assert _tags(client, bot_headers)["by-api"]["created_by_bot_user"] is None
+    created = client.post(f"{API}/tags/", headers=bot_headers, json={"name": "more"})
+    assert created.json()["created_by_bot_user"] is None
+
     # A deleted bot user stays named, marked deleted.
     client.delete(f"{API}/bot-users/{bot['id']}", headers=owner)
     assert _tags(client, owner)["by-api"]["created_by_bot_user"] == {

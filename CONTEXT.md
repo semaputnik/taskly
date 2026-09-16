@@ -77,8 +77,10 @@ new name onto a task, and it stays until the user deletes it, whether or not
 any task carries it. Renaming a tag renames it on every task; deleting it takes
 it off every task and cannot be undone. Two spellings of one idea are put
 together by a **merge**: the tasks carrying one tag carry the other instead, and
-the first tag is gone — like a deletion, it cannot be undone. Only the user
-renames, merges or deletes tags.
+the first tag is gone — like a deletion, it cannot be undone. Tags whose names
+differ only in form (case, separators, a plural) are offered as **likely
+duplicates**; the user merges a group or keeps it apart, and nothing is merged
+on their behalf. Only the user renames, merges or deletes tags.
 _Avoid_: treating a tag as text copied onto each task, or as something scoped
 to a project.
 

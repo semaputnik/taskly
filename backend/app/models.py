@@ -259,14 +259,14 @@ class TagPublic(TagBase):
     archived_task_count: int = 0
     # The bot user that brought the tag into being, if one did — through the
     # API or by typing a new name onto a task — so an agent's vocabulary can
-    # be told from the user's own (semaputnik/taskly#69).
+    # be told from the user's own (FR-01.28).
     created_by_bot_user: BotUserRef | None = None
 
 
 class TagDuplicateDismissal(SQLModel, table=True):
     """
     A group of likely duplicate tags the user said to stop offering
-    (semaputnik/taskly#69).
+    (FR-01.28).
 
     The group is remembered by its members exactly as they were — each id with
     the name it had — so renaming one of them, or a new spelling joining them,
@@ -316,7 +316,7 @@ class TagMerge(SQLModel):
 class TagMergePreview(SQLModel):
     """
     What a merge would move: the tasks carrying any of the sources, each
-    counted once, live and archived apart (semaputnik/taskly#69).
+    counted once, live and archived apart (FR-01.27).
     """
 
     task_count: int
