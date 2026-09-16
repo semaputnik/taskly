@@ -16,6 +16,7 @@ import {
 } from "@/components/Records/RecordPanel"
 import useCustomToast from "@/hooks/useCustomToast"
 import { handleError } from "@/utils"
+import { archivedNote, tasks } from "./counts"
 import DeleteTag from "./DeleteTag"
 
 /**
@@ -118,17 +119,24 @@ function TagRecord({ tag }: { tag: TagPublic }) {
 
       <PropertyList>
         <PropertyRow icon={CheckSquare} label="Tasks">
-          {(tag.task_count ?? 0) > 0 ? (
-            <RouterLink
-              to="/tasks"
-              search={{ tag: tag.name }}
-              className="px-2 underline-offset-4 hover:underline"
-            >
-              {tag.task_count === 1 ? "1 task" : `${tag.task_count} tasks`}
-            </RouterLink>
-          ) : (
-            <ReadOnlyValue>No tasks</ReadOnlyValue>
-          )}
+          <span className="flex flex-wrap items-baseline gap-x-2">
+            {(tag.task_count ?? 0) > 0 ? (
+              <RouterLink
+                to="/tasks"
+                search={{ tag: tag.name }}
+                className="px-2 underline-offset-4 hover:underline"
+              >
+                {tasks(tag.task_count ?? 0)}
+              </RouterLink>
+            ) : (
+              <ReadOnlyValue>No tasks</ReadOnlyValue>
+            )}
+            {archivedNote(tag) && (
+              <span className="text-muted-foreground text-xs">
+                {archivedNote(tag)}
+              </span>
+            )}
+          </span>
         </PropertyRow>
       </PropertyList>
     </>

@@ -639,6 +639,10 @@ export type TagPublic = {
      * Task Count
      */
     task_count?: number;
+    /**
+     * Archived Task Count
+     */
+    archived_task_count?: number;
 };
 
 /**

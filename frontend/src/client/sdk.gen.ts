@@ -636,12 +636,12 @@ export class TagsService {
      *
      * A bot user reads its owner's whole vocabulary, counts included, whatever
      * its scope: tags belong to the user rather than to a project, so a scope
-     * has nothing to narrow them by (ADR-0003). The counts include tasks in
-     * archived projects, for the same reason they include tasks outside the
-     * scope: the count is the owner's, and narrowing it per caller would make
-     * one tag mean two different things — which is the split ADR-0003 refused.
-     * The archive still holds: FR-05.13 is about reaching those tasks, and none
-     * of them is reachable from here.
+     * has nothing to narrow them by (ADR-0003). The counts are the owner's for
+     * every caller — narrowing them per caller would make one tag mean two
+     * different things, which is the split ADR-0003 refused. `task_count` is
+     * the live tasks, as the task list filtered by the tag shows them;
+     * `archived_task_count` is those archived with their project, which are
+     * counted but not reachable from here (FR-05.13).
      */
     public static readTags<ThrowOnError extends boolean = true>(options?: Options<tagsReadTagsData, ThrowOnError>) {
         return (options?.client ?? client).get<tagsReadTagsResponses, tagsReadTagsErrors, ThrowOnError>({

@@ -16,17 +16,20 @@ import {
 import { LoadingButton } from "@/components/ui/loading-button"
 import useCustomToast from "@/hooks/useCustomToast"
 import { handleError } from "@/utils"
+import { allTasks, totalTasks } from "./counts"
 
 interface DeleteTagProps {
   tag: TagPublic
   onSuccess: () => void
 }
 
-function tasksLosingIt(count: number): string {
-  if (count === 0) {
+function tasksLosingIt(tag: TagPublic): string {
+  const total = totalTasks(tag)
+  if (total === 0) {
     return "No task carries it."
   }
-  return `It will be taken off ${count} ${count === 1 ? "task" : "tasks"}; the ${count === 1 ? "task stays" : "tasks stay"} as ${count === 1 ? "it is" : "they are"}.`
+  // Archived work is reached too: the tag goes from every task it is on.
+  return `It will be taken off ${allTasks(tag)}; ${total === 1 ? "the task stays as it is" : "the tasks stay as they are"}.`
 }
 
 /**
@@ -59,7 +62,7 @@ const DeleteTag = ({ tag, onSuccess }: DeleteTagProps) => {
         <DialogHeader>
           <DialogTitle>Delete the tag {tag.name}?</DialogTitle>
           <DialogDescription>
-            {tasksLosingIt(tag.task_count ?? 0)} This can't be undone.
+            {tasksLosingIt(tag)} This can't be undone.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>

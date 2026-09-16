@@ -239,9 +239,12 @@ class TagUpdate(SQLModel):
 
 class TagPublic(TagBase):
     id: uuid.UUID
-    # The tasks carrying it that are not deleted: what the user can see, and
-    # what deleting the tag takes it off (FR-01.26).
+    # The live tasks carrying it — not deleted, not archived with their
+    # project: exactly what the task list filtered by the tag shows (FR-01.26).
     task_count: int = 0
+    # The tasks carrying it that are archived with their project. Not in the
+    # list, but deleting or merging the tag reaches them too.
+    archived_task_count: int = 0
 
 
 class TagsPublic(SQLModel):

@@ -139,6 +139,72 @@ def test_the_task_count_leaves_out_deleted_tasks(
     assert listed["work"]["task_count"] == 1
 
 
+def _archived_project_with_task(
+    client: TestClient, headers: Headers, tags: list[str]
+) -> str:
+    project_id = create_project(client, headers, "Old house")
+    root = _task(client, headers, tags, project_id=project_id)
+    # A subtask is archived with the project its root task resolves to.
+    _task(client, headers, tags, parent_id=root)
+    r = client.post(f"{API}/projects/{project_id}/archive", headers=headers)
+    assert r.status_code == 200, r.text
+    return project_id
+
+
+def test_the_count_matches_the_task_list_it_links_to(
+    client: TestClient, owner: Headers
+) -> None:
+    # The count is the live tasks — what the list behind it shows — and the
+    # tasks archived with their project are reported beside it, not in it.
+    _task(client, owner, ["home"])
+    project_id = _archived_project_with_task(client, owner, ["home"])
+
+    tag = _tags(client, owner)["home"]
+    listed = client.get(f"{API}/tasks/", headers=owner, params={"tag": "home"})
+    assert tag["task_count"] == listed.json()["count"] == 1
+    assert tag["archived_task_count"] == 2
+    one = client.get(f"{API}/tags/{tag['id']}", headers=owner).json()
+    assert (one["task_count"], one["archived_task_count"]) == (1, 2)
+
+    # Unarchiving counts them as live again.
+    client.post(f"{API}/projects/{project_id}/unarchive", headers=owner)
+    tag = _tags(client, owner)["home"]
+    listed = client.get(f"{API}/tasks/", headers=owner, params={"tag": "home"})
+    assert tag["task_count"] == listed.json()["count"] == 3
+    assert tag["archived_task_count"] == 0
+
+
+def test_a_bot_user_reads_the_same_counts_as_its_owner(
+    client: TestClient, owner: Headers
+) -> None:
+    live_project = create_project(client, owner, "Live")
+    _task(client, owner, ["home"], project_id=live_project)
+    _task(client, owner, ["home"])
+    _archived_project_with_task(client, owner, ["home"])
+    bot_headers = issue_bot_headers(
+        client, owner, project_ids=[live_project], permissions={"read_tasks": True}
+    )
+
+    as_owner = _tags(client, owner)["home"]
+    as_bot = _tags(client, bot_headers)["home"]
+    assert as_bot == as_owner
+    assert (as_bot["task_count"], as_bot["archived_task_count"]) == (2, 2)
+
+
+def test_deleting_a_tag_takes_it_off_archived_tasks_too(
+    client: TestClient, db: Session, owner: Headers
+) -> None:
+    _archived_project_with_task(client, owner, ["home"])
+    tag = _tags(client, owner)["home"]
+
+    assert _delete(client, owner, tag["id"]).status_code == 200
+
+    links = db.exec(select(TaskTag).where(TaskTag.tag_id == uuid.UUID(tag["id"]))).all()
+    assert links == []
+    archived = client.get(f"{API}/tasks/", headers=owner, params={"archived": True})
+    assert [task["tags"] for task in archived.json()["data"]] == [[], []]
+
+
 # --- Renaming -----------------------------------------------------------------
 
 
@@ -151,7 +217,12 @@ def test_renaming_a_tag_renames_it_on_every_task(
 
     r = _rename(client, owner, tag["id"], "housework")
     assert r.status_code == 200, r.text
-    assert r.json() == {"id": tag["id"], "name": "housework", "task_count": 2}
+    assert r.json() == {
+        "id": tag["id"],
+        "name": "housework",
+        "task_count": 2,
+        "archived_task_count": 0,
+    }
 
     assert _task_tags(client, owner, first) == ["housework", "work"]
     assert _task_tags(client, owner, second) == ["housework"]

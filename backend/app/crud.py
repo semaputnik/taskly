@@ -614,26 +614,34 @@ def get_tags(
         .limit(limit)
     )
     tags = session.exec(statement).all()
-    task_counts = get_tag_task_counts(session=session, tag_ids=[tag.id for tag in tags])
-    return [tag_public(tag, task_counts.get(tag.id, 0)) for tag in tags], count
+    return tag_publics(session=session, tags=tags), count
 
 
-def tag_public(tag: Tag, task_count: int = 0) -> TagPublic:
-    return TagPublic(id=tag.id, name=tag.name, task_count=task_count)
-
-
-def get_tag_task_counts(
-    *, session: Session, tag_ids: Sequence[uuid.UUID]
-) -> dict[uuid.UUID, int]:
+def tag_publics(*, session: Session, tags: Sequence[Tag]) -> list[TagPublic]:
     """
-    How many tasks carry each tag, keyed by tag id. A deleted task is not
-    counted: the user cannot see it, though deleting the tag takes it off that
-    task too.
+    Tags as the API reports them, with how many tasks carry each.
+
+    `task_count` is the live tasks carrying the tag — neither deleted nor
+    archived with their project — because that is exactly what the task list
+    filtered by the tag shows, and the count is read as a promise about that
+    list (semaputnik/taskly#85). The tasks archived with their project are
+    reported beside it rather than dropped: deleting or merging the tag still
+    reaches them, and those confirmations have to say so.
+
+    The counts are the owner's whoever asks, a bot user included, so one tag
+    never means two things (ADR-0003).
     """
-    if not tag_ids:
-        return {}
+    if not tags:
+        return []
+    owner_id = tags[0].owner_id
+    tag_ids = [tag.id for tag in tags]
+    archived = col(Task.id).in_(archived_task_ids(owner_id))
     rows = session.exec(
-        select(TaskTag.tag_id, func.count())
+        select(
+            TaskTag.tag_id,
+            func.count().filter(~archived),
+            func.count().filter(archived),
+        )
         .where(
             col(TaskTag.tag_id).in_(tag_ids),
             TaskTag.task_id == Task.id,
@@ -641,7 +649,16 @@ def get_tag_task_counts(
         )
         .group_by(col(TaskTag.tag_id))
     ).all()
-    return dict(rows)
+    counts = {tag_id: (live, archived_count) for tag_id, live, archived_count in rows}
+    return [
+        TagPublic(
+            id=tag.id,
+            name=tag.name,
+            task_count=counts.get(tag.id, (0, 0))[0],
+            archived_task_count=counts.get(tag.id, (0, 0))[1],
+        )
+        for tag in tags
+    ]
 
 
 def get_tag_by_name(*, session: Session, owner_id: uuid.UUID, name: str) -> Tag | None:

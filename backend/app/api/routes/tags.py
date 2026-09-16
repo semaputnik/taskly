@@ -51,12 +51,12 @@ def read_tags(
 
     A bot user reads its owner's whole vocabulary, counts included, whatever
     its scope: tags belong to the user rather than to a project, so a scope
-    has nothing to narrow them by (ADR-0003). The counts include tasks in
-    archived projects, for the same reason they include tasks outside the
-    scope: the count is the owner's, and narrowing it per caller would make
-    one tag mean two different things — which is the split ADR-0003 refused.
-    The archive still holds: FR-05.13 is about reaching those tasks, and none
-    of them is reachable from here.
+    has nothing to narrow them by (ADR-0003). The counts are the owner's for
+    every caller — narrowing them per caller would make one tag mean two
+    different things, which is the split ADR-0003 refused. `task_count` is
+    the live tasks, as the task list filtered by the tag shows them;
+    `archived_task_count` is those archived with their project, which are
+    counted but not reachable from here (FR-05.13).
     """
     tags, count = crud.get_tags(
         session=session, owner_id=caller.owner_id, q=q, skip=skip, limit=limit
@@ -72,8 +72,7 @@ def read_tag(*, session: SessionDep, caller: CallerDep, tag_id: uuid.UUID) -> An
     exclude.
     """
     tag = _get_owned_tag(session, caller.owner_id, tag_id)
-    task_counts = crud.get_tag_task_counts(session=session, tag_ids=[tag.id])
-    return crud.tag_public(tag, task_counts.get(tag.id, 0))
+    return crud.tag_publics(session=session, tags=[tag])[0]
 
 
 @router.post("/", response_model=TagPublic)
@@ -87,7 +86,7 @@ def create_tag(*, session: SessionDep, caller: CallerDep, tag_in: TagCreate) -> 
     authorization.authorize_tag_creation(caller)
     _refuse_taken_name(session, caller.owner_id, tag_in.name)
     tag = crud.create_tag(session=session, owner_id=caller.owner_id, name=tag_in.name)
-    return crud.tag_public(tag)
+    return crud.tag_publics(session=session, tags=[tag])[0]
 
 
 @router.patch("/{tag_id}", response_model=TagPublic)
@@ -107,8 +106,7 @@ def rename_tag(
     if tag_in.name != tag.name:
         _refuse_taken_name(session, current_user.id, tag_in.name)
         tag = crud.rename_tag(session=session, tag=tag, name=tag_in.name)
-    task_counts = crud.get_tag_task_counts(session=session, tag_ids=[tag.id])
-    return crud.tag_public(tag, task_counts.get(tag.id, 0))
+    return crud.tag_publics(session=session, tags=[tag])[0]
 
 
 @router.delete("/{tag_id}")

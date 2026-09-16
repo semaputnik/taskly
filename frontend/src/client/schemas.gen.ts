@@ -1071,6 +1071,11 @@ export const TagPublicSchema = {
             type: 'integer',
             title: 'Task Count',
             default: 0
+        },
+        archived_task_count: {
+            type: 'integer',
+            title: 'Archived Task Count',
+            default: 0
         }
     },
     type: 'object',
