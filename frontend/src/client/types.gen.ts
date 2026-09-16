@@ -673,7 +673,7 @@ export type TagMerge = {
  * TagMergePreview
  *
  * What a merge would move: the tasks carrying any of the sources, each
- * counted once, live and archived apart (semaputnik/taskly#69).
+ * counted once, live and archived apart (FR-01.27).
  */
 export type TagMergePreview = {
     /**

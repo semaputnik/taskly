@@ -1148,7 +1148,7 @@ export const TagMergePreviewSchema = {
         'archived_task_count'
     ],
     title: 'TagMergePreview',
-    description: 'What a merge would move: the tasks carrying any of the sources, each\ncounted once, live and archived apart (semaputnik/taskly#69).'
+    description: 'What a merge would move: the tasks carrying any of the sources, each\ncounted once, live and archived apart (FR-01.27).'
 } as const;
 
 export const TagPublicSchema = {
