@@ -360,9 +360,15 @@ test("A refused rename keeps the name that was typed", async ({ page }) => {
   await name.fill("errands")
   await name.press("Enter")
 
-  // The API refuses a name already in use, and says so; the typed name stays
-  // where the reader left it rather than snapping back.
+  // The API refuses a name already in use, and says so. Putting the two
+  // together is offered as a merge of its own, which the reader declines.
   await expect(page.getByText("You already have a tag named")).toBeVisible()
+  const offer = page.getByRole("dialog", { name: "Merge into errands?" })
+  await expect(offer).toBeVisible()
+  await offer.getByRole("button", { name: "Cancel" }).click()
+  await expect(offer).toBeHidden()
+
+  // The typed name stays where the reader left it rather than snapping back.
   await expect(name).toHaveValue("errands")
 
   // And nothing was renamed behind it.
