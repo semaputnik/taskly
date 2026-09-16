@@ -31,20 +31,27 @@ test("A task is assigned to a bot user from the task form and found by it", asyn
   expect(created.ok()).toBe(true)
 
   await page.goto("/tasks")
+  // Captured in one field, then assigned in the panel that capture leaves
+  // open — the same controls that edit a task any other day.
   await page.getByRole("button", { name: "Add Task" }).click()
-  await page.getByPlaceholder("Task title").fill("Sort the inbox")
-  await page
-    .getByRole("dialog")
-    .getByRole("combobox", { name: "Assignee" })
-    .click()
+  const title = page.getByRole("textbox", { name: "Task title" })
+  await title.fill("Sort the inbox")
+  await title.press("Enter")
+  const panel = page.getByRole("dialog", { name: "Sort the inbox" })
+  await panel.getByRole("combobox", { name: "Assignee" }).click()
   await page.getByRole("option", { name: "Triage bot" }).click()
-  await page.getByRole("button", { name: "Save" }).click()
-  await expect(page.getByText("Task created successfully")).toBeVisible()
+  await expect(panel.getByRole("combobox", { name: "Assignee" })).toContainText(
+    "Triage bot",
+  )
+  await page.keyboard.press("Escape")
 
   await page.getByRole("button", { name: "Add Task" }).click()
-  await page.getByPlaceholder("Task title").fill("Call the bank")
-  await page.getByRole("button", { name: "Save" }).click()
-  await expect(page.getByText("Task created successfully").last()).toBeVisible()
+  await title.fill("Call the bank")
+  await title.press("Enter")
+  await expect(
+    page.getByRole("dialog", { name: "Call the bank" }),
+  ).toBeVisible()
+  await page.keyboard.press("Escape")
   await expect(page.getByRole("row", { name: /Call the bank/ })).toBeVisible()
 
   await page.getByRole("button", { name: "Filters" }).click()

@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { ChevronRight } from "lucide-react"
 
 import { ProjectsService, type TaskPublic, TasksService } from "@/client"
@@ -12,9 +12,10 @@ import {
 } from "@/components/ui/sheet"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import AddTask from "./AddTask"
 import { CompleteTask } from "./CompleteTask"
+import { CaptureField, type CaptureTarget, useTaskCapture } from "./capture"
 import DeleteTask from "./DeleteTask"
+import { NewTask } from "./NewTask"
 import { TaskAttachments } from "./TaskAttachments"
 import { TaskComments } from "./TaskComments"
 import { TaskProperties } from "./TaskProperties"
@@ -22,9 +23,18 @@ import { TaskProperties } from "./TaskProperties"
 interface TaskDetailProps {
   /** The task to show, or null for a closed panel. */
   taskId: string | null
+  /** Open on a task that does not exist yet, ready to capture one. */
+  capturing?: boolean
+  /** Where a captured task lands, named on screen before it is created. */
+  captureTarget?: CaptureTarget
   onClose: () => void
   /** Move the panel to another task without closing it. */
   onOpenTask: (taskId: string) => void
+  /**
+   * A task has just been captured. `stay` is set when the reader asked to keep
+   * capturing, so the panel holds still instead of moving onto the record.
+   */
+  onCaptured?: (taskId: string, stay: boolean) => void
 }
 
 /**
@@ -37,8 +47,18 @@ interface TaskDetailProps {
  * entry or the dashboard can link straight to a task rather than dropping the
  * reader on the unfiltered list.
  */
-export function TaskDetail({ taskId, onClose, onOpenTask }: TaskDetailProps) {
-  const isOpen = Boolean(taskId)
+export function TaskDetail({
+  taskId,
+  capturing = false,
+  captureTarget,
+  onClose,
+  onOpenTask,
+  onCaptured,
+}: TaskDetailProps) {
+  // Capture is the panel one step earlier, so it opens the same surface. The
+  // record itself is only fetched once there is one.
+  const isCapturing = capturing && !taskId
+  const isOpen = Boolean(taskId) || capturing
 
   // Fetched by id rather than read out of the table: a link may point at a
   // task the current filters exclude, and it must still open.
@@ -47,7 +67,7 @@ export function TaskDetail({ taskId, onClose, onOpenTask }: TaskDetailProps) {
     queryFn: async () =>
       (await TasksService.readTask({ path: { task_id: taskId as string } }))
         .data,
-    enabled: isOpen,
+    enabled: Boolean(taskId),
   })
 
   const { data: projects } = useQuery({
@@ -55,7 +75,7 @@ export function TaskDetail({ taskId, onClose, onOpenTask }: TaskDetailProps) {
     queryFn: async () =>
       (await ProjectsService.readProjects({ query: { skip: 0, limit: 100 } }))
         .data,
-    enabled: isOpen,
+    enabled: Boolean(taskId),
   })
   // Subtasks are not a nested field, so the panel finds this task's children
   // in the list.
@@ -63,7 +83,7 @@ export function TaskDetail({ taskId, onClose, onOpenTask }: TaskDetailProps) {
     queryKey: ["tasks", { skip: 0, limit: 200 }],
     queryFn: async () =>
       (await TasksService.readTasks({ query: { skip: 0, limit: 200 } })).data,
-    enabled: isOpen,
+    enabled: Boolean(taskId),
   })
 
   const projectName = task
@@ -82,7 +102,14 @@ export function TaskDetail({ taskId, onClose, onOpenTask }: TaskDetailProps) {
         side="right"
         className="w-full gap-0 overflow-y-auto p-0 sm:max-w-xl"
       >
-        {isPending || !task ? (
+        {isCapturing && captureTarget ? (
+          <NewTask
+            target={captureTarget}
+            onCreated={(created, stay) => onCaptured?.(created.id, stay)}
+          />
+        ) : !taskId ? // On the way out: the panel still animates, but there is no record
+        // left to draw and a skeleton would read as one loading.
+        null : isPending || !task ? (
           <div className="flex flex-col gap-4 p-6">
             <Skeleton className="h-4 w-24" />
             <Skeleton className="h-7 w-3/4" />
@@ -177,10 +204,10 @@ export function TaskDetail({ taskId, onClose, onOpenTask }: TaskDetailProps) {
                   </p>
                 )}
                 {/* Adding a subtask belongs with the subtasks, not in a menu
-                    somewhere else on the panel. */}
-                <div>
-                  <AddTask parent={task} />
-                </div>
+                    somewhere else on the panel — and it is the same one-field
+                    capture as anywhere else, because a subtask is a full task
+                    rather than a checklist item. */}
+                <SubtaskCapture parent={task} />
               </TabsContent>
 
               <TabsContent value="files">
@@ -191,5 +218,39 @@ export function TaskDetail({ taskId, onClose, onOpenTask }: TaskDetailProps) {
         )}
       </SheetContent>
     </Sheet>
+  )
+}
+
+/**
+ * One-field capture for a child of the open task.
+ *
+ * It sits beneath the subtasks, where the reader already is when they decide
+ * to add one, and it leaves them there: the child appears in the list above
+ * and the parent stays open. The child holds no project of its own — it
+ * belongs to the project of its root task (FR-02.4).
+ */
+function SubtaskCapture({ parent }: { parent: TaskPublic }) {
+  const queryClient = useQueryClient()
+  const capture = useTaskCapture(
+    { parentId: parent.id, projectName: "Follows its parent task" },
+    () => {
+      // The panel finds its children in the task list, so that is what has to
+      // catch up; the reader is not moved onto the child.
+      queryClient.invalidateQueries({ queryKey: ["tasks"] })
+    },
+  )
+
+  return (
+    <>
+      <CaptureField
+        staysOpen
+        label="Subtask title"
+        placeholder="Add a subtask"
+        onCommit={capture.create}
+      />
+      <output aria-live="polite" className="sr-only">
+        {capture.announcement}
+      </output>
+    </>
   )
 }
