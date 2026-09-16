@@ -11,7 +11,7 @@ import {
 import { cn } from "@/lib/utils"
 
 // The form's values: nobody, the user, or a bot user's id as it is.
-export const UNASSIGNED = "unassigned"
+const UNASSIGNED = "unassigned"
 export const ASSIGNED_TO_ME = "me"
 
 /** What the form starts from for a task. */

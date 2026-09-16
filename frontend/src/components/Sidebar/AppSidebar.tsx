@@ -7,13 +7,15 @@ import {
   History,
   Home,
   type LucideIcon,
+  Plus,
   Settings,
   Tag,
   Users,
 } from "lucide-react"
 
 import { SidebarAppearance } from "@/components/Common/Appearance"
-import AddTask from "@/components/Tasks/AddTask"
+import { useCapture } from "@/components/Tasks/capture"
+import { Button } from "@/components/ui/button"
 import {
   Sidebar,
   SidebarContent,
@@ -91,6 +93,43 @@ function IconAction({
   )
 }
 
+/**
+ * The app's primary action: start capture.
+ *
+ * It opens the task's own panel rather than a form — writing a task down is
+ * one field, and everything else about it is set in the panel afterwards. The
+ * label says the intent, which has not changed.
+ */
+function CaptureAction() {
+  const { isMobile, setOpenMobile } = useSidebar()
+  const { start } = useCapture()
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          aria-label="Add Task"
+          onClick={() => {
+            if (isMobile) setOpenMobile(false)
+            start()
+          }}
+          // px-2 lines the plus up with the navigation icons below, so
+          // collapsing the sidebar leaves the column where it was.
+          className="w-full justify-start px-2! group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0!"
+        >
+          <Plus />
+          <span className="group-data-[collapsible=icon]:hidden">Add Task</span>
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent side="right" align="center" className="flex gap-2">
+        Add Task
+        {/* The key is only discoverable where the action is. */}
+        <kbd className="text-primary-foreground/70 font-sans">C</kbd>
+      </TooltipContent>
+    </Tooltip>
+  )
+}
+
 export function AppSidebar() {
   const { user: currentUser } = useAuth()
   const { open } = useSidebar()
@@ -114,7 +153,7 @@ export function AppSidebar() {
             </TooltipContent>
           </Tooltip>
         </div>
-        <AddTask trigger="sidebar" />
+        <CaptureAction />
       </SidebarHeader>
       <SidebarContent>
         <Main items={items} />

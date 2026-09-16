@@ -524,8 +524,9 @@ The signature component of the system.
   so the rail still answers "whose account is this".
 
 ### Dialogs
-The system's only heavy surface, and its standard form for create, edit, and
-confirm.
+The system's only heavy surface. It confirms, and it edits the records that
+have no panel of their own; it never creates a task, which is what capture is
+for.
 - Centred, `max-w-lg` (32rem) capped at `calc(100% - 2rem)`, 0.625rem radius,
   1.5rem padding, 1rem gaps, float shadow over a 50% black scrim.
 - Enter and exit both animate: fade plus a 95%→100% zoom over 200ms.
@@ -607,11 +608,33 @@ return 200. The panel fetches by id rather than reading the loaded table, so a
 link still opens a record the current filters exclude.
 
 **The Stay-Put Rule.** Opening a record never moves the reader to another
-screen. Every surface that lists tasks carries the panel's parameter and
-renders the panel itself, so the dashboard and the activity log open a task
-over themselves — a link out of a long log must not cost the reader their place
-in it. Links between records therefore target the current route, not a fixed
-one.
+screen. The panel and its parameter belong to the app shell rather than to any
+one screen, so the dashboard, the activity log and the project list all open a
+task over themselves — a link out of a long log must not cost the reader their
+place in it. Links between records therefore target the current route, not a
+fixed one.
+
+**Capture is the panel.** A task is created in the same surface it is read in,
+one step earlier: the panel opens in a new-record state with one field — the
+title — focused, and the project the task will land in named beside it. There
+is no create form, because a form would be a second model of a record the panel
+already edits, and the reader would have to learn both.
+
+- **Nothing is written until a title is committed.** Opening capture sends no
+  request: an empty record would reach the activity log, the REST API a bot
+  user reads, and the list, for the cost of an accidental keystroke. Enter
+  commits; the modifier chord commits and holds capture open for the next
+  thought, so a burst of them costs one gesture each.
+- **Escape before the commit cancels silently** — no request, no record, no
+  toast. After it, the task exists and dismissal only closes the panel:
+  deleting is the corner control, never a side effect of leaving.
+- **The rest of the record waits for the record.** The new-record state carries
+  the title and the destination project, and the properties appear the moment
+  there is something to hang them on. Controls that quietly buffer their values
+  would be a form with its Save button hidden.
+- **One key opens capture from anywhere** in the authenticated app. It stands
+  down while a field is being typed into or a dialog, panel or menu is open, so
+  it never eats a keystroke meant for something else.
 
 **Keep view state out of the query.** The open panel is view state, not a
 filter, so it must be stripped before the search object becomes an API query.

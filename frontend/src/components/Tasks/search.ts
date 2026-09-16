@@ -7,21 +7,22 @@ import { z } from "zod"
  * breaking the page: an unusable value simply drops its filter.
  */
 /**
- * The task whose detail panel is open.
+ * The task whose detail panel is open, and whether capture is open.
  *
- * It lives in the URL so the panel can be linked to and so Back closes it, and
- * every screen that lists tasks carries it — a reader who opens a task from
- * the dashboard or the activity log stays where they were, rather than being
- * moved to the task list to read one record.
+ * They live in the URL so the panel can be linked to and so Back closes it,
+ * and they are validated by the layout rather than by each screen: the panel
+ * is mounted once for the whole app, so every route carries them and a reader
+ * who opens a task from the dashboard or the activity log stays where they
+ * were.
  */
-export const openTaskSchema = {
+export const panelSearchSchema = z.object({
   task: z.string().uuid().optional().catch(undefined),
-}
-
-export type OpenTaskSearch = { task?: string }
+  // Capture: the panel opened on a record that does not exist yet. It is view
+  // state like the open task, so it travels the same way and Back cancels it.
+  capture: z.literal(true).optional().catch(undefined),
+})
 
 export const taskSearchSchema = z.object({
-  ...openTaskSchema,
   project_id: z.string().optional().catch(undefined),
   // "me", "unassigned", or the id of one of the user's bot users.
   assignee: z
@@ -39,6 +40,12 @@ export const taskSearchSchema = z.object({
 })
 
 export type TaskSearch = z.infer<typeof taskSearchSchema>
+
+/**
+ * What the task list actually receives: its own filters plus the panel's view
+ * state, which the layout validates for every screen.
+ */
+export type TaskListSearch = TaskSearch & z.infer<typeof panelSearchSchema>
 
 /**
  * The fields that narrow the list, as opposed to the ones that order it.

@@ -1,18 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router"
-import { z } from "zod"
 
 import { NeedsYou } from "@/components/Dashboard/NeedsYou"
 import { WhileYouWereAway } from "@/components/Dashboard/WhileYouWereAway"
 import { partOfDay } from "@/components/Dashboard/when"
-import { openTaskSchema } from "@/components/Tasks/search"
-import { TaskDetail } from "@/components/Tasks/TaskDetail"
 import useAuth from "@/hooks/useAuth"
 
 export const Route = createFileRoute("/_layout/")({
   component: Dashboard,
-  // The dashboard opens tasks in place, so it carries the panel's parameter
-  // too: reading one task should not cost the reader this screen.
-  validateSearch: z.object(openTaskSchema),
   head: () => ({
     meta: [
       {
@@ -33,19 +27,9 @@ function greetingName(fullName?: string | null, email?: string): string {
 
 function Dashboard() {
   const { user: currentUser } = useAuth()
-  const { task } = Route.useSearch()
-  const navigate = Route.useNavigate()
-  const openTask = (next: string | undefined) =>
-    navigate({ search: { task: next } })
 
   return (
     <div className="flex flex-col gap-6">
-      <TaskDetail
-        taskId={task ?? null}
-        onClose={() => openTask(undefined)}
-        onOpenTask={openTask}
-      />
-
       <div>
         <h1 className="text-2xl font-bold tracking-tight">
           Good {partOfDay()},{" "}

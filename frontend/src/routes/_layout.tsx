@@ -1,6 +1,8 @@
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router"
 
 import AppSidebar from "@/components/Sidebar/AppSidebar"
+import { panelSearchSchema } from "@/components/Tasks/search"
+import { TaskPanel } from "@/components/Tasks/TaskPanel"
 import {
   SidebarInset,
   SidebarProvider,
@@ -10,6 +12,9 @@ import { isLoggedIn } from "@/hooks/useAuth"
 
 export const Route = createFileRoute("/_layout")({
   component: Layout,
+  // The panel and capture are validated here, so every authenticated screen
+  // carries them (The Stay-Put Rule).
+  validateSearch: panelSearchSchema,
   beforeLoad: async () => {
     if (!isLoggedIn()) {
       throw redirect({
@@ -36,6 +41,9 @@ function Layout() {
           </div>
         </main>
       </SidebarInset>
+      {/* Mounted once: a record opens over whatever screen the reader is on,
+          and capture starts from any of them. */}
+      <TaskPanel />
     </SidebarProvider>
   )
 }

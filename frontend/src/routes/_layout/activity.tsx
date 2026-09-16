@@ -6,8 +6,6 @@ import { type ActivityEntryPublic, ActivityService } from "@/client"
 import { ActivityDescription } from "@/components/Activity/ActivityDescription"
 import { ActorLabel } from "@/components/Activity/ActorLabel"
 import { RestoreDeletion } from "@/components/Activity/RestoreDeletion"
-import { openTaskSchema } from "@/components/Tasks/search"
-import { TaskDetail } from "@/components/Tasks/TaskDetail"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
@@ -24,8 +22,6 @@ const PAGE_SIZE = 50
 
 const activitySearchSchema = z.object({
   page: z.number().int().min(1).optional().catch(undefined),
-  // The log opens a task in place, so paging state survives reading one.
-  ...openTaskSchema,
 })
 
 export const Route = createFileRoute("/_layout/activity")({
@@ -99,10 +95,8 @@ function PendingRows() {
  * entries: the API offers no way to ask for anyone else's (FR-10.7).
  */
 function Activity() {
-  const { page = 1, task } = Route.useSearch()
+  const { page = 1 } = Route.useSearch()
   const navigate = Route.useNavigate()
-  const openTask = (next: string | undefined) =>
-    navigate({ search: (previous) => ({ ...previous, task: next }) })
   const { user: currentUser } = useAuth()
 
   const query = { skip: (page - 1) * PAGE_SIZE, limit: PAGE_SIZE }
@@ -124,11 +118,6 @@ function Activity() {
 
   return (
     <div className="flex flex-col gap-6">
-      <TaskDetail
-        taskId={task ?? null}
-        onClose={() => openTask(undefined)}
-        onOpenTask={openTask}
-      />
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Activity</h1>
         <p className="text-muted-foreground">

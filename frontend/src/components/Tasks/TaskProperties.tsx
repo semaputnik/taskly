@@ -48,7 +48,12 @@ const NO_PRIORITY = "none"
 const ghost =
   "border-transparent bg-transparent shadow-none hover:bg-accent focus-visible:border-ring dark:bg-transparent dark:hover:bg-accent/50"
 
-function Row({
+/**
+ * One property: an icon and its label in a fixed column, the value beside it.
+ * The panel before the record exists lays its own rows out with this, so a
+ * property sits in the same place whether or not the task is saved yet.
+ */
+export function Row({
   icon: Icon,
   label,
   htmlFor,

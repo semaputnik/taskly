@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { LoadingButton } from "@/components/ui/loading-button"
+import { Textarea } from "@/components/ui/textarea"
 import useCustomToast from "@/hooks/useCustomToast"
 import { handleError } from "@/utils"
 
@@ -130,7 +131,7 @@ const EditProject = ({ project, onSuccess }: EditProjectProps) => {
                   <FormItem>
                     <FormLabel>Description</FormLabel>
                     <FormControl>
-                      <Input placeholder="Description" type="text" {...field} />
+                      <Textarea placeholder="Description" rows={3} {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

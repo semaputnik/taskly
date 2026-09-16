@@ -15,9 +15,13 @@ test("A user's own changes appear on the Activity page, newest first", async ({
 
   await page.goto("/tasks")
   await page.getByRole("button", { name: "Add Task" }).click()
-  await page.getByPlaceholder("Task title").fill("Renew the passport")
-  await page.getByRole("button", { name: "Save" }).click()
-  await expect(page.getByText("Task created successfully")).toBeVisible()
+  const title = page.getByRole("textbox", { name: "Task title" })
+  await title.fill("Renew the passport")
+  await title.press("Enter")
+  await expect(
+    page.getByRole("dialog", { name: "Renew the passport" }),
+  ).toBeVisible()
+  await page.keyboard.press("Escape")
 
   await page
     .getByRole("row", { name: /Renew the passport/ })
@@ -55,9 +59,13 @@ test("A deleted task can be restored from the Activity page", async ({
 
   await page.goto("/tasks")
   await page.getByRole("button", { name: "Add Task" }).click()
-  await page.getByPlaceholder("Task title").fill("Cancel the gym")
-  await page.getByRole("button", { name: "Save" }).click()
-  await expect(page.getByText("Task created successfully")).toBeVisible()
+  const title = page.getByRole("textbox", { name: "Task title" })
+  await title.fill("Cancel the gym")
+  await title.press("Enter")
+  await expect(
+    page.getByRole("dialog", { name: "Cancel the gym" }),
+  ).toBeVisible()
+  await page.keyboard.press("Escape")
 
   const taskRow = page.getByRole("row", { name: /Cancel the gym/ })
   await taskRow.getByText("Cancel the gym").click()

@@ -7,24 +7,25 @@ import { ProjectsService, TasksService } from "@/client"
 import { DataTable } from "@/components/Common/DataTable"
 import { EmptyState } from "@/components/Common/EmptyState"
 import PendingTasks from "@/components/Pending/PendingTasks"
+import { useCapture } from "@/components/Tasks/capture"
 import { getColumns } from "@/components/Tasks/columns"
 import {
   clearedFilters,
   hasActiveFilters,
+  type TaskListSearch,
   type TaskSearch,
   taskSearchSchema,
 } from "@/components/Tasks/search"
-import { TaskDetail } from "@/components/Tasks/TaskDetail"
 import { TaskFilters } from "@/components/Tasks/TaskFilters"
 import { buildTaskTree } from "@/components/Tasks/tree"
 import { Button } from "@/components/ui/button"
 import useAuth from "@/hooks/useAuth"
 
-function getTasksQueryOptions(search: TaskSearch, currentUserId?: string) {
-  // `task` names the panel that is open, not a filter. Leaving it in would put
-  // it in the query key, so opening a task would refetch the list and drop the
-  // whole table back to its skeleton.
-  const { assignee, task: _open, ...filters } = search
+function getTasksQueryOptions(search: TaskListSearch, currentUserId?: string) {
+  // `task` and `capture` name the panel's state, not a filter. Leaving them in
+  // would put them in the query key, so opening a task would refetch the list
+  // and drop the whole table back to its skeleton.
+  const { assignee, task: _open, capture: _capturing, ...filters } = search
   const query = {
     ...filters,
     // "Me" needs the id the API filters on, a bot user is named by its own
@@ -71,11 +72,13 @@ function TasksTableContent({
   currentUserId,
   onClearFilters,
   onOpenTask,
+  onCapture,
 }: {
-  search: TaskSearch
+  search: TaskListSearch
   currentUserId?: string
   onClearFilters: () => void
   onOpenTask: (taskId: string) => void
+  onCapture: () => void
 }) {
   const { data: tasks } = useSuspenseQuery(
     getTasksQueryOptions(search, currentUserId),
@@ -113,11 +116,14 @@ function TasksTableContent({
           <EmptyState
             icon={CheckSquare}
             title="No tasks yet"
-            description="Add the first one from the sidebar — or let a bot user file them for you through the REST API."
+            description="Writing one down takes a title — or let a bot user file them for you through the REST API."
             action={
-              <Button variant="outline" asChild>
-                <RouterLink to="/bots">Set up a bot user</RouterLink>
-              </Button>
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                <Button onClick={onCapture}>Add a task</Button>
+                <Button variant="outline" asChild>
+                  <RouterLink to="/bots">Set up a bot user</RouterLink>
+                </Button>
+              </div>
             }
           />
         )
@@ -130,10 +136,12 @@ function TasksTable({
   search,
   onClearFilters,
   onOpenTask,
+  onCapture,
 }: {
-  search: TaskSearch
+  search: TaskListSearch
   onClearFilters: () => void
   onOpenTask: (taskId: string) => void
+  onCapture: () => void
 }) {
   const { user: currentUser } = useAuth()
 
@@ -150,6 +158,7 @@ function TasksTable({
         currentUserId={currentUser?.id}
         onClearFilters={onClearFilters}
         onOpenTask={onOpenTask}
+        onCapture={onCapture}
       />
     </Suspense>
   )
@@ -158,18 +167,12 @@ function TasksTable({
 function Tasks() {
   const search = Route.useSearch()
   const navigate = Route.useNavigate()
+  const { start, openTask } = useCapture()
   const applyFilters = (next: Partial<TaskSearch>) =>
     navigate({ search: (previous) => ({ ...previous, ...next }) })
-  const openTask = (task: string | undefined) =>
-    navigate({ search: (previous) => ({ ...previous, task }) })
 
   return (
     <div className="flex flex-col gap-6">
-      <TaskDetail
-        taskId={search.task ?? null}
-        onClose={() => openTask(undefined)}
-        onOpenTask={openTask}
-      />
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Tasks</h1>
         <p className="text-muted-foreground">Everything you need to get done</p>
@@ -179,6 +182,7 @@ function Tasks() {
         search={search}
         onClearFilters={() => applyFilters(clearedFilters())}
         onOpenTask={openTask}
+        onCapture={start}
       />
     </div>
   )
