@@ -14,9 +14,7 @@ const PendingProjects = () => (
       <TableRow>
         <TableHead>Name</TableHead>
         <TableHead>Description</TableHead>
-        <TableHead>
-          <span className="sr-only">Actions</span>
-        </TableHead>
+        <TableHead>Tasks</TableHead>
       </TableRow>
     </TableHeader>
     <TableBody>
@@ -29,9 +27,7 @@ const PendingProjects = () => (
             <Skeleton className="h-4 w-48" />
           </TableCell>
           <TableCell>
-            <div className="flex justify-end">
-              <Skeleton className="size-8 rounded-md" />
-            </div>
+            <Skeleton className="h-4 w-8" />
           </TableCell>
         </TableRow>
       ))}

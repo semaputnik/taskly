@@ -461,7 +461,13 @@ The signature component of the system.
   in Ink Muted. Header rows do not respond to hover.
 - **Rows:** 1px hairline bottom border, dropped on the last row; hover fills with
   Surface Quiet at 50% alpha, transitioning colour only. Cells are 0.75rem ×
-  1rem, `whitespace-nowrap`, vertically centred.
+  1rem, `whitespace-nowrap`, vertically centred. A row that opens a record is a
+  control: it takes focus, answers Enter and Space, shows the focus ring, and
+  carries an accessible name saying what it opens ("Open Kitchen rebuild"). It
+  stays a `row` for assistive technology — a button's role would take the
+  table's structure away from the readers who depend on it.
+- **No action column.** A row carries no menu and no buttons: it opens the
+  record, and everything the record can do lives in its panel.
 - **Content conventions:** the subject column is 500 weight; every supporting
   column is Ink Muted; a completed task's title takes `line-through` plus Ink
   Muted; absent values ("No due date", "No tags") are italic Ink Muted rather
@@ -552,13 +558,17 @@ rather than a table.
   keeps its label when it has nothing to show.
 
 ### Detail panel
-A record's one address, opened by clicking its row. A right-hand `Sheet` at
-`max-w-xl` over the standard scrim, scrolling as one column:
-- **Header:** the breadcrumb that locates it (project, then parent where there
-  is one), the completion control, the title at 1.25rem/600, and the actions
-  menu. Bordered off from the body.
-- **Properties:** an `8rem` label column of Ink Muted text with a 1rem icon, and
-  the value beside it, baseline-aligned. Rows are separated by hairlines and
+A record's one address, opened by clicking its row — the same surface for every
+record type the product has: tasks, projects, tags and bot users. A right-hand
+`Sheet` at `max-w-xl` over the standard scrim, scrolling as one column:
+- **Header:** the breadcrumb that locates it (the record's type, and the
+  project and parent where there are any), the completion control, and the
+  record's name at 1.25rem/600 — as the control that renames it, where it can
+  be renamed. Bordered off from the body.
+- **Properties:** a label column of Ink Muted text with a 1rem icon, and the
+  value beside it, baseline-aligned. The column is `8rem` from `md` and
+  proportional below it, so a phone does not spend a third of its width on
+  labels. Rows are separated by hairlines and
   every value starts on the same line, whatever its type — text, badge, chip
   row. An unset value reads *Not set* in italic Ink Muted, never blank. The
   record's own history belongs here too: when it was created is a property, not
@@ -578,7 +588,7 @@ the panel *is* the editor. Reading something must never mean opening four
 dialogs in turn, and changing a field must never mean opening a form that
 restates the record you are already looking at.
 
-**No overflow menu.** There is no `⋮` anywhere on a record. A menu is what a
+**No overflow menu.** There is no `⋮` anywhere in the product. A menu is what a
 surface reaches for when it has not decided where its actions belong, and every
 action here has a home: a field is changed in the field, a subtask is added
 from the Subtasks tab beneath the subtasks, and delete — the one act with no
@@ -592,15 +602,24 @@ nothing to forget to press and nothing to discard; Escape returns a text field
 to its stored value. Success is silent — the value on screen is the receipt —
 and only a failure raises a toast.
 
-**Controls rest flat.** A property list rendered as seven bordered inputs reads
-as a form to fill in; this is a record to read that happens to be editable. Each
-control drops its border and shadow at rest and takes `bg-accent` on hover, with
-the focus ring on `:focus-visible` as everywhere else. Fields the record cannot
-own — a subtask's project and schedule, which follow its parent — render as
+**Controls rest flat, except where nothing can hover.** A property list rendered
+as seven bordered inputs reads as a form to fill in; this is a record to read
+that happens to be editable. Each control drops its border and shadow at rest
+and takes `bg-accent` on hover, with the focus ring on `:focus-visible` as
+everywhere else. Fields the record cannot own — a subtask's project and
+schedule, which follow its parent; the Inbox's name, which is fixed — render as
 Ink Muted prose saying so, not as a disabled control.
 
-**The Real Address Rule.** The open panel lives in the URL (`?task=<id>`), so
-it can be linked to and Back closes it. Every reference to a record anywhere in
+Hover is a pointer's affordance and a thumb has none, so under
+`@media (pointer: coarse)` the affordance stops being conditional: every
+editable control (`.record-control`) keeps a quiet border and fill at rest, and
+a read-only value carries neither. On a touch screen what can be changed is
+visible without trying it.
+
+**The Real Address Rule.** The open panel lives in the URL — `?task=<id>`,
+`?project=<id>`, `?tag_id=<id>`, `?bot=<id>` — so it can be linked to and Back
+closes it. One record is open at a time: opening any of them clears the rest
+rather than stacking sheets. Every reference to a record anywhere in
 the product — an activity entry, a dashboard row, a breadcrumb — links to that
 record, never to the list it lives in. Dropping the reader on an unfiltered
 table and leaving them to find the thing again is a broken link that happens to

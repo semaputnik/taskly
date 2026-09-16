@@ -6,12 +6,11 @@ import {
   Clock,
   Flag,
   FolderKanban,
-  type LucideIcon,
   Repeat,
   Tag,
   User as UserIcon,
 } from "lucide-react"
-import { useEffect, useId, useState } from "react"
+import { useId } from "react"
 
 import {
   ProjectsService,
@@ -19,6 +18,13 @@ import {
   type TaskPublic,
   type TaskUpdate,
 } from "@/client"
+import {
+  EditableText,
+  ghost,
+  PropertyList,
+  PropertyRow,
+  ReadOnlyValue,
+} from "@/components/Records/RecordPanel"
 import { Input } from "@/components/ui/input"
 import {
   Select,
@@ -27,126 +33,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Textarea } from "@/components/ui/textarea"
 import useAuth from "@/hooks/useAuth"
 import { cn } from "@/lib/utils"
 import { AssigneeSelect, assigneeFormValue, toAssigneeId } from "./assignee"
-import { CompleteTask } from "./CompleteTask"
 import { DueDateScopeDialog, NO_RECURRENCE } from "./recurrence"
 import { TagsField } from "./TagsField"
 import { useTaskUpdate } from "./useTaskUpdate"
 
 const NO_PRIORITY = "none"
-
-/**
- * Controls in the panel are flat until you reach for them.
- *
- * A property list of seven bordered inputs reads as a form to fill in; this is
- * a record to read, which happens to be editable. The affordance arrives on
- * hover and focus, where it is needed, and the resting state stays a list.
- */
-const ghost =
-  "border-transparent bg-transparent shadow-none hover:bg-accent focus-visible:border-ring dark:bg-transparent dark:hover:bg-accent/50"
-
-/**
- * One property: an icon and its label in a fixed column, the value beside it.
- * The panel before the record exists lays its own rows out with this, so a
- * property sits in the same place whether or not the task is saved yet.
- */
-export function Row({
-  icon: Icon,
-  label,
-  htmlFor,
-  children,
-}: {
-  icon: LucideIcon
-  label: string
-  htmlFor?: string
-  children: React.ReactNode
-}) {
-  return (
-    <div className="grid grid-cols-[8rem_1fr] items-center gap-2 py-1">
-      <label
-        htmlFor={htmlFor}
-        className="text-muted-foreground flex items-center gap-2 text-sm"
-      >
-        <Icon className="size-4 shrink-0" aria-hidden />
-        {label}
-      </label>
-      <div className="min-w-0 text-sm">{children}</div>
-    </div>
-  )
-}
-
-/** Text that saves when you leave it, and forgets the edit on Escape. */
-function EditableText({
-  value,
-  onCommit,
-  multiline,
-  className,
-  placeholder,
-  id,
-  ariaLabel,
-}: {
-  value: string
-  onCommit: (next: string) => void
-  multiline?: boolean
-  className?: string
-  placeholder?: string
-  id?: string
-  ariaLabel?: string
-}) {
-  const [draft, setDraft] = useState(value)
-  // The field is fed by the server after every save, and by a bot editing the
-  // same task; re-sync unless the reader is the one holding the value.
-  const [editing, setEditing] = useState(false)
-  useEffect(() => {
-    if (!editing) setDraft(value)
-  }, [value, editing])
-
-  const commit = () => {
-    setEditing(false)
-    if (draft !== value) onCommit(draft)
-  }
-
-  const shared = {
-    id,
-    "aria-label": ariaLabel,
-    value: draft,
-    placeholder,
-    onFocus: () => setEditing(true),
-    onBlur: commit,
-    className: cn(ghost, className),
-  }
-
-  return multiline ? (
-    <Textarea
-      {...shared}
-      rows={3}
-      onChange={(e) => setDraft(e.target.value)}
-      onKeyDown={(e) => {
-        if (e.key === "Escape") {
-          setDraft(value)
-          setEditing(false)
-          e.currentTarget.blur()
-        }
-      }}
-    />
-  ) : (
-    <Input
-      {...shared}
-      onChange={(e) => setDraft(e.target.value)}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") e.currentTarget.blur()
-        if (e.key === "Escape") {
-          setDraft(value)
-          setEditing(false)
-          e.currentTarget.blur()
-        }
-      }}
-    />
-  )
-}
 
 function formatDateTime(value: string): string {
   return new Date(value).toLocaleString(undefined, {
@@ -184,20 +78,11 @@ export function TaskProperties({ task }: { task: TaskPublic }) {
 
   return (
     <>
-      <div className="flex items-start gap-3 px-6 pb-4">
-        <span className="mt-2.5">
-          <CompleteTask task={task} />
-        </span>
-        <EditableText
-          value={task.title}
-          ariaLabel="Task title"
-          onCommit={(title) => title.trim() && save({ title: title.trim() })}
-          className="h-auto px-2 py-1.5 text-xl leading-snug font-semibold md:text-xl"
-        />
-      </div>
-
-      <div className="divide-y px-6 py-2">
-        <Row icon={task.completed ? CircleCheck : CircleDashed} label="Status">
+      <PropertyList>
+        <PropertyRow
+          icon={task.completed ? CircleCheck : CircleDashed}
+          label="Status"
+        >
           <span className="px-2">
             {task.completed ? (
               <span className="text-primary font-medium">Completed</span>
@@ -205,13 +90,15 @@ export function TaskProperties({ task }: { task: TaskPublic }) {
               "Not completed"
             )}
           </span>
-        </Row>
+        </PropertyRow>
 
-        <Row icon={FolderKanban} label="Project" htmlFor={`${ids}-project`}>
+        <PropertyRow
+          icon={FolderKanban}
+          label="Project"
+          htmlFor={`${ids}-project`}
+        >
           {isSubtask ? (
-            <span className="text-muted-foreground px-2">
-              Follows its parent task
-            </span>
+            <ReadOnlyValue>Follows its parent task</ReadOnlyValue>
           ) : (
             <Select
               value={task.project_id}
@@ -232,9 +119,9 @@ export function TaskProperties({ task }: { task: TaskPublic }) {
               </SelectContent>
             </Select>
           )}
-        </Row>
+        </PropertyRow>
 
-        <Row icon={Calendar} label="Due date" htmlFor={`${ids}-due`}>
+        <PropertyRow icon={Calendar} label="Due date" htmlFor={`${ids}-due`}>
           <Input
             id={`${ids}-due`}
             type="date"
@@ -242,9 +129,9 @@ export function TaskProperties({ task }: { task: TaskPublic }) {
             onChange={(e) => save({ due_date: e.target.value || null })}
             className={cn(ghost, "w-full")}
           />
-        </Row>
+        </PropertyRow>
 
-        <Row icon={Flag} label="Priority" htmlFor={`${ids}-priority`}>
+        <PropertyRow icon={Flag} label="Priority" htmlFor={`${ids}-priority`}>
           <Select
             value={task.priority ?? NO_PRIORITY}
             onValueChange={(value) =>
@@ -271,9 +158,9 @@ export function TaskProperties({ task }: { task: TaskPublic }) {
               ))}
             </SelectContent>
           </Select>
-        </Row>
+        </PropertyRow>
 
-        <Row icon={UserIcon} label="Assignee">
+        <PropertyRow icon={UserIcon} label="Assignee">
           <AssigneeSelect
             value={assigneeFormValue(task)}
             onChange={(value) =>
@@ -283,21 +170,21 @@ export function TaskProperties({ task }: { task: TaskPublic }) {
             current={task.assignee_bot_user ?? undefined}
             className={ghost}
           />
-        </Row>
+        </PropertyRow>
 
-        <Row icon={Tag} label="Tags">
+        <PropertyRow icon={Tag} label="Tags">
           <TagsField
             value={task.tags ?? []}
             onChange={(tags) => save({ tags })}
             className={cn(ghost, "w-full")}
           />
-        </Row>
+        </PropertyRow>
 
-        <Row icon={Repeat} label="Repeat" htmlFor={`${ids}-repeat`}>
+        <PropertyRow icon={Repeat} label="Repeat" htmlFor={`${ids}-repeat`}>
           {isSubtask ? (
-            <span className="text-muted-foreground px-2">
+            <ReadOnlyValue>
               Only a task at the top of its tree can repeat
-            </span>
+            </ReadOnlyValue>
           ) : (
             <div className="flex items-center gap-2">
               <Select
@@ -355,10 +242,10 @@ export function TaskProperties({ task }: { task: TaskPublic }) {
               )}
             </div>
           )}
-        </Row>
+        </PropertyRow>
 
-        <Row icon={Clock} label="Created">
-          <span className="text-muted-foreground px-2">
+        <PropertyRow icon={Clock} label="Created">
+          <ReadOnlyValue>
             {task.created_at ? (
               <time dateTime={task.created_at}>
                 {formatDateTime(task.created_at)}
@@ -366,9 +253,9 @@ export function TaskProperties({ task }: { task: TaskPublic }) {
             ) : (
               "Unknown"
             )}
-          </span>
-        </Row>
-      </div>
+          </ReadOnlyValue>
+        </PropertyRow>
+      </PropertyList>
 
       <div className="border-t px-6 py-5">
         <h3 className="mb-2 px-2 text-sm font-medium">Description</h3>
@@ -377,9 +264,9 @@ export function TaskProperties({ task }: { task: TaskPublic }) {
           value={task.description ?? ""}
           placeholder="Add a description"
           ariaLabel="Task description"
-          onCommit={(description) =>
+          onCommit={(description) => {
             save({ description: description.trim() || null })
-          }
+          }}
         />
       </div>
 

@@ -36,6 +36,9 @@ const RevokeToken = ({ bot }: { bot: BotUserPublic }) => {
     onError: handleError.bind(showErrorToast),
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["bots"] })
+      // The panel reads the bot user by id, so the list's key does not cover
+      // it: without this the panel would still say the token is active.
+      queryClient.invalidateQueries({ queryKey: ["bot", bot.id] })
     },
   })
 

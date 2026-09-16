@@ -3,7 +3,6 @@ import type { ColumnDef } from "@tanstack/react-table"
 
 import type { TagPublic } from "@/client"
 import type { DataTableFeatures } from "@/components/Common/DataTable"
-import { TagActionsMenu } from "./TagActionsMenu"
 
 export const columns: ColumnDef<DataTableFeatures, TagPublic>[] = [
   {
@@ -29,14 +28,5 @@ export const columns: ColumnDef<DataTableFeatures, TagPublic>[] = [
         </Link>
       )
     },
-  },
-  {
-    id: "actions",
-    header: () => <span className="sr-only">Actions</span>,
-    cell: ({ row }) => (
-      <div className="flex justify-end">
-        <TagActionsMenu tag={row.original} />
-      </div>
-    ),
   },
 ]

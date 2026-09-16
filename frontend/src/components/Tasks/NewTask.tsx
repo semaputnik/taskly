@@ -2,12 +2,13 @@ import { FolderKanban } from "lucide-react"
 
 import type { TaskPublic } from "@/client"
 import {
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet"
+  PropertyList,
+  PropertyRow,
+  ReadOnlyValue,
+  RecordHeader,
+  titleFieldClass,
+} from "@/components/Records/RecordPanel"
 import { CaptureField, type CaptureTarget, useTaskCapture } from "./capture"
-import { Row } from "./TaskProperties"
 
 /**
  * The panel before the record exists.
@@ -30,25 +31,24 @@ export function NewTask({
 
   return (
     <>
-      <SheetHeader className="gap-3 border-b p-6">
-        <SheetDescription className="pr-20 text-sm">New task</SheetDescription>
-        <SheetTitle className="sr-only">New task</SheetTitle>
-        <CaptureField
-          autoFocus
-          label="Task title"
-          placeholder="What needs doing?"
-          onCommit={capture.create}
-          className="h-auto border-transparent bg-transparent px-2 py-1.5 text-xl leading-snug font-semibold shadow-none md:text-xl dark:bg-transparent"
-        />
-      </SheetHeader>
+      <RecordHeader
+        breadcrumb="New task"
+        title={
+          <CaptureField
+            autoFocus
+            label="Task title"
+            placeholder="What needs doing?"
+            onCommit={capture.create}
+            className={`border-transparent bg-transparent shadow-none dark:bg-transparent ${titleFieldClass}`}
+          />
+        }
+      />
 
-      <div className="divide-y px-6 py-2">
-        <Row icon={FolderKanban} label="Project">
-          <span className="text-muted-foreground px-2">
-            {target.projectName}
-          </span>
-        </Row>
-      </div>
+      <PropertyList>
+        <PropertyRow icon={FolderKanban} label="Project">
+          <ReadOnlyValue>{target.projectName}</ReadOnlyValue>
+        </PropertyRow>
+      </PropertyList>
 
       <p className="text-muted-foreground px-6 py-4 text-sm text-pretty">
         Enter records it and opens it here, where the rest is set. Hold ⌘ or

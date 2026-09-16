@@ -2,7 +2,7 @@
 
 import { type Client, formDataBodySerializer, type Options as Options2, type TDataShape, urlSearchParamsBodySerializer } from './client';
 import { client } from './client.gen';
-import type { activityReadActivityLogData, activityReadActivityLogErrors, activityReadActivityLogResponses, activityRestoreFromActivityEntryData, activityRestoreFromActivityEntryErrors, activityRestoreFromActivityEntryResponses, attachmentsDeleteAttachmentData, attachmentsDeleteAttachmentErrors, attachmentsDeleteAttachmentResponses, attachmentsDownloadAttachmentData, attachmentsDownloadAttachmentErrors, attachmentsDownloadAttachmentResponses, attachmentsReadAttachmentsData, attachmentsReadAttachmentsErrors, attachmentsReadAttachmentsResponses, attachmentsUploadAttachmentData, attachmentsUploadAttachmentErrors, attachmentsUploadAttachmentResponses, botsCreateBotUserData, botsCreateBotUserErrors, botsCreateBotUserResponses, botsDeleteBotUserData, botsDeleteBotUserErrors, botsDeleteBotUserResponses, botsIssueBotUserTokenData, botsIssueBotUserTokenErrors, botsIssueBotUserTokenResponses, botsReadBotUsersData, botsReadBotUsersErrors, botsReadBotUsersResponses, botsRevokeBotUserTokenData, botsRevokeBotUserTokenErrors, botsRevokeBotUserTokenResponses, botsUpdateBotUserData, botsUpdateBotUserErrors, botsUpdateBotUserResponses, commentsCreateCommentData, commentsCreateCommentErrors, commentsCreateCommentResponses, commentsDeleteCommentData, commentsDeleteCommentErrors, commentsDeleteCommentResponses, commentsReadCommentsData, commentsReadCommentsErrors, commentsReadCommentsResponses, commentsUpdateCommentData, commentsUpdateCommentErrors, commentsUpdateCommentResponses, loginLoginAccessTokenData, loginLoginAccessTokenErrors, loginLoginAccessTokenResponses, loginRecoverPasswordData, loginRecoverPasswordErrors, loginRecoverPasswordHtmlContentData, loginRecoverPasswordHtmlContentErrors, loginRecoverPasswordHtmlContentResponses, loginRecoverPasswordResponses, loginResetPasswordData, loginResetPasswordErrors, loginResetPasswordResponses, loginTestTokenData, loginTestTokenResponses, privateCreateUserData, privateCreateUserErrors, privateCreateUserResponses, projectsArchiveProjectData, projectsArchiveProjectErrors, projectsArchiveProjectResponses, projectsCreateProjectData, projectsCreateProjectErrors, projectsCreateProjectResponses, projectsDeleteProjectData, projectsDeleteProjectErrors, projectsDeleteProjectResponses, projectsReadProjectsData, projectsReadProjectsErrors, projectsReadProjectsResponses, projectsUnarchiveProjectData, projectsUnarchiveProjectErrors, projectsUnarchiveProjectResponses, projectsUpdateProjectData, projectsUpdateProjectErrors, projectsUpdateProjectResponses, tagsCreateTagData, tagsCreateTagErrors, tagsCreateTagResponses, tagsDeleteTagData, tagsDeleteTagErrors, tagsDeleteTagResponses, tagsReadTagsData, tagsReadTagsErrors, tagsReadTagsResponses, tagsRenameTagData, tagsRenameTagErrors, tagsRenameTagResponses, tasksCreateTaskData, tasksCreateTaskErrors, tasksCreateTaskResponses, tasksDeleteTaskData, tasksDeleteTaskErrors, tasksDeleteTaskResponses, tasksReadTaskData, tasksReadTaskErrors, tasksReadTaskResponses, tasksReadTasksData, tasksReadTasksErrors, tasksReadTasksResponses, tasksUpdateTaskData, tasksUpdateTaskErrors, tasksUpdateTaskResponses, usersDeleteUserMeData, usersDeleteUserMeResponses, usersReadUserMeData, usersReadUserMeResponses, usersReadUsersData, usersReadUsersErrors, usersReadUsersResponses, usersRegisterUserData, usersRegisterUserErrors, usersRegisterUserResponses, usersUpdatePasswordMeData, usersUpdatePasswordMeErrors, usersUpdatePasswordMeResponses, usersUpdateUserMeData, usersUpdateUserMeErrors, usersUpdateUserMeResponses, utilsHealthCheckData, utilsHealthCheckResponses, utilsTestEmailData, utilsTestEmailErrors, utilsTestEmailResponses } from './types.gen';
+import type { activityReadActivityLogData, activityReadActivityLogErrors, activityReadActivityLogResponses, activityRestoreFromActivityEntryData, activityRestoreFromActivityEntryErrors, activityRestoreFromActivityEntryResponses, attachmentsDeleteAttachmentData, attachmentsDeleteAttachmentErrors, attachmentsDeleteAttachmentResponses, attachmentsDownloadAttachmentData, attachmentsDownloadAttachmentErrors, attachmentsDownloadAttachmentResponses, attachmentsReadAttachmentsData, attachmentsReadAttachmentsErrors, attachmentsReadAttachmentsResponses, attachmentsUploadAttachmentData, attachmentsUploadAttachmentErrors, attachmentsUploadAttachmentResponses, botsCreateBotUserData, botsCreateBotUserErrors, botsCreateBotUserResponses, botsDeleteBotUserData, botsDeleteBotUserErrors, botsDeleteBotUserResponses, botsIssueBotUserTokenData, botsIssueBotUserTokenErrors, botsIssueBotUserTokenResponses, botsReadBotUserData, botsReadBotUserErrors, botsReadBotUserResponses, botsReadBotUsersData, botsReadBotUsersErrors, botsReadBotUsersResponses, botsRevokeBotUserTokenData, botsRevokeBotUserTokenErrors, botsRevokeBotUserTokenResponses, botsUpdateBotUserData, botsUpdateBotUserErrors, botsUpdateBotUserResponses, commentsCreateCommentData, commentsCreateCommentErrors, commentsCreateCommentResponses, commentsDeleteCommentData, commentsDeleteCommentErrors, commentsDeleteCommentResponses, commentsReadCommentsData, commentsReadCommentsErrors, commentsReadCommentsResponses, commentsUpdateCommentData, commentsUpdateCommentErrors, commentsUpdateCommentResponses, loginLoginAccessTokenData, loginLoginAccessTokenErrors, loginLoginAccessTokenResponses, loginRecoverPasswordData, loginRecoverPasswordErrors, loginRecoverPasswordHtmlContentData, loginRecoverPasswordHtmlContentErrors, loginRecoverPasswordHtmlContentResponses, loginRecoverPasswordResponses, loginResetPasswordData, loginResetPasswordErrors, loginResetPasswordResponses, loginTestTokenData, loginTestTokenResponses, privateCreateUserData, privateCreateUserErrors, privateCreateUserResponses, projectsArchiveProjectData, projectsArchiveProjectErrors, projectsArchiveProjectResponses, projectsCreateProjectData, projectsCreateProjectErrors, projectsCreateProjectResponses, projectsDeleteProjectData, projectsDeleteProjectErrors, projectsDeleteProjectResponses, projectsReadProjectData, projectsReadProjectErrors, projectsReadProjectResponses, projectsReadProjectsData, projectsReadProjectsErrors, projectsReadProjectsResponses, projectsUnarchiveProjectData, projectsUnarchiveProjectErrors, projectsUnarchiveProjectResponses, projectsUpdateProjectData, projectsUpdateProjectErrors, projectsUpdateProjectResponses, tagsCreateTagData, tagsCreateTagErrors, tagsCreateTagResponses, tagsDeleteTagData, tagsDeleteTagErrors, tagsDeleteTagResponses, tagsReadTagData, tagsReadTagErrors, tagsReadTagResponses, tagsReadTagsData, tagsReadTagsErrors, tagsReadTagsResponses, tagsRenameTagData, tagsRenameTagErrors, tagsRenameTagResponses, tasksCreateTaskData, tasksCreateTaskErrors, tasksCreateTaskResponses, tasksDeleteTaskData, tasksDeleteTaskErrors, tasksDeleteTaskResponses, tasksReadTaskData, tasksReadTaskErrors, tasksReadTaskResponses, tasksReadTasksData, tasksReadTasksErrors, tasksReadTasksResponses, tasksUpdateTaskData, tasksUpdateTaskErrors, tasksUpdateTaskResponses, usersDeleteUserMeData, usersDeleteUserMeResponses, usersReadUserMeData, usersReadUserMeResponses, usersReadUsersData, usersReadUsersErrors, usersReadUsersResponses, usersRegisterUserData, usersRegisterUserErrors, usersRegisterUserResponses, usersUpdatePasswordMeData, usersUpdatePasswordMeErrors, usersUpdatePasswordMeResponses, usersUpdateUserMeData, usersUpdateUserMeErrors, usersUpdateUserMeResponses, utilsHealthCheckData, utilsHealthCheckResponses, utilsTestEmailData, utilsTestEmailErrors, utilsTestEmailResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -249,6 +249,25 @@ export class ProjectsService {
      */
     public static deleteProject<ThrowOnError extends boolean = true>(options: Options<projectsDeleteProjectData, ThrowOnError>) {
         return (options.client ?? client).delete<projectsDeleteProjectResponses, projectsDeleteProjectErrors, ThrowOnError>({
+            responseType: 'json',
+            security: [{ scheme: 'bearer', type: 'http' }],
+            url: '/api/v1/projects/{project_id}',
+            ...options
+        });
+    }
+    
+    /**
+     * Read Project
+     *
+     * Retrieve one project by its id: what the project's panel is addressed by,
+     * so a link opens a project the list in view would exclude.
+     *
+     * A bot user reads only the projects in its scope, and never an archived one
+     * (FR-08.9, FR-05.13). No task permission is asked for: a bot that may write
+     * into a project has to be able to resolve the project it writes into.
+     */
+    public static readProject<ThrowOnError extends boolean = true>(options: Options<projectsReadProjectData, ThrowOnError>) {
+        return (options.client ?? client).get<projectsReadProjectResponses, projectsReadProjectErrors, ThrowOnError>({
             responseType: 'json',
             security: [{ scheme: 'bearer', type: 'http' }],
             url: '/api/v1/projects/{project_id}',
@@ -623,6 +642,22 @@ export class TagsService {
     }
     
     /**
+     * Read Tag
+     *
+     * Retrieve one tag by its id, with the number of tasks carrying it: what the
+     * tag's panel is addressed by, so a link opens a tag the list in view would
+     * exclude.
+     */
+    public static readTag<ThrowOnError extends boolean = true>(options: Options<tagsReadTagData, ThrowOnError>) {
+        return (options.client ?? client).get<tagsReadTagResponses, tagsReadTagErrors, ThrowOnError>({
+            responseType: 'json',
+            security: [{ scheme: 'bearer', type: 'http' }],
+            url: '/api/v1/tags/{tag_id}',
+            ...options
+        });
+    }
+    
+    /**
      * Rename Tag
      *
      * Rename a tag: every task carrying it shows the new name (FR-01.24). Names
@@ -733,6 +768,22 @@ export class BotsService {
      */
     public static deleteBotUser<ThrowOnError extends boolean = true>(options: Options<botsDeleteBotUserData, ThrowOnError>) {
         return (options.client ?? client).delete<botsDeleteBotUserResponses, botsDeleteBotUserErrors, ThrowOnError>({
+            responseType: 'json',
+            security: [{ scheme: 'bearer', type: 'http' }],
+            url: '/api/v1/bot-users/{bot_user_id}',
+            ...options
+        });
+    }
+    
+    /**
+     * Read Bot User
+     *
+     * Retrieve one bot user by its id, with its scope: what the bot user's panel
+     * is addressed by. A deleted bot user is gone from here like it is from the
+     * list (FR-08.19).
+     */
+    public static readBotUser<ThrowOnError extends boolean = true>(options: Options<botsReadBotUserData, ThrowOnError>) {
+        return (options.client ?? client).get<botsReadBotUserResponses, botsReadBotUserErrors, ThrowOnError>({
             responseType: 'json',
             security: [{ scheme: 'bearer', type: 'http' }],
             url: '/api/v1/bot-users/{bot_user_id}',

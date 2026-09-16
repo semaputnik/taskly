@@ -28,6 +28,7 @@ from app.models import (
     DueDateScope,
     Project,
     ProjectCreate,
+    ProjectPublic,
     ProjectUpdate,
     Recurrence,
     RecurrenceFrequency,
@@ -834,6 +835,54 @@ def get_task_project_ids(
     )
     rows = session.exec(select(tree.c.id, tree.c.project_id)).all()
     return dict(rows)
+
+
+def get_project_task_counts(
+    *,
+    session: Session,
+    owner_id: uuid.UUID,
+    project_ids: Sequence[uuid.UUID] | None = None,
+) -> dict[uuid.UUID, int]:
+    """
+    How many tasks resolve to each of a user's projects, keyed by project id,
+    narrowed to `project_ids` where the caller only needs some of them.
+
+    A subtask holds no project of its own, so the count follows each tree down
+    from its root: what a project holds is its whole trees, not their tops
+    (FR-02.4). Deleted tasks are not counted — the user cannot see them, and
+    deleting the project again would be what brings them back into play.
+    """
+    roots: list[Any] = [
+        Task.owner_id == owner_id,
+        col(Task.parent_id).is_(None),
+        not_deleted(Task),
+    ]
+    # Only the projects being reported: a panel showing one project has no use
+    # for a walk over every tree in the account.
+    if project_ids is not None:
+        if not project_ids:
+            return {}
+        roots.append(col(Task.project_id).in_(project_ids))
+
+    tree = (
+        select(Task.id, Task.project_id)
+        .where(*roots)
+        .cte("project_task_counts", recursive=True)
+    )
+    child = aliased(Task)
+    tree = tree.union_all(
+        select(child.id, tree.c.project_id)
+        .join(tree, col(child.parent_id) == tree.c.id)
+        .where(not_deleted(child))
+    )
+    rows = session.exec(
+        select(tree.c.project_id, func.count()).group_by(tree.c.project_id)
+    ).all()
+    return {project_id: count for project_id, count in rows if project_id}
+
+
+def project_public(project: Project, task_count: int = 0) -> ProjectPublic:
+    return ProjectPublic.model_validate(project, update={"task_count": task_count})
 
 
 def has_uncompleted_subtasks(*, session: Session, task: Task) -> bool:

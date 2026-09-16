@@ -126,3 +126,19 @@
     cursor: pointer;
   }
 }
+
+@layer components {
+  /*
+   * A panel's controls rest flat and take their affordance from hover, which
+   * a touch screen does not have: without this, an editable select and a
+   * read-only value are the same flat row under a thumb. Where the pointer is
+   * coarse the affordance stops being conditional — it is quiet, but it is
+   * always there, and only editable controls carry it.
+   */
+  @media (pointer: coarse) {
+    .record-control {
+      border-color: var(--input);
+      background-color: color-mix(in oklab, var(--accent) 40%, transparent);
+    }
+  }
+}

@@ -74,6 +74,32 @@ def refuse_archived_for_bot(caller: Caller) -> None:
         )
 
 
+def authorize_project(caller: Caller, project: Project) -> None:
+    """
+    Refuse a bot the project itself: the archive first, then the scope.
+
+    Reading a project is not reading its tasks — a bot that may only write
+    still has to be able to resolve the project it writes into — so no task
+    permission is consulted here (FR-08.9).
+    """
+    bot = caller.bot
+    if bot is None:
+        return
+    if project.is_archived:
+        raise _refuse(
+            PROJECT_ARCHIVED_CODE,
+            f"The project “{project.name}” is archived. Bot users have no "
+            "access to archived projects.",
+            project_id=str(project.id),
+        )
+    if project.id not in caller.project_ids:
+        raise _refuse(
+            OUTSIDE_SCOPE_CODE,
+            f"The project “{project.name}” is not in this bot user's scope.",
+            project_id=str(project.id),
+        )
+
+
 def authorize_tasks(
     caller: Caller, action: TaskAction, project: Project | None = None
 ) -> None:
@@ -88,19 +114,7 @@ def authorize_tasks(
     if bot is None:
         return
     if project is not None:
-        if project.is_archived:
-            raise _refuse(
-                PROJECT_ARCHIVED_CODE,
-                f"The project “{project.name}” is archived. Bot users have no "
-                "access to archived projects.",
-                project_id=str(project.id),
-            )
-        if project.id not in caller.project_ids:
-            raise _refuse(
-                OUTSIDE_SCOPE_CODE,
-                f"The project “{project.name}” is not in this bot user's scope.",
-                project_id=str(project.id),
-            )
+        authorize_project(caller, project)
     permission, doing = _PERMISSIONS[action]
     if not getattr(bot, permission):
         raise _refuse(
@@ -163,14 +177,18 @@ def get_project(
     session: Session,
     caller: Caller,
     project_id: uuid.UUID,
-    action: TaskAction = TaskAction.READ,
+    action: TaskAction | None = TaskAction.READ,
 ) -> Project:
     """
-    A project the caller does `action` on tasks in, refused like
-    `authorize_tasks` refuses anything in it when the caller is a bot.
+    A project of the caller's, refused like `authorize_tasks` refuses anything
+    in it when the caller is a bot. `action` of None asks for the project
+    itself rather than for what may be done to the tasks in it.
     """
     project = get_project_of(session, caller.owner_id, project_id)
-    authorize_tasks(caller, action, project)
+    if action is None:
+        authorize_project(caller, project)
+    else:
+        authorize_tasks(caller, action, project)
     return project
 
 

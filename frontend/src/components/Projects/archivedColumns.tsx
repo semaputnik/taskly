@@ -3,11 +3,10 @@ import type { ColumnDef } from "@tanstack/react-table"
 import type { ProjectPublic } from "@/client"
 import type { DataTableFeatures } from "@/components/Common/DataTable"
 import { cn } from "@/lib/utils"
-import UnarchiveProject from "./UnarchiveProject"
 
 /**
- * Archived projects offer one action only: unarchiving. Everything else about
- * them is frozen until then (FR-05.12).
+ * Archived projects read like live ones: unarchiving is a property of the
+ * project, done in its panel, not an action stapled to its row (FR-05.12).
  */
 export const archivedColumns: ColumnDef<DataTableFeatures, ProjectPublic>[] = [
   {
@@ -28,12 +27,15 @@ export const archivedColumns: ColumnDef<DataTableFeatures, ProjectPublic>[] = [
     },
   },
   {
-    id: "actions",
-    header: () => <span className="sr-only">Actions</span>,
-    cell: ({ row }) => (
-      <div className="flex justify-end">
-        <UnarchiveProject project={row.original} />
-      </div>
-    ),
+    id: "tasks",
+    header: "Tasks",
+    cell: ({ row }) => {
+      const count = row.original.task_count ?? 0
+      return (
+        <span className={cn("tabular-nums", !count && "text-muted-foreground")}>
+          {count === 0 ? "None" : count}
+        </span>
+      )
+    },
   },
 ]

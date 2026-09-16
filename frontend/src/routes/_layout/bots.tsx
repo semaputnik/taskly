@@ -11,6 +11,7 @@ import { IssuedTokenProvider } from "@/components/Bots/IssuedToken"
 import { DataTable } from "@/components/Common/DataTable"
 import { EmptyState } from "@/components/Common/EmptyState"
 import PendingBots from "@/components/Pending/PendingBots"
+import { useRecordPanels } from "@/components/Records/panels"
 
 function getBotsQueryOptions() {
   return {
@@ -31,7 +32,7 @@ export const Route = createFileRoute("/_layout/bots")({
   }),
 })
 
-function BotsTableContent() {
+function BotsTableContent({ onOpen }: { onOpen: (botId: string) => void }) {
   const { data: bots } = useSuspenseQuery(getBotsQueryOptions())
   const { data: projects } = useSuspenseQuery(scopeProjectsQueryOptions())
 
@@ -43,6 +44,8 @@ function BotsTableContent() {
     <DataTable
       columns={getColumns(projectsById)}
       data={bots.data}
+      rowLabel={(bot) => `Open ${bot.name}`}
+      onRowClick={(bot) => onOpen(bot.id)}
       empty={
         <EmptyState
           icon={Bot}
@@ -60,7 +63,11 @@ function BotsTableContent() {
  * these steps (FR-07.3).
  */
 function Bots() {
+  const { openBot } = useRecordPanels()
+
   return (
+    // A bot user created here is issued its token in the same step, and that
+    // reveal outlives the form it came from.
     <IssuedTokenProvider>
       <div className="flex flex-col gap-6">
         <div className="flex items-center justify-between">
@@ -73,7 +80,7 @@ function Bots() {
           <AddBotUser />
         </div>
         <Suspense fallback={<PendingBots />}>
-          <BotsTableContent />
+          <BotsTableContent onOpen={openBot} />
         </Suspense>
       </div>
     </IssuedTokenProvider>

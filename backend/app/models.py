@@ -168,6 +168,9 @@ class ProjectPublic(ProjectBase):
     id: uuid.UUID
     is_inbox: bool
     is_archived: bool
+    # The tasks resolving to it that are not deleted — what archiving takes out
+    # of view and what deleting takes down with it (FR-05.9, FR-05.11).
+    task_count: int = 0
     created_at: datetime | None = None
 
 

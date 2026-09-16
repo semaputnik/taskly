@@ -16,9 +16,13 @@ test("A bot user is created on the Bots page and its token is shown once", async
 
   await page.goto("/projects")
   await page.getByRole("button", { name: "Add Project" }).click()
-  await page.getByPlaceholder("Project name").fill("Support queue")
-  await page.getByRole("button", { name: "Save" }).click()
-  await expect(page.getByText("Project created successfully")).toBeVisible()
+  const projectName = page.getByRole("textbox", { name: "Project name" })
+  await projectName.fill("Support queue")
+  await projectName.press("Enter")
+  await expect(
+    page.getByRole("dialog", { name: "Support queue" }),
+  ).toBeVisible()
+  await page.keyboard.press("Escape")
 
   await page.goto("/bots")
   await expect(page.getByRole("heading", { name: "Bots" })).toBeVisible()
@@ -51,17 +55,18 @@ test("A bot user is created on the Bots page and its token is shown once", async
   await dialog.getByRole("button", { name: "Done" }).click()
   await expect(dialog).toBeHidden()
 
-  const row = page.getByRole("row").filter({ hasText: "Triage agent" })
+  const row = page.getByRole("row", { name: "Open Triage agent" })
   await expect(row).toContainText("Support queue")
   await expect(row).toContainText("Read tasks")
-  await expect(row).toContainText("Never expires")
-  await expect(row.getByRole("button", { name: "Issue token" })).toHaveCount(0)
+  await expect(row).toContainText("Active")
 
-  // Once the dialog is gone, nothing on the page can show the token again.
-  // The request above used it, which the reloaded page reports.
+  // Once the dialog is gone, nothing can show the token again. The request
+  // above used it, which the bot user's panel reports.
   await page.reload()
-  await expect(row).toBeVisible()
-  await expect(row).toContainText("Last used")
+  await row.click()
+  const panel = page.getByRole("dialog", { name: "Triage agent" })
+  await expect(panel).toContainText("Never — it works until revoked")
+  await expect(panel).not.toContainText("Never used")
   expect(await page.content()).not.toContain(token)
 })
 
@@ -87,20 +92,22 @@ test("A token is revoked and a new one issued with an expiry", async ({
     .inputValue()
   await firstDialog.getByRole("button", { name: "Done" }).click()
 
-  const row = page.getByRole("row").filter({ hasText: "Nightly sync" })
-  await row.getByRole("button", { name: "Revoke" }).click()
+  const row = page.getByRole("row", { name: "Open Nightly sync" })
+  await row.click()
+  const panel = page.getByRole("dialog", { name: "Nightly sync" })
+  await panel.getByRole("button", { name: "Revoke" }).click()
   await page
     .getByRole("dialog", { name: "Revoke the token for Nightly sync?" })
-    .getByRole("button", { name: "Revoke" })
+    .getByRole("button", { name: "Revoke", exact: true })
     .click()
-  await expect(row).toContainText("Revoked")
+  await expect(panel).toContainText("Revoked")
 
   const refused = await request.get(`${api}/tasks/`, {
     headers: { Authorization: `Bearer ${first}` },
   })
   expect(refused.status()).toBe(401)
 
-  await row.getByRole("button", { name: "Issue new token" }).click()
+  await panel.getByRole("button", { name: "Issue new token" }).click()
   const expiresOn = new Date()
   expiresOn.setDate(expiresOn.getDate() + 7)
   const date = [
@@ -122,8 +129,8 @@ test("A token is revoked and a new one issued with an expiry", async ({
   expect(second).not.toBe(first)
   await secondDialog.getByRole("button", { name: "Done" }).click()
 
-  await expect(row).toContainText("Expires")
-  await expect(row).toContainText("Never used")
+  await expect(panel).toContainText("Active")
+  await expect(panel).toContainText("Never used")
   const accepted = await request.get(`${api}/tasks/`, {
     headers: { Authorization: `Bearer ${second}` },
   })
@@ -143,9 +150,11 @@ test("A bot's scope is narrowed and the bot is deleted from the Bots page", asyn
   await page.goto("/projects")
   for (const name of ["Docs", "Billing"]) {
     await page.getByRole("button", { name: "Add Project" }).click()
-    await page.getByPlaceholder("Project name").fill(name)
-    await page.getByRole("button", { name: "Save" }).click()
-    await expect(page.getByText("Project created successfully")).toBeVisible()
+    const field = page.getByRole("textbox", { name: "Project name" })
+    await field.fill(name)
+    await field.press("Enter")
+    await expect(page.getByRole("dialog", { name })).toBeVisible()
+    await page.keyboard.press("Escape")
     await expect(page.getByRole("dialog")).toBeHidden()
   }
 
@@ -179,23 +188,25 @@ test("A bot's scope is narrowed and the bot is deleted from the Bots page", asyn
   expect(created.ok()).toBe(true)
   const task = await created.json()
 
-  // Narrowed to Docs, renamed, and able to create nothing any more.
-  await page
-    .getByRole("button", { name: "Actions for Changelog agent" })
-    .click()
-  await page.getByRole("menuitem", { name: "Edit Bot" }).click()
-  const editDialog = page.getByRole("dialog", { name: "Edit Bot" })
-  await expect(
-    editDialog.getByRole("checkbox", { name: "Billing" }),
-  ).toBeChecked()
-  await editDialog.getByPlaceholder("Bot name").fill("Docs agent")
-  await editDialog.getByRole("checkbox", { name: "Billing" }).uncheck()
-  await editDialog.getByRole("checkbox", { name: "Create tasks" }).uncheck()
-  await editDialog.getByRole("button", { name: "Save" }).click()
-  await expect(page.getByText("Bot updated successfully")).toBeVisible()
-  await expect(editDialog).toBeHidden()
+  // Narrowed to Docs, renamed, and able to create nothing any more — each
+  // change saving on its own, in the panel.
+  await page.getByRole("row", { name: "Open Changelog agent" }).click()
+  const panel = page.getByRole("dialog", { name: "Changelog agent" })
+  const billingBox = panel.getByRole("checkbox", { name: "Billing" })
+  await expect(billingBox).toBeChecked()
+  await billingBox.click()
+  await expect(billingBox).not.toBeChecked()
+  const createTasks = panel.getByRole("checkbox", { name: "Create tasks" })
+  await createTasks.click()
+  await expect(createTasks).not.toBeChecked()
+  // Renaming last: the panel is announced by the record's name, and the
+  // record's name is what is being changed.
+  const name = panel.getByRole("textbox", { name: "Bot name" })
+  await name.fill("Docs agent")
+  await name.press("Enter")
+  await page.keyboard.press("Escape")
 
-  const row = page.getByRole("row").filter({ hasText: "Docs agent" })
+  const row = page.getByRole("row", { name: "Open Docs agent" })
   await expect(row).toContainText("Docs")
   await expect(row).not.toContainText("Billing")
   await expect(row).toContainText("Read tasks")
@@ -208,8 +219,11 @@ test("A bot's scope is narrowed and the bot is deleted from the Bots page", asyn
   expect(outside.status()).toBe(403)
   expect((await outside.json()).detail.code).toBe("outside_scope")
 
-  await page.getByRole("button", { name: "Actions for Docs agent" }).click()
-  await page.getByRole("menuitem", { name: "Delete Bot" }).click()
+  await row.click()
+  await page
+    .getByRole("dialog", { name: "Docs agent" })
+    .getByRole("button", { name: "Delete bot user" })
+    .click()
   await page
     .getByRole("dialog", { name: "Delete Docs agent?" })
     .getByRole("button", { name: "Delete" })

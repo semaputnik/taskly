@@ -1,6 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query"
-import { useNavigate, useSearch } from "@tanstack/react-router"
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 
 import { type TaskCreate, type TaskPublic, TasksService } from "@/client"
 import { Input } from "@/components/ui/input"
@@ -175,43 +174,6 @@ export function CaptureField({
       className={className}
     />
   )
-}
-
-/**
- * Where capture happens and how it is left, held in the URL beside the open
- * panel: capture opens over the screen the reader is on, and Back cancels it
- * (The Stay-Put Rule, The Real Address Rule).
- */
-export function useCapture() {
-  const navigate = useNavigate()
-  const search = useSearch({ strict: false }) as {
-    task?: string
-    capture?: true
-    project_id?: string
-  }
-
-  const go = useCallback(
-    (next: { task?: string; capture?: true }) =>
-      navigate({
-        to: ".",
-        search: (previous: Record<string, unknown>) => ({
-          ...previous,
-          task: next.task,
-          capture: next.capture,
-        }),
-      }),
-    [navigate],
-  )
-
-  return {
-    taskId: search.task ?? null,
-    capturing: search.capture === true,
-    /** The project the current list is narrowed to, if it is narrowed at all. */
-    filteredProjectId: search.project_id,
-    start: useCallback(() => go({ capture: true }), [go]),
-    close: useCallback(() => go({}), [go]),
-    openTask: useCallback((task: string) => go({ task }), [go]),
-  }
 }
 
 /** Elements that own the keyboard while they are open. */

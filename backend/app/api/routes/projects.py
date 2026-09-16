@@ -25,6 +25,14 @@ from app.models import (
 router = APIRouter(prefix="/projects", tags=["projects"])
 
 
+def _task_count(session: SessionDep, project: Project) -> int:
+    """What one project holds, for the responses that report a single one."""
+    counts = crud.get_project_task_counts(
+        session=session, owner_id=project.owner_id, project_ids=[project.id]
+    )
+    return counts.get(project.id, 0)
+
+
 @router.get("/", response_model=ProjectsPublic)
 def read_projects(
     session: SessionDep,
@@ -54,7 +62,34 @@ def read_projects(
 
     statement = select(Project).where(*conditions).offset(skip).limit(limit)
     projects = session.exec(statement).all()
-    return ProjectsPublic(data=projects, count=count)
+    task_counts = crud.get_project_task_counts(
+        session=session,
+        owner_id=caller.owner_id,
+        project_ids=[project.id for project in projects],
+    )
+    return ProjectsPublic(
+        data=[
+            crud.project_public(project, task_counts.get(project.id, 0))
+            for project in projects
+        ],
+        count=count,
+    )
+
+
+@router.get("/{project_id}", response_model=ProjectPublic)
+def read_project(
+    *, session: SessionDep, caller: CallerDep, project_id: uuid.UUID
+) -> Any:
+    """
+    Retrieve one project by its id: what the project's panel is addressed by,
+    so a link opens a project the list in view would exclude.
+
+    A bot user reads only the projects in its scope, and never an archived one
+    (FR-08.9, FR-05.13). No task permission is asked for: a bot that may write
+    into a project has to be able to resolve the project it writes into.
+    """
+    project = authorization.get_project(session, caller, project_id, action=None)
+    return crud.project_public(project, _task_count(session, project))
 
 
 @router.post("/", response_model=ProjectPublic)
@@ -64,9 +99,10 @@ def create_project(
     """
     Create a new project.
     """
-    return crud.create_project(
+    project = crud.create_project(
         session=session, project_create=project_in, owner_id=current_user.id
     )
+    return crud.project_public(project)
 
 
 @router.patch("/{project_id}", response_model=ProjectPublic)
@@ -86,9 +122,10 @@ def update_project(
         raise HTTPException(
             status_code=400, detail="The Inbox project cannot be renamed"
         )
-    return crud.update_project(
+    project = crud.update_project(
         session=session, db_project=project, project_in=project_in
     )
+    return crud.project_public(project, _task_count(session, project))
 
 
 @router.post("/{project_id}/archive", response_model=ProjectPublic)
@@ -110,7 +147,8 @@ def archive_project(
         raise HTTPException(
             status_code=400, detail="The Inbox project cannot be archived"
         )
-    return crud.set_project_archived(session=session, project=project, archived=True)
+    project = crud.set_project_archived(session=session, project=project, archived=True)
+    return crud.project_public(project, _task_count(session, project))
 
 
 @router.post("/{project_id}/unarchive", response_model=ProjectPublic)
@@ -122,7 +160,10 @@ def unarchive_project(
     (FR-05.10, FR-05.11).
     """
     project = get_owned_project(session, current_user, project_id)
-    return crud.set_project_archived(session=session, project=project, archived=False)
+    project = crud.set_project_archived(
+        session=session, project=project, archived=False
+    )
+    return crud.project_public(project, _task_count(session, project))
 
 
 @router.delete("/{project_id}")

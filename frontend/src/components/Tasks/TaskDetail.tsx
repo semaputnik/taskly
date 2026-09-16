@@ -2,15 +2,13 @@ import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { ChevronRight } from "lucide-react"
 
 import { ProjectsService, type TaskPublic, TasksService } from "@/client"
-import { Badge } from "@/components/ui/badge"
 import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet"
-import { Skeleton } from "@/components/ui/skeleton"
+  EditableText,
+  RecordHeader,
+  RecordPanel,
+  titleFieldClass,
+} from "@/components/Records/RecordPanel"
+import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { CompleteTask } from "./CompleteTask"
 import { CaptureField, type CaptureTarget, useTaskCapture } from "./capture"
@@ -19,6 +17,7 @@ import { NewTask } from "./NewTask"
 import { TaskAttachments } from "./TaskAttachments"
 import { TaskComments } from "./TaskComments"
 import { TaskProperties } from "./TaskProperties"
+import { useTaskUpdate } from "./useTaskUpdate"
 
 interface TaskDetailProps {
   /** The task to show, or null for a closed panel. */
@@ -62,7 +61,11 @@ export function TaskDetail({
 
   // Fetched by id rather than read out of the table: a link may point at a
   // task the current filters exclude, and it must still open.
-  const { data: task, isPending } = useQuery({
+  const {
+    data: task,
+    isPending,
+    isError,
+  } = useQuery({
     queryKey: ["task", taskId],
     queryFn: async () =>
       (await TasksService.readTask({ path: { task_id: taskId as string } }))
@@ -97,36 +100,31 @@ export function TaskDetail({
     : []
 
   return (
-    <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <SheetContent
-        side="right"
-        className="w-full gap-0 overflow-y-auto p-0 sm:max-w-xl"
-      >
-        {isCapturing && captureTarget ? (
-          <NewTask
-            target={captureTarget}
-            onCreated={(created, stay) => onCaptured?.(created.id, stay)}
-          />
-        ) : !taskId ? // On the way out: the panel still animates, but there is no record
-        // left to draw and a skeleton would read as one loading.
-        null : isPending || !task ? (
-          <div className="flex flex-col gap-4 p-6">
-            <Skeleton className="h-4 w-24" />
-            <Skeleton className="h-7 w-3/4" />
-            <Skeleton className="h-40 w-full" />
-          </div>
-        ) : (
-          <>
-            {/* Delete is a corner control like the close button, on the same
-                line as one rather than floating in the header's flow beneath
-                it. It is alone there: every other change to a task is made in
-                the field it belongs to. */}
-            <div className="absolute top-1.5 right-9 z-10">
-              <DeleteTask task={task} onSuccess={onClose} />
-            </div>
-
-            <SheetHeader className="gap-3 border-b p-6">
-              <SheetDescription className="flex min-w-0 items-center gap-1 pr-20 text-sm">
+    <RecordPanel
+      open={isOpen}
+      onClose={onClose}
+      name={isCapturing ? "New task" : (task?.title ?? "Task")}
+      kind="task"
+      missing={!isCapturing && Boolean(taskId) && isError}
+      // On the way out there is no record left to draw, and a skeleton would
+      // read as one loading.
+      pending={!isCapturing && Boolean(taskId) && isPending}
+      destructive={
+        task && !isCapturing ? (
+          <DeleteTask task={task} onSuccess={onClose} />
+        ) : undefined
+      }
+    >
+      {isCapturing && captureTarget ? (
+        <NewTask
+          target={captureTarget}
+          onCreated={(created, stay) => onCaptured?.(created.id, stay)}
+        />
+      ) : !task ? null : (
+        <>
+          <RecordHeader
+            breadcrumb={
+              <>
                 <span className="shrink-0">{projectName ?? "Inbox"}</span>
                 {parent && (
                   <>
@@ -140,84 +138,107 @@ export function TaskDetail({
                     </button>
                   </>
                 )}
-              </SheetDescription>
-              <SheetTitle className="sr-only">{task.title}</SheetTitle>
-            </SheetHeader>
+              </>
+            }
+            title={
+              <div className="flex items-start gap-3">
+                <span className="mt-2.5">
+                  <CompleteTask task={task} />
+                </span>
+                <TaskTitle task={task} />
+              </div>
+            }
+          />
 
-            <TaskProperties task={task} />
+          <TaskProperties task={task} />
 
-            <Tabs
-              defaultValue="comments"
-              className="gap-4 border-t px-6 py-5"
-              // Remounting per task keeps one task's draft comment from
-              // appearing under the next one.
-              key={task.id}
-            >
-              <TabsList>
-                <TabsTrigger value="comments">Comments</TabsTrigger>
-                <TabsTrigger value="subtasks">
-                  Subtasks
-                  {children.length > 0 && (
-                    <span className="text-muted-foreground tabular-nums">
-                      {children.length}
-                    </span>
-                  )}
-                </TabsTrigger>
-                <TabsTrigger value="files">Files</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="comments">
-                <TaskComments task={task} />
-              </TabsContent>
-
-              <TabsContent value="subtasks" className="flex flex-col gap-3">
-                {children.length ? (
-                  <ul className="flex flex-col gap-2">
-                    {children.map((child) => (
-                      <li
-                        key={child.id}
-                        className="flex items-center gap-3 rounded-md border px-3 py-2"
-                      >
-                        <CompleteTask task={child} />
-                        <button
-                          type="button"
-                          onClick={() => onOpenTask(child.id)}
-                          className={`min-w-0 flex-1 truncate text-left text-sm underline-offset-4 hover:underline ${
-                            child.completed
-                              ? "text-muted-foreground line-through"
-                              : ""
-                          }`}
-                        >
-                          {child.title}
-                        </button>
-                        {child.priority && (
-                          <Badge variant="outline" className="shrink-0">
-                            {child.priority}
-                          </Badge>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="text-muted-foreground text-sm italic">
-                    No subtasks yet.
-                  </p>
+          <Tabs
+            defaultValue="comments"
+            className="gap-4 border-t px-6 py-5"
+            // Remounting per task keeps one task's draft comment from
+            // appearing under the next one.
+            key={task.id}
+          >
+            <TabsList>
+              <TabsTrigger value="comments">Comments</TabsTrigger>
+              <TabsTrigger value="subtasks">
+                Subtasks
+                {children.length > 0 && (
+                  <span className="text-muted-foreground tabular-nums">
+                    {children.length}
+                  </span>
                 )}
-                {/* Adding a subtask belongs with the subtasks, not in a menu
+              </TabsTrigger>
+              <TabsTrigger value="files">Files</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="comments">
+              <TaskComments task={task} />
+            </TabsContent>
+
+            <TabsContent value="subtasks" className="flex flex-col gap-3">
+              {children.length ? (
+                <ul className="flex flex-col gap-2">
+                  {children.map((child) => (
+                    <li
+                      key={child.id}
+                      className="flex items-center gap-3 rounded-md border px-3 py-2"
+                    >
+                      <CompleteTask task={child} />
+                      <button
+                        type="button"
+                        onClick={() => onOpenTask(child.id)}
+                        className={`min-w-0 flex-1 truncate text-left text-sm underline-offset-4 hover:underline ${
+                          child.completed
+                            ? "text-muted-foreground line-through"
+                            : ""
+                        }`}
+                      >
+                        {child.title}
+                      </button>
+                      {child.priority && (
+                        <Badge variant="outline" className="shrink-0">
+                          {child.priority}
+                        </Badge>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-muted-foreground text-sm italic">
+                  No subtasks yet.
+                </p>
+              )}
+              {/* Adding a subtask belongs with the subtasks, not in a menu
                     somewhere else on the panel — and it is the same one-field
                     capture as anywhere else, because a subtask is a full task
                     rather than a checklist item. */}
-                <SubtaskCapture parent={task} />
-              </TabsContent>
+              <SubtaskCapture parent={task} />
+            </TabsContent>
 
-              <TabsContent value="files">
-                <TaskAttachments task={task} />
-              </TabsContent>
-            </Tabs>
-          </>
-        )}
-      </SheetContent>
-    </Sheet>
+            <TabsContent value="files">
+              <TaskAttachments task={task} />
+            </TabsContent>
+          </Tabs>
+        </>
+      )}
+    </RecordPanel>
+  )
+}
+
+/** The task's own name, saved when focus leaves it. */
+function TaskTitle({ task }: { task: TaskPublic }) {
+  const update = useTaskUpdate(task)
+
+  return (
+    <EditableText
+      value={task.title}
+      ariaLabel="Task title"
+      onCommit={(title) => {
+        if (title.trim()) update.save({ title: title.trim() })
+      }}
+      className={titleFieldClass}
+    />
   )
 }
 

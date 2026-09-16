@@ -1,14 +1,15 @@
 import { useSuspenseQuery } from "@tanstack/react-query"
 import { createFileRoute } from "@tanstack/react-router"
-import { Tag } from "lucide-react"
+import { Plus, Tag } from "lucide-react"
 import { Suspense } from "react"
 
 import { TagsService } from "@/client"
 import { DataTable } from "@/components/Common/DataTable"
 import { EmptyState } from "@/components/Common/EmptyState"
 import PendingTags from "@/components/Pending/PendingTags"
-import AddTag from "@/components/Tags/AddTag"
+import { useRecordPanels } from "@/components/Records/panels"
 import { columns } from "@/components/Tags/columns"
+import { Button } from "@/components/ui/button"
 
 // Under "tags", so creating, renaming and deleting refresh autocomplete and the
 // tag filter along with this page.
@@ -31,18 +32,27 @@ export const Route = createFileRoute("/_layout/tags")({
   }),
 })
 
-function TagsTableContent() {
+function TagsTableContent({
+  onOpen,
+  onAdd,
+}: {
+  onOpen: (tagId: string) => void
+  onAdd: () => void
+}) {
   const { data: tags } = useSuspenseQuery(getTagsQueryOptions())
 
   return (
     <DataTable
       columns={columns}
       data={tags.data}
+      rowLabel={(tag) => `Open ${tag.name}`}
+      onRowClick={(tag) => onOpen(tag.id)}
       empty={
         <EmptyState
           icon={Tag}
           title="No tags yet"
           description="Tags are created by using them: type one on a task and it appears here, ready to rename or reuse."
+          action={<Button onClick={onAdd}>Add a tag</Button>}
         />
       }
     />
@@ -54,6 +64,8 @@ function TagsTableContent() {
  * (FR-01.26). Creating one also happens by typing it onto a task.
  */
 function Tags() {
+  const { openTag, capture } = useRecordPanels()
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
@@ -63,10 +75,13 @@ function Tags() {
             Label tasks across all of your projects
           </p>
         </div>
-        <AddTag />
+        <Button onClick={() => capture("tag")}>
+          <Plus />
+          Add Tag
+        </Button>
       </div>
       <Suspense fallback={<PendingTags />}>
-        <TagsTableContent />
+        <TagsTableContent onOpen={openTag} onAdd={() => capture("tag")} />
       </Suspense>
     </div>
   )

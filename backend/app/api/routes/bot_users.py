@@ -85,6 +85,21 @@ def read_bot_users(
     )
 
 
+@router.get("/{bot_user_id}", response_model=BotUserPublic)
+def read_bot_user(
+    *, session: SessionDep, current_user: CurrentUser, bot_user_id: uuid.UUID
+) -> Any:
+    """
+    Retrieve one bot user by its id, with its scope: what the bot user's panel
+    is addressed by. A deleted bot user is gone from here like it is from the
+    list (FR-08.19).
+    """
+    bot = _get_owned_bot_user(session, current_user, bot_user_id)
+    return _public(
+        bot, crud.get_bot_user_project_ids(session=session, bot_ids=[bot.id])[bot.id]
+    )
+
+
 @router.post("/", response_model=BotUserPublic)
 def create_bot_user(
     *, session: SessionDep, current_user: CurrentUser, bot_user_in: BotUserCreate

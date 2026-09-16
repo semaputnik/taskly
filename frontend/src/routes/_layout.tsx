@@ -1,8 +1,7 @@
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router"
-
+import { RecordPanels } from "@/components/Records/RecordPanels"
 import AppSidebar from "@/components/Sidebar/AppSidebar"
 import { panelSearchSchema } from "@/components/Tasks/search"
-import { TaskPanel } from "@/components/Tasks/TaskPanel"
 import {
   SidebarInset,
   SidebarProvider,
@@ -43,7 +42,7 @@ function Layout() {
       </SidebarInset>
       {/* Mounted once: a record opens over whatever screen the reader is on,
           and capture starts from any of them. */}
-      <TaskPanel />
+      <RecordPanels />
     </SidebarProvider>
   )
 }
