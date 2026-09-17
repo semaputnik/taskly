@@ -210,8 +210,9 @@ only saturated things a screen can contain.
 - **Alert Red** — destructive intent, and one status: the delete/revoke/archive
   confirmation button, invalid field borders and rings, error text — and
   *overdue*, the one state a task tracker is right to raise its voice about (the
-  dashboard's overdue band and its days-late counts). It is no other status and
-  never decorates. In dark mode it shifts to
+  dashboard's overdue band and its days-late counts, and the days-late count of
+  a late task in "Waiting on others"). It is no other status and never
+  decorates. In dark mode it shifts to
   `alert-red-lifted`, which is lighter and noticeably less saturated, because
   full-chroma red on a dark ground reads as an emergency rather than a warning.
 
@@ -312,7 +313,8 @@ letterforms.
 
 **The Uppercase-Header Rule.** Uppercase with letter-spacing belongs to one job:
 labelling a band of rows. That covers table column headers and the group headers
-inside a list sheet — the dashboard's "Overdue" and "Due today" bands, and the
+inside a list sheet — the dashboard's "Overdue", "Due today" and "Waiting on
+others" bands, and the
 "While you were away" band over its log. Both sit on the same `muted/50` fill,
 because they are the same device. It is the system's one micro-typographic
 signature and it holds only while nothing else borrows it: page headings,
@@ -447,6 +449,16 @@ is the one place the product toggles a record's own state from a list, and it
 sits beside the thing it is about. A square check selects a row for a batch.
 The two live in the same row and must never be confused, which is why they are
 different shapes rather than two identical boxes in different columns.
+
+**The Four-Glyph Rule.** A task's status is carried by one of four glyphs,
+told apart by shape alone so they read in greyscale at 16px: an empty dashed
+ring for To do, a half-filled ring for In progress, a ring with a clock hand for
+Waiting, and a ring with a check for Done. They are Ink, and Ink Muted for Done;
+never Signal Teal and never a second hue (The One Signal Rule). A glyph always
+travels with its label, or with an accessible name where the label does not
+fit — the list's status column drops to the glyph alone on a narrow screen and
+keeps a 44px target. The glyph is a reading; the round check stays the one
+control that closes a task from a list, and it is checked only for Done.
 
 **The Pill-Means-Data Rule.** Fully-round is reserved for badges — values
 attached to a record. If it is pressable and pill-shaped, it is miscommunicating.
@@ -630,6 +642,12 @@ rather than a table.
   table is where long lists belong.
 - The empty state lives *inside* a band rather than replacing it, so the sheet
   keeps its label when it has nothing to show.
+- **Waiting on others** is the dashboard's last band, after the This week row:
+  every Waiting task, soonest due first and undated last, ending in a "See all"
+  row to the list filtered to Waiting. It appears only when something is
+  waiting, and it stands even when the bands above are clear. Overdue, Due today
+  and This week hold only To do and In progress work, because a waiting task's
+  next move is not the reader's.
 
 ### Detail panel
 A record's one address, opened by clicking its row — the same surface for every
@@ -647,12 +665,28 @@ record type the product has: tasks, projects, tags and bot users. A right-hand
   row. An unset value reads *Not set* in italic Ink Muted, never blank. The
   record's own history belongs here too: when it was created is a property, not
   a footnote.
+- **A value that wraps keeps its label on its first line.** The label and the
+  value are each at least one control tall and top-aligned, so a single-line
+  row reads as it always did and a row of chips does not pull its label into
+  its middle. Tags are the case: the chips, then a ghost **+ Add tag** button
+  that opens a popover to search, choose and create. Anything that needs room
+  to find or create a value goes in a popover anchored to the value, never
+  stacked under the row. The popover is Paper with a hairline and the Menu
+  shadow; its highlighted row is Surface Quiet and its check is Ink.
 - **The corner is for dismissal only.** Close sits alone in the top-right, a
   32px target under a mouse and 44px under a thumb, like every dismiss control
   in the product. The corner of a sheet is muscle memory for *dismiss*, so
   nothing that destroys is ever placed beside it.
 - **Delete sits at the foot**, below everything else, as one labelled control
   — "Delete task", not a bare icon — separated by a hairline.
+- **A draft commits from a pinned footer.** A record that does not exist yet
+  (task capture) opens in the record's own layout, minus what only a record
+  has: its status, when it was created, and its tabs. Its breadcrumb reads
+  "New task · Not saved yet". The one commit, **Create task**, sits in a
+  Paper strip pinned to the bottom of the panel under a hairline, within
+  thumb reach, and is the draft's only Signal Teal fill. A hint beside it
+  names the chord that commits and starts another. Closing a draft that holds
+  anything asks "Discard this task?", with Keep editing as the default.
 - **A record that cannot be read says so at once.** A skeleton stands only
   while a request is on its way. A record the API refuses — deleted, not the
   reader's — reads "could not be opened", identically for both, with Close; a

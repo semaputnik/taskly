@@ -41,6 +41,7 @@ from app.models import (
     Tag,
     Task,
     TaskPriority,
+    TaskStatus,
     TaskTag,
 )
 
@@ -134,7 +135,7 @@ class _TaskState:
     description: str | None
     due_date: date | None
     priority: TaskPriority | None
-    completed: bool
+    status: TaskStatus
     project_id: uuid.UUID | None
     assignee_id: uuid.UUID | None
     assignee_bot_user_id: uuid.UUID | None
@@ -478,14 +479,20 @@ def _task_entries(
                 )
             )
 
-    if before.completed != after.completed:
-        entries.append(
-            entry(
-                ActivityAction.TASK_COMPLETED
-                if after.completed
-                else ActivityAction.TASK_REOPENED
+    if before.status != after.status:
+        # To or out of done keeps the entries the log has always had; only a
+        # move between open statuses is new, and it names both ends.
+        if after.status is TaskStatus.DONE:
+            entries.append(entry(ActivityAction.TASK_COMPLETED))
+        elif before.status is TaskStatus.DONE:
+            entries.append(entry(ActivityAction.TASK_REOPENED, to=after.status))
+        else:
+            entries.append(
+                entry(
+                    ActivityAction.TASK_STATUS_CHANGED,
+                    **{"from": before.status, "to": after.status},
+                )
             )
-        )
 
     return entries
 
@@ -578,7 +585,7 @@ def _snapshot(state: _TaskState, refs: _Refs) -> dict[str, Any]:
         "description": state.description,
         "due_date": state.due_date,
         "priority": state.priority,
-        "completed": state.completed,
+        "status": state.status,
         "project": refs.project(state.project_id),
         "assignee_id": _assignee_id(state),
         "assignee": refs.assignee(state),
@@ -591,7 +598,7 @@ def _open_occurrences(session: Session, series_id: uuid.UUID) -> list[uuid.UUID]
     rows = session.execute(
         select(col(Task.id)).where(
             Task.series_id == series_id,
-            Task.completed == False,  # noqa: E712
+            col(Task.status) != TaskStatus.DONE,
             col(Task.deletion_id).is_(None),
         )
     ).all()
@@ -617,7 +624,7 @@ def _load_states(
         col(Task.description),
         col(Task.due_date),
         col(Task.priority),
-        col(Task.completed),
+        col(Task.status),
         col(Task.project_id),
         col(Task.assignee_id),
         col(Task.assignee_bot_user_id),
@@ -646,7 +653,7 @@ def _load_states(
             description=row.description,
             due_date=row.due_date,
             priority=row.priority,
-            completed=row.completed,
+            status=row.status,
             project_id=row.project_id,
             assignee_id=row.assignee_id,
             assignee_bot_user_id=row.assignee_bot_user_id,

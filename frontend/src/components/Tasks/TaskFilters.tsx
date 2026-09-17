@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query"
 import { SlidersHorizontal, X } from "lucide-react"
 import { useState } from "react"
 
-import { ProjectsService, TagsService } from "@/client"
+import { ProjectsService, TagsService, type TaskStatus } from "@/client"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -16,6 +16,17 @@ import {
 } from "@/components/ui/select"
 import { useBotUsers } from "./assignee"
 import { clearedFilters, hasActiveFilters, type TaskSearch } from "./search"
+import {
+  describeStatusFilter,
+  isOpenFilter,
+  OPEN_STATUSES,
+  STATUS_LABELS,
+  STATUSES,
+} from "./statuses"
+
+// The status filter's choices: Open, or one status. Open is written to the
+// URL as its three statuses, which is what the API filters on.
+const OPEN = "open"
 
 // A Select cannot hold an empty value, so "no filter" needs a name of its own.
 // Everything selectable here is an id or a fixed keyword, never free text, so
@@ -87,6 +98,16 @@ function DateFilter({
       />
     </div>
   )
+}
+
+/**
+ * Which choice the status select shows. A URL naming some other set of
+ * statuses matches none of them; its chip still says what it filters.
+ */
+function statusValue(statuses: TaskStatus[] | undefined): string | undefined {
+  if (!statuses) return undefined
+  if (isOpenFilter(statuses)) return OPEN
+  return statuses.length === 1 ? statuses[0] : undefined
 }
 
 /** One active filter, named in the reader's words, with the way to drop it. */
@@ -186,18 +207,19 @@ export function TaskFilters({ search, onChange }: TaskFiltersProps) {
       label: `Priority: ${search.priority}`,
       clear: { priority: undefined },
     })
-  if (search.completed !== undefined)
+  const statusLabel = describeStatusFilter(search.status)
+  if (statusLabel)
     chips.push({
-      key: "completed",
-      label: search.completed ? "Completed" : "Not completed",
-      clear: { completed: undefined },
+      key: "status",
+      label: `Status: ${statusLabel}`,
+      clear: { status: undefined },
     })
   if (search.overdue)
     chips.push({
       key: "overdue",
       label: "Overdue",
-      // Overdue turned completion off with it, so dropping it puts both back.
-      clear: { overdue: undefined, completed: undefined },
+      // Overdue asked for open work with it, so dropping it puts both back.
+      clear: { overdue: undefined, status: undefined },
     })
   if (search.due_from)
     chips.push({
@@ -234,16 +256,15 @@ export function TaskFilters({ search, onChange }: TaskFiltersProps) {
           )}
         </Button>
 
-        {/* Late work people still care about is late work still open, so the
-            button asks for both — visibly, in the URL, rather than by having
-            one filter decide another. */}
+        {/* Late work is open work, and the button says so in the URL as the
+            Open status filter, where the reader can see and change it. */}
         <Button
           variant={search.overdue ? "default" : "outline"}
           onClick={() =>
             onChange(
               search.overdue
-                ? { overdue: undefined, completed: undefined }
-                : { overdue: true, completed: false },
+                ? { overdue: undefined, status: undefined }
+                : { overdue: true, status: OPEN_STATUSES },
             )
           }
         >
@@ -305,18 +326,22 @@ export function TaskFilters({ search, onChange }: TaskFiltersProps) {
           <FilterSelect
             label="Status"
             anyLabel="Any status"
-            value={
-              search.completed === undefined
-                ? undefined
-                : String(search.completed)
-            }
+            value={statusValue(search.status)}
             options={[
-              { value: "false", label: "Not completed" },
-              { value: "true", label: "Completed" },
+              { value: OPEN, label: "Open" },
+              ...STATUSES.map((status) => ({
+                value: status,
+                label: STATUS_LABELS[status],
+              })),
             ]}
             onChange={(value) =>
               onChange({
-                completed: value === undefined ? undefined : value === "true",
+                status:
+                  value === undefined
+                    ? undefined
+                    : value === OPEN
+                      ? OPEN_STATUSES
+                      : [value as TaskStatus],
               })
             }
           />

@@ -153,19 +153,48 @@ def test_filter_by_priority_treats_unset_as_p4(client: TestClient, db: Session) 
     assert sorted(_titles(client, headers, priority="P4")) == ["Bottom", "Unset"]
 
 
-def test_filter_by_completion_state_both_ways(client: TestClient, db: Session) -> None:
+OPEN = ["todo", "in_progress", "waiting"]
+
+
+def test_filter_by_one_or_more_statuses(client: TestClient, db: Session) -> None:
     headers = _headers_for_new_user(client, db)
-    done = _create_task(client, headers, "Done")
-    _create_task(client, headers, "Open")
+    for title, status in (
+        ("Planned", "todo"),
+        ("Started", "in_progress"),
+        ("Parked", "waiting"),
+        ("Finished", "done"),
+    ):
+        task = _create_task(client, headers, title)
+        r = client.patch(
+            f"{settings.API_V1_STR}/tasks/{task['id']}",
+            headers=headers,
+            json={"status": status},
+        )
+        assert r.status_code == 200, r.text
 
-    client.patch(
-        f"{settings.API_V1_STR}/tasks/{done['id']}",
+    assert _titles(client, headers, status="done") == ["Finished"]
+    assert _titles(client, headers, status="waiting") == ["Parked"]
+    assert sorted(_titles(client, headers, status=["todo", "in_progress"])) == [
+        "Planned",
+        "Started",
+    ]
+    assert sorted(_titles(client, headers, status=OPEN)) == [
+        "Parked",
+        "Planned",
+        "Started",
+    ]
+    # No status asked for is every status.
+    assert len(_titles(client, headers)) == 4
+
+
+def test_an_unknown_status_is_refused(client: TestClient, db: Session) -> None:
+    headers = _headers_for_new_user(client, db)
+    r = client.get(
+        f"{settings.API_V1_STR}/tasks/",
         headers=headers,
-        json={"completed": True},
+        params={"status": "completed"},
     )
-
-    assert _titles(client, headers, completed=True) == ["Done"]
-    assert _titles(client, headers, completed=False) == ["Open"]
+    assert r.status_code == 422
 
 
 def test_filter_by_a_due_date_range(client: TestClient, db: Session) -> None:
@@ -196,16 +225,26 @@ def test_filter_for_overdue_tasks(client: TestClient, db: Session) -> None:
     client.patch(
         f"{settings.API_V1_STR}/tasks/{done['id']}",
         headers=headers,
-        json={"completed": True},
+        json={"status": "done"},
     )
 
-    # Overdue is about the due date alone, so it can be combined with the
-    # completion filter rather than quietly deciding it.
+    parked = _create_task(client, headers, "Late and waiting", due_date=str(YESTERDAY))
+    client.patch(
+        f"{settings.API_V1_STR}/tasks/{parked['id']}",
+        headers=headers,
+        json={"status": "waiting"},
+    )
+
+    # Overdue is open work past its date: a done task is never late, and a
+    # waiting one still is. Which open statuses to show is the status filter's
+    # call.
     assert sorted(_titles(client, headers, overdue=True)) == [
         "Late",
-        "Late but done",
+        "Late and waiting",
     ]
-    assert _titles(client, headers, overdue=True, completed=False) == ["Late"]
+    assert _titles(client, headers, overdue=True, status="waiting") == [
+        "Late and waiting"
+    ]
 
 
 def test_filters_combine_with_and(client: TestClient, db: Session) -> None:

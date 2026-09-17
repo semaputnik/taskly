@@ -2,22 +2,45 @@ import { useQuery } from "@tanstack/react-query"
 import { Link as RouterLink } from "@tanstack/react-router"
 import { ArrowRight, CheckCheck } from "lucide-react"
 
-import { ProjectsService, type TaskPublic, TasksService } from "@/client"
+import {
+  ProjectsService,
+  type TaskPublic,
+  type TaskStatus,
+  TasksService,
+} from "@/client"
 import { CompleteTask } from "@/components/Tasks/CompleteTask"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
+import { formatDay } from "@/lib/dates"
 import { cn } from "@/lib/utils"
 import { daysLate, inAWeek, today, tomorrow } from "./when"
 
 const PREVIEW_ROWS = 5
 
-function openTasks(query: Record<string, unknown>) {
+// The work the owner can move themselves. A waiting task is open too, but its
+// next move is someone else's, so it has a band of its own rather than
+// nagging from Overdue and Today.
+const ACTIONABLE: TaskStatus[] = ["todo", "in_progress"]
+const WAITING: TaskStatus[] = ["waiting"]
+
+function tasksIn(status: TaskStatus[], query: Record<string, unknown>) {
+  const full = { ...query, status }
   return {
-    queryKey: ["tasks", query],
-    queryFn: async () =>
-      (await TasksService.readTasks({ query: { ...query, completed: false } }))
-        .data,
+    queryKey: ["tasks", full],
+    queryFn: async () => (await TasksService.readTasks({ query: full })).data,
   }
+}
+
+const actionable = (query: Record<string, unknown>) =>
+  tasksIn(ACTIONABLE, query)
+
+/** Late in Alert Red, as in Overdue; otherwise just the day it is due. */
+function WaitingDue({ dueDate }: { dueDate?: string | null }) {
+  if (!dueDate) return null
+  if (dueDate < today()) {
+    return <span className="text-destructive">{daysLate(dueDate)}</span>
+  }
+  return <span className="text-muted-foreground">{formatDay(dueDate)}</span>
 }
 
 /**
@@ -105,12 +128,16 @@ function Rows({ count }: { count: number }) {
  * anything longer than a few rows hands off to Tasks.
  */
 export function NeedsYou() {
-  const overdue = useQuery(openTasks({ overdue: true, limit: PREVIEW_ROWS }))
+  const overdue = useQuery(actionable({ overdue: true, limit: PREVIEW_ROWS }))
   const due = useQuery(
-    openTasks({ due_from: today(), due_to: today(), limit: PREVIEW_ROWS }),
+    actionable({ due_from: today(), due_to: today(), limit: PREVIEW_ROWS }),
   )
   const week = useQuery(
-    openTasks({ due_from: tomorrow(), due_to: inAWeek(), limit: 1 }),
+    actionable({ due_from: tomorrow(), due_to: inAWeek(), limit: 1 }),
+  )
+  // Soonest first, undated last: the API sorts a missing date to the end.
+  const waiting = useQuery(
+    tasksIn(WAITING, { sort: "due_date", limit: PREVIEW_ROWS }),
   )
   const { data: projects } = useQuery({
     queryKey: ["projects"],
@@ -126,6 +153,7 @@ export function NeedsYou() {
   const overdueCount = overdue.data?.count ?? 0
   const dueCount = due.data?.count ?? 0
   const weekCount = week.data?.count ?? 0
+  const waitingCount = waiting.data?.count ?? 0
   const clear = !isPending && overdueCount === 0 && dueCount === 0
 
   return (
@@ -172,7 +200,7 @@ export function NeedsYou() {
               {overdueCount > PREVIEW_ROWS && (
                 <MoreLink
                   count={overdueCount - PREVIEW_ROWS}
-                  search={{ overdue: true, completed: false }}
+                  search={{ overdue: true, status: ACTIONABLE }}
                 />
               )}
             </Group>
@@ -193,7 +221,7 @@ export function NeedsYou() {
                   search={{
                     due_from: today(),
                     due_to: today(),
-                    completed: false,
+                    status: ACTIONABLE,
                   }}
                 />
               )}
@@ -205,7 +233,11 @@ export function NeedsYou() {
       {!isPending && weekCount > 0 && !clear && (
         <RouterLink
           to="/tasks"
-          search={{ due_from: tomorrow(), due_to: inAWeek(), completed: false }}
+          search={{
+            due_from: tomorrow(),
+            due_to: inAWeek(),
+            status: ACTIONABLE,
+          }}
           className="hover:bg-muted/50 flex items-center justify-between gap-2 border-t px-4 py-3 text-sm transition-colors"
         >
           <span className="text-muted-foreground">
@@ -214,15 +246,41 @@ export function NeedsYou() {
           <ArrowRight className="text-muted-foreground size-4" aria-hidden />
         </RouterLink>
       )}
+
+      {/* After This week, and only when something is waiting: what the owner
+          has to chase rather than do. It stands whether or not the rest is
+          clear, since being clear of work is not being clear of waits. */}
+      {!waiting.isPending && waitingCount > 0 && (
+        <div className="border-t">
+          <Group label="Waiting on others" count={waitingCount}>
+            {waiting.data?.data.map((task) => (
+              <TaskRow
+                key={task.id}
+                task={task}
+                projectName={names[task.project_id]}
+                trailing={<WaitingDue dueDate={task.due_date} />}
+              />
+            ))}
+            <MoreLink
+              count={waitingCount - PREVIEW_ROWS}
+              label="See all"
+              search={{ status: WAITING, sort: "due_date" }}
+            />
+          </Group>
+        </div>
+      )}
     </div>
   )
 }
 
 function MoreLink({
   count,
+  label,
   search,
 }: {
   count: number
+  /** Said instead of the count when there is nothing more to count. */
+  label?: string
   search: Record<string, unknown>
 }) {
   return (
@@ -231,7 +289,7 @@ function MoreLink({
       search={search}
       className="text-muted-foreground hover:bg-muted/50 hover:text-foreground flex items-center gap-1.5 border-b px-4 py-2.5 text-sm transition-colors last:border-b-0"
     >
-      {count} more
+      {count > 0 ? `${count} more` : label}
       <ArrowRight className="size-3.5" aria-hidden />
     </RouterLink>
   )

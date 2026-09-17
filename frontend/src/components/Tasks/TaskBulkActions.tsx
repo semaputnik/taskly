@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query"
-import { Trash2, X } from "lucide-react"
+import { ChevronDown, Trash2, X } from "lucide-react"
 import { useState } from "react"
 
 import {
@@ -18,6 +18,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { LoadingButton } from "@/components/ui/loading-button"
 import {
@@ -29,7 +34,8 @@ import {
 } from "@/components/ui/select"
 import useCustomToast from "@/hooks/useCustomToast"
 import { handleError } from "@/utils"
-import { TagsField } from "./TagsField"
+import { StatusMenuItems } from "./status"
+import { BulkTagPicker } from "./TagPicker"
 
 /**
  * What a selection can be done to, in one bar.
@@ -69,14 +75,18 @@ export function TaskBulkActions({
   const [dueDate, setDueDate] = useState("")
 
   const change = useMutation({
-    mutationFn: (body: Omit<TaskBulkUpdate, "task_ids">) =>
+    mutationFn: ({
+      keepSelection: _keep,
+      ...body
+    }: Omit<TaskBulkUpdate, "task_ids"> & { keepSelection?: boolean }) =>
       TasksService.bulkUpdateTasks({ body: { ...body, task_ids: selected } }),
-    onSuccess: ({ data }) => {
+    onSuccess: ({ data }, { keepSelection }) => {
       setRefused([])
       showSuccessToast(
         `${data.updated} ${data.updated === 1 ? "task" : "tasks"} changed`,
       )
-      onDone()
+      // Tagging keeps the selection, so several tags go on in one visit.
+      if (!keepSelection) onDone()
     },
     onError: (error: Error) => {
       // A batch lands whole or not at all, so a refusal names the rows that
@@ -154,22 +164,40 @@ export function TaskBulkActions({
           }}
         />
 
-        <div className="w-48">
-          <TagsField
-            value={[]}
-            floatingHint
-            aria-label="Add a tag to the selection"
-            onChange={(tags) =>
-              tags.length > 0 && change.mutate({ add_tags: tags })
-            }
-          />
-        </div>
+        <BulkTagPicker
+          onAdd={(tag) =>
+            change.mutate({ add_tags: [tag], keepSelection: true })
+          }
+        />
 
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm">
+              Set status
+              <ChevronDown className="text-muted-foreground" aria-hidden />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
+            <StatusMenuItems
+              onChoose={(status) =>
+                // Done takes the subtasks with it, as Complete does: a batch
+                // has no one task to ask about.
+                change.mutate(
+                  status === "done"
+                    ? { status, subtasks: "complete" }
+                    : { status },
+                )
+              }
+            />
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        {/* The shortcut to done, kept beside the menu. */}
         <Button
           variant="outline"
           size="sm"
           onClick={() =>
-            change.mutate({ completed: true, subtasks: "complete" })
+            change.mutate({ status: "done", subtasks: "complete" })
           }
         >
           Complete

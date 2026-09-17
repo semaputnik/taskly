@@ -1,5 +1,7 @@
 import { z } from "zod"
 
+import { STATUSES } from "./statuses"
+
 /**
  * The task list's view, held in the URL so it can be shared or reloaded.
  *
@@ -37,7 +39,9 @@ export const taskSearchSchema = z.object({
     .catch(undefined),
   tag: z.string().optional().catch(undefined),
   priority: z.enum(["P1", "P2", "P3", "P4"]).optional().catch(undefined),
-  completed: z.boolean().optional().catch(undefined),
+  // The API's repeatable `status`: Open is its three statuses, not a keyword,
+  // so the URL says exactly what the list asks for.
+  status: z.array(z.enum(STATUSES)).nonempty().optional().catch(undefined),
   due_from: z.string().optional().catch(undefined),
   due_to: z.string().optional().catch(undefined),
   overdue: z.literal(true).optional().catch(undefined),
@@ -66,7 +70,7 @@ export const FILTER_KEYS = [
   "assignee",
   "tag",
   "priority",
-  "completed",
+  "status",
   "due_from",
   "due_to",
   "overdue",

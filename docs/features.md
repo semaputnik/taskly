@@ -28,7 +28,7 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
 | **Owner** | The user who created a bot user. |
 | **Scope** | The set of permissions granted to a bot user: which projects it can see and what it can do. |
 | **Token** | The credential a bot user uses to authenticate to the REST API. A bot user has one token. |
-| **Task** | The main entity: a unit of work that is either completed or not completed. |
+| **Task** | The main entity: a unit of work with a status — To do, In progress, Waiting or Done. A task that is not Done is *open*. |
 | **Subtask** | A task that is a child of another task. A subtask is a full task. |
 | **Project** | A container that groups tasks. Every task belongs to a project. Projects are flat: there is no nesting. |
 | **Inbox** | The default project every user has. Tasks go there unless another project is chosen. Cannot be renamed or deleted. |
@@ -62,9 +62,16 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
 - **FR-01.3** Priority takes one of four values: `P1`, `P2`, `P3`, `P4`.
   `P1` is the highest priority, `P4` the lowest. Priority is optional; a task
   with no priority set behaves as `P4`.
-- **FR-01.4** A task has exactly two states: **completed** and **not completed**.
-  There are no other workflow statuses (Todoist-style).
-- **FR-01.5** A user can mark a task as completed and return it to not completed.
+- **FR-01.4** A task has exactly one of four statuses: **To do**, **In
+  progress**, **Waiting** and **Done** (`todo`, `in_progress`, `waiting`,
+  `done` in the REST API). A task is **open** when its status is To do, In
+  progress or Waiting, and **closed** when it is Done. Waiting means the task
+  is open but its next move belongs to someone or something other than the
+  owner. A new task is To do unless it is created with another status. The
+  statuses are fixed; a user cannot define their own (ADR-0004).
+- **FR-01.5** A user, or a bot user allowed to update the task, can move a task
+  to any status. Closing a task is a single action from any open status (the
+  checkbox), and undoing it returns the task to To do.
 - **FR-01.6** A task has at most one assignee. A task can have no assignee.
 - **FR-01.7** The assignee is either the user or one of the user's bot users.
 
@@ -119,23 +126,25 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
   task that has subtasks, Taskly shows the user a warning.
 - **FR-01.12** The REST API rejects a request to delete a task that has
   subtasks with an error, unless the request explicitly confirms cascading
-  deletion. This mirrors the completion behavior (FR-02.6, FR-02.7).
+  deletion. This mirrors the behavior of closing a task (FR-02.6, FR-02.7).
 
 #### Recurrence
 
 - **FR-01.13** A task can be marked as recurring, with a fixed-interval rule:
   daily, weekly, monthly, or every N days.
-- **FR-01.14** Completing a recurring task creates its next occurrence as a
-  new task. The new task copies the completed one's fields (title,
-  description, priority, assignee, tags) and its subtask tree, with the
-  subtasks not completed. Comments and attachments are not copied — they
-  belong to the occurrence that was completed.
-- **FR-01.15** The next occurrence's due date is the completed occurrence's
-  due date plus the recurrence interval — a fixed schedule, independent of
-  when the occurrence was actually completed.
-- **FR-01.16** Only one open (not completed) occurrence of a recurring task
-  exists at a time. The next occurrence is not created until the current one
-  is completed, even if its due date has already passed.
+- **FR-01.14** Moving a recurring task to Done creates its next occurrence as
+  a new task, which starts as To do. The new task copies the done one's fields
+  (title, description, priority, assignee, tags) and its subtask tree, with
+  every subtask To do. Comments and attachments are not copied — they belong
+  to the occurrence that was done. Moving an occurrence between open statuses
+  never creates an occurrence.
+- **FR-01.15** The next occurrence's due date is the done occurrence's due
+  date plus the recurrence interval — a fixed schedule, independent of when
+  the occurrence was actually done.
+- **FR-01.16** Only one open occurrence of a recurring task exists at a time.
+  The next occurrence is not created until the current one is Done, even if
+  its due date has already passed. Only the latest occurrence can be moved out
+  of Done, and the recurrence rule can change only while the task is open.
 - **FR-01.17** A user can change the due date of the open occurrence of a
   recurring task, like on any task. Taskly asks whether the change applies
   only to this occurrence or to this and all following occurrences.
@@ -151,18 +160,20 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
 
 - **FR-02.1** A task can have subtasks.
 - **FR-02.2** A subtask is a full task: it has all task fields and supports
-  everything a task supports (comments, attachments, completion, etc.).
+  everything a task supports (comments, attachments, statuses, etc.).
 - **FR-02.3** Subtasks can be nested to any depth.
 - **FR-02.4** A subtask always belongs to the same project as its parent.
   Moving a task to another project moves all its subtasks with it.
-- **FR-02.5** When a user completes a task that has uncompleted subtasks, Taskly
-  asks whether to complete the subtasks as well or leave them uncompleted.
-- **FR-02.6** The REST API rejects a request to complete a task that has
-  uncompleted subtasks with an error, and the task stays uncompleted. This
-  applies to every API client, human or bot.
-- **FR-02.7** The REST API lets a client complete such a task anyway by stating
-  explicitly in the request that the subtasks stay uncompleted.
-- **FR-02.8** Completing all subtasks does not complete the parent task
+- **FR-02.5** When a user moves a task that has open subtasks to Done, Taskly
+  asks whether to move the subtasks to Done as well or leave them as they are.
+- **FR-02.6** The REST API rejects a request to move a task that has open
+  subtasks to Done with an error, and the task keeps its status. This applies
+  to every API client, human or bot.
+- **FR-02.7** The REST API lets a client move such a task to Done anyway by
+  stating explicitly in the request whether the subtasks stay as they are or
+  are moved to Done too. Moving a task between open statuses never touches its
+  subtasks.
+- **FR-02.8** Closing all subtasks does not close the parent task
   automatically.
 
 ### F-03. Comments
@@ -228,7 +239,7 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
   - assignee
   - tag
   - priority
-  - completion state
+  - status: Open, or any one or more of the four statuses
   - due date
 - **FR-06.3** Filters can be combined; a task must match all active filters.
 - **FR-06.4** The task list can be sorted, at minimum by due date and by
@@ -336,8 +347,9 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
   - Tasks:
     - a task is created
     - a task is changed
-    - a task is completed
-    - a task is returned to not completed
+    - a task is completed (moved to Done)
+    - a task is reopened (moved out of Done)
+    - a task is moved between open statuses, with the status before and after
     - a task is deleted
     - a task is moved to a project
     - an assignee is set on a task
@@ -388,7 +400,6 @@ Not requirements yet. Recorded so they are not lost.
 ## 6. Out of scope
 
 - Collaboration between human users (shared projects, assigning tasks to other people, etc.).
-- Task workflow statuses beyond completed / not completed.
 - Superuser functions other than viewing the list of users.
 - Restricting bot users by tags. Bot access is limited by projects only.
 - Bot users creating, updating or deleting projects.

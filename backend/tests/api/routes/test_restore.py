@@ -255,20 +255,22 @@ def test_restoring_would_not_open_a_second_occurrence_of_the_same_series(
         recurrence={"frequency": "weekly"},
     )
     r = client.patch(
-        f"{API}/tasks/{first['id']}", headers=headers, json={"completed": True}
+        f"{API}/tasks/{first['id']}", headers=headers, json={"status": "done"}
     )
     assert r.status_code == 200
     second = next(
         t
         for t in client.get(
-            f"{API}/tasks/", headers=headers, params={"completed": False}
+            f"{API}/tasks/",
+            headers=headers,
+            params={"status": ["todo", "in_progress", "waiting"]},
         ).json()["data"]
         if t["title"] == "Water plants"
     )
     entry = _delete_task(client, headers, second["id"])
     # The earlier occurrence is the latest one left, so it can be reopened.
     r = client.patch(
-        f"{API}/tasks/{first['id']}", headers=headers, json={"completed": False}
+        f"{API}/tasks/{first['id']}", headers=headers, json={"status": "todo"}
     )
     assert r.status_code == 200, r.text
 
@@ -478,7 +480,7 @@ def test_a_project_restore_that_would_reopen_a_series_is_refused_whole(
     )
     _create_task(client, headers, "Fix the tap", project_id=project["id"])
     r = client.patch(
-        f"{API}/tasks/{first['id']}", headers=headers, json={"completed": True}
+        f"{API}/tasks/{first['id']}", headers=headers, json={"status": "done"}
     )
     assert r.status_code == 200
     # The completed occurrence leaves the project; its successor stays in it.
@@ -490,7 +492,7 @@ def test_a_project_restore_that_would_reopen_a_series_is_refused_whole(
     # With the successor deleted, the first occurrence is the latest left and
     # can be reopened, so the series is open again outside the project.
     r = client.patch(
-        f"{API}/tasks/{first['id']}", headers=headers, json={"completed": False}
+        f"{API}/tasks/{first['id']}", headers=headers, json={"status": "todo"}
     )
     assert r.status_code == 200, r.text
 

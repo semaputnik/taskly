@@ -293,12 +293,12 @@ def test_unarchiving_brings_every_task_back_exactly_as_it_was(
     )
     child = _create_task(client, headers, "Child", parent_id=root["id"])
     r = client.patch(
-        f"{API}/tasks/{child['id']}", headers=headers, json={"completed": True}
+        f"{API}/tasks/{child['id']}", headers=headers, json={"status": "done"}
     )
     assert r.status_code == 200, r.text
 
     before = _tasks(client, headers)
-    assert before["Child"]["completed"] is True
+    assert before["Child"]["status"] == "done"
 
     assert _archive(client, headers, project_id).status_code == 200
     assert _tasks(client, headers) == {}
@@ -340,7 +340,7 @@ def _complete_task(client: TestClient, a: Account) -> httpx.Response:
     return client.patch(
         f"{API}/tasks/{a.archived_subtask['id']}",
         headers=a.headers,
-        json={"completed": True},
+        json={"status": "done"},
     )
 
 
@@ -348,7 +348,7 @@ def _reopen_task(client: TestClient, a: Account) -> httpx.Response:
     return client.patch(
         f"{API}/tasks/{a.archived_subtask['id']}",
         headers=a.headers,
-        json={"completed": False},
+        json={"status": "todo"},
     )
 
 
@@ -516,7 +516,7 @@ def test_an_archived_project_stays_readable(client: TestClient, db: Session) -> 
 FILTERS: list[dict[str, object]] = [
     {"tag": "focus"},
     {"priority": "P1"},
-    {"completed": False},
+    {"status": "todo"},
     {"due_from": YESTERDAY.isoformat(), "due_to": YESTERDAY.isoformat()},
     {"overdue": True},
     {"assignee": "me"},

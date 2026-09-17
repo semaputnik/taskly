@@ -246,12 +246,14 @@ def test_a_recurring_task_passes_its_bot_assignee_to_the_next_occurrence(
         },
     ).json()["id"]
 
-    r = client.patch(f"{API}/tasks/{task_id}", headers=owner, json={"completed": True})
+    r = client.patch(f"{API}/tasks/{task_id}", headers=owner, json={"status": "done"})
     assert r.status_code == 200, r.text
 
-    r = client.get(f"{API}/tasks/", headers=owner, params={"completed": False}).json()[
-        "data"
-    ]
+    r = client.get(
+        f"{API}/tasks/",
+        headers=owner,
+        params={"status": ["todo", "in_progress", "waiting"]},
+    ).json()["data"]
     assert [(t["title"], t["assignee_id"]) for t in r] == [("Weekly report", bot_id)]
 
 

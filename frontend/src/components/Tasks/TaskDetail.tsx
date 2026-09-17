@@ -185,7 +185,7 @@ export function TaskDetail({
                         type="button"
                         onClick={() => onOpenTask(child.id)}
                         className={`min-w-0 flex-1 truncate text-left text-sm underline-offset-4 hover:underline ${
-                          child.completed
+                          child.status === "done"
                             ? "text-muted-foreground line-through"
                             : ""
                         }`}
@@ -206,9 +206,9 @@ export function TaskDetail({
                 </p>
               )}
               {/* Adding a subtask belongs with the subtasks, not in a menu
-                    somewhere else on the panel — and it is the same one-field
-                    capture as anywhere else, because a subtask is a full task
-                    rather than a checklist item. */}
+                    somewhere else on the panel. It stays one field: the reader
+                    is working down a list here, and each child opens as a full
+                    task to set the rest. */}
               <SubtaskCapture parent={task} />
             </TabsContent>
 

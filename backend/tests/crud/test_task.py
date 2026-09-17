@@ -3,7 +3,14 @@ import datetime
 from sqlmodel import Session
 
 from app import crud
-from app.models import ProjectCreate, TaskCreate, TaskPriority, TaskUpdate, UserCreate
+from app.models import (
+    ProjectCreate,
+    TaskCreate,
+    TaskPriority,
+    TaskStatus,
+    TaskUpdate,
+    UserCreate,
+)
 from tests.utils.utils import random_email, random_lower_string
 
 
@@ -36,7 +43,7 @@ def test_create_task(db: Session) -> None:
     assert task.description == "2%"
     assert task.due_date == datetime.date(2026, 1, 1)
     assert task.priority == TaskPriority.P2
-    assert task.completed is False
+    assert task.status is TaskStatus.TODO
     assert task.project_id == inbox.id
     assert task.owner_id == user.id
     assert task.assignee_id is None
@@ -98,14 +105,14 @@ def test_complete_and_return_to_not_completed(db: Session) -> None:
     )
 
     completed = crud.update_task(
-        session=db, db_task=task, task_in=TaskUpdate(completed=True)
+        session=db, db_task=task, task_in=TaskUpdate(status=TaskStatus.DONE)
     )
-    assert completed.completed is True
+    assert completed.status is TaskStatus.DONE
 
     not_completed = crud.update_task(
-        session=db, db_task=completed, task_in=TaskUpdate(completed=False)
+        session=db, db_task=completed, task_in=TaskUpdate(status=TaskStatus.TODO)
     )
-    assert not_completed.completed is False
+    assert not_completed.status is TaskStatus.TODO
 
 
 def test_move_task_to_another_project(db: Session) -> None:

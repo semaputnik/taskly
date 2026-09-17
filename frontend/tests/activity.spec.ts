@@ -25,12 +25,12 @@ test("A user's own changes appear on the Activity page, newest first", async ({
 
   await page
     .getByRole("row", { name: /Renew the passport/ })
-    .getByRole("checkbox", { name: "Mark as completed" })
+    .getByRole("checkbox", { name: "Mark as done" })
     .click()
   await expect(
     page
       .getByRole("row", { name: /Renew the passport/ })
-      .getByRole("checkbox", { name: "Mark as not completed" }),
+      .getByRole("checkbox", { name: "Reopen task" }),
   ).toBeVisible()
 
   await page.goto("/activity")

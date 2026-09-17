@@ -9,7 +9,7 @@ export type ClientOptions = {
  *
  * Everything the activity log records (FR-10.3).
  */
-export type ActivityAction = 'task_created' | 'task_changed' | 'tasks_bulk_changed' | 'task_completed' | 'task_reopened' | 'task_deleted' | 'task_restored' | 'task_moved' | 'task_assigned' | 'task_unassigned' | 'project_created' | 'project_changed' | 'project_deleted' | 'project_restored' | 'comment_added' | 'comment_edited' | 'comment_deleted' | 'attachment_added' | 'attachment_deleted' | 'tag_created' | 'tag_renamed' | 'tag_deleted' | 'tag_merged';
+export type ActivityAction = 'task_created' | 'task_changed' | 'tasks_bulk_changed' | 'task_completed' | 'task_reopened' | 'task_status_changed' | 'task_deleted' | 'task_restored' | 'task_moved' | 'task_assigned' | 'task_unassigned' | 'project_created' | 'project_changed' | 'project_deleted' | 'project_restored' | 'comment_added' | 'comment_edited' | 'comment_deleted' | 'attachment_added' | 'attachment_deleted' | 'tag_created' | 'tag_renamed' | 'tag_deleted' | 'tag_merged';
 
 /**
  * ActivityEntityType
@@ -582,7 +582,7 @@ export type ProjectsPublic = {
  * Recurrence
  *
  * How often a recurring task comes back: a fixed interval, never tied to when
- * an occurrence happened to be completed (FR-01.13, FR-01.15).
+ * an occurrence happened to be done (FR-01.13, FR-01.15).
  */
 export type Recurrence = {
     frequency: RecurrenceFrequency;
@@ -605,11 +605,12 @@ export type SortOrder = 'asc' | 'desc';
 /**
  * SubtaskCompletion
  *
- * What a completion request says about the task's uncompleted subtasks.
+ * What a request that moves a task to done says about its open subtasks.
  *
  * Sending neither value is not a default: the request is refused, so a client
- * never completes a parent without saying what happens below it (FR-02.6,
- * FR-02.7).
+ * never closes a parent without saying what happens below it (FR-02.6,
+ * FR-02.7). `complete` moves the subtasks to done; `leave_uncompleted` leaves
+ * each in the open status it has.
  */
 export type SubtaskCompletion = 'leave_uncompleted' | 'complete';
 
@@ -764,10 +765,7 @@ export type TaskBulkUpdate = {
      * Task Ids
      */
     task_ids: Array<string>;
-    /**
-     * Completed
-     */
-    completed?: boolean | null;
+    status?: TaskStatus | null;
     subtasks?: SubtaskCompletion | null;
     priority?: TaskPriority | null;
     /**
@@ -826,6 +824,7 @@ export type TaskCreate = {
      */
     assignee_id?: string | null;
     recurrence?: Recurrence | null;
+    status?: TaskStatus;
 };
 
 /**
@@ -854,10 +853,7 @@ export type TaskPublic = {
      * Id
      */
     id: string;
-    /**
-     * Completed
-     */
-    completed: boolean;
+    status: TaskStatus;
     /**
      * Project Id
      */
@@ -888,6 +884,16 @@ export type TaskPublic = {
 export type TaskSort = 'due_date' | 'priority';
 
 /**
+ * TaskStatus
+ *
+ * Where a task stands (FR-01.4). Four fixed values rather than user-defined
+ * ones (ADR-0004): every rule in the product only needs to know whether a
+ * task is open or done, and the three open values tell apart who holds the
+ * next move.
+ */
+export type TaskStatus = 'todo' | 'in_progress' | 'waiting' | 'done';
+
+/**
  * TaskUpdate
  */
 export type TaskUpdate = {
@@ -912,10 +918,7 @@ export type TaskUpdate = {
      * Assignee Id
      */
     assignee_id?: string | null;
-    /**
-     * Completed
-     */
-    completed?: boolean | null;
+    status?: TaskStatus | null;
     /**
      * Tags
      */
@@ -1576,9 +1579,9 @@ export type tasksReadTasksData = {
          */
         priority?: TaskPriority | null;
         /**
-         * Completed
+         * Status
          */
-        completed?: boolean | null;
+        status?: Array<TaskStatus> | null;
         /**
          * Due From
          */

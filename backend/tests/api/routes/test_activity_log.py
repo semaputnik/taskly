@@ -100,7 +100,7 @@ def test_creating_a_task_is_logged(client: TestClient, db: Session) -> None:
     assert snapshot["project"] == {"id": project["id"], "name": "Home"}
     assert snapshot["priority"] == "P2"
     assert snapshot["tags"] == ["plumbing"]
-    assert snapshot["completed"] is False
+    assert snapshot["status"] == "todo"
 
 
 def test_changing_a_task_is_logged_with_what_changed(
@@ -196,8 +196,8 @@ def test_completing_and_reopening_a_task_are_logged(
     task = _create_task(client, headers, "Call the bank")
     seen = _log(client, headers)
 
-    _patch(client, headers, task["id"], completed=True)
-    _patch(client, headers, task["id"], completed=False)
+    _patch(client, headers, task["id"], status="done")
+    _patch(client, headers, task["id"], status="todo")
 
     actions = [e["action"] for e in _log_after(client, headers, seen)]
     assert actions == ["task_completed", "task_reopened"]
@@ -428,7 +428,7 @@ def test_one_request_with_several_changes_writes_an_entry_for_each(
         title="Print the quarterly report",
         project_id=work["id"],
         assignee_id=_me(client, headers),
-        completed=True,
+        status="done",
     )
 
     actions = [e["action"] for e in _log_after(client, headers, seen)]
@@ -454,7 +454,7 @@ def test_resending_unchanged_fields_writes_nothing(
         title="Call the bank",
         description=None,
         tags=["money"],
-        completed=False,
+        status="todo",
     )
 
     assert _log_after(client, headers, seen) == []
@@ -469,7 +469,7 @@ def test_completing_subtasks_along_with_their_parent_logs_each_completion(
     grandchild = _create_task(client, headers, "Books", parent_id=child["id"])
     seen = _log(client, headers)
 
-    _patch(client, headers, root["id"], completed=True, subtasks="complete")
+    _patch(client, headers, root["id"], status="done", subtasks="complete")
 
     completed = {
         e["entity_id"]
@@ -492,7 +492,7 @@ def test_completing_a_recurring_task_logs_the_next_occurrence(
     )
     seen = _log(client, headers)
 
-    _patch(client, headers, task["id"], completed=True)
+    _patch(client, headers, task["id"], status="done")
 
     completed, created = _log_after(client, headers, seen)
     assert completed["action"] == "task_completed"
@@ -524,7 +524,7 @@ def test_a_refused_change_writes_nothing(client: TestClient, db: Session) -> Non
     r = client.patch(
         f"{API}/tasks/{root['id']}",
         headers=headers,
-        json={"title": "Move flat", "completed": True},
+        json={"title": "Move flat", "status": "done"},
     )
     assert r.status_code == 409
 

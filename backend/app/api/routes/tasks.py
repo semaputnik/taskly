@@ -35,16 +35,18 @@ from app.models import (
     TaskQuery,
     TaskRefusal,
     TasksPublic,
+    TaskStatus,
     TaskUpdate,
 )
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
-# Refusing to complete a parent with open subtasks is a state conflict the
-# client can resolve, not a malformed request: it gets its own status code and
-# a code the frontend matches on to raise the prompt (FR-02.5, FR-02.6).
-UNCOMPLETED_SUBTASKS_STATUS = 409
-UNCOMPLETED_SUBTASKS_CODE = "task_has_uncompleted_subtasks"
+# Refusing to close a parent with open subtasks is a state conflict the client
+# can resolve, not a malformed request: it gets its own status code and a code
+# the frontend matches on to raise the prompt (FR-02.5, FR-02.6). The code
+# keeps its original wording, which clients already match on.
+OPEN_SUBTASKS_STATUS = 409
+OPEN_SUBTASKS_CODE = "task_has_uncompleted_subtasks"
 
 # Deleting takes the whole subtree with it, so the same shape of refusal guards
 # it: the request has to confirm the cascade before anything goes (FR-01.12).
@@ -105,14 +107,24 @@ def _resolve_assignee(
 
 
 def _check_recurrence(
-    *, parent_id: uuid.UUID | None, recurrence: Recurrence | None, due_date: date | None
+    *,
+    parent_id: uuid.UUID | None,
+    recurrence: Recurrence | None,
+    due_date: date | None,
+    status: TaskStatus | None = None,
 ) -> None:
     """
-    A recurring task is a root task with a due date: its next occurrence's due
-    date is counted from this one's, and a subtask's routine is its root's.
+    A recurring task is an open root task with a due date: its next
+    occurrence's due date is counted from this one's, a subtask's routine is
+    its root's, and a series always has one open occurrence.
     """
     if recurrence is None:
         return
+    if status is TaskStatus.DONE:
+        raise HTTPException(
+            status_code=400,
+            detail="Only an open task can recur",
+        )
     if parent_id is not None:
         raise HTTPException(
             status_code=400,
@@ -246,6 +258,7 @@ def create_task(*, session: SessionDep, caller: CallerDep, task_in: TaskCreate) 
         parent_id=task_in.parent_id,
         recurrence=task_in.recurrence,
         due_date=task_in.due_date,
+        status=task_in.status,
     )
 
     if parent is not None:
@@ -398,17 +411,37 @@ def bulk_update_tasks(
             )
             continue
         if (
-            changes.completed is True
+            changes.status is TaskStatus.DONE
             and changes.subtasks is None
-            and crud.has_uncompleted_subtasks(session=session, task=task)
+            and crud.has_open_subtasks(session=session, task=task)
         ):
             refusals.append(
                 TaskRefusal(
                     task_id=task.id,
-                    code=UNCOMPLETED_SUBTASKS_CODE,
+                    code=OPEN_SUBTASKS_CODE,
                     message=(
-                        f"“{task.title}” has uncompleted subtasks. Say whether "
-                        "they are completed too."
+                        f"“{task.title}” has open subtasks. Say whether they "
+                        "are done too."
+                    ),
+                )
+            )
+            continue
+        if (
+            changes.status is not None
+            and changes.status is not TaskStatus.DONE
+            and task.status is TaskStatus.DONE
+            and crud.is_superseded(session=session, task=task)
+        ):
+            # A later occurrence is already open: reopening this one would
+            # leave its series with two (FR-01.16).
+            refusals.append(
+                TaskRefusal(
+                    task_id=task.id,
+                    code=OCCURRENCE_SUPERSEDED_CODE,
+                    message=(
+                        f"“{task.title}” is an earlier occurrence of a "
+                        "recurring task. Only the latest occurrence can be "
+                        "reopened."
                     ),
                 )
             )
@@ -431,6 +464,11 @@ def bulk_update_tasks(
 
     if refusals:
         raise _bulk_refusal(refusals)
+    if changes.subtasks is not None and changes.status is not TaskStatus.DONE:
+        raise HTTPException(
+            status_code=400,
+            detail="`subtasks` only applies to a request that moves tasks to done",
+        )
 
     assignee = None
     if "assignee_id" in changes.model_fields_set:
@@ -456,8 +494,8 @@ def _batch_summary(
     """What the log says a batch did, in the words the reader will see."""
     summary: dict[str, Any] = {}
     fields_set = changes.model_fields_set
-    if "completed" in fields_set:
-        summary["completed"] = changes.completed
+    if "status" in fields_set:
+        summary["status"] = changes.status
     if "priority" in fields_set:
         summary["priority"] = changes.priority
     if "due_date" in fields_set:
@@ -533,12 +571,13 @@ def update_task(
     task_in: TaskUpdate,
 ) -> Any:
     """
-    Update a task: its fields, completion state, assignee, or project.
+    Update a task: its fields, status, assignee, or project.
 
-    Completing a task that still has uncompleted subtasks is refused unless the
-    request says what happens to them, through `subtasks`.
+    Moving a task to done while it still has open subtasks is refused unless
+    the request says what happens to them, through `subtasks`. Moving between
+    open statuses never touches the subtasks.
 
-    Completing an occurrence of a recurring task creates the next one. Moving
+    Moving an occurrence of a recurring task to done creates the next one. Moving
     the due date of an open occurrence needs `due_date_scope` to say whether
     the rest of the series moves with it.
 
@@ -585,23 +624,23 @@ def update_task(
             current=crud.Assignee(task.assignee_id, task.assignee_bot_user_id),
         )
 
-    if task_in.subtasks is not None and task_in.completed is not True:
+    if task_in.subtasks is not None and task_in.status is not TaskStatus.DONE:
         raise HTTPException(
             status_code=400,
-            detail="`subtasks` only applies to a request that completes the task",
+            detail="`subtasks` only applies to a request that moves the task to done",
         )
 
-    if task_in.completed is True and crud.has_uncompleted_subtasks(
+    if task_in.status is TaskStatus.DONE and crud.has_open_subtasks(
         session=session, task=task
     ):
         if task_in.subtasks is None:
             raise HTTPException(
-                status_code=UNCOMPLETED_SUBTASKS_STATUS,
+                status_code=OPEN_SUBTASKS_STATUS,
                 detail={
-                    "code": UNCOMPLETED_SUBTASKS_CODE,
+                    "code": OPEN_SUBTASKS_CODE,
                     "message": (
-                        "This task has uncompleted subtasks. Say whether they "
-                        "stay uncompleted or are completed too."
+                        "This task has open subtasks. Say whether they stay "
+                        "as they are or are done too."
                     ),
                 },
             )
@@ -636,14 +675,15 @@ def _check_recurrence_update(
     recurrence = task_in.recurrence if "recurrence" in fields_set else current
     due_date = task_in.due_date if "due_date" in fields_set else task.due_date
     recurrence_changes = recurrence != current
+    is_done = task.status is TaskStatus.DONE
 
     if recurrence_changes:
-        if task.completed:
+        if is_done:
             # Its series has already moved on, or it would start one that
-            # nothing ever completes into a next occurrence.
+            # nothing ever moves to done to create a next occurrence.
             raise HTTPException(
                 status_code=400,
-                detail="Only a task that is not completed can change how it recurs",
+                detail="Only an open task can change how it recurs",
             )
         _check_recurrence(
             parent_id=task.parent_id, recurrence=recurrence, due_date=due_date
@@ -655,7 +695,7 @@ def _check_recurrence_update(
     # date moving on its own asks what happens to the rest of the series.
     reschedules = (
         current is not None
-        and not task.completed
+        and not is_done
         and not recurrence_changes
         and due_date != task.due_date
     )
@@ -675,13 +715,14 @@ def _check_recurrence_update(
             status_code=400,
             detail=(
                 "`due_date_scope` only applies to changing the due date of a "
-                "recurring task that is not completed"
+                "recurring task that is open"
             ),
         )
 
     if (
-        task_in.completed is False
-        and task.completed
+        task_in.status is not None
+        and task_in.status is not TaskStatus.DONE
+        and is_done
         and crud.is_superseded(session=session, task=task)
     ):
         raise HTTPException(
@@ -690,7 +731,7 @@ def _check_recurrence_update(
                 "code": OCCURRENCE_SUPERSEDED_CODE,
                 "message": (
                     "A later occurrence of this recurring task already exists. "
-                    "Only the latest occurrence can be returned to not completed."
+                    "Only the latest occurrence can be reopened."
                 ),
             },
         )

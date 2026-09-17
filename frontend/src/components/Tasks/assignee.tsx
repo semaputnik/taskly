@@ -10,23 +10,14 @@ import {
 } from "@/components/ui/select"
 import { cn } from "@/lib/utils"
 
-// The form's values: nobody, the user, or a bot user's id as it is.
-const UNASSIGNED = "unassigned"
-export const ASSIGNED_TO_ME = "me"
+import { ASSIGNED_TO_ME, UNASSIGNED } from "./draft"
+
+export { ASSIGNED_TO_ME, toAssigneeId } from "./draft"
 
 /** What the form starts from for a task. */
 export function assigneeFormValue(task: TaskPublic): string {
   if (task.assignee_bot_user) return task.assignee_bot_user.id
   return task.assignee_id ? ASSIGNED_TO_ME : UNASSIGNED
-}
-
-/** The `assignee_id` the API takes for a form value. */
-export function toAssigneeId(
-  value: string | undefined,
-  currentUserId: string | undefined,
-): string | null {
-  if (!value || value === UNASSIGNED) return null
-  return value === ASSIGNED_TO_ME ? (currentUserId ?? null) : value
 }
 
 export function useBotUsers() {

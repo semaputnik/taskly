@@ -48,7 +48,7 @@ Taskly is self-hosted, and the data stays on the owner's own server. That is the
 
 ## Capabilities and Constraints
 
-- **Tasks.** A task has a title, description, due date (date only), priority P1–P4, an optional assignee (the user or one of their bot users), tags, and a recurrence rule (daily, weekly, monthly or every N days). A completed recurring task spawns its next occurrence as a new task.
+- **Tasks.** A task has a title, description, due date (date only), priority P1–P4, an optional assignee (the user or one of their bot users), tags, and a recurrence rule (daily, weekly, monthly or every N days). A task is To do, In progress, Waiting or Done; Waiting stays open, and moving a recurring task to Done spawns its next occurrence as a new task.
 - **Subtasks** nest to any depth and are full tasks. A subtask belongs to the project of its root task.
 - **Projects** are flat. Every user has an Inbox that cannot be renamed or deleted. Projects can be archived, which is distinct from deleted: an archived project is read-only for the human and invisible to bots.
 - **Deletion** of tasks and projects is soft and restorable from the activity log. Tag deletes and merges, comment and attachment deletion, and bot-user deletion cannot be undone.
@@ -56,7 +56,6 @@ Taskly is self-hosted, and the data stays on the owner's own server. That is the
 - **Bot users** are deliberately weak. They have no login, no password and no email. Their scope is an explicit list of projects plus permissions (task create/read/update/delete, comments, tag creation). They never reach archived projects, never read the activity log, and cannot edit or delete comments. Their comments are append-only.
 - **Out of scope:**
   - collaboration between humans;
-  - workflow statuses beyond completed and not completed;
   - text search;
   - nested projects;
   - giving a bot access to all projects at once.

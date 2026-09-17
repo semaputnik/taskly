@@ -88,7 +88,7 @@ def test_the_narrowed_feed_is_the_same_entries_as_the_whole_log(
     task_id = create_task(client, bot, project_id=project_id, title="Second")
     assert (
         client.patch(
-            f"{API}/tasks/{task_id}", headers=bot, json={"completed": True}
+            f"{API}/tasks/{task_id}", headers=bot, json={"status": "done"}
         ).status_code
         == 200
     )

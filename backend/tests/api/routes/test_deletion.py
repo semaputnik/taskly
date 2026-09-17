@@ -240,10 +240,10 @@ def test_a_deleted_subtask_does_not_block_completing_its_parent(
     r = client.patch(
         f"{settings.API_V1_STR}/tasks/{root['id']}",
         headers=headers,
-        json={"completed": True},
+        json={"status": "done"},
     )
     assert r.status_code == 200
-    assert r.json()["completed"] is True
+    assert r.json()["status"] == "done"
 
 
 def test_a_deleted_task_cannot_be_used_as_a_parent(
