@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query"
+import { useSuspenseQuery } from "@tanstack/react-query"
 import { Link as RouterLink } from "@tanstack/react-router"
 import { ArrowRight, Bot } from "lucide-react"
 
@@ -12,13 +12,37 @@ import { timeAgo } from "./when"
 
 const PREVIEW_ROWS = 6
 
-function Rows() {
-  return Array.from({ length: 3 }).map((_, index) => (
-    <div key={index} className="flex flex-col gap-2 border-b px-4 py-3">
-      <Skeleton className="h-3 w-24" />
-      <Skeleton className="h-4 w-44" />
+export const recentActivityQueryOptions = {
+  queryKey: ["activity", { skip: 0, limit: PREVIEW_ROWS }],
+  queryFn: async () =>
+    (
+      await ActivityService.readActivityLog({
+        query: { skip: 0, limit: PREVIEW_ROWS },
+      })
+    ).data,
+}
+
+function Header() {
+  return (
+    <h2 className="bg-muted/50 border-b px-4 py-2.5 text-xs font-semibold tracking-wider uppercase">
+      While you were away
+    </h2>
+  )
+}
+
+/** The card while its entries are on their way. */
+export function WhileYouWereAwayPending() {
+  return (
+    <div className="bg-card overflow-hidden rounded-lg border">
+      <Header />
+      {Array.from({ length: 3 }).map((_, index) => (
+        <div key={index} className="flex flex-col gap-2 border-b px-4 py-3">
+          <Skeleton className="h-3 w-24" />
+          <Skeleton className="h-4 w-44" />
+        </div>
+      ))}
     </div>
-  ))
+  )
 }
 
 /**
@@ -28,27 +52,14 @@ function Rows() {
  */
 export function WhileYouWereAway() {
   const { user: currentUser } = useAuth()
-  const { data, isPending } = useQuery({
-    queryKey: ["activity", { skip: 0, limit: PREVIEW_ROWS }],
-    queryFn: async () =>
-      (
-        await ActivityService.readActivityLog({
-          query: { skip: 0, limit: PREVIEW_ROWS },
-        })
-      ).data,
-  })
-
-  const entries = data?.data ?? []
+  const { data } = useSuspenseQuery(recentActivityQueryOptions)
+  const entries = data.data
 
   return (
     <div className="bg-card overflow-hidden rounded-lg border">
-      <h2 className="bg-muted/50 border-b px-4 py-2.5 text-xs font-semibold tracking-wider uppercase">
-        While you were away
-      </h2>
+      <Header />
 
-      {isPending ? (
-        <Rows />
-      ) : entries.length === 0 ? (
+      {entries.length === 0 ? (
         <div className="flex flex-col items-center gap-2 px-6 py-12 text-center">
           <Bot className="text-muted-foreground size-6" aria-hidden />
           <p className="font-medium">Nothing has happened yet</p>

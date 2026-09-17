@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query"
+import { useSuspenseQueries } from "@tanstack/react-query"
 import { Link as RouterLink } from "@tanstack/react-router"
 import { ArrowRight, CheckCheck } from "lucide-react"
 
@@ -97,7 +97,9 @@ function TaskRow({
         {task.title}
       </RouterLink>
       {projectName && (
-        <span className="text-muted-foreground hidden text-sm sm:inline">
+        // Capped and truncated: a long project name must not squeeze the
+        // task's own title out of its row.
+        <span className="text-muted-foreground hidden max-w-[40%] shrink-0 truncate text-sm sm:inline">
           {projectName}
         </span>
       )}
@@ -113,13 +115,25 @@ function TaskRow({
   )
 }
 
-function Rows({ count }: { count: number }) {
-  return Array.from({ length: count }).map((_, index) => (
-    <div key={index} className="flex items-center gap-3 border-b px-4 py-3">
-      <Skeleton className="size-4 rounded-[4px]" />
-      <Skeleton className="h-4 w-48" />
+/** The sheet while its bands are on their way. */
+export function NeedsYouPending() {
+  return (
+    <div className="bg-card overflow-hidden rounded-lg border">
+      {["Overdue", "Due today"].map((label) => (
+        <Group key={label} label={label} count={0}>
+          {Array.from({ length: 2 }).map((_, index) => (
+            <div
+              key={index}
+              className="flex items-center gap-3 border-b px-4 py-3"
+            >
+              <Skeleton className="size-4 rounded-[4px]" />
+              <Skeleton className="h-4 w-48" />
+            </div>
+          ))}
+        </Group>
+      ))}
     </div>
-  ))
+  )
 }
 
 /**
@@ -128,46 +142,40 @@ function Rows({ count }: { count: number }) {
  * anything longer than a few rows hands off to Tasks.
  */
 export function NeedsYou() {
-  const overdue = useQuery(actionable({ overdue: true, limit: PREVIEW_ROWS }))
-  const due = useQuery(
-    actionable({ due_from: today(), due_to: today(), limit: PREVIEW_ROWS }),
-  )
-  const week = useQuery(
-    actionable({ due_from: tomorrow(), due_to: inAWeek(), limit: 1 }),
-  )
-  // Soonest first, undated last: the API sorts a missing date to the end.
-  const waiting = useQuery(
-    tasksIn(WAITING, { sort: "due_date", limit: PREVIEW_ROWS }),
-  )
-  const { data: projects } = useQuery({
-    queryKey: ["projects"],
-    queryFn: async () =>
-      (await ProjectsService.readProjects({ query: { skip: 0, limit: 100 } }))
-        .data,
+  // One hook, so the five requests run side by side, and the sheet is drawn
+  // once they have all answered: a band that arrived on its own would push the
+  // sheet, and the log below it on a phone, down after first paint.
+  const [overdue, due, week, waiting, projects] = useSuspenseQueries({
+    queries: [
+      actionable({ overdue: true, limit: PREVIEW_ROWS }),
+      actionable({ due_from: today(), due_to: today(), limit: PREVIEW_ROWS }),
+      actionable({ due_from: tomorrow(), due_to: inAWeek(), limit: 1 }),
+      // Soonest first, undated last: the API sorts a missing date to the end.
+      tasksIn(WAITING, { sort: "due_date", limit: PREVIEW_ROWS }),
+      {
+        queryKey: ["projects"],
+        queryFn: async () =>
+          (
+            await ProjectsService.readProjects({
+              query: { skip: 0, limit: 100 },
+            })
+          ).data,
+      },
+    ],
   })
 
   const names = Object.fromEntries(
-    (projects?.data ?? []).map((project) => [project.id, project.name]),
+    projects.data.data.map((project) => [project.id, project.name]),
   )
-  const isPending = overdue.isPending || due.isPending
-  const overdueCount = overdue.data?.count ?? 0
-  const dueCount = due.data?.count ?? 0
-  const weekCount = week.data?.count ?? 0
-  const waitingCount = waiting.data?.count ?? 0
-  const clear = !isPending && overdueCount === 0 && dueCount === 0
+  const overdueCount = overdue.data.count
+  const dueCount = due.data.count
+  const weekCount = week.data.count
+  const waitingCount = waiting.data.count
+  const clear = overdueCount === 0 && dueCount === 0
 
   return (
     <div className="bg-card overflow-hidden rounded-lg border">
-      {isPending ? (
-        <>
-          <Group label="Overdue" count={0}>
-            <Rows count={2} />
-          </Group>
-          <Group label="Due today" count={0}>
-            <Rows count={2} />
-          </Group>
-        </>
-      ) : clear ? (
+      {clear ? (
         <Group label="Due today" count={0}>
           <div className="flex flex-col items-center gap-2 px-6 py-12 text-center">
             <CheckCheck className="text-muted-foreground size-6" aria-hidden />
@@ -183,7 +191,7 @@ export function NeedsYou() {
         <>
           {overdueCount > 0 && (
             <Group label="Overdue" count={overdueCount} tone="alert">
-              {overdue.data?.data.map((task) => (
+              {overdue.data.data.map((task) => (
                 <TaskRow
                   key={task.id}
                   task={task}
@@ -208,7 +216,7 @@ export function NeedsYou() {
 
           {dueCount > 0 && (
             <Group label="Due today" count={dueCount}>
-              {due.data?.data.map((task) => (
+              {due.data.data.map((task) => (
                 <TaskRow
                   key={task.id}
                   task={task}
@@ -230,7 +238,7 @@ export function NeedsYou() {
         </>
       )}
 
-      {!isPending && weekCount > 0 && !clear && (
+      {weekCount > 0 && !clear && (
         <RouterLink
           to="/tasks"
           search={{
@@ -250,10 +258,10 @@ export function NeedsYou() {
       {/* After This week, and only when something is waiting: what the owner
           has to chase rather than do. It stands whether or not the rest is
           clear, since being clear of work is not being clear of waits. */}
-      {!waiting.isPending && waitingCount > 0 && (
+      {waitingCount > 0 && (
         <div className="border-t">
           <Group label="Waiting on others" count={waitingCount}>
-            {waiting.data?.data.map((task) => (
+            {waiting.data.data.map((task) => (
               <TaskRow
                 key={task.id}
                 task={task}

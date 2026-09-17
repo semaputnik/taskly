@@ -1,4 +1,4 @@
-import { useSuspenseQuery } from "@tanstack/react-query"
+import { usePrefetchQuery, useSuspenseQuery } from "@tanstack/react-query"
 import { createFileRoute } from "@tanstack/react-router"
 import { Plus, Tag } from "lucide-react"
 import { Suspense } from "react"
@@ -9,7 +9,10 @@ import { EmptyState } from "@/components/Common/EmptyState"
 import PendingTags from "@/components/Pending/PendingTags"
 import { useRecordPanels } from "@/components/Records/panels"
 import { columns } from "@/components/Tags/columns"
-import { DuplicateGroups } from "@/components/Tags/DuplicateGroups"
+import {
+  DuplicateGroups,
+  duplicatesQueryOptions,
+} from "@/components/Tags/DuplicateGroups"
 import { Button } from "@/components/ui/button"
 
 // Under "tags", so creating, renaming and deleting refresh autocomplete and the
@@ -66,6 +69,10 @@ function TagsTableContent({
  */
 function Tags() {
   const { openTag, capture } = useRecordPanels()
+  // Both requests start now, side by side, rather than one after the other as
+  // each suspends in turn.
+  usePrefetchQuery(getTagsQueryOptions())
+  usePrefetchQuery(duplicatesQueryOptions)
 
   return (
     <div className="flex flex-col gap-6">
@@ -81,8 +88,8 @@ function Tags() {
           Add Tag
         </Button>
       </div>
-      <DuplicateGroups onOpenTag={openTag} />
       <Suspense fallback={<PendingTags />}>
+        <DuplicateGroups onOpenTag={openTag} />
         <TagsTableContent onOpen={openTag} onAdd={() => capture("tag")} />
       </Suspense>
     </div>

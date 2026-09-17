@@ -1563,6 +1563,10 @@ export type tasksReadTasksData = {
          */
         project_id?: string | null;
         /**
+         * Parent Id
+         */
+        parent_id?: string | null;
+        /**
          * Assignee Id
          */
         assignee_id?: string | null;
