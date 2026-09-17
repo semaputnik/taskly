@@ -137,6 +137,39 @@ In the repository, go to **Settings** > **Secrets and variables** > **Actions** 
 
 Add the `DOCKERHUB_TOKEN` repository secret: a Docker Hub [access token](https://docs.docker.com/security/for-developers/access-tokens/) with **Read & Write** permission.
 
+## Run a Published Image on a Server
+
+The `compose.release.yml` file runs the published image instead of building from source. It is self-contained: the server needs only this file and an `.env` beside it, so there is no checkout to keep in sync and no build to wait for.
+
+Copy the two files to the server:
+
+```bash
+scp compose.release.yml .env.release.example root@your-server.example.com:/root/taskly/
+```
+
+On the server, create the `.env` and replace every placeholder in it:
+
+```bash
+cd /root/taskly
+mv .env.release.example .env
+```
+
+Set `TASKLY_IMAGE` to the published image, such as `docker.io/your-account/taskly`, and `TASKLY_TAG` to the released version, such as `1.2.3`. Pinning the version rather than `latest` means a restart brings back the same image. The application refuses to start while `SECRET_KEY`, `FIRST_SUPERUSER_PASSWORD` or `POSTGRES_PASSWORD` is still `changethis`.
+
+For an image in a private Docker Hub repository, log in on the server first with `docker login`.
+
+Then pull the image, prepare the database, and start the application:
+
+```bash
+docker compose -f compose.release.yml pull
+docker compose -f compose.release.yml run --rm backend bash scripts/prestart.sh
+docker compose -f compose.release.yml up -d
+```
+
+To release a new version, set `TASKLY_TAG` to it and repeat those three commands.
+
+The stack is named `taskly`, so its volumes are `taskly_app-db-data` and `taskly_attachments-data` wherever the file is placed. A server already running the build-from-source stack from `/root/code/app` keeps its data under that directory's project name instead, so moving to `compose.release.yml` there starts from empty volumes unless the data is migrated across.
+
 ## URLs
 
 Replace `fastapi-project.example.com` with your domain.
