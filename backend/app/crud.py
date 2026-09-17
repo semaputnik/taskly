@@ -1009,30 +1009,43 @@ def get_task_project_id(*, session: Session, task: Task) -> uuid.UUID:
 
 
 def get_task_project_ids(
-    *, session: Session, owner_id: uuid.UUID
+    *, session: Session, owner_id: uuid.UUID, task_ids: Collection[uuid.UUID]
 ) -> dict[uuid.UUID, uuid.UUID]:
     """
-    The project every one of a user's tasks belongs to, keyed by task id.
+    The project each of `task_ids` belongs to, keyed by task id.
 
-    One walk down from the root tasks resolves whole trees at once, so listing
-    tasks does not cost a query per subtask.
+    One walk up from those tasks to their roots, in a single query: the cost
+    follows the tasks asked about and their depth, not the size of the
+    account, and listing tasks does not cost a query per subtask.
+
+    A task that is deleted, or that hangs under a deleted ancestor, is left
+    out: the walk stops at the first deleted task, so it never reaches a root.
+    Callers rely on that to tell a live task from one that is gone.
     """
-    tree = (
-        select(Task.id, Task.project_id)
+    if not task_ids:
+        return {}
+    walk = (
+        select(
+            col(Task.id).label("task_id"),
+            col(Task.parent_id).label("parent_id"),
+            col(Task.project_id).label("project_id"),
+        )
         .where(
+            col(Task.id).in_(set(task_ids)),
             Task.owner_id == owner_id,
-            col(Task.parent_id).is_(None),
             not_deleted(Task),
         )
-        .cte("task_projects", recursive=True)
+        .cte("task_ancestry", recursive=True)
     )
-    child = aliased(Task)
-    tree = tree.union_all(
-        select(child.id, tree.c.project_id)
-        .join(tree, col(child.parent_id) == tree.c.id)
-        .where(not_deleted(child))
+    parent = aliased(Task)
+    walk = walk.union_all(
+        select(walk.c.task_id, parent.parent_id, parent.project_id)
+        .join(walk, col(parent.id) == walk.c.parent_id)
+        .where(not_deleted(parent))
     )
-    rows = session.exec(select(tree.c.id, tree.c.project_id)).all()
+    rows = session.exec(
+        select(walk.c.task_id, walk.c.project_id).where(walk.c.parent_id.is_(None))
+    ).all()
     return dict(rows)
 
 
