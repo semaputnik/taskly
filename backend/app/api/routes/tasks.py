@@ -3,25 +3,14 @@ from datetime import date
 from typing import Annotated, Any
 
 from fastapi import APIRouter, HTTPException, Query
-from sqlmodel import col, select
 
-from app import activity, crud
-from app.api import authorization
-from app.api.authorization import TaskAction
-from app.api.deps import (
-    PROJECT_ARCHIVED_CODE,
-    Caller,
-    CallerDep,
-    CurrentUser,
-    SessionDep,
-    get_owned_project,
-    require_project_writable,
-    require_task_writable,
-)
+from app import activity, crud, deletions
+from app.api import access
+from app.api.access import TaskAction
+from app.api.deps import Caller, CallerDep, CurrentUser, SessionDep
 from app.models import (
     ActivityAction,
     BotUser,
-    BotUserRef,
     BulkResult,
     Message,
     Project,
@@ -38,6 +27,7 @@ from app.models import (
     TaskStatus,
     TaskUpdate,
 )
+from app.read_models import task_publics
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
@@ -134,46 +124,6 @@ def _check_recurrence(
         raise HTTPException(status_code=400, detail="A recurring task needs a due date")
 
 
-def _public(
-    task: Task,
-    *,
-    project_id: uuid.UUID,
-    tags: list[str],
-    recurrence: Recurrence | None,
-    bot_users: dict[uuid.UUID, BotUserRef],
-) -> TaskPublic:
-    """
-    A task as the API reports it, with the project it resolves to, its tags,
-    its recurrence and its assignee filled in. Listings resolve them in bulk;
-    `_read` does one task.
-    """
-    return TaskPublic.model_validate(
-        task,
-        update={
-            "project_id": project_id,
-            "tags": tags,
-            "recurrence": recurrence,
-            "assignee_id": task.assignee_id or task.assignee_bot_user_id,
-            "assignee_bot_user": bot_users.get(task.assignee_bot_user_id)
-            if task.assignee_bot_user_id
-            else None,
-        },
-    )
-
-
-def _read(session: SessionDep, task: Task) -> TaskPublic:
-    """One task, with everything the API reports about it looked up."""
-    return _public(
-        task,
-        project_id=crud.get_task_project_id(session=session, task=task),
-        tags=crud.get_task_tags(session=session, task_ids=[task.id])[task.id],
-        recurrence=crud.get_recurrences(session=session, tasks=[task])[task.id],
-        bot_users=crud.get_bot_user_refs(
-            session=session, bot_user_ids=[task.assignee_bot_user_id]
-        ),
-    )
-
-
 @router.get("/", response_model=TasksPublic)
 def read_tasks(
     session: SessionDep,
@@ -188,17 +138,17 @@ def read_tasks(
     archive.
     """
     if query.archived:
-        authorization.refuse_archived_for_bot(caller)
+        access.refuse_archived_for_bot(caller)
     if query.project_id is not None:
         # 404 rather than an empty list: a project the user cannot see is not a
         # project with no tasks.
-        authorization.get_project(session, caller, query.project_id)
+        access.get_project(session, caller, query.project_id)
     else:
-        authorization.authorize_tasks(caller, TaskAction.READ)
+        access.authorize_tasks(caller, TaskAction.READ)
     if query.parent_id is not None:
         # Likewise for a parent: a task the caller cannot read is not a task
         # without subtasks.
-        authorization.get_task(session, caller, query.parent_id, TaskAction.READ)
+        access.get_task(session, caller, query.parent_id, TaskAction.READ)
 
     tasks, count = crud.get_tasks(
         session=session,
@@ -206,29 +156,7 @@ def read_tasks(
         query=query,
         project_ids=caller.project_ids if caller.bot else None,
     )
-    project_ids = crud.get_task_project_ids(
-        session=session,
-        owner_id=caller.owner_id,
-        task_ids=[task.id for task in tasks],
-    )
-    tags = crud.get_task_tags(session=session, task_ids=[task.id for task in tasks])
-    recurrences = crud.get_recurrences(session=session, tasks=tasks)
-    bot_users = crud.get_bot_user_refs(
-        session=session, bot_user_ids=[task.assignee_bot_user_id for task in tasks]
-    )
-    return TasksPublic(
-        data=[
-            _public(
-                task,
-                project_id=project_ids[task.id],
-                tags=tags[task.id],
-                recurrence=recurrences[task.id],
-                bot_users=bot_users,
-            )
-            for task in tasks
-        ],
-        count=count,
-    )
+    return TasksPublic(data=task_publics(session, tasks), count=count)
 
 
 @router.post("/", response_model=TaskPublic)
@@ -245,21 +173,26 @@ def create_task(*, session: SessionDep, caller: CallerDep, task_in: TaskCreate) 
     yet (FR-08.9).
     """
     # Where the task goes is settled first, so a bot user is refused by its
-    # scope before anything about the request itself is looked at.
-    parent: Task | None = None
+    # scope, and anyone by the archive, before anything about the request
+    # itself is looked at.
+    is_subtask = task_in.parent_id is not None
     if task_in.parent_id is not None:
-        parent = authorization.get_task(
+        project = access.get_task(
             session, caller, task_in.parent_id, TaskAction.CREATE
-        )
+        ).project
     elif task_in.project_id is not None:
-        project = authorization.get_project(
+        project = access.get_project(
             session, caller, task_in.project_id, TaskAction.CREATE
         )
     else:
-        project = crud.get_inbox_project(session=session, owner_id=caller.owner_id)
-        authorization.authorize_tasks(caller, TaskAction.CREATE, project)
+        project = access.get_project(
+            session,
+            caller,
+            crud.get_inbox_project(session=session, owner_id=caller.owner_id).id,
+            TaskAction.CREATE,
+        )
     tag_names = _unique(task_in.tags)
-    authorization.authorize_tag_names(session, caller, tag_names)
+    access.authorize_tag_names(session, caller, tag_names)
 
     assignee = _resolve_assignee(session, caller, task_in.assignee_id)
     _check_recurrence(
@@ -269,28 +202,23 @@ def create_task(*, session: SessionDep, caller: CallerDep, task_in: TaskCreate) 
         status=task_in.status,
     )
 
-    if parent is not None:
-        require_task_writable(session, parent.id)
-        if task_in.project_id is not None:
-            raise HTTPException(
-                status_code=400,
-                detail="A subtask belongs to the project of its parent",
-            )
-        # The subtask's own project is derived from its parent's tree.
-        project_id = None
-    else:
-        require_project_writable(project)
-        project_id = project.id
+    if is_subtask and task_in.project_id is not None:
+        raise HTTPException(
+            status_code=400,
+            detail="A subtask belongs to the project of its parent",
+        )
 
     task = crud.create_task(
         session=session,
         task_create=task_in,
-        project_id=project_id,
+        # A subtask's own project is derived from its parent's tree.
+        project_id=None if is_subtask else project.id,
         owner_id=caller.owner_id,
         assignee=assignee,
         tag_names=tag_names,
     )
-    return _read(session, task)
+    [public] = task_publics(session, [task], projects={task.id: project.id})
+    return public
 
 
 # A batch is one act over a selection, and it lands whole or not at all: the
@@ -314,69 +242,6 @@ def _bulk_refusal(refusals: list[TaskRefusal]) -> HTTPException:
     )
 
 
-def _projects_of(
-    session: SessionDep, current_user: CurrentUser, tasks: list[Task]
-) -> dict[uuid.UUID, Project]:
-    """
-    The project each task resolves to, in one walk up from the batch rather
-    than one per task: a batch may name hundreds.
-    """
-    if not tasks:
-        return {}
-    project_ids = crud.get_task_project_ids(
-        session=session,
-        owner_id=current_user.id,
-        task_ids=[task.id for task in tasks],
-    )
-    projects = {
-        project.id: project
-        for project in session.exec(
-            select(Project).where(
-                col(Project.id).in_({project_ids[task.id] for task in tasks})
-            )
-        ).all()
-    }
-    return {task.id: projects[project_ids[task.id]] for task in tasks}
-
-
-def _archived_refusal(task: Task, project: Project) -> TaskRefusal:
-    return TaskRefusal(
-        task_id=task.id,
-        code=PROJECT_ARCHIVED_CODE,
-        message=(
-            f"“{task.title}” is in the archived project “{project.name}”, "
-            "which is read-only."
-        ),
-    )
-
-
-def _owned_tasks(
-    session: SessionDep,
-    current_user: CurrentUser,
-    task_ids: list[uuid.UUID],
-) -> tuple[list[Task], list[TaskRefusal]]:
-    """
-    The caller's own tasks among those named, and a refusal for each of the
-    rest. A task somebody else owns is refused exactly like one that does not
-    exist: the batch says nothing about whose it is.
-    """
-    tasks: list[Task] = []
-    refusals: list[TaskRefusal] = []
-    for task_id in dict.fromkeys(task_ids):
-        task = session.get(Task, task_id)
-        if not task or task.owner_id != current_user.id or task.deletion_id:
-            refusals.append(
-                TaskRefusal(
-                    task_id=task_id,
-                    code="not_found",
-                    message="This task is not there any more.",
-                )
-            )
-            continue
-        tasks.append(task)
-    return tasks, refusals
-
-
 @router.post("/bulk", response_model=BulkResult)
 def bulk_update_tasks(
     *, session: SessionDep, current_user: CurrentUser, changes: TaskBulkUpdate
@@ -392,7 +257,11 @@ def bulk_update_tasks(
     All-or-nothing: every task is checked before any of them is written, so a
     selection that cannot be changed whole is not changed at all.
     """
-    tasks, refusals = _owned_tasks(session, current_user, changes.task_ids)
+    caller = Caller(owner_id=current_user.id)
+    resolved, refusals = access.get_tasks(
+        session, caller, changes.task_ids, TaskAction.UPDATE
+    )
+    tasks = [each.task for each in resolved]
 
     destination = None
     if "project_id" in changes.model_fields_set:
@@ -400,16 +269,12 @@ def bulk_update_tasks(
             raise HTTPException(
                 status_code=400, detail="A task must belong to a project"
             )
-        destination = get_owned_project(session, current_user, changes.project_id)
-        require_project_writable(destination)
+        destination = access.get_project(
+            session, caller, changes.project_id, TaskAction.UPDATE
+        )
     moving = destination is not None
 
-    projects = _projects_of(session, current_user, tasks)
     for task in tasks:
-        project = projects[task.id]
-        if project.is_archived:
-            refusals.append(_archived_refusal(task, project))
-            continue
         if moving and task.parent_id is not None:
             refusals.append(
                 TaskRefusal(
@@ -484,9 +349,7 @@ def bulk_update_tasks(
 
     assignee = None
     if "assignee_id" in changes.model_fields_set:
-        assignee = _resolve_assignee(
-            session, Caller(owner_id=current_user.id), changes.assignee_id
-        )
+        assignee = _resolve_assignee(session, caller, changes.assignee_id)
 
     activity.set_batch(
         session,
@@ -537,15 +400,14 @@ def bulk_delete_tasks(
     until the request says it may — the same confirmation the single-task
     delete asks for (FR-01.12).
     """
-    tasks, refusals = _owned_tasks(session, current_user, request.task_ids)
-    projects = _projects_of(session, current_user, tasks)
+    # The archive is refused like every other obstacle: a batch says which
+    # tasks stood in the way, rather than stopping at the first one.
+    resolved, refusals = access.get_tasks(
+        session, Caller(owner_id=current_user.id), request.task_ids, TaskAction.DELETE
+    )
+    tasks = [each.task for each in resolved]
     for task in tasks:
-        project = projects[task.id]
-        if project.is_archived:
-            # Collected like every other refusal: a batch says which tasks
-            # stood in the way, rather than stopping at the first one.
-            refusals.append(_archived_refusal(task, project))
-        elif not request.delete_subtasks and crud.has_subtasks(
+        if not request.delete_subtasks and crud.has_subtasks(
             session=session, task=task
         ):
             refusals.append(
@@ -561,8 +423,8 @@ def bulk_delete_tasks(
     if refusals:
         raise _bulk_refusal(refusals)
 
-    deleted = crud.bulk_delete_tasks(session=session, tasks=tasks)
-    return BulkResult(deleted=deleted)
+    deletion_id = deletions.delete_tasks(session, tasks)
+    return BulkResult(deleted=len(deletions.marked_task_ids(session, deletion_id)))
 
 
 @router.get("/{task_id}", response_model=TaskPublic)
@@ -570,8 +432,11 @@ def read_task(*, session: SessionDep, caller: CallerDep, task_id: uuid.UUID) -> 
     """
     Retrieve a single task.
     """
-    task = authorization.get_task(session, caller, task_id, TaskAction.READ)
-    return _read(session, task)
+    resolved = access.get_task(session, caller, task_id, TaskAction.READ)
+    [public] = task_publics(
+        session, [resolved.task], projects={task_id: resolved.project.id}
+    )
+    return public
 
 
 @router.patch("/{task_id}", response_model=TaskPublic)
@@ -597,12 +462,11 @@ def update_task(
     too (FR-08.8). It applies and removes its owner's tags freely, and needs
     the permission to create tags for a name that is not one yet (FR-08.9).
     """
-    task = authorization.get_task(session, caller, task_id, TaskAction.UPDATE)
+    resolved = access.get_task(session, caller, task_id, TaskAction.UPDATE)
+    task, project_id = resolved.task, resolved.project.id
     tag_names = _unique(task_in.tags) if task_in.tags is not None else None
-    authorization.authorize_tag_names(session, caller, tag_names)
-    require_task_writable(session, task.id)
-    project_id = crud.get_task_project_id(session=session, task=task)
-    _check_recurrence_update(session=session, task=task, task_in=task_in)
+    access.authorize_tag_names(session, caller, tag_names)
+    recurrence = _check_recurrence_update(session=session, task=task, task_in=task_in)
 
     if "project_id" in task_in.model_fields_set:
         if task_in.project_id is None:
@@ -620,11 +484,7 @@ def update_task(
         # Moving a task in is as much a change to the destination as creating
         # one there. For a bot the source was checked with the task, so work
         # can neither leave its scope nor enter from outside it.
-        require_project_writable(
-            authorization.get_project(
-                session, caller, task_in.project_id, TaskAction.UPDATE
-            )
-        )
+        access.get_project(session, caller, task_in.project_id, TaskAction.UPDATE)
         project_id = task_in.project_id
 
     assignee = None
@@ -667,21 +527,26 @@ def update_task(
         tag_names=tag_names,
     )
 
-    return _public(
-        task,
-        project_id=project_id,
-        tags=crud.get_task_tags(session=session, task_ids=[task.id])[task.id],
-        recurrence=crud.get_recurrences(session=session, tasks=[task])[task.id],
-        bot_users=crud.get_bot_user_refs(
-            session=session, bot_user_ids=[task.assignee_bot_user_id]
-        ),
+    # The recurrence the check read is still the task's unless the update
+    # set a new one, which is read back as stored.
+    [public] = task_publics(
+        session,
+        [task],
+        projects={task.id: project_id},
+        recurrences={}
+        if "recurrence" in task_in.model_fields_set
+        else {task.id: recurrence},
     )
+    return public
 
 
 def _check_recurrence_update(
     *, session: SessionDep, task: Task, task_in: TaskUpdate
-) -> None:
-    """Everything an update has to get right about the task's series."""
+) -> Recurrence | None:
+    """
+    Everything an update has to get right about the task's series. Returns
+    the recurrence the task has now, which it read to decide.
+    """
     fields_set = task_in.model_fields_set
     current = crud.get_recurrences(session=session, tasks=[task])[task.id]
     recurrence = task_in.recurrence if "recurrence" in fields_set else current
@@ -747,6 +612,7 @@ def _check_recurrence_update(
                 ),
             },
         )
+    return current
 
 
 @router.delete("/{task_id}")
@@ -765,8 +631,7 @@ def delete_task(
     take down far more than the task named here, a task that still has subtasks
     is only deleted when `delete_subtasks` says so (FR-01.11, FR-01.12).
     """
-    task = authorization.get_task(session, caller, task_id, TaskAction.DELETE)
-    require_task_writable(session, task.id)
+    task = access.get_task(session, caller, task_id, TaskAction.DELETE).task
 
     if not delete_subtasks and crud.has_subtasks(session=session, task=task):
         raise HTTPException(
@@ -780,5 +645,5 @@ def delete_task(
             },
         )
 
-    crud.delete_task(session=session, task=task)
+    deletions.delete_task(session, task)
     return Message(message="Task deleted successfully")

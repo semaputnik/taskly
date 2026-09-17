@@ -2,7 +2,7 @@ import { useId } from "react"
 import type { UseFormReturn } from "react-hook-form"
 import { z } from "zod"
 
-import { type BotScope, ProjectsService } from "@/client"
+import type { BotScope } from "@/client"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
   FormControl,
@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import type { ScopeProject } from "@/lib/serverState"
 import { PERMISSIONS } from "./permissions"
 
 export const botFormSchema = z.object({
@@ -33,44 +34,6 @@ export function toBotScope(data: BotFormData): BotScope {
     permissions: Object.fromEntries(
       PERMISSIONS.map(({ key }) => [key, data.permissions.includes(key)]),
     ),
-  }
-}
-
-export interface ScopeProject {
-  id: string
-  name: string
-  archived: boolean
-}
-
-/**
- * Every project a scope can name: the live ones and the archived ones. A
- * deleted project is in neither list, and the API leaves it out of scopes too.
- *
- * Keyed under "projects", so anything that changes projects refreshes it.
- */
-export function scopeProjectsQueryOptions() {
-  return {
-    queryKey: ["projects", "bot-scope"],
-    queryFn: async (): Promise<ScopeProject[]> => {
-      const [live, archived] = await Promise.all(
-        [false, true].map(
-          async (archived) =>
-            (
-              await ProjectsService.readProjects({
-                query: { archived, skip: 0, limit: 100 },
-              })
-            ).data,
-        ),
-      )
-      return [
-        ...live.data.map((p) => ({ id: p.id, name: p.name, archived: false })),
-        ...archived.data.map((p) => ({
-          id: p.id,
-          name: p.name,
-          archived: true,
-        })),
-      ]
-    },
   }
 }
 

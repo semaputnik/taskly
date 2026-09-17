@@ -5,13 +5,13 @@ import {
   QueryClientProvider,
 } from "@tanstack/react-query"
 import { createRouter, RouterProvider } from "@tanstack/react-router"
-import { AxiosError } from "axios"
 import { StrictMode } from "react"
 import ReactDOM from "react-dom/client"
 import { client } from "./client/client.gen"
 import { ThemeProvider } from "./components/theme-provider"
 import { Toaster } from "./components/ui/sonner"
-import { isRefusal } from "./lib/apiErrors"
+import { isRefusal, isSessionGone } from "./lib/apiErrors"
+import { configureServerState } from "./lib/serverState"
 import "./index.css"
 import { routeTree } from "./routeTree.gen"
 
@@ -20,17 +20,14 @@ client.setConfig({
   auth: () => localStorage.getItem("access_token") || "",
 })
 
-/** Whether the API turned the request away for who the caller is. */
-const isCredentialError = (error: Error): boolean =>
-  error instanceof AxiosError &&
-  [401, 403].includes(error.response?.status ?? 0)
-
 // Every query on a screen is refused at once, and each fresh assignment to
 // `location.href` aborts the navigation the previous one started.
 let redirectingToLogin = false
 
 const handleApiError = (error: Error) => {
-  if (!isCredentialError(error) || redirectingToLogin) return
+  // Only a session that is gone sends the reader to sign in: a 403 refuses
+  // something the signed-in reader asked for, and is said where it happened.
+  if (!isSessionGone(error) || redirectingToLogin) return
   redirectingToLogin = true
   localStorage.removeItem("access_token")
   window.location.href = "/login"
@@ -58,13 +55,7 @@ const queryClient = new QueryClient({
   }),
 })
 
-// The signed-in account changes only through its own settings, which
-// invalidate it, so every screen that mounts does not have to ask again. The
-// project list is shorter-lived: its task counts move when a bot user files
-// work. A few seconds still spare the burst of requests a panel or a screen
-// makes as its parts mount one after another.
-queryClient.setQueryDefaults(["currentUser"], { staleTime: 5 * 60 * 1000 })
-queryClient.setQueryDefaults(["projects"], { staleTime: 10 * 1000 })
+configureServerState(queryClient)
 
 const router = createRouter({ routeTree })
 declare module "@tanstack/react-router" {

@@ -2,7 +2,8 @@ import { useQuery } from "@tanstack/react-query"
 import { useBlocker } from "@tanstack/react-router"
 import { useEffect, useRef, useState } from "react"
 
-import { ProjectsService, type TaskPublic } from "@/client"
+import type { TaskPublic } from "@/client"
+import { useCaptureFocus } from "@/components/Records/panels"
 import {
   DescriptionSection,
   ghost,
@@ -20,10 +21,12 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
+import { projectsQuery } from "@/lib/serverState"
 import { cn } from "@/lib/utils"
-import { type CaptureTarget, useTaskCapture } from "./capture"
+import type { CaptureTarget } from "./capture"
 import { carryOver, emptyDraft, isTouched, type TaskFields } from "./draft"
 import { TaskPropertyRows } from "./TaskProperties"
+import { useTaskCapture } from "./useTaskWrites"
 
 // The commit chord, named the way the reader's keyboard names it.
 const CHORD =
@@ -60,7 +63,7 @@ export function NewTask({
   const [defaults, setDefaults] = useState(() => emptyDraft(target))
   const [draft, setDraft] = useState(defaults)
   const touched = isTouched(draft, defaults)
-  const titleRef = useRef<HTMLInputElement>(null)
+  const titleRef = useCaptureFocus<HTMLInputElement>()
   // Set while a commit is taking the reader onto the new record, which is a
   // way of leaving the draft that loses nothing.
   const leaving = useRef(false)
@@ -78,23 +81,6 @@ export function NewTask({
         : current,
     )
   }
-
-  // Focused from here rather than through `autoFocus`, which a sheet's own
-  // opening focus would win against. It is claimed twice: on a phone the
-  // sidebar is a sheet of its own, and it hands focus back to the button that
-  // opened capture as it finishes closing, a moment after this panel arrives.
-  useEffect(() => {
-    const frame = requestAnimationFrame(() => titleRef.current?.focus())
-    const settled = setTimeout(() => {
-      if (document.activeElement !== titleRef.current) {
-        titleRef.current?.focus()
-      }
-    }, 350)
-    return () => {
-      cancelAnimationFrame(frame)
-      clearTimeout(settled)
-    }
-  }, [])
 
   // Every way out goes through the address — Escape, the close button, a
   // click outside, Back, a link — so the question is asked there, and the
@@ -133,12 +119,7 @@ export function NewTask({
 
   // Unset already means the Inbox to the API, so choosing the Inbox is kept
   // as unset: picking what is already shown is not a change to the draft.
-  const { data: projects } = useQuery({
-    queryKey: ["projects"],
-    queryFn: async () =>
-      (await ProjectsService.readProjects({ query: { skip: 0, limit: 100 } }))
-        .data,
-  })
+  const { data: projects } = useQuery(projectsQuery())
   const inboxId = projects?.data.find((project) => project.is_inbox)?.id
   const change = (patch: Partial<TaskFields>) =>
     setDraft((previous) => ({

@@ -3,7 +3,7 @@ import uuid
 
 from sqlmodel import Session
 
-from app import crud
+from app import crud, deletions
 from app.models import (
     ProjectCreate,
     Task,
@@ -186,7 +186,7 @@ def test_task_project_ids_leave_out_tasks_under_a_deleted_ancestor(
     db: Session,
 ) -> None:
     project_id, chain = _tree(db, depth=4)
-    crud.delete_task(session=db, task=chain[1])
+    deletions.delete_task(db, chain[1])
     db.commit()
 
     resolved = crud.get_task_project_ids(

@@ -1,6 +1,6 @@
 import type { TaskPublic } from "@/client"
 import { Checkbox } from "@/components/ui/checkbox"
-import { useTaskStatus } from "./status"
+import { useTaskStatus } from "./useTaskWrites"
 
 interface CompleteTaskProps {
   task: TaskPublic

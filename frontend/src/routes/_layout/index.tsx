@@ -4,7 +4,7 @@ import { Suspense } from "react"
 
 import { NeedsYou, NeedsYouPending } from "@/components/Dashboard/NeedsYou"
 import {
-  recentActivityQueryOptions,
+  recentActivityQuery,
   WhileYouWereAway,
   WhileYouWereAwayPending,
 } from "@/components/Dashboard/WhileYouWereAway"
@@ -35,7 +35,7 @@ function Dashboard() {
   const { user: currentUser } = useAuth()
   // Started here, beside the queue's own requests, rather than after the
   // queue has suspended and resumed.
-  usePrefetchQuery(recentActivityQueryOptions)
+  usePrefetchQuery(recentActivityQuery())
 
   return (
     <div className="flex flex-col gap-6">

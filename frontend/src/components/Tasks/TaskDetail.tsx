@@ -1,44 +1,33 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { useQuery } from "@tanstack/react-query"
 import { ChevronRight } from "lucide-react"
 
-import { ProjectsService, type TaskPublic, TasksService } from "@/client"
+import type { TaskPublic } from "@/client"
+import { useRecordPanel } from "@/components/Records/panels"
 import {
   EditableText,
   RecordHeader,
   RecordPanel,
-  recordLoad,
   titleFieldClass,
 } from "@/components/Records/RecordPanel"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import {
+  projectsQuery,
+  taskQuery,
+  tasksQuery,
+  useReportChange,
+} from "@/lib/serverState"
 import { CompleteTask } from "./CompleteTask"
-import { CaptureField, type CaptureTarget, useTaskCapture } from "./capture"
+import { CaptureField, useCaptureTarget } from "./capture"
 import DeleteTask from "./DeleteTask"
 import { NewTask } from "./NewTask"
 import { TaskAttachments } from "./TaskAttachments"
 import { TaskComments } from "./TaskComments"
 import { TaskProperties } from "./TaskProperties"
-import { useTaskUpdate } from "./useTaskUpdate"
+import { useTaskCapture, useTaskUpdate } from "./useTaskWrites"
 
 /** More than a panel should list; past it, the tab says how many there are. */
 const SUBTASK_LIMIT = 100
-
-interface TaskDetailProps {
-  /** The task to show, or null for a closed panel. */
-  taskId: string | null
-  /** Open on a task that does not exist yet, ready to capture one. */
-  capturing?: boolean
-  /** Where a captured task lands, named on screen before it is created. */
-  captureTarget?: CaptureTarget
-  onClose: () => void
-  /** Move the panel to another task without closing it. */
-  onOpenTask: (taskId: string) => void
-  /**
-   * A task has just been captured. `stay` is set when the reader asked to keep
-   * capturing, so the panel holds still instead of moving onto the record.
-   */
-  onCaptured?: (taskId: string, stay: boolean) => void
-}
 
 /**
  * Everything one task is and has, in a single panel.
@@ -50,56 +39,33 @@ interface TaskDetailProps {
  * entry or the dashboard can link straight to a task rather than dropping the
  * reader on the unfiltered list.
  */
-export function TaskDetail({
-  taskId,
-  capturing = false,
-  captureTarget,
-  onClose,
-  onOpenTask,
-  onCaptured,
-}: TaskDetailProps) {
-  // Capture is the panel one step earlier, so it opens the same surface. The
-  // record itself is only fetched once there is one.
-  const isCapturing = capturing && !taskId
-  const isOpen = Boolean(taskId) || capturing
-
+export function TaskDetail() {
   // Fetched by id rather than read out of the table: a link may point at a
   // task the current filters exclude, and it must still open.
-  const query = useQuery({
-    queryKey: ["task", taskId],
-    queryFn: async () =>
-      (await TasksService.readTask({ path: { task_id: taskId as string } }))
-        .data,
-    enabled: Boolean(taskId),
-  })
-  const task = query.data
+  const {
+    id: taskId,
+    capturing,
+    record: task,
+    panels,
+    shell,
+  } = useRecordPanel("task")
+  const captureTarget = useCaptureTarget()
+  const onOpenTask = panels.openTask
 
   const { data: projects } = useQuery({
-    queryKey: ["projects"],
-    queryFn: async () =>
-      (await ProjectsService.readProjects({ query: { skip: 0, limit: 100 } }))
-        .data,
+    ...projectsQuery(),
     enabled: Boolean(taskId),
   })
   // Subtasks are not a nested field, so the panel asks for this task's
-  // children alone. Under "tasks", so every change to a task refreshes them.
-  const subtaskQuery = { parent_id: taskId, limit: SUBTASK_LIMIT }
+  // children alone: a task list like any other, refreshed with them.
   const { data: subtasks } = useQuery({
-    queryKey: ["tasks", subtaskQuery],
-    queryFn: async () =>
-      (await TasksService.readTasks({ query: subtaskQuery })).data,
+    ...tasksQuery({ parent_id: taskId, limit: SUBTASK_LIMIT }),
     enabled: Boolean(taskId),
   })
   // The parent by its own address, which is also where its panel reads it,
   // so following the breadcrumb opens it from the cache.
   const parentId = task?.parent_id
-  const { data: parent } = useQuery({
-    queryKey: ["task", parentId],
-    queryFn: async () =>
-      (await TasksService.readTask({ path: { task_id: parentId as string } }))
-        .data,
-    enabled: Boolean(parentId),
-  })
+  const { data: parent } = useQuery(taskQuery(parentId))
 
   const projectName = task
     ? projects?.data.find((p) => p.id === task.project_id)?.name
@@ -109,21 +75,21 @@ export function TaskDetail({
 
   return (
     <RecordPanel
-      open={isOpen}
-      onClose={onClose}
-      name={isCapturing ? "New task" : (task?.title ?? "Task")}
-      kind="task"
-      {...recordLoad(query, !isCapturing && Boolean(taskId))}
+      {...shell}
       destructive={
-        task && !isCapturing ? (
-          <DeleteTask task={task} onSuccess={onClose} />
+        task && !capturing ? (
+          <DeleteTask task={task} onSuccess={shell.onClose} />
         ) : undefined
       }
     >
-      {isCapturing && captureTarget ? (
+      {capturing ? (
         <NewTask
           target={captureTarget}
-          onCreated={(created, stay) => onCaptured?.(created.id, stay)}
+          onCreated={(created, stay) => {
+            // A run of captures holds the panel still; a single one hands the
+            // reader the record it just made, at its own address.
+            if (!stay) panels.openTask(created.id)
+          }}
         />
       ) : !task ? null : (
         <>
@@ -245,9 +211,9 @@ function TaskTitle({ task }: { task: TaskPublic }) {
     <EditableText
       value={task.title}
       ariaLabel="Task title"
-      onCommit={(title) => {
-        if (title.trim()) update.save({ title: title.trim() })
-      }}
+      onCommit={(title) =>
+        title.trim() ? update.save({ title: title.trim() }) : undefined
+      }
       className={titleFieldClass}
     />
   )
@@ -262,13 +228,13 @@ function TaskTitle({ task }: { task: TaskPublic }) {
  * belongs to the project of its root task (FR-02.4).
  */
 function SubtaskCapture({ parent }: { parent: TaskPublic }) {
-  const queryClient = useQueryClient()
+  const reportChange = useReportChange()
   const capture = useTaskCapture(
     { parentId: parent.id, projectName: "Follows its parent task" },
     () => {
       // The panel's children are a task list query, so that is what has to
       // catch up; the reader is not moved onto the child.
-      queryClient.invalidateQueries({ queryKey: ["tasks"] })
+      reportChange({ type: "task created" })
     },
   )
 

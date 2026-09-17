@@ -1,5 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod"
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { useMutation, useQuery } from "@tanstack/react-query"
 import { Plus } from "lucide-react"
 import { useState } from "react"
 import { useForm } from "react-hook-form"
@@ -26,13 +26,12 @@ import {
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { LoadingButton } from "@/components/ui/loading-button"
-import useCustomToast from "@/hooks/useCustomToast"
-import { handleError } from "@/utils"
+import { scopeProjectsQuery, useReportChange } from "@/lib/serverState"
+import { toastError } from "@/lib/toasts"
 import {
   type BotFormData,
   BotFormFields,
   botFormSchema,
-  scopeProjectsQueryOptions,
   toBotScope,
 } from "./BotFormFields"
 import { useShowIssuedToken } from "./IssuedToken"
@@ -46,11 +45,10 @@ import { expiryFromDate, today } from "./tokens"
 const AddBotUser = () => {
   const [isOpen, setIsOpen] = useState(false)
   const showIssuedToken = useShowIssuedToken()
-  const queryClient = useQueryClient()
-  const { showErrorToast } = useCustomToast()
+  const reportChange = useReportChange()
 
   const { data: projects } = useQuery({
-    ...scopeProjectsQueryOptions(),
+    ...scopeProjectsQuery(),
     enabled: isOpen,
   })
 
@@ -86,10 +84,8 @@ const AddBotUser = () => {
       setIsOpen(false)
       showIssuedToken(result)
     },
-    onError: handleError.bind(showErrorToast),
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["bots"] })
-    },
+    onError: (error) => toastError(error),
+    onSettled: () => reportChange({ type: "bot user changed" }),
   })
 
   return (

@@ -3,7 +3,6 @@ import { createFileRoute } from "@tanstack/react-router"
 import { Archive as ArchiveIcon } from "lucide-react"
 import { Suspense } from "react"
 
-import { ProjectsService, TasksService } from "@/client"
 import { DataTable } from "@/components/Common/DataTable"
 import { EmptyState } from "@/components/Common/EmptyState"
 import PendingProjects from "@/components/Pending/PendingProjects"
@@ -12,24 +11,11 @@ import { archivedColumns } from "@/components/Projects/archivedColumns"
 import { useRecordPanels } from "@/components/Records/panels"
 import { getColumns } from "@/components/Tasks/columns"
 import { buildTaskTree } from "@/components/Tasks/tree"
+import { projectsQuery, tasksQuery } from "@/lib/serverState"
 
-// Both keys sit under the ones the live views use, so anything that
-// invalidates projects or tasks refreshes the archive as well.
-function getArchivedProjectsQueryOptions() {
-  const query = { archived: true, skip: 0, limit: 100 }
-  return {
-    queryFn: async () => (await ProjectsService.readProjects({ query })).data,
-    queryKey: ["projects", query],
-  }
-}
-
-function getArchivedTasksQueryOptions() {
-  const query = { archived: true, skip: 0, limit: 100 }
-  return {
-    queryFn: async () => (await TasksService.readTasks({ query })).data,
-    queryKey: ["tasks", query],
-  }
-}
+const archivedProjectsQuery = () => projectsQuery({ archived: true })
+const archivedTasksQuery = () =>
+  tasksQuery({ archived: true, skip: 0, limit: 100 })
 
 export const Route = createFileRoute("/_layout/archive")({
   component: Archive,
@@ -47,7 +33,7 @@ function ArchivedProjectsContent({
 }: {
   onOpen: (projectId: string) => void
 }) {
-  const { data: projects } = useSuspenseQuery(getArchivedProjectsQueryOptions())
+  const { data: projects } = useSuspenseQuery(archivedProjectsQuery())
 
   return (
     <DataTable
@@ -67,8 +53,8 @@ function ArchivedProjectsContent({
 }
 
 function ArchivedTasksContent() {
-  const { data: tasks } = useSuspenseQuery(getArchivedTasksQueryOptions())
-  const { data: projects } = useSuspenseQuery(getArchivedProjectsQueryOptions())
+  const { data: tasks } = useSuspenseQuery(archivedTasksQuery())
+  const { data: projects } = useSuspenseQuery(archivedProjectsQuery())
 
   const projectNames = Object.fromEntries(
     projects.data.map((project) => [project.id, project.name]),

@@ -1,5 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod"
-import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { useMutation } from "@tanstack/react-query"
 import { useState } from "react"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
@@ -17,9 +17,9 @@ import {
 import { Input } from "@/components/ui/input"
 import { LoadingButton } from "@/components/ui/loading-button"
 import useAuth from "@/hooks/useAuth"
-import useCustomToast from "@/hooks/useCustomToast"
+import { useReportChange } from "@/lib/serverState"
+import { toastError, toastSuccess } from "@/lib/toasts"
 import { cn } from "@/lib/utils"
-import { handleError } from "@/utils"
 
 const formSchema = z.object({
   full_name: z.string().max(30).optional(),
@@ -29,8 +29,7 @@ const formSchema = z.object({
 type FormData = z.infer<typeof formSchema>
 
 const UserInformation = () => {
-  const queryClient = useQueryClient()
-  const { showSuccessToast, showErrorToast } = useCustomToast()
+  const reportChange = useReportChange()
   const [editMode, setEditMode] = useState(false)
   const { user: currentUser } = useAuth()
 
@@ -52,13 +51,11 @@ const UserInformation = () => {
     mutationFn: (data: UserUpdateMe) =>
       UsersService.updateUserMe({ body: data }),
     onSuccess: () => {
-      showSuccessToast("User updated successfully")
+      toastSuccess("User updated successfully")
       toggleEditMode()
     },
-    onError: handleError.bind(showErrorToast),
-    onSettled: () => {
-      queryClient.invalidateQueries()
-    },
+    onError: (error) => toastError(error),
+    onSettled: () => reportChange({ type: "account changed" }),
   })
 
   const onSubmit = (data: FormData) => {

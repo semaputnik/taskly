@@ -1,4 +1,3 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query"
 import {
   ChevronDown,
   CircleCheck,
@@ -7,24 +6,9 @@ import {
   Contrast,
   type LucideIcon,
 } from "lucide-react"
-import { useState } from "react"
 
-import {
-  type SubtaskCompletion,
-  type TaskPublic,
-  type TaskStatus,
-  TasksService,
-} from "@/client"
+import type { TaskPublic, TaskStatus } from "@/client"
 import { Button } from "@/components/ui/button"
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -32,10 +16,9 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import useCustomToast from "@/hooks/useCustomToast"
 import { cn } from "@/lib/utils"
-import { handleError, isOpenSubtasksError } from "@/utils"
 import { STATUS_LABELS, STATUSES } from "./statuses"
+import { useTaskStatus } from "./useTaskWrites"
 
 export { OPEN_STATUSES, STATUS_LABELS, STATUSES } from "./statuses"
 
@@ -76,119 +59,6 @@ export function StatusGlyph({
       aria-label={labelled ? STATUS_LABELS[status] : undefined}
       role={labelled ? "img" : undefined}
     />
-  )
-}
-
-/**
- * Moving one task to a status, from whichever control asked.
- *
- * Moving to done is the one move the API may refuse and ask about: a task
- * with open subtasks needs to be told what happens to them (FR-02.5). Every
- * control — the checkbox, the list's status menu, the panel's status row —
- * goes through here, so that refusal turns into the same prompt wherever it
- * came from. Render `prompt` alongside the control.
- */
-export function useTaskStatus(task: TaskPublic) {
-  const [isPrompting, setIsPrompting] = useState(false)
-  const [announcement, setAnnouncement] = useState("")
-  const queryClient = useQueryClient()
-  const { showErrorToast } = useCustomToast()
-
-  const mutation = useMutation({
-    mutationFn: (body: { status: TaskStatus; subtasks?: SubtaskCompletion }) =>
-      TasksService.updateTask({ path: { task_id: task.id }, body }),
-    onSuccess: (_, body) => {
-      setIsPrompting(false)
-      setAnnouncement(`${task.title} moved to ${STATUS_LABELS[body.status]}`)
-    },
-    onError: (error: Error) => {
-      if (isOpenSubtasksError(error)) {
-        setIsPrompting(true)
-        return
-      }
-      handleError.call(showErrorToast, error)
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["tasks"] })
-      queryClient.invalidateQueries({ queryKey: ["task", task.id] })
-      queryClient.invalidateQueries({ queryKey: ["activity"] })
-    },
-  })
-
-  const change = (status: TaskStatus) => {
-    if (status !== task.status) mutation.mutate({ status })
-  }
-
-  const prompt = (
-    <>
-      {/* The change happens in a list or behind a menu that has closed, so
-          it is said as well as shown. */}
-      <output aria-live="polite" className="sr-only">
-        {announcement}
-      </output>
-      <SubtasksPrompt
-        title={task.title}
-        open={isPrompting}
-        onOpenChange={setIsPrompting}
-        pending={mutation.isPending}
-        onChoose={(subtasks) => mutation.mutate({ status: "done", subtasks })}
-      />
-    </>
-  )
-
-  return { change, isPending: mutation.isPending, prompt }
-}
-
-function SubtasksPrompt({
-  title,
-  open,
-  onOpenChange,
-  pending,
-  onChoose,
-}: {
-  title: string
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  pending: boolean
-  onChoose: (subtasks: SubtaskCompletion) => void
-}) {
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        className="sm:max-w-md"
-        // Portalled out of a clickable row, whose click would open the task.
-        onClick={(event) => event.stopPropagation()}
-      >
-        <DialogHeader>
-          <DialogTitle>This task has open subtasks</DialogTitle>
-          <DialogDescription>
-            “{title}” still has subtasks that are not done. Choose what happens
-            to them.
-          </DialogDescription>
-        </DialogHeader>
-        <DialogFooter className="sm:flex-col sm:gap-2">
-          <Button
-            variant="outline"
-            disabled={pending}
-            onClick={() => onChoose("complete")}
-          >
-            Mark the subtasks done too
-          </Button>
-          <Button
-            variant="outline"
-            disabled={pending}
-            onClick={() => onChoose("leave_uncompleted")}
-          >
-            Leave the subtasks as they are
-          </Button>
-          <DialogClose asChild>
-            <Button variant="ghost" disabled={pending}>
-              Cancel
-            </Button>
-          </DialogClose>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
   )
 }
 

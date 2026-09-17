@@ -32,6 +32,13 @@ repos:
         types: [text]
         files: ^frontend/
 
+      - id: local-frontend-unit-tests
+        name: frontend unit tests
+        entry: bash -c 'cd frontend && bun run test:unit'
+        language: unsupported
+        pass_filenames: false
+        files: ^frontend/src/
+
       - id: local-ruff-check
         name: ruff check
         entry: uv run ruff check --force-exclude --fix --exit-non-zero-on-fix

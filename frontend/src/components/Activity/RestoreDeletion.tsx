@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { useMutation } from "@tanstack/react-query"
 import { ArchiveRestore } from "lucide-react"
 import { useState } from "react"
 
@@ -14,8 +14,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { LoadingButton } from "@/components/ui/loading-button"
-import useCustomToast from "@/hooks/useCustomToast"
-import { handleError } from "@/utils"
+import { useReportChange } from "@/lib/serverState"
+import { toastError, toastSuccess } from "@/lib/toasts"
 
 interface RestoreDeletionProps {
   entry: ActivityEntryPublic
@@ -72,8 +72,7 @@ function describe(entry: ActivityEntryPublic) {
  */
 export function RestoreDeletion({ entry }: RestoreDeletionProps) {
   const [isOpen, setIsOpen] = useState(false)
-  const queryClient = useQueryClient()
-  const { showSuccessToast, showErrorToast } = useCustomToast()
+  const reportChange = useReportChange()
   const { heading, name, comesBack } = describe(entry)
 
   const mutation = useMutation({
@@ -82,18 +81,14 @@ export function RestoreDeletion({ entry }: RestoreDeletionProps) {
         path: { entry_id: entry.id },
       }),
     onSuccess: () => {
-      showSuccessToast(`“${name}” restored`)
+      toastSuccess(`“${name}” restored`)
       setIsOpen(false)
     },
     onError: (error: Error) => {
       setIsOpen(false)
-      handleError.call(showErrorToast, error)
+      toastError(error)
     },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["activity"] })
-      queryClient.invalidateQueries({ queryKey: ["tasks"] })
-      queryClient.invalidateQueries({ queryKey: ["projects"] })
-    },
+    onSettled: () => reportChange({ type: "deletion restored" }),
   })
 
   return (

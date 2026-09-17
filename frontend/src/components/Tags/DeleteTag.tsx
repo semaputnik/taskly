@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { useMutation } from "@tanstack/react-query"
 import { useState } from "react"
 
 import { type TagPublic, TagsService } from "@/client"
@@ -14,8 +14,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { LoadingButton } from "@/components/ui/loading-button"
-import useCustomToast from "@/hooks/useCustomToast"
-import { handleError } from "@/utils"
+import { useReportChange } from "@/lib/serverState"
+import { toastError, toastSuccess } from "@/lib/toasts"
 import { allTasks, totalTasks } from "./counts"
 
 interface DeleteTagProps {
@@ -38,21 +38,17 @@ function tasksLosingIt(tag: TagPublic): string {
  */
 const DeleteTag = ({ tag, onSuccess }: DeleteTagProps) => {
   const [isOpen, setIsOpen] = useState(false)
-  const queryClient = useQueryClient()
-  const { showSuccessToast, showErrorToast } = useCustomToast()
+  const reportChange = useReportChange()
 
   const mutation = useMutation({
     mutationFn: () => TagsService.deleteTag({ path: { tag_id: tag.id } }),
     onSuccess: () => {
-      showSuccessToast(`“${tag.name}” was deleted`)
+      toastSuccess(`“${tag.name}” was deleted`)
       setIsOpen(false)
       onSuccess()
     },
-    onError: handleError.bind(showErrorToast),
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["tags"] })
-      queryClient.invalidateQueries({ queryKey: ["tasks"] })
-    },
+    onError: (error) => toastError(error),
+    onSettled: () => reportChange({ type: "tag changed" }),
   })
 
   return (

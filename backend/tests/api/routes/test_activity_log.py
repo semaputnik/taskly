@@ -689,3 +689,23 @@ def test_a_change_committed_without_a_flush_of_its_own_is_logged(
     ).all()
     assert [entry.action for entry in entries] == ["task_created", "task_changed"]
     assert entries[1].details["changes"] == {"title": {"from": "Before", "to": "After"}}
+
+
+def test_a_tag_entry_can_be_opened_while_the_tag_exists(
+    client: TestClient, db: Session
+) -> None:
+    headers = _headers_for_new_user(client, db)
+    r = client.post(f"{API}/tags/", headers=headers, json={"name": "errands"})
+    assert r.status_code == 200, r.text
+    tag = r.json()
+
+    [created] = [e for e in _log(client, headers) if e["entity_type"] == "tag"]
+    assert created["entity_id"] == tag["id"]
+    assert created["entity_exists"] is True
+    assert created["entity_project_id"] is None
+
+    r = client.delete(f"{API}/tags/{tag['id']}", headers=headers)
+    assert r.status_code == 200, r.text
+    tag_entries = [e for e in _log(client, headers) if e["entity_type"] == "tag"]
+    assert tag_entries
+    assert all(entry["entity_exists"] is False for entry in tag_entries)

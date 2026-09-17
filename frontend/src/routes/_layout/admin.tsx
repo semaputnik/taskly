@@ -9,14 +9,7 @@ import { DataTable } from "@/components/Common/DataTable"
 import { EmptyState } from "@/components/Common/EmptyState"
 import PendingUsers from "@/components/Pending/PendingUsers"
 import useAuth from "@/hooks/useAuth"
-
-function getUsersQueryOptions() {
-  return {
-    queryFn: async () =>
-      (await UsersService.readUsers({ query: { skip: 0, limit: 100 } })).data,
-    queryKey: ["users"],
-  }
-}
+import { usersQuery } from "@/lib/serverState"
 
 export const Route = createFileRoute("/_layout/admin")({
   component: Admin,
@@ -39,7 +32,7 @@ export const Route = createFileRoute("/_layout/admin")({
 
 function UsersTableContent() {
   const { user: currentUser } = useAuth()
-  const { data: users } = useSuspenseQuery(getUsersQueryOptions())
+  const { data: users } = useSuspenseQuery(usersQuery())
 
   const tableData: UserTableData[] = users.data.map((user: UserPublic) => ({
     ...user,

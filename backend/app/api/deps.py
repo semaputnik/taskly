@@ -14,20 +14,12 @@ from pydantic import ValidationError
 from sqlalchemy import or_, update
 from sqlmodel import Session, col, select
 
-from app import activity, crud
+from app import activity
 from app.core import security
 from app.core.config import settings
 from app.core.db import engine
 from app.core.storage import AttachmentStorage, LocalAttachmentStorage
-from app.models import (
-    BotUser,
-    BotUserProject,
-    Comment,
-    Project,
-    Task,
-    TokenPayload,
-    User,
-)
+from app.models import BotUser, BotUserProject, TokenPayload, User
 
 reusable_oauth2 = OAuth2PasswordBearer(
     tokenUrl=f"{settings.API_V1_STR}/login/access-token"
@@ -128,9 +120,12 @@ def get_current_user(session: SessionDep, token: TokenDep) -> User:
         )
         token_data = TokenPayload(**payload)
     except InvalidTokenError, ValidationError:
+        # The session is gone, which is what 401 says: the client signs in
+        # again. 403 is kept for what a known caller is refused.
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
+            status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Could not validate credentials",
+            headers={"WWW-Authenticate": "Bearer"},
         )
     user = session.get(User, token_data.sub)
     if not user:
@@ -161,8 +156,8 @@ class Caller:
 
     `owner_id` is whose data the request reaches: the user's own, or the
     owning user's for a bot, which never reaches anyone else's. For a bot,
-    `bot` and the projects of its scope come along, so the shared
-    authorization step (`app.api.authorization`) can narrow what it reaches.
+    `bot` and the projects of its scope come along, so Task access
+    (`app.api.access`) can narrow what it reaches.
     """
 
     owner_id: uuid.UUID
@@ -193,101 +188,6 @@ def get_current_active_superuser(current_user: CurrentUser) -> User:
             status_code=403, detail="The user doesn't have enough privileges"
         )
     return current_user
-
-
-def get_owned_project(
-    session: SessionDep, current_user: CurrentUser, project_id: uuid.UUID
-) -> Project:
-    return get_project_of(session, current_user.id, project_id)
-
-
-def get_project_of(
-    session: Session, owner_id: uuid.UUID, project_id: uuid.UUID
-) -> Project:
-    project = session.get(Project, project_id)
-    if (
-        not project
-        or project.owner_id != owner_id
-        # A deleted project is invisible until it is restored (FR-05.8).
-        or project.deletion_id is not None
-    ):
-        raise HTTPException(status_code=404, detail="Project not found")
-    return project
-
-
-def get_owned_task(
-    session: SessionDep, current_user: CurrentUser, task_id: uuid.UUID
-) -> Task:
-    return get_task_of(session, current_user.id, task_id)
-
-
-def get_task_of(session: Session, owner_id: uuid.UUID, task_id: uuid.UUID) -> Task:
-    task = session.get(Task, task_id)
-    if not task or task.owner_id != owner_id or task.deletion_id is not None:
-        raise HTTPException(status_code=404, detail="Task not found")
-    return task
-
-
-# Writing into an archived project is refused with its own status and code
-# rather than a generic permission error, so a client can tell the user why
-# and what would undo it (FR-05.12).
-PROJECT_ARCHIVED_STATUS = 409
-PROJECT_ARCHIVED_CODE = "project_archived"
-
-
-def require_project_writable(project: Project) -> None:
-    """
-    Refuse any change to an archived project or to anything in it: archiving
-    freezes the project whole until it is unarchived (FR-05.12).
-    """
-    if project.is_archived:
-        raise HTTPException(
-            status_code=PROJECT_ARCHIVED_STATUS,
-            detail={
-                "code": PROJECT_ARCHIVED_CODE,
-                "message": (
-                    f"The project “{project.name}” is archived, so it and its "
-                    "tasks are read-only. Unarchive it to make changes."
-                ),
-                "project_id": str(project.id),
-            },
-        )
-
-
-def require_task_writable(session: Session, task_id: uuid.UUID) -> None:
-    """
-    Refuse any change to a task, or to a comment or attachment on it, while the
-    project it resolves to is archived. A subtask holds no project of its own,
-    so the check follows the tree up to the project that decides.
-    """
-    task = session.get(Task, task_id)
-    if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
-    project = session.get(Project, crud.get_task_project_id(session=session, task=task))
-    if project:
-        require_project_writable(project)
-
-
-def require_task_visible(session: Session, task_id: uuid.UUID, detail: str) -> None:
-    """
-    A row that hangs off a task (a comment, an attachment) is only visible
-    while its task is: once the task is soft-deleted, reading the row through
-    the task is refused (`get_owned_task`), so reaching it directly has to be
-    refused the same way.
-    """
-    task = session.get(Task, task_id)
-    if not task or task.deletion_id is not None:
-        raise HTTPException(status_code=404, detail=detail)
-
-
-def get_owned_comment(
-    session: SessionDep, current_user: CurrentUser, comment_id: uuid.UUID
-) -> Comment:
-    comment = session.get(Comment, comment_id)
-    if not comment or comment.owner_id != current_user.id:
-        raise HTTPException(status_code=404, detail="Comment not found")
-    require_task_visible(session, comment.task_id, "Comment not found")
-    return comment
 
 
 @lru_cache

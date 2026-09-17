@@ -4,15 +4,10 @@ from typing import Any
 from fastapi import APIRouter, HTTPException
 from sqlmodel import col, func, select
 
-from app import crud
-from app.api import authorization
-from app.api.deps import (
-    CallerDep,
-    CurrentUser,
-    SessionDep,
-    get_owned_project,
-    require_project_writable,
-)
+from app import crud, deletions
+from app.api import access
+from app.api.access import TaskAction
+from app.api.deps import Caller, CallerDep, CurrentUser, SessionDep
 from app.models import (
     Message,
     Project,
@@ -49,7 +44,7 @@ def read_projects(
     (FR-08.9, FR-05.13).
     """
     if archived:
-        authorization.refuse_archived_for_bot(caller)
+        access.refuse_archived_for_bot(caller)
     conditions: list[Any] = [
         Project.owner_id == caller.owner_id,
         crud.not_deleted(Project),
@@ -88,7 +83,7 @@ def read_project(
     (FR-08.9, FR-05.13). No task permission is asked for: a bot that may write
     into a project has to be able to resolve the project it writes into.
     """
-    project = authorization.get_project(session, caller, project_id, action=None)
+    project = access.get_project(session, caller, project_id, action=None)
     return crud.project_public(project, _task_count(session, project))
 
 
@@ -116,8 +111,9 @@ def update_project(
     """
     Update a project's name and/or description.
     """
-    project = get_owned_project(session, current_user, project_id)
-    require_project_writable(project)
+    project = access.get_project(
+        session, Caller(owner_id=current_user.id), project_id, TaskAction.UPDATE
+    )
     if project.is_inbox and "name" in project_in.model_fields_set:
         raise HTTPException(
             status_code=400, detail="The Inbox project cannot be renamed"
@@ -140,7 +136,9 @@ def archive_project(
     A toggle, not a deletion — nothing is recorded to restore from, and
     archiving a project that already is changes nothing.
     """
-    project = get_owned_project(session, current_user, project_id)
+    project = access.get_project(
+        session, Caller(owner_id=current_user.id), project_id, action=None
+    )
     if project.is_inbox:
         # Tasks created without a project land in the Inbox (FR-05.4), which
         # an archived, read-only Inbox could no longer take.
@@ -159,7 +157,9 @@ def unarchive_project(
     Unarchive a project, bringing it and its tasks back exactly as they were
     (FR-05.10, FR-05.11).
     """
-    project = get_owned_project(session, current_user, project_id)
+    project = access.get_project(
+        session, Caller(owner_id=current_user.id), project_id, action=None
+    )
     project = crud.set_project_archived(
         session=session, project=project, archived=False
     )
@@ -178,10 +178,12 @@ def delete_project(
     Archiving does not stand in the way: an archived project can be deleted
     like any other.
     """
-    project = get_owned_project(session, current_user, project_id)
+    project = access.get_project(
+        session, Caller(owner_id=current_user.id), project_id, action=None
+    )
     if project.is_inbox:
         raise HTTPException(
             status_code=400, detail="The Inbox project cannot be deleted"
         )
-    crud.delete_project(session=session, project=project)
+    deletions.delete_project(session, project)
     return Message(message="Project deleted successfully")

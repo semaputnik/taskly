@@ -13,7 +13,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
-import useCustomToast from "@/hooks/useCustomToast"
+import { toastProblem } from "@/lib/toasts"
 
 export const NO_RECURRENCE = "none"
 
@@ -66,14 +66,13 @@ export function IntervalDaysField({
   className?: string
 }) {
   const [draft, setDraft] = useState(String(value))
-  const { showErrorToast } = useCustomToast()
   useEffect(() => setDraft(String(value)), [value])
 
   const commit = () => {
     const days = Number(draft)
     if (!Number.isInteger(days) || days < MIN_INTERVAL_DAYS) {
       setDraft(String(value))
-      showErrorToast(
+      toastProblem(
         `Every N days starts at ${MIN_INTERVAL_DAYS} days. For a task that comes back daily, choose Every day.`,
       )
       return

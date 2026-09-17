@@ -4,7 +4,7 @@ from typing import Annotated, Any
 from fastapi import APIRouter, HTTPException, Query
 
 from app import activity, crud
-from app.api import authorization
+from app.api import access
 from app.api.deps import CallerDep, CurrentUser, SessionDep
 from app.models import (
     Message,
@@ -156,7 +156,7 @@ def create_tag(*, session: SessionDep, caller: CallerDep, tag_in: TagCreate) -> 
 
     A bot user needs the permission to create tags (FR-08.9).
     """
-    authorization.authorize_tag_creation(caller)
+    access.authorize_tag_creation(caller)
     _refuse_taken_name(session, caller.owner_id, tag_in.name)
     tag = crud.create_tag(session=session, owner_id=caller.owner_id, name=tag_in.name)
     return crud.tag_publics(

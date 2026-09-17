@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { useMutation, useQuery } from "@tanstack/react-query"
 import {
   Activity,
   CalendarClock,
@@ -10,6 +10,7 @@ import {
 import { useEffect, useState } from "react"
 
 import { type BotScope, BotsService, type BotUserPublic } from "@/client"
+import { useRecordPanel } from "@/components/Records/panels"
 import {
   EditableText,
   PropertyList,
@@ -17,18 +18,16 @@ import {
   ReadOnlyValue,
   RecordHeader,
   RecordPanel,
-  recordLoad,
   titleFieldClass,
   valueInset,
 } from "@/components/Records/RecordPanel"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
-import useCustomToast from "@/hooks/useCustomToast"
 import { formatDateTime, formatDayOf } from "@/lib/dates"
+import { scopeProjectsQuery, useReportChange } from "@/lib/serverState"
+import { toastError } from "@/lib/toasts"
 import { cn } from "@/lib/utils"
-import { handleError } from "@/utils"
 import { BotConsole } from "./BotConsole"
-import { scopeProjectsQueryOptions } from "./BotFormFields"
 import DeleteBotUser from "./DeleteBotUser"
 import { ago, until } from "./health"
 import IssueToken from "./IssueToken"
@@ -52,35 +51,15 @@ const STATUS_TEXT = {
  * one cell, with the rest of its actions in an overflow menu 260 pixels away.
  * Here each of those is a property, read where it is changed.
  */
-export function BotPanel({
-  botId,
-  onClose,
-}: {
-  botId: string | null
-  onClose: () => void
-}) {
-  const query = useQuery({
-    queryKey: ["bot", botId],
-    queryFn: async () =>
-      (
-        await BotsService.readBotUser({
-          path: { bot_user_id: botId as string },
-        })
-      ).data,
-    enabled: Boolean(botId),
-  })
-  const bot = query.data
+export function BotPanel() {
+  const { record: bot, shell } = useRecordPanel("bot")
 
   return (
     <RecordPanel
-      open={Boolean(botId)}
-      onClose={onClose}
-      name={bot?.name ?? "Bot user"}
-      kind="bot user"
-      {...recordLoad(query, Boolean(botId))}
+      {...shell}
       destructive={
         bot && !bot.deleted ? (
-          <DeleteBotUser bot={bot} onSuccess={onClose} />
+          <DeleteBotUser bot={bot} onSuccess={shell.onClose} />
         ) : undefined
       }
     >
@@ -96,7 +75,7 @@ function BotRecord({ bot }: { bot: BotUserPublic }) {
   // Live projects and the archived ones this bot is already scoped to: an
   // archived project stays in a scope, out of reach until it comes back, and
   // a grant the user cannot see is a grant they cannot take away (FR-05.13).
-  const { data: projects } = useQuery(scopeProjectsQueryOptions())
+  const { data: projects } = useQuery(scopeProjectsQuery())
 
   // The scope as the reader has it, which is ahead of the server while a
   // save is in flight. Building each change from the server's copy would let
@@ -296,8 +275,7 @@ function BotRecord({ bot }: { bot: BotUserPublic }) {
  * back: there is no Save button here either (FR-08.9).
  */
 function useBotUpdate(bot: BotUserPublic) {
-  const queryClient = useQueryClient()
-  const { showErrorToast } = useCustomToast()
+  const reportChange = useReportChange()
 
   const mutation = useMutation({
     mutationFn: ({ scope, name }: { scope?: BotScope; name?: string }) =>
@@ -305,13 +283,9 @@ function useBotUpdate(bot: BotUserPublic) {
         path: { bot_user_id: bot.id },
         body: { scope, name },
       }),
-    onError: handleError.bind(showErrorToast),
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["bots"] })
-      queryClient.invalidateQueries({ queryKey: ["bot", bot.id] })
-      // A renamed bot user is named on its tasks and in the log.
-      queryClient.invalidateQueries({ queryKey: ["tasks"] })
-    },
+    onError: (error) => toastError(error),
+    // A renamed bot user is named on its tasks and in the log.
+    onSettled: () => reportChange({ type: "bot user changed", botId: bot.id }),
   })
 
   return async (scope?: BotScope, name?: string) => {

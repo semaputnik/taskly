@@ -1,27 +1,27 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { useMutation, useQuery } from "@tanstack/react-query"
 import { Bot, CheckSquare, Merge } from "lucide-react"
 import { useState } from "react"
 
 import { type TagPublic, TagsService } from "@/client"
 import { NewRecord } from "@/components/Records/NewRecord"
+import { useRecordPanel } from "@/components/Records/panels"
 import {
   EditableText,
   PropertyList,
   PropertyRow,
   RecordHeader,
   RecordPanel,
-  recordLoad,
   titleFieldClass,
   valueInset,
 } from "@/components/Records/RecordPanel"
 import { Button } from "@/components/ui/button"
-import useCustomToast from "@/hooks/useCustomToast"
-import { handleError, isTagExistsError } from "@/utils"
+import { Refusal, refusalCode } from "@/lib/apiErrors"
+import { tagVocabularyQuery, useReportChange } from "@/lib/serverState"
+import { toastError } from "@/lib/toasts"
 import { BotCreator } from "./BotCreator"
 import DeleteTag from "./DeleteTag"
 import { MergeTags } from "./MergeTags"
 import { TaskCount } from "./TaskCount"
-import { useVocabulary } from "./vocabulary"
 
 /**
  * A tag as a record: its name, what carries it, and the two ways to make it
@@ -30,37 +30,15 @@ import { useVocabulary } from "./vocabulary"
  * A tag is a thin record and its panel is short. The value is that it has an
  * address and the same shape as every other record, not the amount in it.
  */
-export function TagPanel({
-  tagId,
-  capturing,
-  onClose,
-  onCreated,
-  onOpenTag,
-}: {
-  tagId: string | null
-  capturing: boolean
-  onClose: () => void
-  onCreated: (tag: TagPublic) => void
-  onOpenTag: (tagId: string) => void
-}) {
-  const query = useQuery({
-    queryKey: ["tag", tagId],
-    queryFn: async () =>
-      (await TagsService.readTag({ path: { tag_id: tagId as string } })).data,
-    enabled: Boolean(tagId),
-  })
-  const tag = query.data
+export function TagPanel() {
+  const { capturing, record: tag, panels, shell } = useRecordPanel("tag")
   // A merge being considered from this panel, and the tag it was offered with
   // when a rename ran into that tag's name.
   const [merging, setMerging] = useState<{ with?: TagPublic } | null>(null)
 
   return (
     <RecordPanel
-      open={Boolean(tagId) || capturing}
-      onClose={onClose}
-      name={capturing ? "New tag" : (tag?.name ?? "Tag")}
-      kind="tag"
-      {...recordLoad(query, !capturing && Boolean(tagId))}
+      {...shell}
       destructive={
         tag ? (
           <>
@@ -75,7 +53,7 @@ export function TagPanel({
               <Merge />
               Merge…
             </Button>
-            <DeleteTag tag={tag} onSuccess={onClose} />
+            <DeleteTag tag={tag} onSuccess={shell.onClose} />
           </>
         ) : undefined
       }
@@ -91,8 +69,8 @@ export function TagPanel({
               data: TagPublic
             }>
           }
-          invalidate={["tags"]}
-          onCreated={onCreated}
+          change={{ type: "tag created" }}
+          onCreated={(created) => panels.openTag(created.id)}
         />
       ) : tag ? (
         <TagRecord
@@ -108,7 +86,7 @@ export function TagPanel({
           onMerged={(survivor) => {
             // A merge that removed this tag moves the panel onto the one
             // that carries its tasks now.
-            if (survivor.id !== tag.id) onOpenTag(survivor.id)
+            if (survivor.id !== tag.id) panels.openTag(survivor.id)
           }}
         />
       )}
@@ -128,7 +106,7 @@ function TagMerge({
   onClose: () => void
   onMerged: (survivor: TagPublic) => void
 }) {
-  const { data: vocabulary } = useVocabulary()
+  const { data: vocabulary } = useQuery(tagVocabularyQuery())
   return (
     <MergeTags
       tags={offered ? [tag, offered] : [tag]}
@@ -148,19 +126,14 @@ function TagRecord({
   tag: TagPublic
   onNameTaken: (taken: TagPublic) => void
 }) {
-  const queryClient = useQueryClient()
-  const { showErrorToast } = useCustomToast()
+  const reportChange = useReportChange()
 
   const rename = useMutation({
     mutationFn: (name: string) =>
       TagsService.renameTag({ path: { tag_id: tag.id }, body: { name } }),
-    onError: handleError.bind(showErrorToast),
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["tags"] })
-      queryClient.invalidateQueries({ queryKey: ["tag", tag.id] })
-      // Renaming a tag renames it on every task carrying it (FR-01.24).
-      queryClient.invalidateQueries({ queryKey: ["tasks"] })
-    },
+    onError: (error) => toastError(error),
+    // Renaming a tag renames it on every task carrying it (FR-01.24).
+    onSettled: () => reportChange({ type: "tag changed" }),
   })
 
   return (
@@ -182,7 +155,7 @@ function TagRecord({
                 // and the toast says which name is taken (FR-01.22). Putting
                 // the two together is a merge, which is offered here as the
                 // separate, confirmed act it is — never done by the rename.
-                if (isTagExistsError(error as Error)) {
+                if (refusalCode(error) === Refusal.TAG_EXISTS) {
                   const holder = (
                     await TagsService.readTags({
                       query: { near: trimmed, skip: 0, limit: 100 },

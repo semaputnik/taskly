@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query"
 import { SlidersHorizontal, X } from "lucide-react"
 import { useState } from "react"
 
-import { ProjectsService, TagsService, type TaskStatus } from "@/client"
+import type { TaskStatus } from "@/client"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -14,6 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { projectsQuery, tagsQuery } from "@/lib/serverState"
 import { useBotUsers } from "./assignee"
 import { clearedFilters, hasActiveFilters, type TaskSearch } from "./search"
 import {
@@ -23,6 +24,7 @@ import {
   STATUS_LABELS,
   STATUSES,
 } from "./statuses"
+import { PRIORITIES } from "./writes"
 
 // The status filter's choices: Open, or one status. Open is written to the
 // URL as its three statuses, which is what the API filters on.
@@ -152,17 +154,8 @@ function ActiveChip({
 export function TaskFilters({ search, onChange }: TaskFiltersProps) {
   const [isOpen, setIsOpen] = useState(false)
   const { data: bots } = useBotUsers()
-  const { data: projects } = useQuery({
-    queryKey: ["projects"],
-    queryFn: async () =>
-      (await ProjectsService.readProjects({ query: { skip: 0, limit: 100 } }))
-        .data,
-  })
-  const { data: tags } = useQuery({
-    queryKey: ["tags"],
-    queryFn: async () =>
-      (await TagsService.readTags({ query: { skip: 0, limit: 100 } })).data,
-  })
+  const { data: projects } = useQuery(projectsQuery())
+  const { data: tags } = useQuery(tagsQuery())
 
   // Tag names are free text, so a tag could be called "any". Selecting by id
   // keeps the sentinel out of the user's namespace; the URL keeps the name.
@@ -315,7 +308,7 @@ export function TaskFilters({ search, onChange }: TaskFiltersProps) {
             label="Priority"
             anyLabel="Any priority"
             value={search.priority}
-            options={["P1", "P2", "P3", "P4"].map((priority) => ({
+            options={PRIORITIES.map((priority) => ({
               value: priority,
               label: priority,
             }))}

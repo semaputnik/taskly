@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query"
 import { Bot } from "lucide-react"
-import { BotsService, type BotUserRef, type TaskPublic } from "@/client"
+import type { BotUserRef, TaskPublic } from "@/client"
 import {
   Select,
   SelectContent,
@@ -8,6 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { botsQuery } from "@/lib/serverState"
 import { cn } from "@/lib/utils"
 
 import { ASSIGNED_TO_ME, UNASSIGNED } from "./draft"
@@ -21,11 +22,7 @@ export function assigneeFormValue(task: TaskPublic): string {
 }
 
 export function useBotUsers() {
-  return useQuery({
-    queryKey: ["bots"],
-    queryFn: async () =>
-      (await BotsService.readBotUsers({ query: { skip: 0, limit: 100 } })).data,
-  })
+  return useQuery(botsQuery())
 }
 
 interface AssigneeSelectProps {

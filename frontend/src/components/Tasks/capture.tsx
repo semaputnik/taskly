@@ -1,12 +1,9 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query"
-import { useEffect, useRef, useState } from "react"
+import { useQuery } from "@tanstack/react-query"
+import { useEffect, useState } from "react"
 
-import { type TaskPublic, TasksService } from "@/client"
+import { useCaptureFocus, useRecordPanels } from "@/components/Records/panels"
 import { Input } from "@/components/ui/input"
-import useAuth from "@/hooks/useAuth"
-import useCustomToast from "@/hooks/useCustomToast"
-import { handleError } from "@/utils"
-import { draftToCreate, emptyDraft, type TaskDraft } from "./draft"
+import { projectsQuery } from "@/lib/serverState"
 
 /**
  * Capture: writing a task down in the panel it will be read in.
@@ -39,76 +36,30 @@ export interface CaptureTarget {
 }
 
 /**
- * Create a task from a committed draft, or from a title alone.
+ * Where a task captured now lands: the project the list is narrowed to, or
+ * the Inbox.
  *
- * `onCreated` decides what happens next: the panel moves onto the new record,
- * or — for a run of captures — stays open with the field cleared.
+ * Asked for as soon as the screen is narrowed to a project rather than when
+ * capture opens: a capture that beats the answer would file the task in the
+ * Inbox while the panel was still saying which project it was going to.
+ * Archived projects are not among them, which is why a list filtered to one
+ * falls back to the Inbox rather than capturing into a project the API would
+ * refuse (FR-05.12).
  */
-export function useTaskCapture(
-  target: CaptureTarget,
-  onCreated: (task: TaskPublic, stay: boolean) => void,
-) {
-  const queryClient = useQueryClient()
-  const { showErrorToast } = useCustomToast()
-  const { user: currentUser } = useAuth()
-  // What a screen reader is told when a task is recorded. A refusal is a
-  // toast, like every other failed save in the panel.
-  const [announcement, setAnnouncement] = useState("")
-  // The titles being written right now, so the same one cannot be sent twice
-  // while the first is still going.
-  const inFlight = useRef(new Set<string>())
-
-  const mutation = useMutation({
-    mutationFn: ({ draft }: { draft: TaskDraft; stay: boolean }) =>
-      TasksService.createTask({
-        body: draftToCreate(draft, target, currentUser?.id),
-      }),
-    onSuccess: (response, { stay }) => {
-      const task = response.data as TaskPublic
-      // Success is silent everywhere else in the panel — the record on screen
-      // is the receipt. A capture that keeps the field empty has no such
-      // receipt, so the one who cannot see the list behind it is told.
-      setAnnouncement(`${task.title} created`)
-      onCreated(task, stay)
-    },
-    onError: (error: Error) => {
-      setAnnouncement("")
-      handleError.call(showErrorToast, error)
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["tasks"] })
-    },
+export function useCaptureTarget(): CaptureTarget {
+  const { capturing, filteredProjectId } = useRecordPanels()
+  const { data: projects } = useQuery({
+    ...projectsQuery(),
+    enabled: capturing === "task" || Boolean(filteredProjectId),
   })
-
+  const filtered = projects?.data.find(
+    (project) => project.id === filteredProjectId,
+  )
   return {
-    /**
-     * Create the task, resolving to whether it was accepted. A refusal keeps
-     * the draft on screen: the words are the reader's, not the request's.
-     *
-     * A run of captures sends as fast as it is typed — each title is its own
-     * task, and holding the second until the first came back would drop it.
-     * What is refused is the same title twice over, which is what an
-     * impatient second Enter on one thought would file.
-     */
-    create: async (input: string | TaskDraft, stay: boolean) => {
-      const draft =
-        typeof input === "string"
-          ? { ...emptyDraft(target), title: input }
-          : input
-      const trimmed = draft.title.trim()
-      if (!trimmed || inFlight.current.has(trimmed)) return false
-      inFlight.current.add(trimmed)
-      try {
-        await mutation.mutateAsync({ draft, stay })
-        return true
-      } catch {
-        return false
-      } finally {
-        inFlight.current.delete(trimmed)
-      }
-    },
-    /** Read by a screen reader; the sighted reader has the record itself. */
-    announcement,
+    projectId: filtered?.id,
+    // The default is stated rather than assumed, from the moment the panel
+    // opens (FR-05.4).
+    projectName: filtered?.name ?? "Inbox",
   }
 }
 
@@ -142,23 +93,7 @@ export function CaptureField({
   className?: string
 }) {
   const [title, setTitle] = useState("")
-  const ref = useRef<HTMLInputElement>(null)
-
-  // Focused from here rather than through `autoFocus`, which a sheet's own
-  // opening focus would win against. It is claimed twice: on a phone the
-  // sidebar is a sheet of its own, and it hands focus back to the button that
-  // opened capture as it finishes closing, a moment after this panel arrives.
-  useEffect(() => {
-    if (!autoFocus) return
-    const frame = requestAnimationFrame(() => ref.current?.focus())
-    const settled = setTimeout(() => {
-      if (document.activeElement !== ref.current) ref.current?.focus()
-    }, 350)
-    return () => {
-      cancelAnimationFrame(frame)
-      clearTimeout(settled)
-    }
-  }, [autoFocus])
+  const ref = useCaptureFocus<HTMLInputElement>(Boolean(autoFocus))
 
   return (
     <Input

@@ -28,6 +28,8 @@ from sqlalchemy import event
 from sqlalchemy.orm import Session
 from sqlmodel import col, select
 
+from app import deletions
+from app.deletions import DeletionKind
 from app.models import (
     ActivityAction,
     ActivityEntityType,
@@ -307,12 +309,15 @@ def _write(session: Session) -> None:
         if merge is not None:
             # A merge rewrites tags and nothing else; its entry says so once.
             continue
-        if batch is not None:
+        if batch is not None and before is not None:
             # The subtasks a completion swept along are part of the same act,
             # and are not counted as tasks the reader picked.
             if task_id in batch[1]:
                 batched.append(task_id)
             continue
+        # What the transaction created is logged as a single change would log
+        # it, batch or not: the next occurrence a completion brings into being
+        # is a new task, and has a named author like any other (FR-10.3).
         entries.extend(_task_entries(task_id, before, state, refs))
 
     if batch is not None and batched:
@@ -336,7 +341,8 @@ def _write(session: Session) -> None:
         # A project's tasks coming back are part of the project's restore,
         # which is logged with the project below. A batch's are not: the batch
         # is the act, and its undo is an act of its own.
-        if session.get_one(Deletion, deletion_id).project_id is None:
+        kind = deletions.kind_of(session.get_one(Deletion, deletion_id))
+        if kind is not DeletionKind.PROJECT:
             entries.append(_restore_entry(session, deletion_id, count, refs))
 
     entries.extend(_project_entries(session, pending, restored))
@@ -503,19 +509,17 @@ def _deletion_entry(
     refs: _Refs,
 ) -> ActivityEntry:
     deletion = session.get_one(Deletion, deletion_id)
-    went_down = session.execute(
-        select(col(Task.id)).where(Task.deletion_id == deletion_id)
-    ).all()
-    if deletion.task_id is None:
+    went_down = sorted(deletions.marked_task_ids(session, deletion_id))
+    if deletions.kind_of(deletion) is DeletionKind.BATCH:
         # A batch names no single task: it is the selection that went down,
         # and the count is what the entry has to say (story 27).
         return ActivityEntry(
             owner_id=deletion.owner_id,
             action=ActivityAction.TASK_DELETED,
             entity_type=ActivityEntityType.TASK,
-            # An entry points at something; for a batch the first row it took
-            # is as good a handle as any, and the restore goes by the event.
-            entity_id=went_down[0][0],
+            # An entry points at something; for a batch any row it took is as
+            # good a handle as any, and the restore goes by the event.
+            entity_id=went_down[0],
             deletion_id=deletion.id,
             details=to_jsonable_python({"task_count": len(went_down)}),
         )
@@ -545,7 +549,7 @@ def _restore_entry(
     refs: _Refs,
 ) -> ActivityEntry:
     deletion = session.get_one(Deletion, deletion_id)
-    if deletion.task_id is None:
+    if deletions.kind_of(deletion) is DeletionKind.BATCH:
         # A batch coming back: what was restored is the selection that went
         # down, said as the count it is.
         return ActivityEntry(
@@ -754,9 +758,7 @@ def _project_entries(
         deletion = session.get_one(Deletion, deletion_id)
         assert deletion.project_id is not None
         project = session.get_one(Project, deletion.project_id)
-        went_down = session.execute(
-            select(col(Task.id)).where(Task.deletion_id == deletion_id)
-        ).all()
+        went_down = deletions.marked_task_ids(session, deletion_id)
         entry = _entry(
             deletion.owner_id,
             ActivityAction.PROJECT_DELETED,

@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { useMutation } from "@tanstack/react-query"
 import { Trash2 } from "lucide-react"
 import { useState } from "react"
 
@@ -14,9 +14,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { LoadingButton } from "@/components/ui/loading-button"
-import useCustomToast from "@/hooks/useCustomToast"
+import { useReportChange } from "@/lib/serverState"
+import { toastError } from "@/lib/toasts"
 import { cn } from "@/lib/utils"
-import { handleError } from "@/utils"
 
 /**
  * Deleting an attachment, behind a confirmation that names the file.
@@ -33,8 +33,7 @@ export function DeleteAttachment({
   className?: string
 }) {
   const [isOpen, setIsOpen] = useState(false)
-  const queryClient = useQueryClient()
-  const { showErrorToast } = useCustomToast()
+  const reportChange = useReportChange()
 
   const mutation = useMutation({
     mutationFn: () =>
@@ -44,10 +43,11 @@ export function DeleteAttachment({
     // The list on screen is the receipt; only a failure is worth a toast, and
     // the file stays where it was.
     onSuccess: () => setIsOpen(false),
-    onError: handleError.bind(showErrorToast),
+    onError: (error) => toastError(error),
     onSettled: () =>
-      queryClient.invalidateQueries({
-        queryKey: ["attachments", attachment.task_id],
+      reportChange({
+        type: "attachments changed",
+        taskId: attachment.task_id,
       }),
   })
 

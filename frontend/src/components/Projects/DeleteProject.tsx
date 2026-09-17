@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { useMutation } from "@tanstack/react-query"
 import { useState } from "react"
 
 import { type ProjectPublic, ProjectsService } from "@/client"
@@ -14,8 +14,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { LoadingButton } from "@/components/ui/loading-button"
-import useCustomToast from "@/hooks/useCustomToast"
-import { handleError } from "@/utils"
+import { useReportChange } from "@/lib/serverState"
+import { toastError, toastSuccess } from "@/lib/toasts"
 
 /**
  * Deleting a project, behind a confirmation that names the cascade.
@@ -33,22 +33,19 @@ export default function DeleteProject({
   onSuccess: () => void
 }) {
   const [isOpen, setIsOpen] = useState(false)
-  const queryClient = useQueryClient()
-  const { showSuccessToast, showErrorToast } = useCustomToast()
+  const reportChange = useReportChange()
 
   const mutation = useMutation({
     mutationFn: () =>
       ProjectsService.deleteProject({ path: { project_id: project.id } }),
     onSuccess: () => {
-      showSuccessToast(`“${project.name}” was deleted`)
+      toastSuccess(`“${project.name}” was deleted`)
       setIsOpen(false)
       onSuccess()
     },
-    onError: handleError.bind(showErrorToast),
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["projects"] })
-      queryClient.invalidateQueries({ queryKey: ["tasks"] })
-    },
+    onError: (error) => toastError(error),
+    onSettled: () =>
+      reportChange({ type: "project changed", projectId: project.id }),
   })
 
   const tasks =

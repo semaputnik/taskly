@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { useMutation } from "@tanstack/react-query"
 import { Link as RouterLink } from "@tanstack/react-router"
 import { Archive, CheckSquare, Clock } from "lucide-react"
 
@@ -8,6 +8,7 @@ import {
   type ProjectUpdate,
 } from "@/client"
 import { NewRecord } from "@/components/Records/NewRecord"
+import { useRecordPanel } from "@/components/Records/panels"
 import {
   DescriptionSection,
   EditableText,
@@ -16,16 +17,15 @@ import {
   ReadOnlyValue,
   RecordHeader,
   RecordPanel,
-  recordLoad,
   titleFieldClass,
   valueInset,
 } from "@/components/Records/RecordPanel"
 import { taskCountLabel } from "@/components/Tags/counts"
 import { LoadingButton } from "@/components/ui/loading-button"
-import useCustomToast from "@/hooks/useCustomToast"
 import { formatDayOf } from "@/lib/dates"
+import { useReportChange } from "@/lib/serverState"
+import { toastError, toastSuccess } from "@/lib/toasts"
 import { cn } from "@/lib/utils"
-import { handleError } from "@/utils"
 import DeleteProject from "./DeleteProject"
 
 /**
@@ -35,41 +35,22 @@ import DeleteProject from "./DeleteProject"
  * actions behind that row's overflow menu, and each action in a dialog of its
  * own. Nothing could link to a project.
  */
-export function ProjectPanel({
-  projectId,
-  capturing,
-  onClose,
-  onCreated,
-}: {
-  projectId: string | null
-  capturing: boolean
-  onClose: () => void
-  onCreated: (project: ProjectPublic) => void
-}) {
+export function ProjectPanel() {
   // Fetched by id rather than read out of the table: a link may point at a
   // project the list in view excludes — an archived one, most of all.
-  const query = useQuery({
-    queryKey: ["project", projectId],
-    queryFn: async () =>
-      (
-        await ProjectsService.readProject({
-          path: { project_id: projectId as string },
-        })
-      ).data,
-    enabled: Boolean(projectId),
-  })
-  const project = query.data
+  const {
+    capturing,
+    record: project,
+    panels,
+    shell,
+  } = useRecordPanel("project")
 
   return (
     <RecordPanel
-      open={Boolean(projectId) || capturing}
-      onClose={onClose}
-      name={capturing ? "New project" : (project?.name ?? "Project")}
-      kind="project"
-      {...recordLoad(query, !capturing && Boolean(projectId))}
+      {...shell}
       destructive={
         project && !project.is_inbox ? (
-          <DeleteProject project={project} onSuccess={onClose} />
+          <DeleteProject project={project} onSuccess={shell.onClose} />
         ) : undefined
       }
     >
@@ -84,8 +65,8 @@ export function ProjectPanel({
               data: ProjectPublic
             }>
           }
-          invalidate={["projects"]}
-          onCreated={onCreated}
+          change={{ type: "project created" }}
+          onCreated={(created) => panels.openProject(created.id)}
         />
       ) : project ? (
         <ProjectRecord project={project} />
@@ -189,8 +170,7 @@ function ProjectRecord({ project }: { project: ProjectPublic }) {
  * one control, both ways, read where the state is.
  */
 function ArchiveToggle({ project }: { project: ProjectPublic }) {
-  const queryClient = useQueryClient()
-  const { showSuccessToast, showErrorToast } = useCustomToast()
+  const reportChange = useReportChange()
 
   const mutation = useMutation({
     mutationFn: () =>
@@ -198,17 +178,14 @@ function ArchiveToggle({ project }: { project: ProjectPublic }) {
         ? ProjectsService.unarchiveProject({ path: { project_id: project.id } })
         : ProjectsService.archiveProject({ path: { project_id: project.id } }),
     onSuccess: () =>
-      showSuccessToast(
+      toastSuccess(
         project.is_archived
           ? `“${project.name}” is back in your projects`
           : `“${project.name}” moved to the archive`,
       ),
-    onError: handleError.bind(showErrorToast),
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["projects"] })
-      queryClient.invalidateQueries({ queryKey: ["project", project.id] })
-      queryClient.invalidateQueries({ queryKey: ["tasks"] })
-    },
+    onError: (error) => toastError(error),
+    onSettled: () =>
+      reportChange({ type: "project changed", projectId: project.id }),
   })
 
   return (
@@ -232,8 +209,7 @@ function ArchiveToggle({ project }: { project: ProjectPublic }) {
 
 /** Saving one field of a project, the way the panel saves every field. */
 function useProjectUpdate(project: ProjectPublic) {
-  const queryClient = useQueryClient()
-  const { showErrorToast } = useCustomToast()
+  const reportChange = useReportChange()
 
   const mutation = useMutation({
     mutationFn: (body: ProjectUpdate) =>
@@ -241,13 +217,10 @@ function useProjectUpdate(project: ProjectPublic) {
         path: { project_id: project.id },
         body,
       }),
-    onError: handleError.bind(showErrorToast),
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["projects"] })
-      queryClient.invalidateQueries({ queryKey: ["project", project.id] })
-      // A project's name shows on every task in it.
-      queryClient.invalidateQueries({ queryKey: ["tasks"] })
-    },
+    onError: (error) => toastError(error),
+    // A project's name shows on every task in it.
+    onSettled: () =>
+      reportChange({ type: "project changed", projectId: project.id }),
   })
 
   return async (body: ProjectUpdate) => {

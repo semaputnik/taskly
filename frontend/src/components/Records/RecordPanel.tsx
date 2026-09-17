@@ -13,9 +13,9 @@ import {
 import { Skeleton } from "@/components/ui/skeleton"
 import { Toaster } from "@/components/ui/sonner"
 import { Textarea } from "@/components/ui/textarea"
-import { isRefusal } from "@/lib/apiErrors"
 import { PANEL_TOASTER_ID, settlePanelNotices } from "@/lib/panelNotices"
 import { cn } from "@/lib/utils"
+import type { RecordLoad } from "./panels"
 
 /**
  * The one shape a record is read and acted on in.
@@ -128,54 +128,6 @@ export function RecordPanel({
       </SheetContent>
     </Sheet>
   )
-}
-
-/** How far a panel has got with reading its record. */
-export interface RecordLoad {
-  /** A request for the record is in flight and nothing is known yet. */
-  pending?: boolean
-  /**
-   * The record cannot be shown. `missing`: the API refused it — deleted, not
-   * the reader's, or not an id at all, which it answers alike so that nothing
-   * is revealed. `unavailable`: the API did not answer, and it may yet.
-   */
-  failure?: "missing" | "unavailable"
-  /** Ask again now, cutting short any retry already waiting. */
-  onRetry?: () => void
-}
-
-/**
- * A panel's load state from its record query, for a panel that is `reading`
- * a record rather than capturing one.
- *
- * A failed read has to say so: a skeleton is shown only while a request is
- * really on its way, never for a request that has already failed. A record
- * already on screen stays there through a background refetch that fails.
- */
-export function recordLoad(
-  query: {
-    data: unknown
-    isLoading: boolean
-    failureCount: number
-    failureReason: Error | null
-    refetch: () => unknown
-  },
-  reading: boolean,
-): RecordLoad {
-  if (!reading) return {}
-  // A failure is said as soon as the first attempt fails, even while a
-  // failure that may pass is still being retried behind it: the skeleton is
-  // only for the first request, genuinely on its way.
-  const failed = query.failureCount > 0 && query.data === undefined
-  return {
-    pending: query.isLoading && !failed,
-    failure: !failed
-      ? undefined
-      : isRefusal(query.failureReason)
-        ? "missing"
-        : "unavailable",
-    onRetry: () => void query.refetch(),
-  }
 }
 
 /**

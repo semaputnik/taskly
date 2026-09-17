@@ -1,9 +1,9 @@
 import { useQuery } from "@tanstack/react-query"
 import { createFileRoute, Link as RouterLink } from "@tanstack/react-router"
 import { CheckSquare, SearchX } from "lucide-react"
-import { useState } from "react"
+import { useRef, useState } from "react"
 
-import { ProjectsService, type TaskPublic, TasksService } from "@/client"
+import { type TaskPublic, TasksService } from "@/client"
 import { DataTable } from "@/components/Common/DataTable"
 import { EmptyState } from "@/components/Common/EmptyState"
 import { useRecordPanels, withoutPanelState } from "@/components/Records/panels"
@@ -21,8 +21,8 @@ import { TaskFilters } from "@/components/Tasks/TaskFilters"
 import { buildTaskTree } from "@/components/Tasks/tree"
 import { Button } from "@/components/ui/button"
 import useAuth from "@/hooks/useAuth"
-import useCustomToast from "@/hooks/useCustomToast"
-import { handleError } from "@/utils"
+import { projectsQuery, tasksQuery } from "@/lib/serverState"
+import { toastError } from "@/lib/toasts"
 
 const PAGE_SIZE = 25
 
@@ -36,9 +36,10 @@ const EMPTY: ReadonlySet<string> = new Set()
 // read, not scanned in order.
 const SORT_FIELDS = { due_date: "due_date", priority: "priority" }
 
-function getTasksQueryOptions(search: TaskListSearch, currentUserId?: string) {
-  const { assignee, page = 1, ...filters } = withoutPanelState(search)
-  const query = {
+/** What the list's filters ask the API for, before any paging. */
+function filtersQuery(search: TaskListSearch, currentUserId?: string) {
+  const { assignee, page: _page, ...filters } = withoutPanelState(search)
+  return {
     ...filters,
     // "Me" needs the id the API filters on, a bot user is named by its own
     // id, and "unassigned" is a flag of its own.
@@ -49,24 +50,6 @@ function getTasksQueryOptions(search: TaskListSearch, currentUserId?: string) {
           ? undefined
           : assignee,
     unassigned: assignee === "unassigned" ? true : undefined,
-    // The page the reader is on, asked for as such: a table that fetches a
-    // window and then pages it in the browser can only page what it fetched,
-    // and would report that window as the total.
-    skip: (page - 1) * PAGE_SIZE,
-    limit: PAGE_SIZE,
-  }
-  return {
-    queryFn: async () => (await TasksService.readTasks({ query })).data,
-    queryKey: ["tasks", query],
-  }
-}
-
-function getProjectsQueryOptions() {
-  return {
-    queryFn: async () =>
-      (await ProjectsService.readProjects({ query: { skip: 0, limit: 100 } }))
-        .data,
-    queryKey: ["projects"],
   }
 }
 
@@ -95,7 +78,6 @@ function Tasks() {
   const navigate = Route.useNavigate()
   const { openTask, capture } = useRecordPanels()
   const { user: currentUser } = useAuth()
-  const { showErrorToast } = useCustomToast()
   const page = search.page ?? 1
 
   // Which tasks are selected, gathered across pages of one filter set. A
@@ -121,11 +103,19 @@ function Tasks() {
   // Filtering by "me" needs the id to filter on: listing before it arrives
   // would show everything, which is the opposite of what was asked for.
   const waitingForMe = search.assignee === "me" && !currentUser
+  const filters = filtersQuery(search, currentUser?.id)
   const { data: tasks, isPending } = useQuery({
-    ...getTasksQueryOptions(search, currentUser?.id),
+    ...tasksQuery({
+      ...filters,
+      // The page the reader is on, asked for as such: a table that fetches a
+      // window and then pages it in the browser can only page what it
+      // fetched, and would report that window as the total.
+      skip: (page - 1) * PAGE_SIZE,
+      limit: PAGE_SIZE,
+    }),
     enabled: !waitingForMe,
   })
-  const { data: projects } = useQuery(getProjectsQueryOptions())
+  const { data: projects } = useQuery(projectsQuery())
 
   const applyFilters = (next: Partial<TaskSearch>) =>
     // Any change to what is being shown returns to the first page: the page
@@ -155,6 +145,11 @@ function Tasks() {
       }),
     })
 
+  // Every task this list has shown, so a batch can be checked against what
+  // the selected tasks are before it is sent — a selection outlives pages.
+  const seen = useRef(new Map<string, TaskPublic>())
+  for (const task of tasks?.data ?? []) seen.current.set(task.id, task)
+
   const count = tasks?.count ?? 0
   const lastPage = Math.max(1, Math.ceil(count / PAGE_SIZE))
   const projectNames = Object.fromEntries(
@@ -182,6 +177,7 @@ function Tasks() {
       {selected.size > 0 && (
         <TaskBulkActions
           selected={[...selected]}
+          known={[...selected].flatMap((id) => seen.current.get(id) ?? [])}
           projects={projects?.data ?? []}
           onDone={clearSelection}
           onClear={clearSelection}
@@ -193,19 +189,15 @@ function Tasks() {
             rows.length > 0 && rows.every((task) => selected.has(task.id))
           }
           onSelectAllMatching={async () => {
-            const { assignee: _assignee, ...rest } = getTasksQueryOptions(
-              search,
-              currentUser?.id,
-            ).queryKey[1] as Record<string, unknown>
             try {
               const all = await TasksService.readTasks({
-                query: { ...rest, skip: 0, limit: MAX_BATCH },
+                query: { ...filters, skip: 0, limit: MAX_BATCH },
               })
-              setSelected(
-                () => new Set((all.data?.data ?? []).map((task) => task.id)),
-              )
+              const matched = all.data?.data ?? []
+              for (const task of matched) seen.current.set(task.id, task)
+              setSelected(() => new Set(matched.map((task) => task.id)))
             } catch (error) {
-              handleError.call(showErrorToast, error as Error)
+              toastError(error)
             }
           }}
         />

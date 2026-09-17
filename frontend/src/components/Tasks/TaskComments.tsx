@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { useMutation, useQuery } from "@tanstack/react-query"
 import { Bot, Pencil, Trash2 } from "lucide-react"
 import { useState } from "react"
 
@@ -7,9 +7,9 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { LoadingButton } from "@/components/ui/loading-button"
 import { Textarea } from "@/components/ui/textarea"
-import useCustomToast from "@/hooks/useCustomToast"
 import { formatDateTime } from "@/lib/dates"
-import { handleError } from "@/utils"
+import { commentsQuery, useReportChange } from "@/lib/serverState"
+import { toastError } from "@/lib/toasts"
 import { useCommentDeletion } from "./commentDeletion"
 import { useCommentDraft } from "./commentDraft"
 
@@ -26,18 +26,12 @@ export const TaskComments = ({ task }: TaskCommentsProps) => {
   const draft = useCommentDraft(task.id)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editDraft, setEditDraft] = useState("")
-  const queryClient = useQueryClient()
-  const { showErrorToast } = useCustomToast()
+  const reportChange = useReportChange()
 
-  const queryKey = ["comments", task.id]
+  const { data: comments, isLoading } = useQuery(commentsQuery(task.id))
 
-  const { data: comments, isLoading } = useQuery({
-    queryKey,
-    queryFn: async () =>
-      (await CommentsService.readComments({ path: { task_id: task.id } })).data,
-  })
-
-  const invalidate = () => queryClient.invalidateQueries({ queryKey })
+  const invalidate = () =>
+    reportChange({ type: "comments changed", taskId: task.id })
 
   const addMutation = useMutation({
     mutationFn: (body: string) =>
@@ -46,7 +40,7 @@ export const TaskComments = ({ task }: TaskCommentsProps) => {
         body: { body },
       }),
     onSuccess: () => draft.clear(),
-    onError: handleError.bind(showErrorToast),
+    onError: (error) => toastError(error),
     onSettled: invalidate,
   })
 
@@ -57,7 +51,7 @@ export const TaskComments = ({ task }: TaskCommentsProps) => {
         body: { body },
       }),
     onSuccess: () => setEditingId(null),
-    onError: handleError.bind(showErrorToast),
+    onError: (error) => toastError(error),
     onSettled: invalidate,
   })
 

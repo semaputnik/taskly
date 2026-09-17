@@ -4,12 +4,15 @@ import { useNavigate } from "@tanstack/react-router"
 import {
   type Body_login_login_access_token as AccessToken,
   LoginService,
-  type UserPublic,
   type UserRegister,
   UsersService,
 } from "@/client"
-import { handleError } from "@/utils"
-import useCustomToast from "./useCustomToast"
+import {
+  clearServerState,
+  currentUserQuery,
+  useReportChange,
+} from "@/lib/serverState"
+import { toastError } from "@/lib/toasts"
 
 const isLoggedIn = () => {
   return localStorage.getItem("access_token") !== null
@@ -18,11 +21,10 @@ const isLoggedIn = () => {
 const useAuth = () => {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const { showErrorToast } = useCustomToast()
+  const reportChange = useReportChange()
 
-  const { data: user } = useQuery<UserPublic | null, Error>({
-    queryKey: ["currentUser"],
-    queryFn: async () => (await UsersService.readUserMe()).data,
+  const { data: user } = useQuery({
+    ...currentUserQuery(),
     enabled: isLoggedIn(),
   })
 
@@ -32,9 +34,9 @@ const useAuth = () => {
     onSuccess: () => {
       navigate({ to: "/login" })
     },
-    onError: handleError.bind(showErrorToast),
+    onError: (error) => toastError(error),
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["users"] })
+      reportChange({ type: "users changed" })
     },
   })
 
@@ -50,11 +52,13 @@ const useAuth = () => {
     onSuccess: () => {
       navigate({ to: "/" })
     },
-    onError: handleError.bind(showErrorToast),
+    onError: (error) => toastError(error),
   })
 
   const logout = () => {
     localStorage.removeItem("access_token")
+    // The next account to sign in in this tab must not see this one's data.
+    clearServerState(queryClient)
     navigate({ to: "/login" })
   }
 
