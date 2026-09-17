@@ -118,6 +118,25 @@ See GitHub's guides for [adding a self-hosted runner](https://docs.github.com/en
 
 When the runner is online, open the repository's **Actions** tab, select **Deploy with Docker Compose**, and select **Run workflow**.
 
+## Publish a Release Image
+
+The `.github/workflows/publish-docker-image.yml` workflow builds the application image and pushes it to Docker Hub when a version tag is pushed:
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+The tag `v1.2.3` publishes `1.2.3`, `1.2` and `latest`. A pre-release tag such as `v1.2.3-rc.1` publishes only `1.2.3-rc.1` and leaves `latest` pointing at the last stable release.
+
+The published image is the one `compose.yml` builds: a single image carrying the API and the prebuilt frontend.
+
+### Configure the Docker Hub Account
+
+In the repository, go to **Settings** > **Secrets and variables** > **Actions** and add the `DOCKERHUB_USERNAME` repository variable, which names both the account the workflow logs in as and the namespace the image is pushed to, so the image is published as `docker.io/$DOCKERHUB_USERNAME/taskly`.
+
+Add the `DOCKERHUB_TOKEN` repository secret: a Docker Hub [access token](https://docs.docker.com/security/for-developers/access-tokens/) with **Read & Write** permission.
+
 ## URLs
 
 Replace `fastapi-project.example.com` with your domain.
