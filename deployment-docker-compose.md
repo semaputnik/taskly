@@ -168,6 +168,12 @@ docker compose -f compose.release.yml up -d
 
 To release a new version, set `TASKLY_TAG` to it and repeat those three commands.
 
+This stack runs no Adminer: a database admin panel on a public subdomain is guarded by the Postgres password alone, which is a poor trade for a tool needed a few times a month. Reach the database over SSH instead:
+
+```bash
+docker compose -f compose.release.yml exec db psql -U postgres app
+```
+
 The stack is named `taskly`, so its volumes are `taskly_app-db-data` and `taskly_attachments-data` wherever the file is placed. A server already running the build-from-source stack from `/root/code/app` keeps its data under that directory's project name instead, so moving to `compose.release.yml` there starts from empty volumes unless the data is migrated across.
 
 ## URLs
@@ -178,4 +184,4 @@ Application (frontend and API): `https://fastapi-project.example.com`
 
 Interactive API docs: `https://fastapi-project.example.com/docs`
 
-Adminer: `https://adminer.fastapi-project.example.com`
+Adminer: `https://adminer.fastapi-project.example.com`, for the stack built from source. The `compose.release.yml` stack does not run it.
