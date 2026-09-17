@@ -1,23 +1,31 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { useEffect, useRef, useState } from "react"
 
-import { type TaskCreate, type TaskPublic, TasksService } from "@/client"
+import { type TaskPublic, TasksService } from "@/client"
 import { Input } from "@/components/ui/input"
+import useAuth from "@/hooks/useAuth"
 import useCustomToast from "@/hooks/useCustomToast"
 import { handleError } from "@/utils"
+import { draftToCreate, emptyDraft, type TaskDraft } from "./draft"
 
 /**
- * Capture: writing a task down costs one field.
+ * Capture: writing a task down in the panel it will be read in.
  *
- * The old Add Task dialog asked for eight fields up front, nine of them
- * optional, and every one of them editable afterwards in the panel that reads
- * the record. Capture keeps the title and hands the rest to the panel, so
- * creating and editing a task are one interaction instead of two models of the
- * same record.
+ * The panel opens as a draft in the task's own layout (ADR-0005): the title,
+ * and every property a task has at creation, all editable from the first
+ * frame. The draft is held here, in the browser, and becomes the task in one
+ * explicit, visible commit — Enter in the title, or Create task — which sends
+ * one create request carrying all of it.
  *
- * Nothing is written until a title is committed. Opening the panel sends no
- * request, so an accidental open leaves no untitled task in the list, in the
- * activity log, or in the API a bot user reads.
+ * That one request is what keeps capture's guarantees. Nothing is written
+ * while the draft is filled in, so a bot user never sees a half-written task,
+ * an accidental open leaves nothing behind, and a task created with a date,
+ * a priority and tags is one creation in the activity log rather than a
+ * creation followed by edits. Because the draft exists only here, closing one
+ * that holds something asks first.
+ *
+ * Projects and tags, whose only property is a name, keep one-field capture,
+ * and so does a subtask added from its parent's Subtasks tab.
  */
 
 /** A task the panel is about to create, and where it will land. */
@@ -31,7 +39,7 @@ export interface CaptureTarget {
 }
 
 /**
- * Create a task from a committed title.
+ * Create a task from a committed draft, or from a title alone.
  *
  * `onCreated` decides what happens next: the panel moves onto the new record,
  * or — for a run of captures — stays open with the field cleared.
@@ -42,6 +50,7 @@ export function useTaskCapture(
 ) {
   const queryClient = useQueryClient()
   const { showErrorToast } = useCustomToast()
+  const { user: currentUser } = useAuth()
   // What a screen reader is told when a task is recorded. A refusal is a
   // toast, like every other failed save in the panel.
   const [announcement, setAnnouncement] = useState("")
@@ -50,12 +59,10 @@ export function useTaskCapture(
   const inFlight = useRef(new Set<string>())
 
   const mutation = useMutation({
-    mutationFn: ({ title }: { title: string; stay: boolean }) => {
-      const body: TaskCreate = target.parentId
-        ? { title, parent_id: target.parentId }
-        : { title, project_id: target.projectId }
-      return TasksService.createTask({ body })
-    },
+    mutationFn: ({ draft }: { draft: TaskDraft; stay: boolean }) =>
+      TasksService.createTask({
+        body: draftToCreate(draft, target, currentUser?.id),
+      }),
     onSuccess: (response, { stay }) => {
       const task = response.data as TaskPublic
       // Success is silent everywhere else in the panel — the record on screen
@@ -76,19 +83,23 @@ export function useTaskCapture(
   return {
     /**
      * Create the task, resolving to whether it was accepted. A refusal keeps
-     * the title on screen: the words are the reader's, not the request's.
+     * the draft on screen: the words are the reader's, not the request's.
      *
      * A run of captures sends as fast as it is typed — each title is its own
      * task, and holding the second until the first came back would drop it.
      * What is refused is the same title twice over, which is what an
      * impatient second Enter on one thought would file.
      */
-    create: async (title: string, stay: boolean) => {
-      const trimmed = title.trim()
+    create: async (input: string | TaskDraft, stay: boolean) => {
+      const draft =
+        typeof input === "string"
+          ? { ...emptyDraft(target), title: input }
+          : input
+      const trimmed = draft.title.trim()
       if (!trimmed || inFlight.current.has(trimmed)) return false
       inFlight.current.add(trimmed)
       try {
-        await mutation.mutateAsync({ title: trimmed, stay })
+        await mutation.mutateAsync({ draft, stay })
         return true
       } catch {
         return false
@@ -98,11 +109,12 @@ export function useTaskCapture(
     },
     /** Read by a screen reader; the sighted reader has the record itself. */
     announcement,
+    isPending: mutation.isPending,
   }
 }
 
 /**
- * The one field capture asks for.
+ * One-field capture, for a subtask added from its parent's Subtasks tab.
  *
  * Enter commits, the way every text field in the product commits. The chord
  * commits and keeps the field, so a burst of thoughts costs one gesture each.

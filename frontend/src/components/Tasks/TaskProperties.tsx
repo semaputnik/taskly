@@ -11,8 +11,10 @@ import {
 import { useId } from "react"
 
 import {
+  type BotUserRef,
   ProjectsService,
   type RecurrenceFrequency,
+  type TaskPriority,
   type TaskPublic,
   type TaskStatus,
   type TaskUpdate,
@@ -36,6 +38,7 @@ import useAuth from "@/hooks/useAuth"
 import { formatDateTime } from "@/lib/dates"
 import { cn } from "@/lib/utils"
 import { AssigneeSelect, assigneeFormValue, toAssigneeId } from "./assignee"
+import type { TaskFields } from "./draft"
 import {
   DueDateScopeDialog,
   IntervalDaysField,
@@ -55,6 +58,197 @@ import { useTaskUpdate } from "./useTaskUpdate"
 const NO_PRIORITY = "none"
 
 /**
+ * The property rows a task has from the moment it is written down: project,
+ * due date, priority, assignee, tags and repeat.
+ *
+ * They render against a source rather than a record — the current values, and
+ * a way to change some of them — so the task's panel and the draft in capture
+ * are one set of rows. A record saves each change as it is made; a draft holds
+ * it until the task is created. Rows only a record has go in `before` and
+ * `after`.
+ */
+export function TaskPropertyRows({
+  fields,
+  onChange,
+  isSubtask,
+  currentBot,
+  defaultProjectName,
+  before,
+  after,
+}: {
+  fields: TaskFields
+  onChange: (patch: Partial<TaskFields>) => void
+  /**
+   * A subtask has no project or schedule of its own: it follows the task at
+   * the top of its tree, which is the one that can be moved (FR-02.4).
+   */
+  isSubtask: boolean
+  /** A deleted bot user the task keeps, offered only to keep it. */
+  currentBot?: BotUserRef | null
+  /** What an unset project is called: the default a draft lands in. */
+  defaultProjectName?: string
+  before?: React.ReactNode
+  after?: React.ReactNode
+}) {
+  const { user: currentUser } = useAuth()
+  const ids = useId()
+
+  const { data: projects } = useQuery({
+    queryKey: ["projects"],
+    queryFn: async () =>
+      (await ProjectsService.readProjects({ query: { skip: 0, limit: 100 } }))
+        .data,
+    enabled: !isSubtask,
+  })
+  const inbox = projects?.data.find((project) => project.is_inbox)
+
+  return (
+    <PropertyList>
+      {before}
+
+      <PropertyRow
+        icon={FolderKanban}
+        label="Project"
+        htmlFor={`${ids}-project`}
+      >
+        {isSubtask ? (
+          <ReadOnlyValue>Follows its parent task</ReadOnlyValue>
+        ) : (
+          <Select
+            // An unset project is the Inbox, which is a project like any
+            // other once the list of them is in.
+            value={fields.project_id ?? inbox?.id ?? ""}
+            onValueChange={(project_id) => onChange({ project_id })}
+          >
+            <SelectTrigger
+              id={`${ids}-project`}
+              className={cn(ghost, "w-full")}
+            >
+              <SelectValue placeholder={defaultProjectName} />
+            </SelectTrigger>
+            <SelectContent>
+              {(projects?.data ?? []).map((project) => (
+                <SelectItem key={project.id} value={project.id}>
+                  {project.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+      </PropertyRow>
+
+      <PropertyRow icon={Calendar} label="Due date" htmlFor={`${ids}-due`}>
+        <DayField
+          id={`${ids}-due`}
+          label="Due date"
+          value={fields.due_date}
+          onChange={(due_date) => onChange({ due_date })}
+          className={ghost}
+        />
+      </PropertyRow>
+
+      <PropertyRow icon={Flag} label="Priority" htmlFor={`${ids}-priority`}>
+        <Select
+          value={fields.priority ?? NO_PRIORITY}
+          onValueChange={(value) =>
+            onChange({
+              priority: value === NO_PRIORITY ? null : (value as TaskPriority),
+            })
+          }
+        >
+          <SelectTrigger id={`${ids}-priority`} className={cn(ghost, "w-full")}>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={NO_PRIORITY}>No priority</SelectItem>
+            {["P1", "P2", "P3", "P4"].map((priority) => (
+              <SelectItem key={priority} value={priority}>
+                {priority}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </PropertyRow>
+
+      <PropertyRow icon={UserIcon} label="Assignee">
+        <AssigneeSelect
+          value={fields.assignee}
+          onChange={(assignee) => onChange({ assignee })}
+          currentUserEmail={currentUser?.email}
+          current={currentBot ?? undefined}
+          className={ghost}
+        />
+      </PropertyRow>
+
+      <PropertyRow icon={Tag} label="Tags">
+        <TagPicker
+          value={fields.tags}
+          onChange={(tags) => onChange({ tags })}
+        />
+      </PropertyRow>
+
+      <PropertyRow icon={Repeat} label="Repeat" htmlFor={`${ids}-repeat`}>
+        {isSubtask ? (
+          <ReadOnlyValue>
+            Only a task at the top of its tree can repeat
+          </ReadOnlyValue>
+        ) : (
+          <div className="flex items-center gap-2">
+            <Select
+              value={fields.recurrence?.frequency ?? NO_RECURRENCE}
+              onValueChange={(value) =>
+                onChange({
+                  recurrence:
+                    value === NO_RECURRENCE
+                      ? null
+                      : {
+                          frequency: value as RecurrenceFrequency,
+                          // A new "every N days" rule needs an interval to be
+                          // a rule at all; it starts at the shortest one.
+                          interval_days:
+                            value === "every_n_days"
+                              ? (fields.recurrence?.interval_days ??
+                                MIN_INTERVAL_DAYS)
+                              : null,
+                        },
+                })
+              }
+            >
+              <SelectTrigger
+                id={`${ids}-repeat`}
+                className={cn(ghost, "w-full")}
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NO_RECURRENCE}>Does not repeat</SelectItem>
+                <SelectItem value="daily">Every day</SelectItem>
+                <SelectItem value="weekly">Every week</SelectItem>
+                <SelectItem value="monthly">Every month</SelectItem>
+                <SelectItem value="every_n_days">Every N days</SelectItem>
+              </SelectContent>
+            </Select>
+            {fields.recurrence?.frequency === "every_n_days" && (
+              <IntervalDaysField
+                value={fields.recurrence.interval_days ?? MIN_INTERVAL_DAYS}
+                onCommit={(interval_days) =>
+                  onChange({
+                    recurrence: { frequency: "every_n_days", interval_days },
+                  })
+                }
+                className={cn(ghost, "w-20 shrink-0")}
+              />
+            )}
+          </div>
+        )}
+      </PropertyRow>
+
+      {after}
+    </PropertyList>
+  )
+}
+
+/**
  * A task's fields, edited where they are read.
  *
  * There is no separate edit screen: a form that restates the record you are
@@ -69,215 +263,85 @@ export function TaskProperties({ task }: { task: TaskPublic }) {
   const status = useTaskStatus(task)
   const ids = useId()
 
-  // A subtask has no project or schedule of its own: it follows the task at
-  // the top of its tree, which is the one that can be moved (FR-02.4).
-  const isSubtask = Boolean(task.parent_id)
+  const fields: TaskFields = {
+    project_id: task.project_id,
+    due_date: task.due_date ?? null,
+    priority: task.priority ?? null,
+    assignee: assigneeFormValue(task),
+    tags: task.tags ?? [],
+    recurrence: task.recurrence ?? null,
+  }
 
-  const { data: projects } = useQuery({
-    queryKey: ["projects"],
-    queryFn: async () =>
-      (await ProjectsService.readProjects({ query: { skip: 0, limit: 100 } }))
-        .data,
-    enabled: !isSubtask,
-  })
-
-  const save = (patch: TaskUpdate) => update.save(patch)
+  const save = (patch: Partial<TaskFields>) => {
+    const { assignee, ...rest } = patch
+    const body: TaskUpdate = { ...rest }
+    if (assignee !== undefined) {
+      body.assignee_id = toAssigneeId(assignee, currentUser?.id)
+    }
+    update.save(body)
+  }
 
   return (
     <>
-      <PropertyList>
-        <PropertyRow
-          icon={statusIcon(task.status)}
-          label="Status"
-          htmlFor={`${ids}-status`}
-        >
-          <Select
-            value={task.status}
-            onValueChange={(value) => status.change(value as TaskStatus)}
-            disabled={status.isPending}
+      <TaskPropertyRows
+        fields={fields}
+        onChange={save}
+        isSubtask={Boolean(task.parent_id)}
+        currentBot={task.assignee_bot_user}
+        before={
+          <PropertyRow
+            icon={statusIcon(task.status)}
+            label="Status"
+            htmlFor={`${ids}-status`}
           >
-            <SelectTrigger id={`${ids}-status`} className={cn(ghost, "w-full")}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {STATUSES.map((value) => (
-                <SelectItem key={value} value={value}>
-                  <StatusGlyph status={value} />
-                  {STATUS_LABELS[value]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </PropertyRow>
-
-        <PropertyRow
-          icon={FolderKanban}
-          label="Project"
-          htmlFor={`${ids}-project`}
-        >
-          {isSubtask ? (
-            <ReadOnlyValue>Follows its parent task</ReadOnlyValue>
-          ) : (
             <Select
-              value={task.project_id}
-              onValueChange={(project_id) => save({ project_id })}
+              value={task.status}
+              onValueChange={(value) => status.change(value as TaskStatus)}
+              disabled={status.isPending}
             >
               <SelectTrigger
-                id={`${ids}-project`}
+                id={`${ids}-status`}
                 className={cn(ghost, "w-full")}
               >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {(projects?.data ?? []).map((project) => (
-                  <SelectItem key={project.id} value={project.id}>
-                    {project.name}
+                {STATUSES.map((value) => (
+                  <SelectItem key={value} value={value}>
+                    <StatusGlyph status={value} />
+                    {STATUS_LABELS[value]}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-          )}
-        </PropertyRow>
-
-        <PropertyRow icon={Calendar} label="Due date" htmlFor={`${ids}-due`}>
-          <DayField
-            id={`${ids}-due`}
-            label="Due date"
-            value={task.due_date}
-            onChange={(due_date) => save({ due_date })}
-            className={ghost}
-          />
-        </PropertyRow>
-
-        <PropertyRow icon={Flag} label="Priority" htmlFor={`${ids}-priority`}>
-          <Select
-            value={task.priority ?? NO_PRIORITY}
-            onValueChange={(value) =>
-              save({
-                priority:
-                  value === NO_PRIORITY
-                    ? null
-                    : (value as TaskUpdate["priority"]),
-              })
-            }
-          >
-            <SelectTrigger
-              id={`${ids}-priority`}
-              className={cn(ghost, "w-full")}
-            >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={NO_PRIORITY}>No priority</SelectItem>
-              {["P1", "P2", "P3", "P4"].map((priority) => (
-                <SelectItem key={priority} value={priority}>
-                  {priority}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </PropertyRow>
-
-        <PropertyRow icon={UserIcon} label="Assignee">
-          <AssigneeSelect
-            value={assigneeFormValue(task)}
-            onChange={(value) =>
-              save({ assignee_id: toAssigneeId(value, currentUser?.id) })
-            }
-            currentUserEmail={currentUser?.email}
-            current={task.assignee_bot_user ?? undefined}
-            className={ghost}
-          />
-        </PropertyRow>
-
-        <PropertyRow icon={Tag} label="Tags">
-          <TagPicker
-            value={task.tags ?? []}
-            onChange={(tags) => save({ tags })}
-          />
-        </PropertyRow>
-
-        <PropertyRow icon={Repeat} label="Repeat" htmlFor={`${ids}-repeat`}>
-          {isSubtask ? (
+          </PropertyRow>
+        }
+        after={
+          <PropertyRow icon={CalendarPlus} label="Created">
             <ReadOnlyValue>
-              Only a task at the top of its tree can repeat
-            </ReadOnlyValue>
-          ) : (
-            <div className="flex items-center gap-2">
-              <Select
-                value={task.recurrence?.frequency ?? NO_RECURRENCE}
-                onValueChange={(value) =>
-                  save({
-                    recurrence:
-                      value === NO_RECURRENCE
-                        ? null
-                        : {
-                            frequency: value as RecurrenceFrequency,
-                            // A new "every N days" rule needs an interval to
-                            // be a rule at all; it starts at the shortest one.
-                            interval_days:
-                              value === "every_n_days"
-                                ? (task.recurrence?.interval_days ??
-                                  MIN_INTERVAL_DAYS)
-                                : null,
-                          },
-                  })
-                }
-              >
-                <SelectTrigger
-                  id={`${ids}-repeat`}
-                  className={cn(ghost, "w-full")}
-                >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={NO_RECURRENCE}>Does not repeat</SelectItem>
-                  <SelectItem value="daily">Every day</SelectItem>
-                  <SelectItem value="weekly">Every week</SelectItem>
-                  <SelectItem value="monthly">Every month</SelectItem>
-                  <SelectItem value="every_n_days">Every N days</SelectItem>
-                </SelectContent>
-              </Select>
-              {task.recurrence?.frequency === "every_n_days" && (
-                <IntervalDaysField
-                  value={task.recurrence.interval_days ?? MIN_INTERVAL_DAYS}
-                  onCommit={(interval_days) =>
-                    save({
-                      recurrence: { frequency: "every_n_days", interval_days },
-                    })
-                  }
-                  className={cn(ghost, "w-20 shrink-0")}
-                />
+              {task.created_at ? (
+                <time dateTime={task.created_at}>
+                  {formatDateTime(task.created_at)}
+                </time>
+              ) : (
+                "Unknown"
               )}
-            </div>
-          )}
-        </PropertyRow>
+            </ReadOnlyValue>
+          </PropertyRow>
+        }
+      />
 
-        <PropertyRow icon={CalendarPlus} label="Created">
-          <ReadOnlyValue>
-            {task.created_at ? (
-              <time dateTime={task.created_at}>
-                {formatDateTime(task.created_at)}
-              </time>
-            ) : (
-              "Unknown"
-            )}
-          </ReadOnlyValue>
-        </PropertyRow>
-      </PropertyList>
-
-      <div className="border-t px-6 py-5">
-        <h3 className="mb-2 px-2 text-sm font-medium">Description</h3>
+      <DescriptionSection>
         <EditableText
           multiline
           value={task.description ?? ""}
           placeholder="Add a description"
           ariaLabel="Task description"
           onCommit={(description) => {
-            save({ description: description.trim() || null })
+            update.save({ description: description.trim() || null })
           }}
         />
-      </div>
+      </DescriptionSection>
 
       {status.prompt}
 
@@ -288,5 +352,19 @@ export function TaskProperties({ task }: { task: TaskPublic }) {
         pending={update.isPending}
       />
     </>
+  )
+}
+
+/** The banded section the description sits in, on a record and a draft. */
+export function DescriptionSection({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <div className="border-t px-6 py-5">
+      <h3 className="mb-2 px-2 text-sm font-medium">Description</h3>
+      {children}
+    </div>
   )
 }

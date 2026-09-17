@@ -679,6 +679,14 @@ record type the product has: tasks, projects, tags and bot users. A right-hand
   nothing that destroys is ever placed beside it.
 - **Delete sits at the foot**, below everything else, as one labelled control
   — "Delete task", not a bare icon — separated by a hairline.
+- **A draft commits from a pinned footer.** A record that does not exist yet
+  (task capture) opens in the record's own layout, minus what only a record
+  has: its status, when it was created, and its tabs. Its breadcrumb reads
+  "New task · Not saved yet". The one commit, **Create task**, sits in a
+  Paper strip pinned to the bottom of the panel under a hairline, within
+  thumb reach, and is the draft's only Signal Teal fill. A hint beside it
+  names the chord that commits and starts another. Closing a draft that holds
+  anything asks "Discard this task?", with Keep editing as the default.
 - **A record that cannot be read says so at once.** A skeleton stands only
   while a request is on its way. A record the API refuses — deleted, not the
   reader's — reads "could not be opened", identically for both, with Close; a
