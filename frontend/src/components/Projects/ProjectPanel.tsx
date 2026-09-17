@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from "@tanstack/react-query"
+import { useMutation } from "@tanstack/react-query"
 import { Link as RouterLink } from "@tanstack/react-router"
 import { Archive, CheckSquare, Clock } from "lucide-react"
 
@@ -8,6 +8,7 @@ import {
   type ProjectUpdate,
 } from "@/client"
 import { NewRecord } from "@/components/Records/NewRecord"
+import { useRecordPanel } from "@/components/Records/panels"
 import {
   DescriptionSection,
   EditableText,
@@ -16,14 +17,13 @@ import {
   ReadOnlyValue,
   RecordHeader,
   RecordPanel,
-  recordLoad,
   titleFieldClass,
   valueInset,
 } from "@/components/Records/RecordPanel"
 import { taskCountLabel } from "@/components/Tags/counts"
 import { LoadingButton } from "@/components/ui/loading-button"
 import { formatDayOf } from "@/lib/dates"
-import { projectQuery, useReportChange } from "@/lib/serverState"
+import { useReportChange } from "@/lib/serverState"
 import { toastError, toastSuccess } from "@/lib/toasts"
 import { cn } from "@/lib/utils"
 import DeleteProject from "./DeleteProject"
@@ -35,32 +35,22 @@ import DeleteProject from "./DeleteProject"
  * actions behind that row's overflow menu, and each action in a dialog of its
  * own. Nothing could link to a project.
  */
-export function ProjectPanel({
-  projectId,
-  capturing,
-  onClose,
-  onCreated,
-}: {
-  projectId: string | null
-  capturing: boolean
-  onClose: () => void
-  onCreated: (project: ProjectPublic) => void
-}) {
+export function ProjectPanel() {
   // Fetched by id rather than read out of the table: a link may point at a
   // project the list in view excludes — an archived one, most of all.
-  const query = useQuery(projectQuery(projectId))
-  const project = query.data
+  const {
+    capturing,
+    record: project,
+    panels,
+    shell,
+  } = useRecordPanel("project")
 
   return (
     <RecordPanel
-      open={Boolean(projectId) || capturing}
-      onClose={onClose}
-      name={capturing ? "New project" : (project?.name ?? "Project")}
-      kind="project"
-      {...recordLoad(query, !capturing && Boolean(projectId))}
+      {...shell}
       destructive={
         project && !project.is_inbox ? (
-          <DeleteProject project={project} onSuccess={onClose} />
+          <DeleteProject project={project} onSuccess={shell.onClose} />
         ) : undefined
       }
     >
@@ -76,7 +66,7 @@ export function ProjectPanel({
             }>
           }
           change={{ type: "project created" }}
-          onCreated={onCreated}
+          onCreated={(created) => panels.openProject(created.id)}
         />
       ) : project ? (
         <ProjectRecord project={project} />

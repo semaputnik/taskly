@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router"
 import type { ReactNode } from "react"
 
 import type { ActivityEntryPublic, TaskStatus } from "@/client"
+import { type RecordKind, recordLink } from "@/components/Records/panels"
 import { STATUS_LABELS } from "@/components/Tasks/statuses"
 import { formatDay } from "@/lib/dates"
 
@@ -104,6 +105,28 @@ function subjectName(entry: ActivityEntryPublic): string {
 }
 
 /**
+ * The record an entry links to: its own entity, or for a comment or a file,
+ * the task it is on.
+ */
+function recordOf(
+  entry: ActivityEntryPublic,
+): { kind: RecordKind; id: string } | null {
+  switch (entry.entity_type) {
+    case "task":
+    case "project":
+    case "tag":
+      return { kind: entry.entity_type, id: entry.entity_id }
+    case "comment":
+    case "attachment": {
+      const task = detail<{ id?: string }>(entry, "task")
+      return task?.id ? { kind: "task", id: task.id } : null
+    }
+    default:
+      return null
+  }
+}
+
+/**
  * One entry as a sentence. It is built from what the entry recorded at the
  * time, so it reads the same after the task is renamed, moved or deleted;
  * only the link depends on the thing still being there.
@@ -115,32 +138,17 @@ export function ActivityDescription({
   const name = subjectName(entry)
   const linkClass = "font-medium underline-offset-4 hover:underline"
 
-  // A task opens its panel on the screen the reader is already on — `to="."`
-  // is the current route — so following a link from a long log does not cost
-  // them their place in it. A project or a tag has no panel, so it falls back
-  // to the task list narrowed to it; dropping the reader on the unfiltered
-  // list would make the link a lie.
-  const subject: ReactNode = !entry.entity_exists ? (
-    <span className="font-medium">{name}</span>
-  ) : entry.entity_type === "task" ? (
-    <Link
-      to="."
-      search={(previous: Record<string, unknown>) => ({
-        ...previous,
-        task: entry.entity_id,
-      })}
-      className={linkClass}
-    >
+  // Every reference to a record links to that record (The Real Address
+  // Rule): its panel opens on the screen the reader is already on, over any
+  // other it replaces, so following a link from a long log does not cost them
+  // their place in it.
+  const record = entry.entity_exists ? recordOf(entry) : null
+  const subject: ReactNode = record ? (
+    <Link {...recordLink(record.kind, record.id)} className={linkClass}>
       {name}
     </Link>
   ) : (
-    <Link
-      to="/tasks"
-      search={{ project_id: entry.entity_project_id ?? undefined }}
-      className={linkClass}
-    >
-      {name}
-    </Link>
+    <span className="font-medium">{name}</span>
   )
 
   switch (entry.action) {

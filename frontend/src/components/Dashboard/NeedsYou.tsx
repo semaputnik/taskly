@@ -3,6 +3,7 @@ import { Link as RouterLink } from "@tanstack/react-router"
 import { ArrowRight, CheckCheck } from "lucide-react"
 
 import type { TaskPublic, TaskStatus } from "@/client"
+import { recordLink } from "@/components/Records/panels"
 import { CompleteTask } from "@/components/Tasks/CompleteTask"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -82,8 +83,7 @@ function TaskRow({
       {/* The title is the link, not the whole row: the row also holds the
           completion control, and a checkbox inside a link is a trap. */}
       <RouterLink
-        to="/"
-        search={{ task: task.id }}
+        {...recordLink("task", task.id)}
         className="min-w-0 flex-1 truncate text-sm font-medium underline-offset-4 hover:underline"
       >
         {task.title}

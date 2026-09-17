@@ -2,7 +2,7 @@ import { Link } from "@tanstack/react-router"
 import { Bot } from "lucide-react"
 
 import type { ActivityEntryPublic } from "@/client"
-import { panelLink } from "@/components/Records/panels"
+import { recordLink } from "@/components/Records/panels"
 import { Badge } from "@/components/ui/badge"
 
 interface ActorLabelProps {
@@ -31,10 +31,7 @@ export function ActorLabel({
       <span className="inline-flex items-center gap-1.5">
         <Bot className="text-muted-foreground size-4" aria-hidden />
         <Link
-          to="."
-          search={(previous: Record<string, unknown>) =>
-            panelLink(previous, { bot: entry.actor_bot_user_id ?? undefined })
-          }
+          {...recordLink("bot", entry.actor_bot_user_id)}
           className="font-medium underline-offset-4 hover:underline"
         >
           {entry.actor_bot_user_name ?? "A bot user"}

@@ -2,11 +2,11 @@ import { useQuery } from "@tanstack/react-query"
 import { ChevronRight } from "lucide-react"
 
 import type { TaskPublic } from "@/client"
+import { useRecordPanel } from "@/components/Records/panels"
 import {
   EditableText,
   RecordHeader,
   RecordPanel,
-  recordLoad,
   titleFieldClass,
 } from "@/components/Records/RecordPanel"
 import { Badge } from "@/components/ui/badge"
@@ -18,7 +18,7 @@ import {
   useReportChange,
 } from "@/lib/serverState"
 import { CompleteTask } from "./CompleteTask"
-import { CaptureField, type CaptureTarget } from "./capture"
+import { CaptureField, useCaptureTarget } from "./capture"
 import DeleteTask from "./DeleteTask"
 import { NewTask } from "./NewTask"
 import { TaskAttachments } from "./TaskAttachments"
@@ -28,23 +28,6 @@ import { useTaskCapture, useTaskUpdate } from "./useTaskWrites"
 
 /** More than a panel should list; past it, the tab says how many there are. */
 const SUBTASK_LIMIT = 100
-
-interface TaskDetailProps {
-  /** The task to show, or null for a closed panel. */
-  taskId: string | null
-  /** Open on a task that does not exist yet, ready to capture one. */
-  capturing?: boolean
-  /** Where a captured task lands, named on screen before it is created. */
-  captureTarget?: CaptureTarget
-  onClose: () => void
-  /** Move the panel to another task without closing it. */
-  onOpenTask: (taskId: string) => void
-  /**
-   * A task has just been captured. `stay` is set when the reader asked to keep
-   * capturing, so the panel holds still instead of moving onto the record.
-   */
-  onCaptured?: (taskId: string, stay: boolean) => void
-}
 
 /**
  * Everything one task is and has, in a single panel.
@@ -56,23 +39,18 @@ interface TaskDetailProps {
  * entry or the dashboard can link straight to a task rather than dropping the
  * reader on the unfiltered list.
  */
-export function TaskDetail({
-  taskId,
-  capturing = false,
-  captureTarget,
-  onClose,
-  onOpenTask,
-  onCaptured,
-}: TaskDetailProps) {
-  // Capture is the panel one step earlier, so it opens the same surface. The
-  // record itself is only fetched once there is one.
-  const isCapturing = capturing && !taskId
-  const isOpen = Boolean(taskId) || capturing
-
+export function TaskDetail() {
   // Fetched by id rather than read out of the table: a link may point at a
   // task the current filters exclude, and it must still open.
-  const query = useQuery(taskQuery(taskId))
-  const task = query.data
+  const {
+    id: taskId,
+    capturing,
+    record: task,
+    panels,
+    shell,
+  } = useRecordPanel("task")
+  const captureTarget = useCaptureTarget()
+  const onOpenTask = panels.openTask
 
   const { data: projects } = useQuery({
     ...projectsQuery(),
@@ -97,21 +75,21 @@ export function TaskDetail({
 
   return (
     <RecordPanel
-      open={isOpen}
-      onClose={onClose}
-      name={isCapturing ? "New task" : (task?.title ?? "Task")}
-      kind="task"
-      {...recordLoad(query, !isCapturing && Boolean(taskId))}
+      {...shell}
       destructive={
-        task && !isCapturing ? (
-          <DeleteTask task={task} onSuccess={onClose} />
+        task && !capturing ? (
+          <DeleteTask task={task} onSuccess={shell.onClose} />
         ) : undefined
       }
     >
-      {isCapturing && captureTarget ? (
+      {capturing ? (
         <NewTask
           target={captureTarget}
-          onCreated={(created, stay) => onCaptured?.(created.id, stay)}
+          onCreated={(created, stay) => {
+            // A run of captures holds the panel still; a single one hands the
+            // reader the record it just made, at its own address.
+            if (!stay) panels.openTask(created.id)
+          }}
         />
       ) : !task ? null : (
         <>

@@ -4,23 +4,19 @@ import { useState } from "react"
 
 import { type TagPublic, TagsService } from "@/client"
 import { NewRecord } from "@/components/Records/NewRecord"
+import { useRecordPanel } from "@/components/Records/panels"
 import {
   EditableText,
   PropertyList,
   PropertyRow,
   RecordHeader,
   RecordPanel,
-  recordLoad,
   titleFieldClass,
   valueInset,
 } from "@/components/Records/RecordPanel"
 import { Button } from "@/components/ui/button"
 import { Refusal, refusalCode } from "@/lib/apiErrors"
-import {
-  tagQuery,
-  tagVocabularyQuery,
-  useReportChange,
-} from "@/lib/serverState"
+import { tagVocabularyQuery, useReportChange } from "@/lib/serverState"
 import { toastError } from "@/lib/toasts"
 import { BotCreator } from "./BotCreator"
 import DeleteTag from "./DeleteTag"
@@ -34,32 +30,15 @@ import { TaskCount } from "./TaskCount"
  * A tag is a thin record and its panel is short. The value is that it has an
  * address and the same shape as every other record, not the amount in it.
  */
-export function TagPanel({
-  tagId,
-  capturing,
-  onClose,
-  onCreated,
-  onOpenTag,
-}: {
-  tagId: string | null
-  capturing: boolean
-  onClose: () => void
-  onCreated: (tag: TagPublic) => void
-  onOpenTag: (tagId: string) => void
-}) {
-  const query = useQuery(tagQuery(tagId))
-  const tag = query.data
+export function TagPanel() {
+  const { capturing, record: tag, panels, shell } = useRecordPanel("tag")
   // A merge being considered from this panel, and the tag it was offered with
   // when a rename ran into that tag's name.
   const [merging, setMerging] = useState<{ with?: TagPublic } | null>(null)
 
   return (
     <RecordPanel
-      open={Boolean(tagId) || capturing}
-      onClose={onClose}
-      name={capturing ? "New tag" : (tag?.name ?? "Tag")}
-      kind="tag"
-      {...recordLoad(query, !capturing && Boolean(tagId))}
+      {...shell}
       destructive={
         tag ? (
           <>
@@ -74,7 +53,7 @@ export function TagPanel({
               <Merge />
               Merge…
             </Button>
-            <DeleteTag tag={tag} onSuccess={onClose} />
+            <DeleteTag tag={tag} onSuccess={shell.onClose} />
           </>
         ) : undefined
       }
@@ -91,7 +70,7 @@ export function TagPanel({
             }>
           }
           change={{ type: "tag created" }}
-          onCreated={onCreated}
+          onCreated={(created) => panels.openTag(created.id)}
         />
       ) : tag ? (
         <TagRecord
@@ -107,7 +86,7 @@ export function TagPanel({
           onMerged={(survivor) => {
             // A merge that removed this tag moves the panel onto the one
             // that carries its tasks now.
-            if (survivor.id !== tag.id) onOpenTag(survivor.id)
+            if (survivor.id !== tag.id) panels.openTag(survivor.id)
           }}
         />
       )}

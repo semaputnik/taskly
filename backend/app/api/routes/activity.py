@@ -20,6 +20,7 @@ from app.models import (
     Comment,
     Message,
     Project,
+    Tag,
 )
 
 router = APIRouter(prefix="/activity-log", tags=["activity"])
@@ -135,11 +136,12 @@ def _restorable(
 
 def _locate(
     session: SessionDep, owner_id: uuid.UUID, entries: Sequence[ActivityEntry]
-) -> dict[uuid.UUID, uuid.UUID]:
+) -> dict[uuid.UUID, uuid.UUID | None]:
     """
     Where each entry's entity can still be opened: the project to open it in,
-    keyed by entity id. An entity that is gone, or hangs off a task that is,
-    has no entry here, so its log entry carries no link.
+    keyed by entity id — None for a tag, which belongs to no project. An
+    entity that is gone, or hangs off a task that is, has no entry here, so
+    its log entry carries no link.
     """
     by_type: dict[str, set[uuid.UUID]] = {}
     for entry in entries:
@@ -165,7 +167,7 @@ def _locate(
         task_ids=task_ids | set(parents.values()),
     )
 
-    locations = {
+    locations: dict[uuid.UUID, uuid.UUID | None] = {
         task_id: task_projects[task_id]
         for task_id in task_ids
         if task_id in task_projects
@@ -184,6 +186,9 @@ def _locate(
             )
         ).all()
         locations.update({project_id: project_id for project_id in live})
+    if tag_ids := by_type.get(ActivityEntityType.TAG):
+        tags = session.exec(select(Tag.id).where(col(Tag.id).in_(tag_ids))).all()
+        locations.update(dict.fromkeys(tags))
     return locations
 
 

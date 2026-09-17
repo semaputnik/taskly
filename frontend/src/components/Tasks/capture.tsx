@@ -1,6 +1,9 @@
-import { useEffect, useRef, useState } from "react"
+import { useQuery } from "@tanstack/react-query"
+import { useEffect, useState } from "react"
 
+import { useCaptureFocus, useRecordPanels } from "@/components/Records/panels"
 import { Input } from "@/components/ui/input"
+import { projectsQuery } from "@/lib/serverState"
 
 /**
  * Capture: writing a task down in the panel it will be read in.
@@ -33,6 +36,34 @@ export interface CaptureTarget {
 }
 
 /**
+ * Where a task captured now lands: the project the list is narrowed to, or
+ * the Inbox.
+ *
+ * Asked for as soon as the screen is narrowed to a project rather than when
+ * capture opens: a capture that beats the answer would file the task in the
+ * Inbox while the panel was still saying which project it was going to.
+ * Archived projects are not among them, which is why a list filtered to one
+ * falls back to the Inbox rather than capturing into a project the API would
+ * refuse (FR-05.12).
+ */
+export function useCaptureTarget(): CaptureTarget {
+  const { capturing, filteredProjectId } = useRecordPanels()
+  const { data: projects } = useQuery({
+    ...projectsQuery(),
+    enabled: capturing === "task" || Boolean(filteredProjectId),
+  })
+  const filtered = projects?.data.find(
+    (project) => project.id === filteredProjectId,
+  )
+  return {
+    projectId: filtered?.id,
+    // The default is stated rather than assumed, from the moment the panel
+    // opens (FR-05.4).
+    projectName: filtered?.name ?? "Inbox",
+  }
+}
+
+/**
  * One-field capture, for a subtask added from its parent's Subtasks tab.
  *
  * Enter commits, the way every text field in the product commits. The chord
@@ -62,23 +93,7 @@ export function CaptureField({
   className?: string
 }) {
   const [title, setTitle] = useState("")
-  const ref = useRef<HTMLInputElement>(null)
-
-  // Focused from here rather than through `autoFocus`, which a sheet's own
-  // opening focus would win against. It is claimed twice: on a phone the
-  // sidebar is a sheet of its own, and it hands focus back to the button that
-  // opened capture as it finishes closing, a moment after this panel arrives.
-  useEffect(() => {
-    if (!autoFocus) return
-    const frame = requestAnimationFrame(() => ref.current?.focus())
-    const settled = setTimeout(() => {
-      if (document.activeElement !== ref.current) ref.current?.focus()
-    }, 350)
-    return () => {
-      cancelAnimationFrame(frame)
-      clearTimeout(settled)
-    }
-  }, [autoFocus])
+  const ref = useCaptureFocus<HTMLInputElement>(Boolean(autoFocus))
 
   return (
     <Input

@@ -3,6 +3,7 @@ import { useBlocker } from "@tanstack/react-router"
 import { useEffect, useRef, useState } from "react"
 
 import type { TaskPublic } from "@/client"
+import { useCaptureFocus } from "@/components/Records/panels"
 import {
   DescriptionSection,
   ghost,
@@ -62,7 +63,7 @@ export function NewTask({
   const [defaults, setDefaults] = useState(() => emptyDraft(target))
   const [draft, setDraft] = useState(defaults)
   const touched = isTouched(draft, defaults)
-  const titleRef = useRef<HTMLInputElement>(null)
+  const titleRef = useCaptureFocus<HTMLInputElement>()
   // Set while a commit is taking the reader onto the new record, which is a
   // way of leaving the draft that loses nothing.
   const leaving = useRef(false)
@@ -80,23 +81,6 @@ export function NewTask({
         : current,
     )
   }
-
-  // Focused from here rather than through `autoFocus`, which a sheet's own
-  // opening focus would win against. It is claimed twice: on a phone the
-  // sidebar is a sheet of its own, and it hands focus back to the button that
-  // opened capture as it finishes closing, a moment after this panel arrives.
-  useEffect(() => {
-    const frame = requestAnimationFrame(() => titleRef.current?.focus())
-    const settled = setTimeout(() => {
-      if (document.activeElement !== titleRef.current) {
-        titleRef.current?.focus()
-      }
-    }, 350)
-    return () => {
-      cancelAnimationFrame(frame)
-      clearTimeout(settled)
-    }
-  }, [])
 
   // Every way out goes through the address — Escape, the close button, a
   // click outside, Back, a link — so the question is asked there, and the

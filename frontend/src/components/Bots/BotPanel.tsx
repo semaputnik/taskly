@@ -10,6 +10,7 @@ import {
 import { useEffect, useState } from "react"
 
 import { type BotScope, BotsService, type BotUserPublic } from "@/client"
+import { useRecordPanel } from "@/components/Records/panels"
 import {
   EditableText,
   PropertyList,
@@ -17,18 +18,13 @@ import {
   ReadOnlyValue,
   RecordHeader,
   RecordPanel,
-  recordLoad,
   titleFieldClass,
   valueInset,
 } from "@/components/Records/RecordPanel"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { formatDateTime, formatDayOf } from "@/lib/dates"
-import {
-  botQuery,
-  scopeProjectsQuery,
-  useReportChange,
-} from "@/lib/serverState"
+import { scopeProjectsQuery, useReportChange } from "@/lib/serverState"
 import { toastError } from "@/lib/toasts"
 import { cn } from "@/lib/utils"
 import { BotConsole } from "./BotConsole"
@@ -55,26 +51,15 @@ const STATUS_TEXT = {
  * one cell, with the rest of its actions in an overflow menu 260 pixels away.
  * Here each of those is a property, read where it is changed.
  */
-export function BotPanel({
-  botId,
-  onClose,
-}: {
-  botId: string | null
-  onClose: () => void
-}) {
-  const query = useQuery(botQuery(botId))
-  const bot = query.data
+export function BotPanel() {
+  const { record: bot, shell } = useRecordPanel("bot")
 
   return (
     <RecordPanel
-      open={Boolean(botId)}
-      onClose={onClose}
-      name={bot?.name ?? "Bot user"}
-      kind="bot user"
-      {...recordLoad(query, Boolean(botId))}
+      {...shell}
       destructive={
         bot && !bot.deleted ? (
-          <DeleteBotUser bot={bot} onSuccess={onClose} />
+          <DeleteBotUser bot={bot} onSuccess={shell.onClose} />
         ) : undefined
       }
     >

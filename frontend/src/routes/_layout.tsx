@@ -1,7 +1,7 @@
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router"
+import { panelSearchSchema } from "@/components/Records/panels"
 import { RecordPanels } from "@/components/Records/RecordPanels"
 import AppSidebar from "@/components/Sidebar/AppSidebar"
-import { panelSearchSchema } from "@/components/Tasks/search"
 import {
   SidebarInset,
   SidebarProvider,
