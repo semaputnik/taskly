@@ -1,12 +1,6 @@
-import { useMutation } from "@tanstack/react-query"
 import { useEffect, useRef, useState } from "react"
 
-import { type TaskPublic, TasksService } from "@/client"
 import { Input } from "@/components/ui/input"
-import useAuth from "@/hooks/useAuth"
-import { useReportChange } from "@/lib/serverState"
-import { toastError } from "@/lib/toasts"
-import { draftToCreate, emptyDraft, type TaskDraft } from "./draft"
 
 /**
  * Capture: writing a task down in the panel it will be read in.
@@ -36,77 +30,6 @@ export interface CaptureTarget {
   projectName: string
   /** Set when capturing a subtask: the parent it belongs to. */
   parentId?: string
-}
-
-/**
- * Create a task from a committed draft, or from a title alone.
- *
- * `onCreated` decides what happens next: the panel moves onto the new record,
- * or — for a run of captures — stays open with the field cleared.
- */
-export function useTaskCapture(
-  target: CaptureTarget,
-  onCreated: (task: TaskPublic, stay: boolean) => void,
-) {
-  const reportChange = useReportChange()
-  const { user: currentUser } = useAuth()
-  // What a screen reader is told when a task is recorded. A refusal is a
-  // toast, like every other failed save in the panel.
-  const [announcement, setAnnouncement] = useState("")
-  // The titles being written right now, so the same one cannot be sent twice
-  // while the first is still going.
-  const inFlight = useRef(new Set<string>())
-
-  const mutation = useMutation({
-    mutationFn: ({ draft }: { draft: TaskDraft; stay: boolean }) =>
-      TasksService.createTask({
-        body: draftToCreate(draft, target, currentUser?.id),
-      }),
-    onSuccess: (response, { stay }) => {
-      const task = response.data as TaskPublic
-      // Success is silent everywhere else in the panel — the record on screen
-      // is the receipt. A capture that keeps the field empty has no such
-      // receipt, so the one who cannot see the list behind it is told.
-      setAnnouncement(`${task.title} created`)
-      onCreated(task, stay)
-    },
-    onError: (error: Error) => {
-      setAnnouncement("")
-      toastError(error)
-    },
-    onSettled: () => reportChange({ type: "task created" }),
-  })
-
-  return {
-    /**
-     * Create the task, resolving to whether it was accepted. A refusal keeps
-     * the draft on screen: the words are the reader's, not the request's.
-     *
-     * A run of captures sends as fast as it is typed — each title is its own
-     * task, and holding the second until the first came back would drop it.
-     * What is refused is the same title twice over, which is what an
-     * impatient second Enter on one thought would file.
-     */
-    create: async (input: string | TaskDraft, stay: boolean) => {
-      const draft =
-        typeof input === "string"
-          ? { ...emptyDraft(target), title: input }
-          : input
-      const trimmed = draft.title.trim()
-      if (!trimmed || inFlight.current.has(trimmed)) return false
-      inFlight.current.add(trimmed)
-      try {
-        await mutation.mutateAsync({ draft, stay })
-        return true
-      } catch {
-        return false
-      } finally {
-        inFlight.current.delete(trimmed)
-      }
-    },
-    /** Read by a screen reader; the sighted reader has the record itself. */
-    announcement,
-  }
 }
 
 /**

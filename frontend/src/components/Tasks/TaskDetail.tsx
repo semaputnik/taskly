@@ -18,13 +18,13 @@ import {
   useReportChange,
 } from "@/lib/serverState"
 import { CompleteTask } from "./CompleteTask"
-import { CaptureField, type CaptureTarget, useTaskCapture } from "./capture"
+import { CaptureField, type CaptureTarget } from "./capture"
 import DeleteTask from "./DeleteTask"
 import { NewTask } from "./NewTask"
 import { TaskAttachments } from "./TaskAttachments"
 import { TaskComments } from "./TaskComments"
 import { TaskProperties } from "./TaskProperties"
-import { useTaskUpdate } from "./useTaskUpdate"
+import { useTaskCapture, useTaskUpdate } from "./useTaskWrites"
 
 /** More than a panel should list; past it, the tab says how many there are. */
 const SUBTASK_LIMIT = 100
@@ -233,9 +233,9 @@ function TaskTitle({ task }: { task: TaskPublic }) {
     <EditableText
       value={task.title}
       ariaLabel="Task title"
-      onCommit={(title) => {
-        if (title.trim()) update.save({ title: title.trim() })
-      }}
+      onCommit={(title) =>
+        title.trim() ? update.save({ title: title.trim() }) : undefined
+      }
       className={titleFieldClass}
     />
   )

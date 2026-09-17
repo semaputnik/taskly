@@ -22,9 +22,10 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { projectsQuery } from "@/lib/serverState"
 import { cn } from "@/lib/utils"
-import { type CaptureTarget, useTaskCapture } from "./capture"
+import type { CaptureTarget } from "./capture"
 import { carryOver, emptyDraft, isTouched, type TaskFields } from "./draft"
 import { TaskPropertyRows } from "./TaskProperties"
+import { useTaskCapture } from "./useTaskWrites"
 
 // The commit chord, named the way the reader's keyboard names it.
 const CHORD =

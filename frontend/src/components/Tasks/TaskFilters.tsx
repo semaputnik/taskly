@@ -24,6 +24,7 @@ import {
   STATUS_LABELS,
   STATUSES,
 } from "./statuses"
+import { PRIORITIES } from "./writes"
 
 // The status filter's choices: Open, or one status. Open is written to the
 // URL as its three statuses, which is what the API filters on.
@@ -307,7 +308,7 @@ export function TaskFilters({ search, onChange }: TaskFiltersProps) {
             label="Priority"
             anyLabel="Any priority"
             value={search.priority}
-            options={["P1", "P2", "P3", "P4"].map((priority) => ({
+            options={PRIORITIES.map((priority) => ({
               value: priority,
               label: priority,
             }))}

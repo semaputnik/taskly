@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query"
 import { createFileRoute, Link as RouterLink } from "@tanstack/react-router"
 import { CheckSquare, SearchX } from "lucide-react"
-import { useState } from "react"
+import { useRef, useState } from "react"
 
 import { type TaskPublic, TasksService } from "@/client"
 import { DataTable } from "@/components/Common/DataTable"
@@ -145,6 +145,11 @@ function Tasks() {
       }),
     })
 
+  // Every task this list has shown, so a batch can be checked against what
+  // the selected tasks are before it is sent — a selection outlives pages.
+  const seen = useRef(new Map<string, TaskPublic>())
+  for (const task of tasks?.data ?? []) seen.current.set(task.id, task)
+
   const count = tasks?.count ?? 0
   const lastPage = Math.max(1, Math.ceil(count / PAGE_SIZE))
   const projectNames = Object.fromEntries(
@@ -172,6 +177,7 @@ function Tasks() {
       {selected.size > 0 && (
         <TaskBulkActions
           selected={[...selected]}
+          known={[...selected].flatMap((id) => seen.current.get(id) ?? [])}
           projects={projects?.data ?? []}
           onDone={clearSelection}
           onClear={clearSelection}
@@ -187,9 +193,9 @@ function Tasks() {
               const all = await TasksService.readTasks({
                 query: { ...filters, skip: 0, limit: MAX_BATCH },
               })
-              setSelected(
-                () => new Set((all.data?.data ?? []).map((task) => task.id)),
-              )
+              const matched = all.data?.data ?? []
+              for (const task of matched) seen.current.set(task.id, task)
+              setSelected(() => new Set(matched.map((task) => task.id)))
             } catch (error) {
               toastError(error)
             }

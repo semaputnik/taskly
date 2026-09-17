@@ -1,13 +1,7 @@
-import { useMutation } from "@tanstack/react-query"
 import { ChevronDown, Trash2, X } from "lucide-react"
 import { useState } from "react"
 
-import {
-  type ProjectPublic,
-  type TaskBulkUpdate,
-  type TaskPriority,
-  TasksService,
-} from "@/client"
+import type { ProjectPublic, TaskPriority, TaskPublic } from "@/client"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -32,11 +26,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { batchRefusals } from "@/lib/apiErrors"
-import { useReportChange } from "@/lib/serverState"
-import { toastError, toastSuccess } from "@/lib/toasts"
 import { StatusMenuItems } from "./status"
 import { BulkTagPicker } from "./TagPicker"
+import { useBulkTaskWrites } from "./useTaskWrites"
+import { PRIORITIES } from "./writes"
 
 /**
  * What a selection can be done to, in one bar.
@@ -51,6 +44,7 @@ const NONE = "none"
 
 export function TaskBulkActions({
   selected,
+  known,
   projects,
   matching,
   pageIsWhollySelected,
@@ -59,6 +53,8 @@ export function TaskBulkActions({
   onClear,
 }: {
   selected: string[]
+  /** The selected tasks this screen has seen, checked before a batch goes. */
+  known: TaskPublic[]
   projects: ProjectPublic[]
   /** How many tasks the current filters match, in total. */
   matching: number
@@ -68,38 +64,19 @@ export function TaskBulkActions({
   onDone: () => void
   onClear: () => void
 }) {
-  const reportChange = useReportChange()
-  const [refused, setRefused] = useState<
-    { task_id: string; message: string }[]
-  >([])
+  const writes = useBulkTaskWrites(selected, known)
+  const { refused } = writes
   const [dueDate, setDueDate] = useState("")
 
-  const change = useMutation({
-    mutationFn: ({
-      keepSelection: _keep,
+  const change = {
+    mutate: async ({
+      keepSelection,
       ...body
-    }: Omit<TaskBulkUpdate, "task_ids"> & { keepSelection?: boolean }) =>
-      TasksService.bulkUpdateTasks({ body: { ...body, task_ids: selected } }),
-    onSuccess: ({ data }, { keepSelection }) => {
-      setRefused([])
-      toastSuccess(
-        `${data.updated} ${data.updated === 1 ? "task" : "tasks"} changed`,
-      )
+    }: Parameters<typeof writes.change>[0] & { keepSelection?: boolean }) => {
       // Tagging keeps the selection, so several tags go on in one visit.
-      if (!keepSelection) onDone()
+      if ((await writes.change(body)) && !keepSelection) onDone()
     },
-    onError: (error: Error) => {
-      // A batch lands whole or not at all, so a refusal names the rows that
-      // stood in the way and leaves everything as it was (story 29).
-      const refusals = batchRefusals(error)
-      if (refusals) {
-        setRefused(refusals)
-        return
-      }
-      toastError(error)
-    },
-    onSettled: () => reportChange({ type: "tasks changed in bulk" }),
-  })
+  }
 
   const count = selected.length
 
@@ -125,7 +102,7 @@ export function TaskBulkActions({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value={NONE}>No priority</SelectItem>
-            {["P1", "P2", "P3", "P4"].map((priority) => (
+            {PRIORITIES.map((priority) => (
               <SelectItem key={priority} value={priority}>
                 {priority}
               </SelectItem>
@@ -201,9 +178,12 @@ export function TaskBulkActions({
 
         <DeleteSelection
           count={count}
-          selected={selected}
-          onDone={onDone}
-          onRefused={setRefused}
+          pending={writes.isPending}
+          onDelete={async () => {
+            const deleted = await writes.remove()
+            if (deleted) onDone()
+            return deleted
+          }}
         />
 
         <Button variant="ghost" size="sm" className="ml-auto" onClick={onClear}>
@@ -245,41 +225,15 @@ export function TaskBulkActions({
 
 function DeleteSelection({
   count,
-  selected,
-  onDone,
-  onRefused,
+  pending,
+  onDelete,
 }: {
   count: number
-  selected: string[]
-  onDone: () => void
-  onRefused: (refusals: { task_id: string; message: string }[]) => void
+  pending: boolean
+  /** Resolves once the batch is settled; a refusal is listed by the bar. */
+  onDelete: () => Promise<boolean>
 }) {
   const [isOpen, setIsOpen] = useState(false)
-  const reportChange = useReportChange()
-
-  const remove = useMutation({
-    mutationFn: (delete_subtasks: boolean) =>
-      TasksService.bulkDeleteTasks({
-        body: { task_ids: selected, delete_subtasks },
-      }),
-    onSuccess: ({ data }) => {
-      toastSuccess(
-        `${data.deleted} ${data.deleted === 1 ? "task" : "tasks"} deleted`,
-      )
-      setIsOpen(false)
-      onDone()
-    },
-    onError: (error: Error) => {
-      const refusals = batchRefusals(error)
-      if (refusals) {
-        onRefused(refusals)
-        setIsOpen(false)
-        return
-      }
-      toastError(error)
-    },
-    onSettled: () => reportChange({ type: "tasks changed in bulk" }),
-  })
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -305,14 +259,17 @@ function DeleteSelection({
         </DialogHeader>
         <DialogFooter>
           <DialogClose asChild>
-            <Button variant="outline" disabled={remove.isPending}>
+            <Button variant="outline" disabled={pending}>
               Cancel
             </Button>
           </DialogClose>
           <LoadingButton
             variant="destructive"
-            loading={remove.isPending}
-            onClick={() => remove.mutate(true)}
+            loading={pending}
+            onClick={async () => {
+              await onDelete()
+              setIsOpen(false)
+            }}
           >
             Delete
           </LoadingButton>

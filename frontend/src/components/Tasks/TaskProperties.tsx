@@ -42,14 +42,14 @@ import { cn } from "@/lib/utils"
 import { AssigneeSelect, assigneeFormValue, toAssigneeId } from "./assignee"
 import type { TaskFields } from "./draft"
 import {
-  DueDateScopeDialog,
   IntervalDaysField,
   MIN_INTERVAL_DAYS,
   NO_RECURRENCE,
 } from "./recurrence"
-import { STATUS_LABELS, STATUSES, StatusGlyph, useTaskStatus } from "./status"
+import { STATUS_LABELS, STATUSES, StatusGlyph } from "./status"
 import { TagPicker } from "./TagPicker"
-import { useTaskUpdate } from "./useTaskUpdate"
+import { useTaskStatus, useTaskUpdate } from "./useTaskWrites"
+import { PRIORITIES } from "./writes"
 
 const NO_PRIORITY = "none"
 
@@ -154,7 +154,7 @@ export function TaskPropertyRows({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value={NO_PRIORITY}>No priority</SelectItem>
-            {["P1", "P2", "P3", "P4"].map((priority) => (
+            {PRIORITIES.map((priority) => (
               <SelectItem key={priority} value={priority}>
                 {priority}
               </SelectItem>
@@ -271,7 +271,7 @@ export function TaskProperties({ task }: { task: TaskPublic }) {
     if (assignee !== undefined) {
       body.assignee_id = toAssigneeId(assignee, currentUser?.id)
     }
-    update.save(body)
+    void update.save(body)
   }
 
   return (
@@ -328,20 +328,15 @@ export function TaskProperties({ task }: { task: TaskPublic }) {
           value={task.description ?? ""}
           placeholder="Add a description"
           ariaLabel="Task description"
-          onCommit={(description) => {
+          onCommit={(description) =>
             update.save({ description: description.trim() || null })
-          }}
+          }
         />
       </DescriptionSection>
 
       {status.prompt}
 
-      <DueDateScopeDialog
-        open={update.scopeNeeded}
-        onOpenChange={(open) => !open && update.cancelScope()}
-        onChoose={update.chooseScope}
-        pending={update.isPending}
-      />
+      {update.prompt}
     </>
   )
 }

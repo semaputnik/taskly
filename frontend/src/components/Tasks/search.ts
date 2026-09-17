@@ -1,6 +1,7 @@
 import { z } from "zod"
 
 import { STATUSES } from "./statuses"
+import { PRIORITIES } from "./writes"
 
 /**
  * The task list's view, held in the URL so it can be shared or reloaded.
@@ -38,7 +39,7 @@ export const taskSearchSchema = z.object({
     .optional()
     .catch(undefined),
   tag: z.string().optional().catch(undefined),
-  priority: z.enum(["P1", "P2", "P3", "P4"]).optional().catch(undefined),
+  priority: z.enum(PRIORITIES).optional().catch(undefined),
   // The API's repeatable `status`: Open is its three statuses, not a keyword,
   // so the URL says exactly what the list asks for.
   status: z.array(z.enum(STATUSES)).nonempty().optional().catch(undefined),

@@ -1,7 +1,6 @@
-import { useMutation } from "@tanstack/react-query"
 import { useState } from "react"
 
-import { type TaskPublic, TasksService } from "@/client"
+import type { TaskPublic } from "@/client"
 import { DeleteTrigger } from "@/components/Records/RecordPanel"
 import { Button } from "@/components/ui/button"
 import {
@@ -14,9 +13,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { LoadingButton } from "@/components/ui/loading-button"
-import { Refusal, refusalCode } from "@/lib/apiErrors"
-import { useReportChange } from "@/lib/serverState"
-import { toastError, toastSuccess } from "@/lib/toasts"
+import { useTaskDelete } from "./useTaskWrites"
 
 interface DeleteTaskProps {
   task: TaskPublic
@@ -35,30 +32,17 @@ const DeleteTask = ({ task, onSuccess }: DeleteTaskProps) => {
   // Set once the API has refused because of subtasks: the dialog then both
   // warns and, on the next attempt, confirms the cascade.
   const [cascadeWarned, setCascadeWarned] = useState(false)
-  const reportChange = useReportChange()
+  const deletion = useTaskDelete(task)
 
-  const mutation = useMutation({
-    mutationFn: (confirmCascade: boolean) =>
-      TasksService.deleteTask({
-        path: { task_id: task.id },
-        query: { delete_subtasks: confirmCascade },
-      }),
-    onSuccess: () => {
-      toastSuccess(
-        `“${task.title}” was deleted. It can be restored from the activity log.`,
-      )
+  const confirm = async () => {
+    const outcome = await deletion.remove(cascadeWarned)
+    if (outcome.saved) {
       setIsOpen(false)
       onSuccess()
-    },
-    onError: (error: Error) => {
-      if (refusalCode(error) === Refusal.HAS_SUBTASKS) {
-        setCascadeWarned(true)
-        return
-      }
-      toastError(error)
-    },
-    onSettled: () => reportChange({ type: "task deleted", taskId: task.id }),
-  })
+    } else if (outcome.reason === "has subtasks") {
+      setCascadeWarned(true)
+    }
+  }
 
   const openDialog = (nextOpen: boolean) => {
     setIsOpen(nextOpen)
@@ -89,14 +73,14 @@ const DeleteTask = ({ task, onSuccess }: DeleteTaskProps) => {
         </DialogHeader>
         <DialogFooter>
           <DialogClose asChild>
-            <Button variant="outline" disabled={mutation.isPending}>
+            <Button variant="outline" disabled={deletion.isPending}>
               Cancel
             </Button>
           </DialogClose>
           <LoadingButton
             variant="destructive"
-            loading={mutation.isPending}
-            onClick={() => mutation.mutate(cascadeWarned)}
+            loading={deletion.isPending}
+            onClick={confirm}
           >
             {cascadeWarned ? "Delete task and subtasks" : "Delete"}
           </LoadingButton>
