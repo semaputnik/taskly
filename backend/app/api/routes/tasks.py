@@ -11,7 +11,6 @@ from app.api.deps import Caller, CallerDep, CurrentUser, SessionDep
 from app.models import (
     ActivityAction,
     BotUser,
-    BotUserRef,
     BulkResult,
     Message,
     Project,
@@ -28,6 +27,7 @@ from app.models import (
     TaskStatus,
     TaskUpdate,
 )
+from app.read_models import task_publics
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
@@ -124,49 +124,6 @@ def _check_recurrence(
         raise HTTPException(status_code=400, detail="A recurring task needs a due date")
 
 
-def _public(
-    task: Task,
-    *,
-    project_id: uuid.UUID,
-    tags: list[str],
-    recurrence: Recurrence | None,
-    bot_users: dict[uuid.UUID, BotUserRef],
-) -> TaskPublic:
-    """
-    A task as the API reports it, with the project it resolves to, its tags,
-    its recurrence and its assignee filled in. Listings resolve them in bulk;
-    `_read` does one task.
-    """
-    return TaskPublic.model_validate(
-        task,
-        update={
-            "project_id": project_id,
-            "tags": tags,
-            "recurrence": recurrence,
-            "assignee_id": task.assignee_id or task.assignee_bot_user_id,
-            "assignee_bot_user": bot_users.get(task.assignee_bot_user_id)
-            if task.assignee_bot_user_id
-            else None,
-        },
-    )
-
-
-def _read(session: SessionDep, task: Task, project_id: uuid.UUID) -> TaskPublic:
-    """
-    One task, with everything the API reports about it looked up, in the
-    project its access was resolved to.
-    """
-    return _public(
-        task,
-        project_id=project_id,
-        tags=crud.get_task_tags(session=session, task_ids=[task.id])[task.id],
-        recurrence=crud.get_recurrences(session=session, tasks=[task])[task.id],
-        bot_users=crud.get_bot_user_refs(
-            session=session, bot_user_ids=[task.assignee_bot_user_id]
-        ),
-    )
-
-
 @router.get("/", response_model=TasksPublic)
 def read_tasks(
     session: SessionDep,
@@ -199,29 +156,7 @@ def read_tasks(
         query=query,
         project_ids=caller.project_ids if caller.bot else None,
     )
-    project_ids = crud.get_task_project_ids(
-        session=session,
-        owner_id=caller.owner_id,
-        task_ids=[task.id for task in tasks],
-    )
-    tags = crud.get_task_tags(session=session, task_ids=[task.id for task in tasks])
-    recurrences = crud.get_recurrences(session=session, tasks=tasks)
-    bot_users = crud.get_bot_user_refs(
-        session=session, bot_user_ids=[task.assignee_bot_user_id for task in tasks]
-    )
-    return TasksPublic(
-        data=[
-            _public(
-                task,
-                project_id=project_ids[task.id],
-                tags=tags[task.id],
-                recurrence=recurrences[task.id],
-                bot_users=bot_users,
-            )
-            for task in tasks
-        ],
-        count=count,
-    )
+    return TasksPublic(data=task_publics(session, tasks), count=count)
 
 
 @router.post("/", response_model=TaskPublic)
@@ -282,7 +217,8 @@ def create_task(*, session: SessionDep, caller: CallerDep, task_in: TaskCreate) 
         assignee=assignee,
         tag_names=tag_names,
     )
-    return _read(session, task, project.id)
+    [public] = task_publics(session, [task], projects={task.id: project.id})
+    return public
 
 
 # A batch is one act over a selection, and it lands whole or not at all: the
@@ -497,7 +433,10 @@ def read_task(*, session: SessionDep, caller: CallerDep, task_id: uuid.UUID) -> 
     Retrieve a single task.
     """
     resolved = access.get_task(session, caller, task_id, TaskAction.READ)
-    return _read(session, resolved.task, resolved.project.id)
+    [public] = task_publics(
+        session, [resolved.task], projects={task_id: resolved.project.id}
+    )
+    return public
 
 
 @router.patch("/{task_id}", response_model=TaskPublic)
@@ -527,7 +466,7 @@ def update_task(
     task, project_id = resolved.task, resolved.project.id
     tag_names = _unique(task_in.tags) if task_in.tags is not None else None
     access.authorize_tag_names(session, caller, tag_names)
-    _check_recurrence_update(session=session, task=task, task_in=task_in)
+    recurrence = _check_recurrence_update(session=session, task=task, task_in=task_in)
 
     if "project_id" in task_in.model_fields_set:
         if task_in.project_id is None:
@@ -588,21 +527,26 @@ def update_task(
         tag_names=tag_names,
     )
 
-    return _public(
-        task,
-        project_id=project_id,
-        tags=crud.get_task_tags(session=session, task_ids=[task.id])[task.id],
-        recurrence=crud.get_recurrences(session=session, tasks=[task])[task.id],
-        bot_users=crud.get_bot_user_refs(
-            session=session, bot_user_ids=[task.assignee_bot_user_id]
-        ),
+    # The recurrence the check read is still the task's unless the update
+    # set a new one, which is read back as stored.
+    [public] = task_publics(
+        session,
+        [task],
+        projects={task.id: project_id},
+        recurrences={}
+        if "recurrence" in task_in.model_fields_set
+        else {task.id: recurrence},
     )
+    return public
 
 
 def _check_recurrence_update(
     *, session: SessionDep, task: Task, task_in: TaskUpdate
-) -> None:
-    """Everything an update has to get right about the task's series."""
+) -> Recurrence | None:
+    """
+    Everything an update has to get right about the task's series. Returns
+    the recurrence the task has now, which it read to decide.
+    """
     fields_set = task_in.model_fields_set
     current = crud.get_recurrences(session=session, tasks=[task])[task.id]
     recurrence = task_in.recurrence if "recurrence" in fields_set else current
@@ -668,6 +612,7 @@ def _check_recurrence_update(
                 ),
             },
         )
+    return current
 
 
 @router.delete("/{task_id}")
