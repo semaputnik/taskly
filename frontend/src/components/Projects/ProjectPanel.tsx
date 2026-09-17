@@ -9,6 +9,7 @@ import {
 } from "@/client"
 import { NewRecord } from "@/components/Records/NewRecord"
 import {
+  DescriptionSection,
   EditableText,
   PropertyList,
   PropertyRow,
@@ -17,10 +18,13 @@ import {
   RecordPanel,
   recordLoad,
   titleFieldClass,
+  valueInset,
 } from "@/components/Records/RecordPanel"
+import { taskCountLabel } from "@/components/Tags/counts"
 import { LoadingButton } from "@/components/ui/loading-button"
 import useCustomToast from "@/hooks/useCustomToast"
 import { formatDayOf } from "@/lib/dates"
+import { cn } from "@/lib/utils"
 import { handleError } from "@/utils"
 import DeleteProject from "./DeleteProject"
 
@@ -125,11 +129,9 @@ function ProjectRecord({ project }: { project: ProjectPublic }) {
             <RouterLink
               to="/tasks"
               search={{ project_id: project.id }}
-              className="px-2 underline-offset-4 hover:underline"
+              className={cn(valueInset, "underline-offset-4 hover:underline")}
             >
-              {project.task_count === 1
-                ? "1 task"
-                : `${project.task_count} tasks`}
+              {taskCountLabel(project.task_count ?? 0)}
             </RouterLink>
           ) : (
             <ReadOnlyValue>No tasks</ReadOnlyValue>
@@ -161,8 +163,7 @@ function ProjectRecord({ project }: { project: ProjectPublic }) {
         </PropertyRow>
       </PropertyList>
 
-      <div className="border-t px-6 py-5">
-        <h3 className="mb-2 px-2 text-sm font-medium">Description</h3>
+      <DescriptionSection>
         {project.is_archived ? (
           <ReadOnlyValue>
             {project.description || "No description"}
@@ -178,7 +179,7 @@ function ProjectRecord({ project }: { project: ProjectPublic }) {
             }
           />
         )}
-      </div>
+      </DescriptionSection>
     </>
   )
 }
@@ -211,7 +212,7 @@ function ArchiveToggle({ project }: { project: ProjectPublic }) {
   })
 
   return (
-    <div className="flex flex-wrap items-center gap-2 px-2">
+    <div className={cn("flex flex-wrap items-center gap-2", valueInset)}>
       <span>
         {project.is_archived
           ? "Archived — read-only until it comes back"

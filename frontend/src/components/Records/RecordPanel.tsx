@@ -294,7 +294,32 @@ export function PropertyList({ children }: { children: React.ReactNode }) {
  * disabled control — a control that cannot be used still asks to be tried.
  */
 export function ReadOnlyValue({ children }: { children: React.ReactNode }) {
-  return <span className="text-muted-foreground px-2">{children}</span>
+  return (
+    <span className={cn("text-muted-foreground", valueInset)}>{children}</span>
+  )
+}
+
+/**
+ * Where a value's text starts in a property row: a control's padding plus its
+ * border, so a read-only value or a link lines up with the select above it
+ * rather than a few pixels short of it.
+ */
+export const valueInset = "px-[calc(--spacing(3)+1px)]"
+
+/** The banded section a record's description sits in, on a record and a draft. */
+export function DescriptionSection({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <div className="border-t px-6 py-5">
+      <h3 className={cn("mb-2 text-sm font-medium", valueInset)}>
+        Description
+      </h3>
+      {children}
+    </div>
+  )
 }
 
 /** Text that saves when you leave it, and forgets the edit on Escape. */

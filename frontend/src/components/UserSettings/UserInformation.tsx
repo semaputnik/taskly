@@ -158,7 +158,7 @@ const UserInformation = () => {
               </>
             ) : (
               <Button type="button" onClick={toggleEditMode}>
-                Edit
+                Edit profile
               </Button>
             )}
           </div>

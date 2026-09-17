@@ -95,8 +95,8 @@ const AddBotUser = () => {
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button className="my-4">
-          <Plus className="mr-2" />
+        <Button>
+          <Plus />
           Add Bot
         </Button>
       </DialogTrigger>

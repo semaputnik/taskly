@@ -12,6 +12,7 @@ import {
   RecordPanel,
   recordLoad,
   titleFieldClass,
+  valueInset,
 } from "@/components/Records/RecordPanel"
 import { Button } from "@/components/ui/button"
 import useCustomToast from "@/hooks/useCustomToast"
@@ -199,11 +200,11 @@ function TagRecord({
 
       <PropertyList>
         <PropertyRow icon={CheckSquare} label="Tasks">
-          <TaskCount tag={tag} className="px-2" />
+          <TaskCount tag={tag} className={valueInset} />
         </PropertyRow>
         {tag.created_by_bot_user && (
           <PropertyRow icon={Bot} label="Created by">
-            <span className="px-2">
+            <span className={valueInset}>
               <BotCreator tag={tag} />
             </span>
           </PropertyRow>

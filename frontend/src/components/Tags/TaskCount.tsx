@@ -20,7 +20,9 @@ export function TaskCount({
   return (
     <span className="flex flex-wrap items-baseline gap-x-2">
       {count === 0 ? (
-        <span className={cn("text-muted-foreground", className)}>No tasks</span>
+        <span className={cn("text-muted-foreground italic", className)}>
+          No tasks
+        </span>
       ) : (
         <Link
           to="/tasks"

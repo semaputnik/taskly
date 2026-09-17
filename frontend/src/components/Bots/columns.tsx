@@ -34,7 +34,9 @@ export function getColumns(
       cell: ({ row }) => {
         const ids = row.original.scope.project_ids
         if (ids.length === 0) {
-          return <span className="text-muted-foreground">None</span>
+          return (
+            <span className="text-muted-foreground italic">No projects</span>
+          )
         }
         return (
           <div className="flex flex-wrap gap-1">
@@ -66,7 +68,9 @@ export function getColumns(
           ({ key }) => row.original.scope.permissions[key],
         )
         if (granted.length === 0) {
-          return <span className="text-muted-foreground">None</span>
+          return (
+            <span className="text-muted-foreground italic">No permissions</span>
+          )
         }
         return (
           <div className="flex flex-wrap gap-1">

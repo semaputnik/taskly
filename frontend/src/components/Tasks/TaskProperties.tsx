@@ -22,6 +22,7 @@ import {
 } from "@/client"
 import { DayField } from "@/components/Common/DayField"
 import {
+  DescriptionSection,
   EditableText,
   ghost,
   PropertyList,
@@ -345,19 +346,5 @@ export function TaskProperties({ task }: { task: TaskPublic }) {
         pending={update.isPending}
       />
     </>
-  )
-}
-
-/** The banded section the description sits in, on a record and a draft. */
-export function DescriptionSection({
-  children,
-}: {
-  children: React.ReactNode
-}) {
-  return (
-    <div className="border-t px-6 py-5">
-      <h3 className="mb-2 px-2 text-sm font-medium">Description</h3>
-      {children}
-    </div>
   )
 }
