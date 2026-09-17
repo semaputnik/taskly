@@ -1,6 +1,5 @@
-import { useQueryClient } from "@tanstack/react-query"
 import { createContext, type ReactNode, useContext, useState } from "react"
-
+import { useReportChange } from "@/lib/serverState"
 import TokenDialog from "./TokenDialog"
 
 export interface Issued {
@@ -21,13 +20,13 @@ const ShowIssuedToken = createContext<(issued: Issued) => void>(() => {})
  */
 export function IssuedTokenProvider({ children }: { children: ReactNode }) {
   const [issued, setIssued] = useState<Issued | null>(null)
-  const queryClient = useQueryClient()
+  const reportChange = useReportChange()
 
   return (
     <ShowIssuedToken.Provider
       value={(next) => {
         setIssued(next)
-        queryClient.invalidateQueries({ queryKey: ["bots"] })
+        reportChange({ type: "bot token changed" })
       }}
     >
       {children}

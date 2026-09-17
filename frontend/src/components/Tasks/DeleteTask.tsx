@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { useMutation } from "@tanstack/react-query"
 import { useState } from "react"
 
 import { type TaskPublic, TasksService } from "@/client"
@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dialog"
 import { LoadingButton } from "@/components/ui/loading-button"
 import useCustomToast from "@/hooks/useCustomToast"
+import { useReportChange } from "@/lib/serverState"
 import { handleError, isSubtaskCascadeError } from "@/utils"
 
 interface DeleteTaskProps {
@@ -34,7 +35,7 @@ const DeleteTask = ({ task, onSuccess }: DeleteTaskProps) => {
   // Set once the API has refused because of subtasks: the dialog then both
   // warns and, on the next attempt, confirms the cascade.
   const [cascadeWarned, setCascadeWarned] = useState(false)
-  const queryClient = useQueryClient()
+  const reportChange = useReportChange()
   const { showSuccessToast, showErrorToast } = useCustomToast()
 
   const mutation = useMutation({
@@ -57,9 +58,7 @@ const DeleteTask = ({ task, onSuccess }: DeleteTaskProps) => {
       }
       handleError.call(showErrorToast, error)
     },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["tasks"] })
-    },
+    onSettled: () => reportChange({ type: "task deleted", taskId: task.id }),
   })
 
   const openDialog = (nextOpen: boolean) => {

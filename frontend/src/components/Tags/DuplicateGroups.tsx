@@ -1,24 +1,14 @@
-import {
-  useMutation,
-  useQueryClient,
-  useSuspenseQuery,
-} from "@tanstack/react-query"
+import { useMutation, useSuspenseQuery } from "@tanstack/react-query"
 import { Merge } from "lucide-react"
 import { useState } from "react"
 
 import { type TagPublic, TagsService } from "@/client"
 import { Button } from "@/components/ui/button"
 import useCustomToast from "@/hooks/useCustomToast"
+import { tagDuplicatesQuery, useReportChange } from "@/lib/serverState"
 import { handleError } from "@/utils"
 import { taskCountLabel, totalTasks } from "./counts"
 import { MergeTags } from "./MergeTags"
-
-// Under "tags", so creating, renaming, deleting and merging a tag all bring
-// the suggestions up to date.
-export const duplicatesQueryOptions = {
-  queryKey: ["tags", "duplicates"],
-  queryFn: async () => (await TagsService.readTagDuplicates()).data,
-}
 
 /**
  * Tags whose names read as the same word, offered for merging
@@ -34,13 +24,13 @@ export function DuplicateGroups({
 }: {
   onOpenTag: (tagId: string) => void
 }) {
-  const queryClient = useQueryClient()
+  const reportChange = useReportChange()
   const { showErrorToast } = useCustomToast()
   const [merging, setMerging] = useState<TagPublic[] | null>(null)
 
   // Suspends with the tag table, so the two arrive together: suggestions
   // that landed on their own would push the table down after it was drawn.
-  const { data } = useSuspenseQuery(duplicatesQueryOptions)
+  const { data } = useSuspenseQuery(tagDuplicatesQuery())
 
   const dismiss = useMutation({
     mutationFn: (tags: TagPublic[]) =>
@@ -48,8 +38,7 @@ export function DuplicateGroups({
         body: { tag_ids: tags.map((tag) => tag.id) },
       }),
     onError: handleError.bind(showErrorToast),
-    onSettled: () =>
-      queryClient.invalidateQueries({ queryKey: ["tags", "duplicates"] }),
+    onSettled: () => reportChange({ type: "tag duplicates dismissed" }),
   })
 
   const groups = data?.data ?? []

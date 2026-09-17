@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { useMutation } from "@tanstack/react-query"
 import { Trash2 } from "lucide-react"
 import { useState } from "react"
 
@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dialog"
 import { LoadingButton } from "@/components/ui/loading-button"
 import useCustomToast from "@/hooks/useCustomToast"
+import { useReportChange } from "@/lib/serverState"
 import { cn } from "@/lib/utils"
 import { handleError } from "@/utils"
 
@@ -33,7 +34,7 @@ export function DeleteAttachment({
   className?: string
 }) {
   const [isOpen, setIsOpen] = useState(false)
-  const queryClient = useQueryClient()
+  const reportChange = useReportChange()
   const { showErrorToast } = useCustomToast()
 
   const mutation = useMutation({
@@ -46,8 +47,9 @@ export function DeleteAttachment({
     onSuccess: () => setIsOpen(false),
     onError: handleError.bind(showErrorToast),
     onSettled: () =>
-      queryClient.invalidateQueries({
-        queryKey: ["attachments", attachment.task_id],
+      reportChange({
+        type: "attachments changed",
+        taskId: attachment.task_id,
       }),
   })
 

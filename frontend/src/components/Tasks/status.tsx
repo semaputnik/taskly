@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { useMutation } from "@tanstack/react-query"
 import {
   ChevronDown,
   CircleCheck,
@@ -33,6 +33,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import useCustomToast from "@/hooks/useCustomToast"
+import { useReportChange } from "@/lib/serverState"
 import { cn } from "@/lib/utils"
 import { handleError, isOpenSubtasksError } from "@/utils"
 import { STATUS_LABELS, STATUSES } from "./statuses"
@@ -91,7 +92,7 @@ export function StatusGlyph({
 export function useTaskStatus(task: TaskPublic) {
   const [isPrompting, setIsPrompting] = useState(false)
   const [announcement, setAnnouncement] = useState("")
-  const queryClient = useQueryClient()
+  const reportChange = useReportChange()
   const { showErrorToast } = useCustomToast()
 
   const mutation = useMutation({
@@ -108,11 +109,7 @@ export function useTaskStatus(task: TaskPublic) {
       }
       handleError.call(showErrorToast, error)
     },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["tasks"] })
-      queryClient.invalidateQueries({ queryKey: ["task", task.id] })
-      queryClient.invalidateQueries({ queryKey: ["activity"] })
-    },
+    onSettled: () => reportChange({ type: "task changed", taskId: task.id }),
   })
 
   const change = (status: TaskStatus) => {

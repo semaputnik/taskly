@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query"
 import { useBlocker } from "@tanstack/react-router"
 import { useEffect, useRef, useState } from "react"
 
-import { ProjectsService, type TaskPublic } from "@/client"
+import type { TaskPublic } from "@/client"
 import {
   DescriptionSection,
   ghost,
@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
+import { projectsQuery } from "@/lib/serverState"
 import { cn } from "@/lib/utils"
 import { type CaptureTarget, useTaskCapture } from "./capture"
 import { carryOver, emptyDraft, isTouched, type TaskFields } from "./draft"
@@ -133,12 +134,7 @@ export function NewTask({
 
   // Unset already means the Inbox to the API, so choosing the Inbox is kept
   // as unset: picking what is already shown is not a change to the draft.
-  const { data: projects } = useQuery({
-    queryKey: ["projects"],
-    queryFn: async () =>
-      (await ProjectsService.readProjects({ query: { skip: 0, limit: 100 } }))
-        .data,
-  })
+  const { data: projects } = useQuery(projectsQuery())
   const inboxId = projects?.data.find((project) => project.is_inbox)?.id
   const change = (patch: Partial<TaskFields>) =>
     setDraft((previous) => ({

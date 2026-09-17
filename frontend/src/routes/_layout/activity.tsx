@@ -2,11 +2,7 @@ import { useQuery } from "@tanstack/react-query"
 import { createFileRoute } from "@tanstack/react-router"
 import { z } from "zod"
 
-import {
-  type ActivityEntryPublic,
-  ActivityService,
-  BotsService,
-} from "@/client"
+import type { ActivityEntryPublic } from "@/client"
 import { ActivityDescription } from "@/components/Activity/ActivityDescription"
 import { ActorLabel } from "@/components/Activity/ActorLabel"
 import { RestoreDeletion } from "@/components/Activity/RestoreDeletion"
@@ -22,6 +18,7 @@ import {
 } from "@/components/ui/table"
 import useAuth from "@/hooks/useAuth"
 import { formatDateTime } from "@/lib/dates"
+import { activityQuery, botQuery } from "@/lib/serverState"
 
 const PAGE_SIZE = 50
 
@@ -114,24 +111,11 @@ function Activity() {
     limit: PAGE_SIZE,
     actor_bot_user_id: actor,
   }
-  const { data, isPending } = useQuery({
-    queryKey: ["activity", query],
-    queryFn: async () =>
-      (await ActivityService.readActivityLog({ query })).data,
-  })
+  const { data, isPending } = useQuery(activityQuery(query))
   // Named from the bot user itself rather than from the feed: a filter that
   // matches nothing still has to say whose nothing it is. A deleted bot user
   // reads here too (FR-08.19).
-  const { data: actorBot } = useQuery({
-    queryKey: ["bot", actor],
-    queryFn: async () =>
-      (
-        await BotsService.readBotUser({
-          path: { bot_user_id: actor as string },
-        })
-      ).data,
-    enabled: Boolean(actor),
-  })
+  const { data: actorBot } = useQuery(botQuery(actor))
 
   const count = data?.count ?? 0
   const lastPage = Math.max(1, Math.ceil(count / PAGE_SIZE))

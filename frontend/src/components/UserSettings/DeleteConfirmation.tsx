@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { useMutation } from "@tanstack/react-query"
 import { useForm } from "react-hook-form"
 
 import { UsersService } from "@/client"
@@ -16,13 +16,14 @@ import {
 import { LoadingButton } from "@/components/ui/loading-button"
 import useAuth from "@/hooks/useAuth"
 import useCustomToast from "@/hooks/useCustomToast"
+import { useReportChange } from "@/lib/serverState"
 import { handleError } from "@/utils"
 
 // What the confirming button says, and what the instruction above it names.
 const CONFIRM = "Delete my account"
 
 const DeleteConfirmation = () => {
-  const queryClient = useQueryClient()
+  const reportChange = useReportChange()
   const { showSuccessToast, showErrorToast } = useCustomToast()
   const { handleSubmit } = useForm()
   const { logout } = useAuth()
@@ -34,9 +35,7 @@ const DeleteConfirmation = () => {
       logout()
     },
     onError: handleError.bind(showErrorToast),
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["currentUser"] })
-    },
+    onSettled: () => reportChange({ type: "account changed" }),
   })
 
   const onSubmit = async () => {

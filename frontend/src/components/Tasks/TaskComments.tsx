@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { useMutation, useQuery } from "@tanstack/react-query"
 import { Bot, Pencil, Trash2 } from "lucide-react"
 import { useState } from "react"
 
@@ -9,6 +9,7 @@ import { LoadingButton } from "@/components/ui/loading-button"
 import { Textarea } from "@/components/ui/textarea"
 import useCustomToast from "@/hooks/useCustomToast"
 import { formatDateTime } from "@/lib/dates"
+import { commentsQuery, useReportChange } from "@/lib/serverState"
 import { handleError } from "@/utils"
 import { useCommentDeletion } from "./commentDeletion"
 import { useCommentDraft } from "./commentDraft"
@@ -26,18 +27,13 @@ export const TaskComments = ({ task }: TaskCommentsProps) => {
   const draft = useCommentDraft(task.id)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editDraft, setEditDraft] = useState("")
-  const queryClient = useQueryClient()
+  const reportChange = useReportChange()
   const { showErrorToast } = useCustomToast()
 
-  const queryKey = ["comments", task.id]
+  const { data: comments, isLoading } = useQuery(commentsQuery(task.id))
 
-  const { data: comments, isLoading } = useQuery({
-    queryKey,
-    queryFn: async () =>
-      (await CommentsService.readComments({ path: { task_id: task.id } })).data,
-  })
-
-  const invalidate = () => queryClient.invalidateQueries({ queryKey })
+  const invalidate = () =>
+    reportChange({ type: "comments changed", taskId: task.id })
 
   const addMutation = useMutation({
     mutationFn: (body: string) =>

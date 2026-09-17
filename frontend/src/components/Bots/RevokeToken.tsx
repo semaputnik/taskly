@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { useMutation } from "@tanstack/react-query"
 import { Ban } from "lucide-react"
 import { useState } from "react"
 
@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dialog"
 import { LoadingButton } from "@/components/ui/loading-button"
 import useCustomToast from "@/hooks/useCustomToast"
+import { useReportChange } from "@/lib/serverState"
 import { handleError } from "@/utils"
 
 /**
@@ -23,7 +24,7 @@ import { handleError } from "@/utils"
  */
 const RevokeToken = ({ bot }: { bot: BotUserPublic }) => {
   const [isOpen, setIsOpen] = useState(false)
-  const queryClient = useQueryClient()
+  const reportChange = useReportChange()
   const { showSuccessToast, showErrorToast } = useCustomToast()
 
   const mutation = useMutation({
@@ -34,12 +35,9 @@ const RevokeToken = ({ bot }: { bot: BotUserPublic }) => {
       setIsOpen(false)
     },
     onError: handleError.bind(showErrorToast),
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["bots"] })
-      // The panel reads the bot user by id, so the list's key does not cover
-      // it: without this the panel would still say the token is active.
-      queryClient.invalidateQueries({ queryKey: ["bot", bot.id] })
-    },
+    // Without the panel's copy refreshed too, it would still say the token
+    // is active.
+    onSettled: () => reportChange({ type: "bot token changed", botId: bot.id }),
   })
 
   return (

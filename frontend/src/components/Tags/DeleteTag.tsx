@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { useMutation } from "@tanstack/react-query"
 import { useState } from "react"
 
 import { type TagPublic, TagsService } from "@/client"
@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dialog"
 import { LoadingButton } from "@/components/ui/loading-button"
 import useCustomToast from "@/hooks/useCustomToast"
+import { useReportChange } from "@/lib/serverState"
 import { handleError } from "@/utils"
 import { allTasks, totalTasks } from "./counts"
 
@@ -38,7 +39,7 @@ function tasksLosingIt(tag: TagPublic): string {
  */
 const DeleteTag = ({ tag, onSuccess }: DeleteTagProps) => {
   const [isOpen, setIsOpen] = useState(false)
-  const queryClient = useQueryClient()
+  const reportChange = useReportChange()
   const { showSuccessToast, showErrorToast } = useCustomToast()
 
   const mutation = useMutation({
@@ -49,10 +50,7 @@ const DeleteTag = ({ tag, onSuccess }: DeleteTagProps) => {
       onSuccess()
     },
     onError: handleError.bind(showErrorToast),
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["tags"] })
-      queryClient.invalidateQueries({ queryKey: ["tasks"] })
-    },
+    onSettled: () => reportChange({ type: "tag changed" }),
   })
 
   return (

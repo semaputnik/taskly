@@ -11,14 +11,13 @@ import {
 } from "lucide-react"
 import { useId } from "react"
 
-import {
-  type BotUserRef,
-  ProjectsService,
-  type RecurrenceFrequency,
-  type TaskPriority,
-  type TaskPublic,
-  type TaskStatus,
-  type TaskUpdate,
+import type {
+  BotUserRef,
+  RecurrenceFrequency,
+  TaskPriority,
+  TaskPublic,
+  TaskStatus,
+  TaskUpdate,
 } from "@/client"
 import { DayField } from "@/components/Common/DayField"
 import {
@@ -38,6 +37,7 @@ import {
 } from "@/components/ui/select"
 import useAuth from "@/hooks/useAuth"
 import { formatDateTime } from "@/lib/dates"
+import { projectsQuery } from "@/lib/serverState"
 import { cn } from "@/lib/utils"
 import { AssigneeSelect, assigneeFormValue, toAssigneeId } from "./assignee"
 import type { TaskFields } from "./draft"
@@ -90,10 +90,7 @@ export function TaskPropertyRows({
   const ids = useId()
 
   const { data: projects } = useQuery({
-    queryKey: ["projects"],
-    queryFn: async () =>
-      (await ProjectsService.readProjects({ query: { skip: 0, limit: 100 } }))
-        .data,
+    ...projectsQuery(),
     enabled: !isSubtask,
   })
   const inbox = projects?.data.find((project) => project.is_inbox)

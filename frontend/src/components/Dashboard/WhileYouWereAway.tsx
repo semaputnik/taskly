@@ -2,25 +2,18 @@ import { useSuspenseQuery } from "@tanstack/react-query"
 import { Link as RouterLink } from "@tanstack/react-router"
 import { ArrowRight, Bot } from "lucide-react"
 
-import { ActivityService } from "@/client"
 import { ActivityDescription } from "@/components/Activity/ActivityDescription"
 import { ActorLabel } from "@/components/Activity/ActorLabel"
 import { Skeleton } from "@/components/ui/skeleton"
 import useAuth from "@/hooks/useAuth"
+import { activityQuery } from "@/lib/serverState"
 import { cn } from "@/lib/utils"
 import { timeAgo } from "./when"
 
 const PREVIEW_ROWS = 6
 
-export const recentActivityQueryOptions = {
-  queryKey: ["activity", { skip: 0, limit: PREVIEW_ROWS }],
-  queryFn: async () =>
-    (
-      await ActivityService.readActivityLog({
-        query: { skip: 0, limit: PREVIEW_ROWS },
-      })
-    ).data,
-}
+export const recentActivityQuery = () =>
+  activityQuery({ skip: 0, limit: PREVIEW_ROWS })
 
 function Header() {
   return (
@@ -52,7 +45,7 @@ export function WhileYouWereAwayPending() {
  */
 export function WhileYouWereAway() {
   const { user: currentUser } = useAuth()
-  const { data } = useSuspenseQuery(recentActivityQueryOptions)
+  const { data } = useSuspenseQuery(recentActivityQuery())
   const entries = data.data
 
   return (

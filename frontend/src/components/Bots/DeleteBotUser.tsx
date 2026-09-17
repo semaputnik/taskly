@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { useMutation } from "@tanstack/react-query"
 import { useState } from "react"
 
 import { BotsService, type BotUserPublic } from "@/client"
@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dialog"
 import { LoadingButton } from "@/components/ui/loading-button"
 import useCustomToast from "@/hooks/useCustomToast"
+import { useReportChange } from "@/lib/serverState"
 import { handleError } from "@/utils"
 
 interface DeleteBotUserProps {
@@ -29,7 +30,7 @@ interface DeleteBotUserProps {
  */
 const DeleteBotUser = ({ bot, onSuccess }: DeleteBotUserProps) => {
   const [isOpen, setIsOpen] = useState(false)
-  const queryClient = useQueryClient()
+  const reportChange = useReportChange()
   const { showSuccessToast, showErrorToast } = useCustomToast()
 
   const mutation = useMutation({
@@ -41,14 +42,9 @@ const DeleteBotUser = ({ bot, onSuccess }: DeleteBotUserProps) => {
       onSuccess()
     },
     onError: handleError.bind(showErrorToast),
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["bots"] })
-      // Its own record still reads — marked deleted now (FR-08.19) — so the
-      // panel must not be left holding the copy from before.
-      queryClient.invalidateQueries({ queryKey: ["bot", bot.id] })
-      // Tasks assigned to it now show it as deleted.
-      queryClient.invalidateQueries({ queryKey: ["tasks"] })
-    },
+    // Its own record still reads — marked deleted now (FR-08.19) — and the
+    // tasks assigned to it now show it as deleted.
+    onSettled: () => reportChange({ type: "bot user changed", botId: bot.id }),
   })
 
   return (

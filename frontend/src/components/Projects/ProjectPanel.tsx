@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { useMutation, useQuery } from "@tanstack/react-query"
 import { Link as RouterLink } from "@tanstack/react-router"
 import { Archive, CheckSquare, Clock } from "lucide-react"
 
@@ -24,6 +24,7 @@ import { taskCountLabel } from "@/components/Tags/counts"
 import { LoadingButton } from "@/components/ui/loading-button"
 import useCustomToast from "@/hooks/useCustomToast"
 import { formatDayOf } from "@/lib/dates"
+import { projectQuery, useReportChange } from "@/lib/serverState"
 import { cn } from "@/lib/utils"
 import { handleError } from "@/utils"
 import DeleteProject from "./DeleteProject"
@@ -48,16 +49,7 @@ export function ProjectPanel({
 }) {
   // Fetched by id rather than read out of the table: a link may point at a
   // project the list in view excludes — an archived one, most of all.
-  const query = useQuery({
-    queryKey: ["project", projectId],
-    queryFn: async () =>
-      (
-        await ProjectsService.readProject({
-          path: { project_id: projectId as string },
-        })
-      ).data,
-    enabled: Boolean(projectId),
-  })
+  const query = useQuery(projectQuery(projectId))
   const project = query.data
 
   return (
@@ -84,7 +76,7 @@ export function ProjectPanel({
               data: ProjectPublic
             }>
           }
-          invalidate={["projects"]}
+          change={{ type: "project created" }}
           onCreated={onCreated}
         />
       ) : project ? (
@@ -189,7 +181,7 @@ function ProjectRecord({ project }: { project: ProjectPublic }) {
  * one control, both ways, read where the state is.
  */
 function ArchiveToggle({ project }: { project: ProjectPublic }) {
-  const queryClient = useQueryClient()
+  const reportChange = useReportChange()
   const { showSuccessToast, showErrorToast } = useCustomToast()
 
   const mutation = useMutation({
@@ -204,11 +196,8 @@ function ArchiveToggle({ project }: { project: ProjectPublic }) {
           : `“${project.name}” moved to the archive`,
       ),
     onError: handleError.bind(showErrorToast),
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["projects"] })
-      queryClient.invalidateQueries({ queryKey: ["project", project.id] })
-      queryClient.invalidateQueries({ queryKey: ["tasks"] })
-    },
+    onSettled: () =>
+      reportChange({ type: "project changed", projectId: project.id }),
   })
 
   return (
@@ -232,7 +221,7 @@ function ArchiveToggle({ project }: { project: ProjectPublic }) {
 
 /** Saving one field of a project, the way the panel saves every field. */
 function useProjectUpdate(project: ProjectPublic) {
-  const queryClient = useQueryClient()
+  const reportChange = useReportChange()
   const { showErrorToast } = useCustomToast()
 
   const mutation = useMutation({
@@ -242,12 +231,9 @@ function useProjectUpdate(project: ProjectPublic) {
         body,
       }),
     onError: handleError.bind(showErrorToast),
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["projects"] })
-      queryClient.invalidateQueries({ queryKey: ["project", project.id] })
-      // A project's name shows on every task in it.
-      queryClient.invalidateQueries({ queryKey: ["tasks"] })
-    },
+    // A project's name shows on every task in it.
+    onSettled: () =>
+      reportChange({ type: "project changed", projectId: project.id }),
   })
 
   return async (body: ProjectUpdate) => {

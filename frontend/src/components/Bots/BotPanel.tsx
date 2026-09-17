@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { useMutation, useQuery } from "@tanstack/react-query"
 import {
   Activity,
   CalendarClock,
@@ -25,10 +25,14 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import useCustomToast from "@/hooks/useCustomToast"
 import { formatDateTime, formatDayOf } from "@/lib/dates"
+import {
+  botQuery,
+  scopeProjectsQuery,
+  useReportChange,
+} from "@/lib/serverState"
 import { cn } from "@/lib/utils"
 import { handleError } from "@/utils"
 import { BotConsole } from "./BotConsole"
-import { scopeProjectsQueryOptions } from "./BotFormFields"
 import DeleteBotUser from "./DeleteBotUser"
 import { ago, until } from "./health"
 import IssueToken from "./IssueToken"
@@ -59,16 +63,7 @@ export function BotPanel({
   botId: string | null
   onClose: () => void
 }) {
-  const query = useQuery({
-    queryKey: ["bot", botId],
-    queryFn: async () =>
-      (
-        await BotsService.readBotUser({
-          path: { bot_user_id: botId as string },
-        })
-      ).data,
-    enabled: Boolean(botId),
-  })
+  const query = useQuery(botQuery(botId))
   const bot = query.data
 
   return (
@@ -96,7 +91,7 @@ function BotRecord({ bot }: { bot: BotUserPublic }) {
   // Live projects and the archived ones this bot is already scoped to: an
   // archived project stays in a scope, out of reach until it comes back, and
   // a grant the user cannot see is a grant they cannot take away (FR-05.13).
-  const { data: projects } = useQuery(scopeProjectsQueryOptions())
+  const { data: projects } = useQuery(scopeProjectsQuery())
 
   // The scope as the reader has it, which is ahead of the server while a
   // save is in flight. Building each change from the server's copy would let
@@ -296,7 +291,7 @@ function BotRecord({ bot }: { bot: BotUserPublic }) {
  * back: there is no Save button here either (FR-08.9).
  */
 function useBotUpdate(bot: BotUserPublic) {
-  const queryClient = useQueryClient()
+  const reportChange = useReportChange()
   const { showErrorToast } = useCustomToast()
 
   const mutation = useMutation({
@@ -306,12 +301,8 @@ function useBotUpdate(bot: BotUserPublic) {
         body: { scope, name },
       }),
     onError: handleError.bind(showErrorToast),
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["bots"] })
-      queryClient.invalidateQueries({ queryKey: ["bot", bot.id] })
-      // A renamed bot user is named on its tasks and in the log.
-      queryClient.invalidateQueries({ queryKey: ["tasks"] })
-    },
+    // A renamed bot user is named on its tasks and in the log.
+    onSettled: () => reportChange({ type: "bot user changed", botId: bot.id }),
   })
 
   return async (scope?: BotScope, name?: string) => {

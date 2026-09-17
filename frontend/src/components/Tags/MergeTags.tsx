@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { useMutation, useQuery } from "@tanstack/react-query"
 import { X } from "lucide-react"
 import { useId, useState } from "react"
 
@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import useCustomToast from "@/hooks/useCustomToast"
+import { tagMergePreviewQuery, useReportChange } from "@/lib/serverState"
 import { handleError } from "@/utils"
 import {
   archivedNote,
@@ -78,7 +79,7 @@ export function MergeTags({
 }) {
   const [members, setMembers] = useState(tags)
   const [survivorId, setSurvivorId] = useState(initialSurvivorId ?? tags[0]?.id)
-  const queryClient = useQueryClient()
+  const reportChange = useReportChange()
   const { showSuccessToast, showErrorToast } = useCustomToast()
   const groupName = useId()
 
@@ -89,17 +90,7 @@ export function MergeTags({
     (candidate) => !members.some((member) => member.id === candidate.id),
   )
 
-  const preview = useQuery({
-    queryKey: ["tag-merge-preview", survivor?.id, sourceIds],
-    queryFn: async () =>
-      (
-        await TagsService.previewTagMerge({
-          path: { tag_id: survivor.id },
-          query: { source_ids: sourceIds },
-        })
-      ).data,
-    enabled: Boolean(survivor) && sourceIds.length > 0,
-  })
+  const preview = useQuery(tagMergePreviewQuery(survivor?.id, sourceIds))
 
   const merge = useMutation({
     mutationFn: () =>
@@ -115,12 +106,7 @@ export function MergeTags({
       onMerged?.(data)
     },
     onError: handleError.bind(showErrorToast),
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["tags"] })
-      queryClient.invalidateQueries({ queryKey: ["tag"] })
-      queryClient.invalidateQueries({ queryKey: ["tasks"] })
-      queryClient.invalidateQueries({ queryKey: ["task"] })
-    },
+    onSettled: () => reportChange({ type: "tag changed" }),
   })
 
   if (!survivor) return null

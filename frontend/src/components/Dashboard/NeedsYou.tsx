@@ -2,16 +2,12 @@ import { useSuspenseQueries } from "@tanstack/react-query"
 import { Link as RouterLink } from "@tanstack/react-router"
 import { ArrowRight, CheckCheck } from "lucide-react"
 
-import {
-  ProjectsService,
-  type TaskPublic,
-  type TaskStatus,
-  TasksService,
-} from "@/client"
+import type { TaskPublic, TaskStatus } from "@/client"
 import { CompleteTask } from "@/components/Tasks/CompleteTask"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { formatDay } from "@/lib/dates"
+import { projectsQuery, tasksQuery } from "@/lib/serverState"
 import { cn } from "@/lib/utils"
 import { daysLate, inAWeek, today, tomorrow } from "./when"
 
@@ -23,16 +19,12 @@ const PREVIEW_ROWS = 5
 const ACTIONABLE: TaskStatus[] = ["todo", "in_progress"]
 const WAITING: TaskStatus[] = ["waiting"]
 
-function tasksIn(status: TaskStatus[], query: Record<string, unknown>) {
-  const full = { ...query, status }
-  return {
-    queryKey: ["tasks", full],
-    queryFn: async () => (await TasksService.readTasks({ query: full })).data,
-  }
-}
+type TasksQuery = Parameters<typeof tasksQuery>[0]
 
-const actionable = (query: Record<string, unknown>) =>
-  tasksIn(ACTIONABLE, query)
+const tasksIn = (status: TaskStatus[], query: TasksQuery) =>
+  tasksQuery({ ...query, status })
+
+const actionable = (query: TasksQuery) => tasksIn(ACTIONABLE, query)
 
 /** Late in Alert Red, as in Overdue; otherwise just the day it is due. */
 function WaitingDue({ dueDate }: { dueDate?: string | null }) {
@@ -152,15 +144,7 @@ export function NeedsYou() {
       actionable({ due_from: tomorrow(), due_to: inAWeek(), limit: 1 }),
       // Soonest first, undated last: the API sorts a missing date to the end.
       tasksIn(WAITING, { sort: "due_date", limit: PREVIEW_ROWS }),
-      {
-        queryKey: ["projects"],
-        queryFn: async () =>
-          (
-            await ProjectsService.readProjects({
-              query: { skip: 0, limit: 100 },
-            })
-          ).data,
-      },
+      projectsQuery(),
     ],
   })
 

@@ -1,8 +1,9 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { useMutation } from "@tanstack/react-query"
 import { useState } from "react"
 
 import { CaptureField } from "@/components/Tasks/capture"
 import useCustomToast from "@/hooks/useCustomToast"
+import { type Change, useReportChange } from "@/lib/serverState"
 import { handleError } from "@/utils"
 import { RecordHeader, titleFieldClass } from "./RecordPanel"
 
@@ -20,7 +21,7 @@ export function NewRecord<T extends { id: string }>({
   placeholder,
   hint,
   create,
-  invalidate,
+  change,
   onCreated,
 }: {
   /** What is being made, said in the panel's breadcrumb. */
@@ -29,11 +30,11 @@ export function NewRecord<T extends { id: string }>({
   placeholder: string
   hint: React.ReactNode
   create: (name: string) => Promise<{ data: T }>
-  /** The query keys the new record belongs to. */
-  invalidate: string[]
+  /** What creating the record changes, as the server state hears it. */
+  change: Change
   onCreated: (record: T) => void
 }) {
-  const queryClient = useQueryClient()
+  const reportChange = useReportChange()
   const { showErrorToast } = useCustomToast()
   const [announcement, setAnnouncement] = useState("")
 
@@ -44,11 +45,7 @@ export function NewRecord<T extends { id: string }>({
       onCreated(data)
     },
     onError: (error: Error) => handleError.call(showErrorToast, error),
-    onSettled: () => {
-      for (const key of invalidate) {
-        queryClient.invalidateQueries({ queryKey: [key] })
-      }
-    },
+    onSettled: () => reportChange(change),
   })
 
   return (

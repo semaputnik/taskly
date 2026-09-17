@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { useMutation } from "@tanstack/react-query"
 import { KeyRound } from "lucide-react"
 import { useState } from "react"
 
@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { LoadingButton } from "@/components/ui/loading-button"
 import useCustomToast from "@/hooks/useCustomToast"
+import { useReportChange } from "@/lib/serverState"
 import { handleError } from "@/utils"
 import { useShowIssuedToken } from "./IssuedToken"
 import { expiryFromDate, today } from "./tokens"
@@ -29,7 +30,7 @@ const IssueToken = ({ bot }: { bot: BotUserPublic }) => {
   const [isOpen, setIsOpen] = useState(false)
   const [expiresOn, setExpiresOn] = useState("")
   const showIssuedToken = useShowIssuedToken()
-  const queryClient = useQueryClient()
+  const reportChange = useReportChange()
   const { showErrorToast } = useCustomToast()
 
   const mutation = useMutation({
@@ -46,11 +47,11 @@ const IssueToken = ({ bot }: { bot: BotUserPublic }) => {
         token: data.token,
         expiresAt: data.expires_at,
       })
-      queryClient.invalidateQueries({ queryKey: ["bot", bot.id] })
+      reportChange({ type: "bot token changed", botId: bot.id })
     },
     onError: (error) => {
       handleError.call(showErrorToast, error)
-      queryClient.invalidateQueries({ queryKey: ["bots"] })
+      reportChange({ type: "bot token changed", botId: bot.id })
     },
   })
 

@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { useMutation } from "@tanstack/react-query"
 import { ChevronDown, Trash2, X } from "lucide-react"
 import { useState } from "react"
 
@@ -33,6 +33,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import useCustomToast from "@/hooks/useCustomToast"
+import { useReportChange } from "@/lib/serverState"
 import { handleError } from "@/utils"
 import { StatusMenuItems } from "./status"
 import { BulkTagPicker } from "./TagPicker"
@@ -67,7 +68,7 @@ export function TaskBulkActions({
   onDone: () => void
   onClear: () => void
 }) {
-  const queryClient = useQueryClient()
+  const reportChange = useReportChange()
   const { showSuccessToast, showErrorToast } = useCustomToast()
   const [refused, setRefused] = useState<
     { task_id: string; message: string }[]
@@ -98,11 +99,7 @@ export function TaskBulkActions({
       }
       handleError.call(showErrorToast, error)
     },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["tasks"] })
-      queryClient.invalidateQueries({ queryKey: ["tags"] })
-      queryClient.invalidateQueries({ queryKey: ["activity"] })
-    },
+    onSettled: () => reportChange({ type: "tasks changed in bulk" }),
   })
 
   const count = selected.length
@@ -259,7 +256,7 @@ function DeleteSelection({
   onRefused: (refusals: { task_id: string; message: string }[]) => void
 }) {
   const [isOpen, setIsOpen] = useState(false)
-  const queryClient = useQueryClient()
+  const reportChange = useReportChange()
   const { showSuccessToast, showErrorToast } = useCustomToast()
 
   const remove = useMutation({
@@ -283,10 +280,7 @@ function DeleteSelection({
       }
       handleError.call(showErrorToast, error)
     },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["tasks"] })
-      queryClient.invalidateQueries({ queryKey: ["activity"] })
-    },
+    onSettled: () => reportChange({ type: "tasks changed in bulk" }),
   })
 
   return (

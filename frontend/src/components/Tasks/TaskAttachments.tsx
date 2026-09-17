@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { useMutation, useQuery } from "@tanstack/react-query"
 import { Download, Upload } from "lucide-react"
 import { useRef } from "react"
 
@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button"
 import { LoadingButton } from "@/components/ui/loading-button"
 import { Separator } from "@/components/ui/separator"
 import useCustomToast from "@/hooks/useCustomToast"
+import { attachmentsQuery, useReportChange } from "@/lib/serverState"
 import { handleError } from "@/utils"
 import { DeleteAttachment } from "./DeleteAttachment"
 
@@ -31,19 +32,13 @@ function formatSize(bytes: number): string {
  */
 export const TaskAttachments = ({ task }: TaskAttachmentsProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const queryClient = useQueryClient()
+  const reportChange = useReportChange()
   const { showErrorToast } = useCustomToast()
 
-  const queryKey = ["attachments", task.id]
+  const { data: attachments, isLoading } = useQuery(attachmentsQuery(task.id))
 
-  const { data: attachments, isLoading } = useQuery({
-    queryKey,
-    queryFn: async () =>
-      (await AttachmentsService.readAttachments({ path: { task_id: task.id } }))
-        .data,
-  })
-
-  const invalidate = () => queryClient.invalidateQueries({ queryKey })
+  const invalidate = () =>
+    reportChange({ type: "attachments changed", taskId: task.id })
 
   const uploadMutation = useMutation({
     mutationFn: (file: File) =>

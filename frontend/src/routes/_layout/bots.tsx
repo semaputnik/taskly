@@ -3,23 +3,14 @@ import { createFileRoute } from "@tanstack/react-router"
 import { Bot } from "lucide-react"
 import { Suspense } from "react"
 
-import { BotsService } from "@/client"
 import AddBotUser from "@/components/Bots/AddBotUser"
-import { scopeProjectsQueryOptions } from "@/components/Bots/BotFormFields"
 import { getColumns } from "@/components/Bots/columns"
 import { IssuedTokenProvider } from "@/components/Bots/IssuedToken"
 import { DataTable } from "@/components/Common/DataTable"
 import { EmptyState } from "@/components/Common/EmptyState"
 import PendingBots from "@/components/Pending/PendingBots"
 import { useRecordPanels } from "@/components/Records/panels"
-
-function getBotsQueryOptions() {
-  return {
-    queryFn: async () =>
-      (await BotsService.readBotUsers({ query: { skip: 0, limit: 100 } })).data,
-    queryKey: ["bots"],
-  }
-}
+import { botsQuery, scopeProjectsQuery } from "@/lib/serverState"
 
 export const Route = createFileRoute("/_layout/bots")({
   component: Bots,
@@ -33,8 +24,8 @@ export const Route = createFileRoute("/_layout/bots")({
 })
 
 function BotsTableContent({ onOpen }: { onOpen: (botId: string) => void }) {
-  const { data: bots } = useSuspenseQuery(getBotsQueryOptions())
-  const { data: projects } = useSuspenseQuery(scopeProjectsQueryOptions())
+  const { data: bots } = useSuspenseQuery(botsQuery())
+  const { data: projects } = useSuspenseQuery(scopeProjectsQuery())
 
   const projectsById = Object.fromEntries(
     projects.map((project) => [project.id, project]),

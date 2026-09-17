@@ -1,7 +1,7 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { useQuery } from "@tanstack/react-query"
 import { ChevronRight } from "lucide-react"
 
-import { ProjectsService, type TaskPublic, TasksService } from "@/client"
+import type { TaskPublic } from "@/client"
 import {
   EditableText,
   RecordHeader,
@@ -11,6 +11,12 @@ import {
 } from "@/components/Records/RecordPanel"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import {
+  projectsQuery,
+  taskQuery,
+  tasksQuery,
+  useReportChange,
+} from "@/lib/serverState"
 import { CompleteTask } from "./CompleteTask"
 import { CaptureField, type CaptureTarget, useTaskCapture } from "./capture"
 import DeleteTask from "./DeleteTask"
@@ -65,41 +71,23 @@ export function TaskDetail({
 
   // Fetched by id rather than read out of the table: a link may point at a
   // task the current filters exclude, and it must still open.
-  const query = useQuery({
-    queryKey: ["task", taskId],
-    queryFn: async () =>
-      (await TasksService.readTask({ path: { task_id: taskId as string } }))
-        .data,
-    enabled: Boolean(taskId),
-  })
+  const query = useQuery(taskQuery(taskId))
   const task = query.data
 
   const { data: projects } = useQuery({
-    queryKey: ["projects"],
-    queryFn: async () =>
-      (await ProjectsService.readProjects({ query: { skip: 0, limit: 100 } }))
-        .data,
+    ...projectsQuery(),
     enabled: Boolean(taskId),
   })
   // Subtasks are not a nested field, so the panel asks for this task's
-  // children alone. Under "tasks", so every change to a task refreshes them.
-  const subtaskQuery = { parent_id: taskId, limit: SUBTASK_LIMIT }
+  // children alone: a task list like any other, refreshed with them.
   const { data: subtasks } = useQuery({
-    queryKey: ["tasks", subtaskQuery],
-    queryFn: async () =>
-      (await TasksService.readTasks({ query: subtaskQuery })).data,
+    ...tasksQuery({ parent_id: taskId, limit: SUBTASK_LIMIT }),
     enabled: Boolean(taskId),
   })
   // The parent by its own address, which is also where its panel reads it,
   // so following the breadcrumb opens it from the cache.
   const parentId = task?.parent_id
-  const { data: parent } = useQuery({
-    queryKey: ["task", parentId],
-    queryFn: async () =>
-      (await TasksService.readTask({ path: { task_id: parentId as string } }))
-        .data,
-    enabled: Boolean(parentId),
-  })
+  const { data: parent } = useQuery(taskQuery(parentId))
 
   const projectName = task
     ? projects?.data.find((p) => p.id === task.project_id)?.name
@@ -262,13 +250,13 @@ function TaskTitle({ task }: { task: TaskPublic }) {
  * belongs to the project of its root task (FR-02.4).
  */
 function SubtaskCapture({ parent }: { parent: TaskPublic }) {
-  const queryClient = useQueryClient()
+  const reportChange = useReportChange()
   const capture = useTaskCapture(
     { parentId: parent.id, projectName: "Follows its parent task" },
     () => {
       // The panel's children are a task list query, so that is what has to
       // catch up; the reader is not moved onto the child.
-      queryClient.invalidateQueries({ queryKey: ["tasks"] })
+      reportChange({ type: "task created" })
     },
   )
 

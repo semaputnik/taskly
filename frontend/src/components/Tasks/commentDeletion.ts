@@ -2,13 +2,10 @@ import { useQueryClient } from "@tanstack/react-query"
 import { useCallback, useSyncExternalStore } from "react"
 import { toast } from "sonner"
 
-import {
-  type CommentPublic,
-  type CommentsPublic,
-  CommentsService,
-} from "@/client"
+import { type CommentPublic, CommentsService } from "@/client"
 import useCustomToast from "@/hooks/useCustomToast"
 import { PANEL_TOASTER_ID, settleWhenPanelCloses } from "@/lib/panelNotices"
+import { commentsQuery, reportChange } from "@/lib/serverState"
 import { handleError } from "@/utils"
 
 /** How long a deleted comment can still be brought back. */
@@ -78,8 +75,8 @@ export function useCommentDeletion(taskId: string) {
           })
           // Out of the cached thread before it is out of the pending set, so
           // it does not flash back while the refetch is on its way.
-          queryClient.setQueryData<CommentsPublic>(
-            ["comments", taskId],
+          queryClient.setQueryData(
+            commentsQuery(taskId).queryKey,
             (thread) =>
               thread && {
                 ...thread,
@@ -97,7 +94,7 @@ export function useCommentDeletion(taskId: string) {
           )
         } finally {
           setPending((ids) => ids.delete(comment.id))
-          queryClient.invalidateQueries({ queryKey: ["comments", taskId] })
+          reportChange(queryClient, { type: "comments changed", taskId })
         }
       }
 

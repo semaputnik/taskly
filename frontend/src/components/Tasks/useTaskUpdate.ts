@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { useMutation } from "@tanstack/react-query"
 import { useState } from "react"
 
 import {
@@ -8,6 +8,7 @@ import {
   type TaskUpdate,
 } from "@/client"
 import useCustomToast from "@/hooks/useCustomToast"
+import { useReportChange } from "@/lib/serverState"
 import { handleError } from "@/utils"
 import { sameRecurrence } from "./recurrence"
 
@@ -26,7 +27,7 @@ import { sameRecurrence } from "./recurrence"
 export function useTaskUpdate(task: TaskPublic) {
   // An update held back until the user says how far a new due date reaches.
   const [awaitingScope, setAwaitingScope] = useState<TaskUpdate | null>(null)
-  const queryClient = useQueryClient()
+  const reportChange = useReportChange()
   const { showErrorToast } = useCustomToast()
 
   const mutation = useMutation({
@@ -37,14 +38,7 @@ export function useTaskUpdate(task: TaskPublic) {
       setAwaitingScope(null)
       handleError.call(showErrorToast, error)
     },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["tasks"] })
-      // The panel reads the task by id, so the list's key does not cover it.
-      queryClient.invalidateQueries({ queryKey: ["task", task.id] })
-      // A tag typed here is new to the account, and one dropped off the last
-      // task carrying it is gone: autocomplete has to catch up either way.
-      queryClient.invalidateQueries({ queryKey: ["tags"] })
-    },
+    onSettled: () => reportChange({ type: "task changed", taskId: task.id }),
   })
 
   const save = (body: TaskUpdate) => {

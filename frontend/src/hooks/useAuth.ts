@@ -4,10 +4,14 @@ import { useNavigate } from "@tanstack/react-router"
 import {
   type Body_login_login_access_token as AccessToken,
   LoginService,
-  type UserPublic,
   type UserRegister,
   UsersService,
 } from "@/client"
+import {
+  clearServerState,
+  currentUserQuery,
+  useReportChange,
+} from "@/lib/serverState"
 import { handleError } from "@/utils"
 import useCustomToast from "./useCustomToast"
 
@@ -18,11 +22,11 @@ const isLoggedIn = () => {
 const useAuth = () => {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const reportChange = useReportChange()
   const { showErrorToast } = useCustomToast()
 
-  const { data: user } = useQuery<UserPublic | null, Error>({
-    queryKey: ["currentUser"],
-    queryFn: async () => (await UsersService.readUserMe()).data,
+  const { data: user } = useQuery({
+    ...currentUserQuery(),
     enabled: isLoggedIn(),
   })
 
@@ -34,7 +38,7 @@ const useAuth = () => {
     },
     onError: handleError.bind(showErrorToast),
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["users"] })
+      reportChange({ type: "users changed" })
     },
   })
 
@@ -55,6 +59,8 @@ const useAuth = () => {
 
   const logout = () => {
     localStorage.removeItem("access_token")
+    // The next account to sign in in this tab must not see this one's data.
+    clearServerState(queryClient)
     navigate({ to: "/login" })
   }
 

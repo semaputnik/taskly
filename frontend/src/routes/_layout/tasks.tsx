@@ -3,7 +3,7 @@ import { createFileRoute, Link as RouterLink } from "@tanstack/react-router"
 import { CheckSquare, SearchX } from "lucide-react"
 import { useState } from "react"
 
-import { ProjectsService, type TaskPublic, TasksService } from "@/client"
+import { type TaskPublic, TasksService } from "@/client"
 import { DataTable } from "@/components/Common/DataTable"
 import { EmptyState } from "@/components/Common/EmptyState"
 import { useRecordPanels, withoutPanelState } from "@/components/Records/panels"
@@ -22,6 +22,7 @@ import { buildTaskTree } from "@/components/Tasks/tree"
 import { Button } from "@/components/ui/button"
 import useAuth from "@/hooks/useAuth"
 import useCustomToast from "@/hooks/useCustomToast"
+import { projectsQuery, tasksQuery } from "@/lib/serverState"
 import { handleError } from "@/utils"
 
 const PAGE_SIZE = 25
@@ -36,9 +37,10 @@ const EMPTY: ReadonlySet<string> = new Set()
 // read, not scanned in order.
 const SORT_FIELDS = { due_date: "due_date", priority: "priority" }
 
-function getTasksQueryOptions(search: TaskListSearch, currentUserId?: string) {
-  const { assignee, page = 1, ...filters } = withoutPanelState(search)
-  const query = {
+/** What the list's filters ask the API for, before any paging. */
+function filtersQuery(search: TaskListSearch, currentUserId?: string) {
+  const { assignee, page: _page, ...filters } = withoutPanelState(search)
+  return {
     ...filters,
     // "Me" needs the id the API filters on, a bot user is named by its own
     // id, and "unassigned" is a flag of its own.
@@ -49,24 +51,6 @@ function getTasksQueryOptions(search: TaskListSearch, currentUserId?: string) {
           ? undefined
           : assignee,
     unassigned: assignee === "unassigned" ? true : undefined,
-    // The page the reader is on, asked for as such: a table that fetches a
-    // window and then pages it in the browser can only page what it fetched,
-    // and would report that window as the total.
-    skip: (page - 1) * PAGE_SIZE,
-    limit: PAGE_SIZE,
-  }
-  return {
-    queryFn: async () => (await TasksService.readTasks({ query })).data,
-    queryKey: ["tasks", query],
-  }
-}
-
-function getProjectsQueryOptions() {
-  return {
-    queryFn: async () =>
-      (await ProjectsService.readProjects({ query: { skip: 0, limit: 100 } }))
-        .data,
-    queryKey: ["projects"],
   }
 }
 
@@ -121,11 +105,19 @@ function Tasks() {
   // Filtering by "me" needs the id to filter on: listing before it arrives
   // would show everything, which is the opposite of what was asked for.
   const waitingForMe = search.assignee === "me" && !currentUser
+  const filters = filtersQuery(search, currentUser?.id)
   const { data: tasks, isPending } = useQuery({
-    ...getTasksQueryOptions(search, currentUser?.id),
+    ...tasksQuery({
+      ...filters,
+      // The page the reader is on, asked for as such: a table that fetches a
+      // window and then pages it in the browser can only page what it
+      // fetched, and would report that window as the total.
+      skip: (page - 1) * PAGE_SIZE,
+      limit: PAGE_SIZE,
+    }),
     enabled: !waitingForMe,
   })
-  const { data: projects } = useQuery(getProjectsQueryOptions())
+  const { data: projects } = useQuery(projectsQuery())
 
   const applyFilters = (next: Partial<TaskSearch>) =>
     // Any change to what is being shown returns to the first page: the page
@@ -193,13 +185,9 @@ function Tasks() {
             rows.length > 0 && rows.every((task) => selected.has(task.id))
           }
           onSelectAllMatching={async () => {
-            const { assignee: _assignee, ...rest } = getTasksQueryOptions(
-              search,
-              currentUser?.id,
-            ).queryKey[1] as Record<string, unknown>
             try {
               const all = await TasksService.readTasks({
-                query: { ...rest, skip: 0, limit: MAX_BATCH },
+                query: { ...filters, skip: 0, limit: MAX_BATCH },
               })
               setSelected(
                 () => new Set((all.data?.data ?? []).map((task) => task.id)),

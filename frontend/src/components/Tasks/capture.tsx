@@ -1,10 +1,11 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { useMutation } from "@tanstack/react-query"
 import { useEffect, useRef, useState } from "react"
 
 import { type TaskPublic, TasksService } from "@/client"
 import { Input } from "@/components/ui/input"
 import useAuth from "@/hooks/useAuth"
 import useCustomToast from "@/hooks/useCustomToast"
+import { useReportChange } from "@/lib/serverState"
 import { handleError } from "@/utils"
 import { draftToCreate, emptyDraft, type TaskDraft } from "./draft"
 
@@ -48,7 +49,7 @@ export function useTaskCapture(
   target: CaptureTarget,
   onCreated: (task: TaskPublic, stay: boolean) => void,
 ) {
-  const queryClient = useQueryClient()
+  const reportChange = useReportChange()
   const { showErrorToast } = useCustomToast()
   const { user: currentUser } = useAuth()
   // What a screen reader is told when a task is recorded. A refusal is a
@@ -75,9 +76,7 @@ export function useTaskCapture(
       setAnnouncement("")
       handleError.call(showErrorToast, error)
     },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["tasks"] })
-    },
+    onSettled: () => reportChange({ type: "task created" }),
   })
 
   return {

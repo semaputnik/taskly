@@ -1,6 +1,5 @@
 import { useQuery } from "@tanstack/react-query"
 
-import { ProjectsService } from "@/client"
 import { BotPanel } from "@/components/Bots/BotPanel"
 import { IssuedTokenProvider } from "@/components/Bots/IssuedToken"
 import { ProjectPanel } from "@/components/Projects/ProjectPanel"
@@ -10,6 +9,7 @@ import {
   useCaptureShortcut,
 } from "@/components/Tasks/capture"
 import { TaskDetail } from "@/components/Tasks/TaskDetail"
+import { projectsQuery } from "@/lib/serverState"
 import { useRecordPanels } from "./panels"
 
 /**
@@ -34,10 +34,7 @@ export function RecordPanels() {
   // Inbox rather than capturing into a project the API would refuse
   // (FR-05.12).
   const { data: projects } = useQuery({
-    queryKey: ["projects"],
-    queryFn: async () =>
-      (await ProjectsService.readProjects({ query: { skip: 0, limit: 100 } }))
-        .data,
+    ...projectsQuery(),
     enabled: capturing === "task" || Boolean(filteredProjectId),
   })
 

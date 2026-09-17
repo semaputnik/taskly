@@ -1,12 +1,7 @@
 import { useQuery } from "@tanstack/react-query"
 import { Link as RouterLink } from "@tanstack/react-router"
 
-import {
-  ActivityService,
-  type BotUserPublic,
-  type TaskPublic,
-  TasksService,
-} from "@/client"
+import type { BotUserPublic, TaskPublic } from "@/client"
 import { ActivityDescription } from "@/components/Activity/ActivityDescription"
 import { useRecordPanels } from "@/components/Records/panels"
 import { OPEN_STATUSES, StatusGlyph } from "@/components/Tasks/status"
@@ -14,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import useAuth from "@/hooks/useAuth"
 import { formatDay } from "@/lib/dates"
+import { activityQuery, tasksQuery } from "@/lib/serverState"
 import { ago } from "./health"
 
 /**
@@ -59,11 +55,7 @@ export function BotConsole({ bot }: { bot: BotUserPublic }) {
 function BotActivity({ bot }: { bot: BotUserPublic }) {
   const { user: currentUser } = useAuth()
   const query = { actor_bot_user_id: bot.id, skip: 0, limit: PREVIEW }
-  const { data, isPending } = useQuery({
-    queryKey: ["activity", query],
-    queryFn: async () =>
-      (await ActivityService.readActivityLog({ query })).data,
-  })
+  const { data, isPending } = useQuery(activityQuery(query))
 
   if (isPending || !data) return <PreviewSkeleton />
 
@@ -121,10 +113,7 @@ function BotTasks({ bot }: { bot: BotUserPublic }) {
     skip: 0,
     limit: PREVIEW,
   }
-  const { data, isPending } = useQuery({
-    queryKey: ["tasks", query],
-    queryFn: async () => (await TasksService.readTasks({ query })).data,
-  })
+  const { data, isPending } = useQuery(tasksQuery(query))
 
   if (isPending || !data) return <PreviewSkeleton />
 

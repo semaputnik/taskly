@@ -3,22 +3,13 @@ import { createFileRoute } from "@tanstack/react-router"
 import { FolderKanban, Plus } from "lucide-react"
 import { Suspense } from "react"
 
-import { ProjectsService } from "@/client"
 import { DataTable } from "@/components/Common/DataTable"
 import { EmptyState } from "@/components/Common/EmptyState"
 import PendingProjects from "@/components/Pending/PendingProjects"
 import { columns } from "@/components/Projects/columns"
 import { useRecordPanels } from "@/components/Records/panels"
 import { Button } from "@/components/ui/button"
-
-function getProjectsQueryOptions() {
-  return {
-    queryFn: async () =>
-      (await ProjectsService.readProjects({ query: { skip: 0, limit: 100 } }))
-        .data,
-    queryKey: ["projects"],
-  }
-}
+import { projectsQuery } from "@/lib/serverState"
 
 export const Route = createFileRoute("/_layout/projects")({
   component: Projects,
@@ -38,7 +29,7 @@ function ProjectsTableContent({
   onOpen: (projectId: string) => void
   onAdd: () => void
 }) {
-  const { data: projects } = useSuspenseQuery(getProjectsQueryOptions())
+  const { data: projects } = useSuspenseQuery(projectsQuery())
 
   return (
     <DataTable

@@ -3,27 +3,14 @@ import { createFileRoute } from "@tanstack/react-router"
 import { Plus, Tag } from "lucide-react"
 import { Suspense } from "react"
 
-import { TagsService } from "@/client"
 import { DataTable } from "@/components/Common/DataTable"
 import { EmptyState } from "@/components/Common/EmptyState"
 import PendingTags from "@/components/Pending/PendingTags"
 import { useRecordPanels } from "@/components/Records/panels"
 import { columns } from "@/components/Tags/columns"
-import {
-  DuplicateGroups,
-  duplicatesQueryOptions,
-} from "@/components/Tags/DuplicateGroups"
+import { DuplicateGroups } from "@/components/Tags/DuplicateGroups"
 import { Button } from "@/components/ui/button"
-
-// Under "tags", so creating, renaming and deleting refresh autocomplete and the
-// tag filter along with this page.
-function getTagsQueryOptions() {
-  const query = { skip: 0, limit: 100 }
-  return {
-    queryFn: async () => (await TagsService.readTags({ query })).data,
-    queryKey: ["tags", "all", query],
-  }
-}
+import { tagDuplicatesQuery, tagsQuery } from "@/lib/serverState"
 
 export const Route = createFileRoute("/_layout/tags")({
   component: Tags,
@@ -43,7 +30,7 @@ function TagsTableContent({
   onOpen: (tagId: string) => void
   onAdd: () => void
 }) {
-  const { data: tags } = useSuspenseQuery(getTagsQueryOptions())
+  const { data: tags } = useSuspenseQuery(tagsQuery())
 
   return (
     <DataTable
@@ -71,8 +58,8 @@ function Tags() {
   const { openTag, capture } = useRecordPanels()
   // Both requests start now, side by side, rather than one after the other as
   // each suspends in turn.
-  usePrefetchQuery(getTagsQueryOptions())
-  usePrefetchQuery(duplicatesQueryOptions)
+  usePrefetchQuery(tagsQuery())
+  usePrefetchQuery(tagDuplicatesQuery())
 
   return (
     <div className="flex flex-col gap-6">

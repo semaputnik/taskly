@@ -2,7 +2,6 @@ import { useQuery } from "@tanstack/react-query"
 import { Check, Plus, X } from "lucide-react"
 import { useEffect, useState } from "react"
 
-import { TagsService } from "@/client"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -18,6 +17,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover"
 import { useDebouncedValue } from "@/hooks/useDebouncedValue"
+import { nearTagsQuery, tagSearchQuery } from "@/lib/serverState"
 import { cn } from "@/lib/utils"
 
 /**
@@ -71,15 +71,7 @@ export function TagPickerContent({
 
   // The server narrows the list: with many tags, fetching a page and
   // filtering it here would quietly stop offering the match further down.
-  const { data: tags } = useQuery({
-    queryKey: ["tags", name],
-    queryFn: async () =>
-      (
-        await TagsService.readTags({
-          query: { q: name || undefined, skip: 0, limit: 100 },
-        })
-      ).data,
-  })
+  const { data: tags } = useQuery(tagSearchQuery(name))
   const names = (tags?.data ?? []).map((tag) => tag.name)
   // Tag names match exactly, as the server matches them. Until the answer for
   // this very name is in, nothing is offered for creation.
@@ -90,13 +82,7 @@ export function TagPickerContent({
   // asked once typing pauses, and only when the name is not a tag already.
   const settled = useDebouncedValue(name, 250)
   const { data: near } = useQuery({
-    queryKey: ["tags", "near", settled],
-    queryFn: async () =>
-      (
-        await TagsService.readTags({
-          query: { near: settled, skip: 0, limit: 5 },
-        })
-      ).data,
+    ...nearTagsQuery(settled),
     enabled: Boolean(settled) && settled === name && answered && !exact,
   })
   const nearMatches =

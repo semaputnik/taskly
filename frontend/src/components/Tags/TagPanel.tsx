@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { useMutation, useQuery } from "@tanstack/react-query"
 import { Bot, CheckSquare, Merge } from "lucide-react"
 import { useState } from "react"
 
@@ -16,12 +16,16 @@ import {
 } from "@/components/Records/RecordPanel"
 import { Button } from "@/components/ui/button"
 import useCustomToast from "@/hooks/useCustomToast"
+import {
+  tagQuery,
+  tagVocabularyQuery,
+  useReportChange,
+} from "@/lib/serverState"
 import { handleError, isTagExistsError } from "@/utils"
 import { BotCreator } from "./BotCreator"
 import DeleteTag from "./DeleteTag"
 import { MergeTags } from "./MergeTags"
 import { TaskCount } from "./TaskCount"
-import { useVocabulary } from "./vocabulary"
 
 /**
  * A tag as a record: its name, what carries it, and the two ways to make it
@@ -43,12 +47,7 @@ export function TagPanel({
   onCreated: (tag: TagPublic) => void
   onOpenTag: (tagId: string) => void
 }) {
-  const query = useQuery({
-    queryKey: ["tag", tagId],
-    queryFn: async () =>
-      (await TagsService.readTag({ path: { tag_id: tagId as string } })).data,
-    enabled: Boolean(tagId),
-  })
+  const query = useQuery(tagQuery(tagId))
   const tag = query.data
   // A merge being considered from this panel, and the tag it was offered with
   // when a rename ran into that tag's name.
@@ -91,7 +90,7 @@ export function TagPanel({
               data: TagPublic
             }>
           }
-          invalidate={["tags"]}
+          change={{ type: "tag created" }}
           onCreated={onCreated}
         />
       ) : tag ? (
@@ -128,7 +127,7 @@ function TagMerge({
   onClose: () => void
   onMerged: (survivor: TagPublic) => void
 }) {
-  const { data: vocabulary } = useVocabulary()
+  const { data: vocabulary } = useQuery(tagVocabularyQuery())
   return (
     <MergeTags
       tags={offered ? [tag, offered] : [tag]}
@@ -148,19 +147,15 @@ function TagRecord({
   tag: TagPublic
   onNameTaken: (taken: TagPublic) => void
 }) {
-  const queryClient = useQueryClient()
+  const reportChange = useReportChange()
   const { showErrorToast } = useCustomToast()
 
   const rename = useMutation({
     mutationFn: (name: string) =>
       TagsService.renameTag({ path: { tag_id: tag.id }, body: { name } }),
     onError: handleError.bind(showErrorToast),
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["tags"] })
-      queryClient.invalidateQueries({ queryKey: ["tag", tag.id] })
-      // Renaming a tag renames it on every task carrying it (FR-01.24).
-      queryClient.invalidateQueries({ queryKey: ["tasks"] })
-    },
+    // Renaming a tag renames it on every task carrying it (FR-01.24).
+    onSettled: () => reportChange({ type: "tag changed" }),
   })
 
   return (
