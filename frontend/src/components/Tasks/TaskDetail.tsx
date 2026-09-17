@@ -20,6 +20,9 @@ import { TaskComments } from "./TaskComments"
 import { TaskProperties } from "./TaskProperties"
 import { useTaskUpdate } from "./useTaskUpdate"
 
+/** More than a panel should list; past it, the tab says how many there are. */
+const SUBTASK_LIMIT = 100
+
 interface TaskDetailProps {
   /** The task to show, or null for a closed panel. */
   taskId: string | null
@@ -78,24 +81,31 @@ export function TaskDetail({
         .data,
     enabled: Boolean(taskId),
   })
-  // Subtasks are not a nested field, so the panel finds this task's children
-  // in the list.
-  const { data: all } = useQuery({
-    queryKey: ["tasks", { skip: 0, limit: 200 }],
+  // Subtasks are not a nested field, so the panel asks for this task's
+  // children alone. Under "tasks", so every change to a task refreshes them.
+  const subtaskQuery = { parent_id: taskId, limit: SUBTASK_LIMIT }
+  const { data: subtasks } = useQuery({
+    queryKey: ["tasks", subtaskQuery],
     queryFn: async () =>
-      (await TasksService.readTasks({ query: { skip: 0, limit: 200 } })).data,
+      (await TasksService.readTasks({ query: subtaskQuery })).data,
     enabled: Boolean(taskId),
+  })
+  // The parent by its own address, which is also where its panel reads it,
+  // so following the breadcrumb opens it from the cache.
+  const parentId = task?.parent_id
+  const { data: parent } = useQuery({
+    queryKey: ["task", parentId],
+    queryFn: async () =>
+      (await TasksService.readTask({ path: { task_id: parentId as string } }))
+        .data,
+    enabled: Boolean(parentId),
   })
 
   const projectName = task
     ? projects?.data.find((p) => p.id === task.project_id)?.name
     : undefined
-  const parent = task?.parent_id
-    ? all?.data.find((t) => t.id === task.parent_id)
-    : undefined
-  const children: TaskPublic[] = task
-    ? (all?.data ?? []).filter((t) => t.parent_id === task.id)
-    : []
+  const children: TaskPublic[] = subtasks?.data ?? []
+  const childCount = subtasks?.count ?? 0
 
   return (
     <RecordPanel
@@ -159,9 +169,9 @@ export function TaskDetail({
               <TabsTrigger value="comments">Comments</TabsTrigger>
               <TabsTrigger value="subtasks">
                 Subtasks
-                {children.length > 0 && (
+                {childCount > 0 && (
                   <span className="text-muted-foreground tabular-nums">
-                    {children.length}
+                    {childCount}
                   </span>
                 )}
               </TabsTrigger>
@@ -203,6 +213,11 @@ export function TaskDetail({
               ) : (
                 <p className="text-muted-foreground text-sm italic">
                   No subtasks yet.
+                </p>
+              )}
+              {childCount > children.length && (
+                <p className="text-muted-foreground text-sm">
+                  Showing the first {children.length} of {childCount} subtasks.
                 </p>
               )}
               {/* Adding a subtask belongs with the subtasks, not in a menu
@@ -251,7 +266,7 @@ function SubtaskCapture({ parent }: { parent: TaskPublic }) {
   const capture = useTaskCapture(
     { parentId: parent.id, projectName: "Follows its parent task" },
     () => {
-      // The panel finds its children in the task list, so that is what has to
+      // The panel's children are a task list query, so that is what has to
       // catch up; the reader is not moved onto the child.
       queryClient.invalidateQueries({ queryKey: ["tasks"] })
     },

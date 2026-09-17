@@ -58,6 +58,14 @@ const queryClient = new QueryClient({
   }),
 })
 
+// The signed-in account changes only through its own settings, which
+// invalidate it, so every screen that mounts does not have to ask again. The
+// project list is shorter-lived: its task counts move when a bot user files
+// work. A few seconds still spare the burst of requests a panel or a screen
+// makes as its parts mount one after another.
+queryClient.setQueryDefaults(["currentUser"], { staleTime: 5 * 60 * 1000 })
+queryClient.setQueryDefaults(["projects"], { staleTime: 10 * 1000 })
+
 const router = createRouter({ routeTree })
 declare module "@tanstack/react-router" {
   interface Register {

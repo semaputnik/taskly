@@ -195,6 +195,10 @@ def read_tasks(
         authorization.get_project(session, caller, query.project_id)
     else:
         authorization.authorize_tasks(caller, TaskAction.READ)
+    if query.parent_id is not None:
+        # Likewise for a parent: a task the caller cannot read is not a task
+        # without subtasks.
+        authorization.get_task(session, caller, query.parent_id, TaskAction.READ)
 
     tasks, count = crud.get_tasks(
         session=session,

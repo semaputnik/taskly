@@ -417,6 +417,9 @@ class TaskQuery(SQLModel):
     # A subtask holds no project of its own, so this matches on the project the
     # task resolves to, not on the column.
     project_id: uuid.UUID | None = None
+    # The direct subtasks of one task: the panel lists a task's children
+    # without fetching the whole list to find them.
+    parent_id: uuid.UUID | None = None
     assignee_id: uuid.UUID | None = None
     # The other half of the assignee filter: tasks with nobody on them.
     unassigned: bool = False

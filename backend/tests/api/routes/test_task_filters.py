@@ -391,3 +391,32 @@ def test_an_unknown_project_filter_is_refused(client: TestClient, db: Session) -
         params={"project_id": str(uuid.uuid4())},
     )
     assert r.status_code == 404
+
+
+def test_filter_by_parent_lists_only_its_direct_subtasks(
+    client: TestClient, db: Session
+) -> None:
+    headers = _headers_for_new_user(client, db)
+    root = _create_task(client, headers, "Root")
+    child = _create_task(client, headers, "Child", parent_id=root["id"])
+    _create_task(client, headers, "Grandchild", parent_id=child["id"])
+    _create_task(client, headers, "Unrelated")
+
+    assert _titles(client, headers, parent_id=root["id"]) == ["Child"]
+    assert _titles(client, headers, parent_id=child["id"]) == ["Grandchild"]
+
+
+def test_filter_by_another_users_task_as_parent_is_refused(
+    client: TestClient, db: Session
+) -> None:
+    headers_a = _headers_for_new_user(client, db)
+    headers_b = _headers_for_new_user(client, db)
+    parent = _create_task(client, headers_b, "B's task")
+    _create_task(client, headers_b, "B's subtask", parent_id=parent["id"])
+
+    r = client.get(
+        f"{settings.API_V1_STR}/tasks/",
+        headers=headers_a,
+        params={"parent_id": parent["id"]},
+    )
+    assert r.status_code == 404

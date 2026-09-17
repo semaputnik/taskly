@@ -530,6 +530,9 @@ def _task_filters(*, owner_id: uuid.UUID, query: TaskQuery) -> list[Any]:
     if query.project_id is not None:
         conditions.append(col(Task.id).in_(project_task_ids(query.project_id)))
 
+    if query.parent_id is not None:
+        conditions.append(col(Task.parent_id) == query.parent_id)
+
     if query.unassigned:
         conditions.append(col(Task.assignee_id).is_(None))
         conditions.append(col(Task.assignee_bot_user_id).is_(None))
