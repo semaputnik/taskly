@@ -378,6 +378,41 @@ def test_a_batch_that_completes_a_recurring_task_moves_its_series_on(
     assert len(open_ones) == 1
     assert open_ones[0]["due_date"] == "2026-03-09"
 
+    # The batch is one entry, and the occurrence it created is logged as a
+    # single completion logs it: a creation with a named author (FR-10.3).
+    log = _log(client, owner)
+    me = client.get(f"{API}/users/me", headers=owner).json()["id"]
+    [batch] = [e for e in log if e["action"] == "tasks_bulk_changed"]
+    assert batch["details"]["task_ids"] == [task_id]
+    [created] = [
+        e
+        for e in log
+        if e["action"] == "task_created" and e["entity_id"] == open_ones[0]["id"]
+    ]
+    assert created["details"]["title"] == "Water the plants"
+    assert created["actor_id"] == me
+    assert created["actor_bot_user_id"] is None
+
+
+def test_a_batch_completion_logs_no_entry_per_swept_subtask(
+    client: TestClient, owner: Headers
+) -> None:
+    project_id = create_project(client, owner)
+    root = create_task(client, owner, project_id=project_id, title="Move house")
+    subtasks = [
+        create_task(client, owner, parent_id=root, title=f"Pack box {index}")
+        for index in range(2)
+    ]
+    before = {entry["id"] for entry in _log(client, owner)}
+
+    r = _bulk(client, owner, task_ids=[root], status="done", subtasks="complete")
+    assert r.status_code == 200, r.text
+
+    assert all(_task(client, owner, task)["status"] == "done" for task in subtasks)
+    new = [entry for entry in _log(client, owner) if entry["id"] not in before]
+    assert [entry["action"] for entry in new] == ["tasks_bulk_changed"]
+    assert new[0]["details"]["task_ids"] == [root]
+
 
 def test_restoring_a_batch_is_recorded_as_its_own_act(
     client: TestClient, owner: Headers

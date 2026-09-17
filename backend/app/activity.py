@@ -309,12 +309,15 @@ def _write(session: Session) -> None:
         if merge is not None:
             # A merge rewrites tags and nothing else; its entry says so once.
             continue
-        if batch is not None:
+        if batch is not None and before is not None:
             # The subtasks a completion swept along are part of the same act,
             # and are not counted as tasks the reader picked.
             if task_id in batch[1]:
                 batched.append(task_id)
             continue
+        # What the transaction created is logged as a single change would log
+        # it, batch or not: the next occurrence a completion brings into being
+        # is a new task, and has a named author like any other (FR-10.3).
         entries.extend(_task_entries(task_id, before, state, refs))
 
     if batch is not None and batched:
