@@ -185,7 +185,7 @@ export function TaskDetail({
                         type="button"
                         onClick={() => onOpenTask(child.id)}
                         className={`min-w-0 flex-1 truncate text-left text-sm underline-offset-4 hover:underline ${
-                          child.completed
+                          child.status === "done"
                             ? "text-muted-foreground line-through"
                             : ""
                         }`}

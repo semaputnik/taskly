@@ -458,12 +458,13 @@ export class TasksService {
     /**
      * Update Task
      *
-     * Update a task: its fields, completion state, assignee, or project.
+     * Update a task: its fields, status, assignee, or project.
      *
-     * Completing a task that still has uncompleted subtasks is refused unless the
-     * request says what happens to them, through `subtasks`.
+     * Moving a task to done while it still has open subtasks is refused unless
+     * the request says what happens to them, through `subtasks`. Moving between
+     * open statuses never touches the subtasks.
      *
-     * Completing an occurrence of a recurring task creates the next one. Moving
+     * Moving an occurrence of a recurring task to done creates the next one. Moving
      * the due date of an open occurrence needs `due_date_scope` to say whether
      * the rest of the series moves with it.
      *

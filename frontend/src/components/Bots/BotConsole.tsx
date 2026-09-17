@@ -147,7 +147,9 @@ function BotTasks({ bot }: { bot: BotUserPublic }) {
             >
               <span
                 className={`min-w-0 flex-1 truncate ${
-                  task.completed ? "text-muted-foreground line-through" : ""
+                  task.status === "done"
+                    ? "text-muted-foreground line-through"
+                    : ""
                 }`}
               >
                 {task.title}

@@ -35,10 +35,10 @@ export function getColumns(
           {readOnly ? (
             <Checkbox
               className="rounded-full"
-              checked={row.original.completed}
+              checked={row.original.status === "done"}
               disabled
               aria-label={
-                row.original.completed ? "Completed" : "Not completed"
+                row.original.status === "done" ? "Completed" : "Not completed"
               }
             />
           ) : (
@@ -57,7 +57,8 @@ export function getColumns(
           <span
             className={cn(
               "font-medium",
-              row.original.completed && "line-through text-muted-foreground",
+              row.original.status === "done" &&
+                "line-through text-muted-foreground",
             )}
           >
             {row.original.title}

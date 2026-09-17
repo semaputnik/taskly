@@ -59,7 +59,7 @@ def _complete(
     return client.patch(
         f"{settings.API_V1_STR}/tasks/{task_id}",
         headers=headers,
-        json={"completed": True, **fields},
+        json={"status": "done", **fields},
     )
 
 
@@ -95,16 +95,16 @@ def test_subtask_is_a_full_task(client: TestClient, db: Session) -> None:
     assert subtask["description"] == "Details"
     assert subtask["due_date"] == "2026-01-01"
     assert subtask["priority"] == "P1"
-    assert subtask["completed"] is False
+    assert subtask["status"] == "todo"
 
     r = client.patch(
         f"{settings.API_V1_STR}/tasks/{subtask['id']}",
         headers=headers,
-        json={"title": "Renamed subtask", "completed": True},
+        json={"title": "Renamed subtask", "status": "done"},
     )
     assert r.status_code == 200
     assert r.json()["title"] == "Renamed subtask"
-    assert r.json()["completed"] is True
+    assert r.json()["status"] == "done"
 
 
 def test_subtask_resolves_to_the_project_of_its_root_ancestor(
@@ -228,7 +228,7 @@ def test_completing_a_task_with_uncompleted_subtasks_is_refused(
     r = _complete(client, headers, root["id"])
     assert r.status_code == 409
     assert r.json()["detail"]["code"] == "task_has_uncompleted_subtasks"
-    assert _read_task(client, headers, root["id"])["completed"] is False
+    assert _read_task(client, headers, root["id"])["status"] == "todo"
 
 
 def test_refusal_looks_at_the_whole_subtree(client: TestClient, db: Session) -> None:
@@ -243,7 +243,7 @@ def test_refusal_looks_at_the_whole_subtree(client: TestClient, db: Session) -> 
     r = _complete(client, headers, root["id"])
     assert r.status_code == 409
     assert r.json()["detail"]["code"] == "task_has_uncompleted_subtasks"
-    assert _read_task(client, headers, grandchild["id"])["completed"] is False
+    assert _read_task(client, headers, grandchild["id"])["status"] == "todo"
 
 
 def test_refusal_is_distinct_from_other_client_errors(
@@ -274,10 +274,10 @@ def test_completing_with_subtasks_left_uncompleted(
 
     r = _complete(client, headers, root["id"], subtasks="leave_uncompleted")
     assert r.status_code == 200
-    assert r.json()["completed"] is True
+    assert r.json()["status"] == "done"
 
-    assert _read_task(client, headers, child["id"])["completed"] is False
-    assert _read_task(client, headers, grandchild["id"])["completed"] is False
+    assert _read_task(client, headers, child["id"])["status"] == "todo"
+    assert _read_task(client, headers, grandchild["id"])["status"] == "todo"
 
 
 def test_completing_with_subtasks_completed_too(
@@ -290,10 +290,10 @@ def test_completing_with_subtasks_completed_too(
 
     r = _complete(client, headers, root["id"], subtasks="complete")
     assert r.status_code == 200
-    assert r.json()["completed"] is True
+    assert r.json()["status"] == "done"
 
-    assert _read_task(client, headers, child["id"])["completed"] is True
-    assert _read_task(client, headers, grandchild["id"])["completed"] is True
+    assert _read_task(client, headers, child["id"])["status"] == "done"
+    assert _read_task(client, headers, grandchild["id"])["status"] == "done"
 
 
 def test_completing_every_subtask_leaves_the_parent_uncompleted(
@@ -308,7 +308,7 @@ def test_completing_every_subtask_leaves_the_parent_uncompleted(
         r = _complete(client, headers, task["id"])
         assert r.status_code == 200
 
-    assert _read_task(client, headers, root["id"])["completed"] is False
+    assert _read_task(client, headers, root["id"])["status"] == "todo"
 
 
 def test_completing_a_parent_whose_subtasks_are_done_needs_no_directive(
@@ -321,7 +321,7 @@ def test_completing_a_parent_whose_subtasks_are_done_needs_no_directive(
 
     r = _complete(client, headers, root["id"])
     assert r.status_code == 200
-    assert r.json()["completed"] is True
+    assert r.json()["status"] == "done"
 
 
 def test_returning_a_task_to_not_completed_is_never_refused(
@@ -335,10 +335,10 @@ def test_returning_a_task_to_not_completed_is_never_refused(
     r = client.patch(
         f"{settings.API_V1_STR}/tasks/{root['id']}",
         headers=headers,
-        json={"completed": False},
+        json={"status": "todo"},
     )
     assert r.status_code == 200
-    assert r.json()["completed"] is False
+    assert r.json()["status"] == "todo"
 
 
 def test_editing_a_parent_without_completing_it_is_never_refused(

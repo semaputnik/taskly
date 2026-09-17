@@ -244,7 +244,7 @@ def test_an_archived_project_refuses_every_write_whatever_the_bot_holds(
         lambda: client.patch(
             f"{API}/tasks/{root}",
             headers=bot,
-            json={"completed": True, "subtasks": "complete"},
+            json={"status": "done", "subtasks": "complete"},
         ),
         lambda: client.delete(
             f"{API}/tasks/{root}", headers=bot, params={"delete_subtasks": True}
@@ -325,7 +325,7 @@ def test_every_change_a_bot_makes_is_logged_as_the_bots(
     task_id = client.post(
         f"{API}/tasks/", headers=bot, json={"title": "Ship", "project_id": project_id}
     ).json()["id"]
-    r = client.patch(f"{API}/tasks/{task_id}", headers=bot, json={"completed": True})
+    r = client.patch(f"{API}/tasks/{task_id}", headers=bot, json={"status": "done"})
     assert r.status_code == 200, r.text
     r = client.delete(f"{API}/tasks/{task_id}", headers=bot)
     assert r.status_code == 200, r.text

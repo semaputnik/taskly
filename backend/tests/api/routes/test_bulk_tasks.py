@@ -134,8 +134,8 @@ def test_a_batch_completes_and_moves(client: TestClient, owner: Headers) -> None
         "Task 1",
     ]
 
-    assert _bulk(client, owner, task_ids=ids, completed=True).status_code == 200
-    assert all(_task(client, owner, task_id)["completed"] for task_id in ids)
+    assert _bulk(client, owner, task_ids=ids, status="done").status_code == 200
+    assert all(_task(client, owner, task_id)["status"] == "done" for task_id in ids)
 
 
 # --- Whose tasks, and which of them ---------------------------------------------
@@ -202,14 +202,14 @@ def test_a_batch_refuses_completing_a_task_with_open_subtasks(
     root = create_task(client, owner, title="Root")
     create_task(client, owner, parent_id=root, title="Subtask")
 
-    r = _bulk(client, owner, task_ids=[root], completed=True)
+    r = _bulk(client, owner, task_ids=[root], status="done")
     assert r.status_code == 409
     assert _refusals(r) == {root: "task_has_uncompleted_subtasks"}
 
     # Saying what happens to them lets the batch through.
-    r = _bulk(client, owner, task_ids=[root], completed=True, subtasks="complete")
+    r = _bulk(client, owner, task_ids=[root], status="done", subtasks="complete")
     assert r.status_code == 200, r.text
-    assert _task(client, owner, root)["completed"] is True
+    assert _task(client, owner, root)["status"] == "done"
 
 
 def test_a_bot_user_cannot_change_tasks_in_a_batch(
@@ -368,12 +368,12 @@ def test_a_batch_that_completes_a_recurring_task_moves_its_series_on(
     assert r.status_code == 200, r.text
     task_id = r.json()["id"]
 
-    assert _bulk(client, owner, task_ids=[task_id], completed=True).status_code == 200
+    assert _bulk(client, owner, task_ids=[task_id], status="done").status_code == 200
 
     open_ones = [
         task
         for task in client.get(f"{API}/tasks/", headers=owner).json()["data"]
-        if task["title"] == "Water the plants" and not task["completed"]
+        if task["title"] == "Water the plants" and task["status"] != "done"
     ]
     assert len(open_ones) == 1
     assert open_ones[0]["due_date"] == "2026-03-09"
@@ -408,7 +408,7 @@ def test_a_batch_counts_the_tasks_that_were_selected(
     root = create_task(client, owner, title="Root")
     create_task(client, owner, parent_id=root, title="Subtask")
 
-    r = _bulk(client, owner, task_ids=[root], completed=True, subtasks="complete")
+    r = _bulk(client, owner, task_ids=[root], status="done", subtasks="complete")
     assert r.status_code == 200, r.text
     assert r.json()["updated"] == 1
 

@@ -49,6 +49,7 @@ from app.models import (
     TaskPriority,
     TaskQuery,
     TaskSort,
+    TaskStatus,
     TaskTag,
     TaskUpdate,
     User,
@@ -207,8 +208,8 @@ def update_task(
     Apply an update to a task, including what it means for the task's series,
     and commit it as one transaction.
 
-    Completing an occurrence of a recurring task creates the next one here, in
-    the same commit as the completion (FR-01.14): there is never a moment with
+    Moving an occurrence of a recurring task to done creates the next one here,
+    in the same commit as the move (FR-01.14): there is never a moment with
     the series left with no open occurrence, or with two.
     """
     # The directives steer what happens around the row (the subtree, the
@@ -224,7 +225,7 @@ def update_task(
     if assignee is not None:
         task_data["assignee_id"] = assignee.user_id
         task_data["assignee_bot_user_id"] = assignee.bot_user_id
-    was_completed = db_task.completed
+    was_done = db_task.status is TaskStatus.DONE
 
     db_task.sqlmodel_update(task_data)
     session.add(db_task)
@@ -239,14 +240,18 @@ def update_task(
     ):
         _stage_reanchor(session=session, task=db_task)
 
-    # The completion has to reach the database before the next occurrence
+    # The move to done has to reach the database before the next occurrence
     # does: only one open occurrence per series is ever allowed to exist.
     session.flush()
 
     if tag_names is not None:
         _stage_task_tags(session=session, task=db_task, names=tag_names)
 
-    if db_task.completed and not was_completed and db_task.series_id is not None:
+    if (
+        db_task.status is TaskStatus.DONE
+        and not was_done
+        and db_task.series_id is not None
+    ):
         _stage_next_occurrence(session=session, task=db_task)
 
     session.commit()
@@ -303,7 +308,7 @@ def shift_date(start: date, recurrence: Recurrence, intervals: int) -> date:
 def is_superseded(*, session: Session, task: Task) -> bool:
     """
     Whether a later occurrence of the task's series already exists. Only the
-    latest occurrence can be open, so only it can be returned to not completed.
+    latest occurrence can be open, so only it can be moved out of done.
     """
     if task.series_id is None or task.series_step is None:
         return False
@@ -380,8 +385,8 @@ def _stage_next_occurrence(*, session: Session, task: Task) -> Task:
 
     Its due date comes from the series' schedule, not from `task`'s own date,
     so an occurrence moved on its own leaves the rest where they were
-    (FR-01.15, FR-01.18). The subtask tree comes along with every subtask not
-    completed; comments and attachments stay with the occurrence they were
+    (FR-01.15, FR-01.18). The subtask tree comes along with every subtask back
+    in to do; comments and attachments stay with the occurrence they were
     about.
     """
     assert task.due_date is not None and task.series_step is not None
@@ -422,7 +427,7 @@ def _stage_copy(
     project_id: uuid.UUID | None,
     due_date: date | None,
 ) -> Task:
-    """A not-completed copy of `source`'s own fields and tags, and nothing else."""
+    """A to-do copy of `source`'s own fields and tags, and nothing else."""
     copy = Task(
         title=source.title,
         description=source.description,
@@ -558,8 +563,8 @@ def _task_filters(*, owner_id: uuid.UUID, query: TaskQuery) -> list[Any]:
         else:
             conditions.append(Task.priority == query.priority)
 
-    if query.completed is not None:
-        conditions.append(Task.completed == query.completed)
+    if query.status:
+        conditions.append(col(Task.status).in_(query.status))
 
     if query.due_from is not None:
         conditions.append(col(Task.due_date) >= query.due_from)
@@ -567,6 +572,7 @@ def _task_filters(*, owner_id: uuid.UUID, query: TaskQuery) -> list[Any]:
         conditions.append(col(Task.due_date) <= query.due_to)
     if query.overdue:
         conditions.append(col(Task.due_date) < date.today())
+        conditions.append(is_open(Task))
 
     return conditions
 
@@ -937,6 +943,11 @@ def _tags_for_names(
     return tags
 
 
+def is_open(model: type[Task]) -> Any:
+    """The filter for tasks that are not done (FR-01.4)."""
+    return col(model.status) != TaskStatus.DONE
+
+
 def not_deleted(model: type[Task] | type[Project]) -> Any:
     """
     The filter every normal query needs: a deletion marks a row instead of
@@ -949,20 +960,20 @@ def not_deleted(model: type[Task] | type[Project]) -> Any:
 def _subtree_cte(root_id: uuid.UUID) -> Any:
     """
     Every descendant of `root_id` that is not deleted, to any depth, as
-    (id, completed) rows.
+    (id, status) rows.
 
     Deleted subtasks are left out: they carry their own deletion event, and a
     deletion always takes a whole subtree, so nothing that is still there hides
     under a deleted one.
     """
     subtree = (
-        select(Task.id, Task.completed)
+        select(Task.id, Task.status)
         .where(Task.parent_id == root_id, not_deleted(Task))
         .cte("subtree", recursive=True)
     )
     child = aliased(Task)
     return subtree.union_all(
-        select(child.id, child.completed)
+        select(child.id, child.status)
         .join(subtree, col(child.parent_id) == subtree.c.id)
         .where(not_deleted(child))
     )
@@ -1070,12 +1081,12 @@ def project_public(project: Project, task_count: int = 0) -> ProjectPublic:
     return ProjectPublic.model_validate(project, update={"task_count": task_count})
 
 
-def has_uncompleted_subtasks(*, session: Session, task: Task) -> bool:
+def has_open_subtasks(*, session: Session, task: Task) -> bool:
     """
-    Whether anything under the task, at any depth, is still not completed.
+    Whether anything under the task, at any depth, is still open.
     """
     subtree = _subtree_cte(task.id)
-    statement = select(subtree.c.id).where(subtree.c.completed.is_(False)).limit(1)
+    statement = select(subtree.c.id).where(subtree.c.status != TaskStatus.DONE).limit(1)
     return session.exec(statement).first() is not None
 
 
@@ -1122,16 +1133,23 @@ def bulk_update_tasks(
         fields["assignee_bot_user_id"] = assignee.bot_user_id
 
     for task in tasks:
-        if changes.completed is True and changes.subtasks is SubtaskCompletion.COMPLETE:
+        if (
+            changes.status is TaskStatus.DONE
+            and changes.subtasks is SubtaskCompletion.COMPLETE
+        ):
             complete_subtasks(session=session, task=task)
-        was_completed = task.completed
+        was_done = task.status is TaskStatus.DONE
         task.sqlmodel_update(fields)
         session.add(task)
-        # Completing an occurrence of a recurring task creates the next one,
-        # in the same transaction, so a series is never left with no open
-        # occurrence — a batch completes exactly as a single task does
+        # Moving an occurrence of a recurring task to done creates the next
+        # one, in the same transaction, so a series is never left with no open
+        # occurrence — a batch closes a task exactly as a single update does
         # (FR-01.14).
-        if task.completed and not was_completed and task.series_id is not None:
+        if (
+            task.status is TaskStatus.DONE
+            and not was_done
+            and task.series_id is not None
+        ):
             _stage_next_occurrence(session=session, task=task)
         if changes.add_tags or changes.remove_tags:
             _stage_tag_changes(
@@ -1232,13 +1250,13 @@ def restoring_reopens_a_series(*, session: Session, tasks: Sequence[Task]) -> bo
     """
     restoring = [task.id for task in tasks]
     for task in tasks:
-        if task.series_id is None or task.completed:
+        if task.series_id is None or task.status is TaskStatus.DONE:
             continue
         statement = (
             select(Task.id)
             .where(
                 Task.series_id == task.series_id,
-                Task.completed == False,  # noqa: E712
+                is_open(Task),
                 not_deleted(Task),
                 col(Task.id).not_in(restoring),
             )
@@ -1329,13 +1347,13 @@ def _mark_deleted(*, session: Session, task_ids: Any, deletion: Deletion) -> Non
 
 def complete_subtasks(*, session: Session, task: Task) -> None:
     """
-    Mark the task's whole subtree completed, leaving the task itself to the
+    Move the task's whole subtree to done, leaving the task itself to the
     caller. Staged, not committed: the caller's update commits both together.
     """
     subtree = _subtree_cte(task.id)
     statement = select(Task).where(col(Task.id).in_(select(subtree.c.id)))
     for subtask in session.exec(statement):
-        subtask.completed = True
+        subtask.status = TaskStatus.DONE
         session.add(subtask)
 
 

@@ -169,7 +169,7 @@ export function TaskBulkActions({
           variant="outline"
           size="sm"
           onClick={() =>
-            change.mutate({ completed: true, subtasks: "complete" })
+            change.mutate({ status: "done", subtasks: "complete" })
           }
         >
           Complete

@@ -79,11 +79,11 @@ export function TaskProperties({ task }: { task: TaskPublic }) {
     <>
       <PropertyList>
         <PropertyRow
-          icon={task.completed ? CircleCheck : CircleDashed}
+          icon={task.status === "done" ? CircleCheck : CircleDashed}
           label="Status"
         >
           <span className="px-2">
-            {task.completed ? (
+            {task.status === "done" ? (
               <span className="font-medium">Completed</span>
             ) : (
               "Not completed"

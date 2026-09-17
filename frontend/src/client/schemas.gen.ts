@@ -8,6 +8,7 @@ export const ActivityActionSchema = {
         'tasks_bulk_changed',
         'task_completed',
         'task_reopened',
+        'task_status_changed',
         'task_deleted',
         'task_restored',
         'task_moved',
@@ -1007,7 +1008,7 @@ export const RecurrenceSchema = {
         'frequency'
     ],
     title: 'Recurrence',
-    description: 'How often a recurring task comes back: a fixed interval, never tied to when\nan occurrence happened to be completed (FR-01.13, FR-01.15).'
+    description: 'How often a recurring task comes back: a fixed interval, never tied to when\nan occurrence happened to be done (FR-01.13, FR-01.15).'
 } as const;
 
 export const RecurrenceFrequencySchema = {
@@ -1037,7 +1038,7 @@ export const SubtaskCompletionSchema = {
         'complete'
     ],
     title: 'SubtaskCompletion',
-    description: 'What a completion request says about the task\'s uncompleted subtasks.\n\nSending neither value is not a default: the request is refused, so a client\nnever completes a parent without saying what happens below it (FR-02.6,\nFR-02.7).'
+    description: 'What a request that moves a task to done says about its open subtasks.\n\nSending neither value is not a default: the request is refused, so a client\nnever closes a parent without saying what happens below it (FR-02.6,\nFR-02.7). `complete` moves the subtasks to done; `leave_uncompleted` leaves\neach in the open status it has.'
 } as const;
 
 export const TagCreateSchema = {
@@ -1268,16 +1269,15 @@ export const TaskBulkUpdateSchema = {
             minItems: 1,
             title: 'Task Ids'
         },
-        completed: {
+        status: {
             anyOf: [
                 {
-                    type: 'boolean'
+                    $ref: '#/components/schemas/TaskStatus'
                 },
                 {
                     type: 'null'
                 }
-            ],
-            title: 'Completed'
+            ]
         },
         subtasks: {
             anyOf: [
@@ -1460,6 +1460,10 @@ export const TaskCreateSchema = {
                     type: 'null'
                 }
             ]
+        },
+        status: {
+            $ref: '#/components/schemas/TaskStatus',
+            default: 'todo'
         }
     },
     type: 'object',
@@ -1526,9 +1530,8 @@ export const TaskPublicSchema = {
             format: 'uuid',
             title: 'Id'
         },
-        completed: {
-            type: 'boolean',
-            title: 'Completed'
+        status: {
+            $ref: '#/components/schemas/TaskStatus'
         },
         project_id: {
             type: 'string',
@@ -1604,7 +1607,7 @@ export const TaskPublicSchema = {
     required: [
         'title',
         'id',
-        'completed',
+        'status',
         'project_id'
     ],
     title: 'TaskPublic'
@@ -1617,6 +1620,18 @@ export const TaskSortSchema = {
         'priority'
     ],
     title: 'TaskSort'
+} as const;
+
+export const TaskStatusSchema = {
+    type: 'string',
+    enum: [
+        'todo',
+        'in_progress',
+        'waiting',
+        'done'
+    ],
+    title: 'TaskStatus',
+    description: 'Where a task stands (FR-01.4). Four fixed values rather than user-defined\nones (ADR-0004): every rule in the product only needs to know whether a\ntask is open or done, and the three open values tell apart who holds the\nnext move.'
 } as const;
 
 export const TaskUpdateSchema = {
@@ -1691,16 +1706,15 @@ export const TaskUpdateSchema = {
             ],
             title: 'Assignee Id'
         },
-        completed: {
+        status: {
             anyOf: [
                 {
-                    type: 'boolean'
+                    $ref: '#/components/schemas/TaskStatus'
                 },
                 {
                     type: 'null'
                 }
-            ],
-            title: 'Completed'
+            ]
         },
         tags: {
             anyOf: [

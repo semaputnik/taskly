@@ -335,6 +335,25 @@ class TaskPriority(StrEnum):
     P4 = "P4"
 
 
+class TaskStatus(StrEnum):
+    """
+    Where a task stands (FR-01.4). Four fixed values rather than user-defined
+    ones (ADR-0004): every rule in the product only needs to know whether a
+    task is open or done, and the three open values tell apart who holds the
+    next move.
+    """
+
+    TODO = "todo"
+    IN_PROGRESS = "in_progress"
+    # Open, but the next move belongs to someone or something other than the
+    # owner. Still open: waiting on a reply is not the work being finished.
+    WAITING = "waiting"
+    DONE = "done"
+
+
+OPEN_STATUSES = (TaskStatus.TODO, TaskStatus.IN_PROGRESS, TaskStatus.WAITING)
+
+
 class TaskSort(StrEnum):
     DUE_DATE = "due_date"
     PRIORITY = "priority"
@@ -356,7 +375,7 @@ class TaskBulkUpdate(SQLModel):
     """
 
     task_ids: list[uuid.UUID] = Field(min_length=1, max_length=500)
-    completed: bool | None = None
+    status: TaskStatus | None = None
     subtasks: SubtaskCompletion | None = None
     priority: TaskPriority | None = None
     due_date: date | None = None
@@ -406,12 +425,15 @@ class TaskQuery(SQLModel):
     unassigned: bool = False
     tag: str | None = None
     priority: TaskPriority | None = None
-    completed: bool | None = None
+    # Any of the listed statuses matches; none listed means every status. A
+    # list rather than an "open" flag, so a client can ask for exactly the
+    # statuses it shows.
+    status: list[TaskStatus] | None = None
     # An inclusive range: both ends are listed.
     due_from: date | None = None
     due_to: date | None = None
-    # Work whose due date has passed. Whether it is finished is the
-    # completion filter's business: every filter owns one dimension, so they
+    # Open work whose due date has passed: a done task is never overdue.
+    # Narrowing to particular open statuses is the status filter's business: every filter owns one dimension, so they
     # can be combined without one quietly overriding another.
     overdue: bool = False
     # Which side of the archive to list: live work by default, or only the
@@ -435,11 +457,12 @@ class TaskQuery(SQLModel):
 
 class SubtaskCompletion(StrEnum):
     """
-    What a completion request says about the task's uncompleted subtasks.
+    What a request that moves a task to done says about its open subtasks.
 
     Sending neither value is not a default: the request is refused, so a client
-    never completes a parent without saying what happens below it (FR-02.6,
-    FR-02.7).
+    never closes a parent without saying what happens below it (FR-02.6,
+    FR-02.7). `complete` moves the subtasks to done; `leave_uncompleted` leaves
+    each in the open status it has.
     """
 
     LEAVE_UNCOMPLETED = "leave_uncompleted"
@@ -462,7 +485,7 @@ MIN_INTERVAL_DAYS = 2
 class Recurrence(SQLModel):
     """
     How often a recurring task comes back: a fixed interval, never tied to when
-    an occurrence happened to be completed (FR-01.13, FR-01.15).
+    an occurrence happened to be done (FR-01.13, FR-01.15).
     """
 
     frequency: RecurrenceFrequency
@@ -563,6 +586,7 @@ class TaskCreate(TaskBase):
     # The owner's id, or the id of one of the owner's bot users (FR-01.7).
     assignee_id: uuid.UUID | None = None
     recurrence: Recurrence | None = None
+    status: TaskStatus = TaskStatus.TODO
 
 
 # Properties to receive via API on update, all are optional
@@ -574,12 +598,12 @@ class TaskUpdate(SQLModel):
     project_id: uuid.UUID | None = None
     # The owner's id, or the id of one of the owner's bot users (FR-01.7).
     assignee_id: uuid.UUID | None = None
-    completed: bool | None = None
+    status: TaskStatus | None = None
     # The task's tags in full: what is sent replaces what it had, and omitting
     # the field leaves them alone.
     tags: list[TagName] | None = None
     # A directive about the task's subtasks rather than a stored field: it is
-    # only meaningful alongside `completed: true`.
+    # only meaningful alongside `status: done`.
     subtasks: SubtaskCompletion | None = None
     # `null` stops the task recurring; omitting the field leaves it alone.
     recurrence: Recurrence | None = None
@@ -610,7 +634,7 @@ class Task(TaskBase, table=True):
             "ix_task_one_open_occurrence",
             "series_id",
             unique=True,
-            postgresql_where=text("NOT completed AND deletion_id IS NULL"),
+            postgresql_where=text("status <> 'done' AND deletion_id IS NULL"),
         ),
         # One assignee at most: the owner or a bot user, never both.
         CheckConstraint(
@@ -620,7 +644,15 @@ class Task(TaskBase, table=True):
     )
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    completed: bool = False
+    status: TaskStatus = Field(
+        default=TaskStatus.TODO,
+        # Stored by value, so the partial index above reads the API's words.
+        sa_type=SAEnum(  # type: ignore
+            TaskStatus,
+            name="taskstatus",
+            values_callable=lambda members: [member.value for member in members],
+        ),
+    )
     parent_id: uuid.UUID | None = Field(
         default=None,
         foreign_key="task.id",
@@ -668,7 +700,7 @@ class Task(TaskBase, table=True):
 # Properties to return via API, id is always required
 class TaskPublic(TaskBase):
     id: uuid.UUID
-    completed: bool
+    status: TaskStatus
     # Always set: a subtask reports the project of its root ancestor.
     project_id: uuid.UUID
     parent_id: uuid.UUID | None = None
@@ -798,6 +830,9 @@ class ActivityAction(StrEnum):
     TASKS_BULK_CHANGED = "tasks_bulk_changed"
     TASK_COMPLETED = "task_completed"
     TASK_REOPENED = "task_reopened"
+    # A move between open statuses; a move to or out of done is completed or
+    # reopened, so an entry never says both.
+    TASK_STATUS_CHANGED = "task_status_changed"
     TASK_DELETED = "task_deleted"
     TASK_RESTORED = "task_restored"
     TASK_MOVED = "task_moved"

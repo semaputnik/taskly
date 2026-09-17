@@ -10,7 +10,7 @@ from app import crud
 from app.api.deps import get_attachment_storage
 from app.core.config import settings
 from app.main import app
-from app.models import Task, UserCreate
+from app.models import Task, TaskStatus, UserCreate
 from tests.api.routes.test_attachments import InMemoryAttachmentStorage
 from tests.utils.bot import create_project, create_user_headers, issue_bot_headers
 from tests.utils.utils import random_email, random_lower_string
@@ -72,7 +72,7 @@ def _patch(
 
 
 def _complete(client: TestClient, headers: dict[str, str], task_id: str) -> dict:
-    r = _patch(client, headers, task_id, completed=True)
+    r = _patch(client, headers, task_id, status="done")
     assert r.status_code == 200, r.text
     return r.json()
 
@@ -89,7 +89,7 @@ def _open_occurrence(
     """The one open task with this title, asserting there is exactly one."""
     matching = [
         t
-        for t in _tasks(client, headers, completed=False)
+        for t in _tasks(client, headers, status=["todo", "in_progress", "waiting"])
         if t["title"] == title and t["parent_id"] is None
     ]
     assert len(matching) == 1, matching
@@ -287,7 +287,7 @@ def test_a_task_stops_recurring_when_its_recurrence_is_cleared(
     assert r.json()["recurrence"] is None
 
     _complete(client, headers, task["id"])
-    assert _tasks(client, headers, completed=False) == []
+    assert _tasks(client, headers, status=["todo", "in_progress", "waiting"]) == []
 
 
 def test_a_completed_task_cannot_change_how_it_recurs(
@@ -364,15 +364,15 @@ def test_completing_an_occurrence_creates_a_new_task_and_keeps_the_old_one_compl
     task = _create_recurring(client, headers, date(2026, 3, 2))
 
     completed = _complete(client, headers, task["id"])
-    assert completed["completed"] is True
+    assert completed["status"] == "done"
     assert completed["due_date"] == "2026-03-02"
 
     successor = _open_occurrence(client, headers)
     assert successor["id"] != task["id"]
-    assert successor["completed"] is False
+    assert successor["status"] == "todo"
 
     r = client.get(f"{API}/tasks/{task['id']}", headers=headers)
-    assert r.json()["completed"] is True
+    assert r.json()["status"] == "done"
 
 
 def test_the_next_occurrence_copies_the_task_fields(
@@ -424,15 +424,18 @@ def test_the_next_occurrence_copies_the_subtask_tree_not_completed(
     _create_task(client, headers, "Archive threads", parent_id=inbox["id"])
     plan = _create_task(client, headers, "Plan the week", parent_id=task["id"])
     gone = _create_task(client, headers, "Dropped step", parent_id=task["id"])
-    assert _patch(client, headers, plan["id"], completed=True).status_code == 200
+    assert _patch(client, headers, plan["id"], status="done").status_code == 200
     r = client.delete(f"{API}/tasks/{gone['id']}", headers=headers)
     assert r.status_code == 200
 
-    r = _patch(client, headers, task["id"], completed=True, subtasks="complete")
+    r = _patch(client, headers, task["id"], status="done", subtasks="complete")
     assert r.status_code == 200, r.text
 
     successor = _open_occurrence(client, headers, "Weekly review")
-    by_title = {t["title"]: t for t in _tasks(client, headers, completed=False)}
+    by_title = {
+        t["title"]: t
+        for t in _tasks(client, headers, status=["todo", "in_progress", "waiting"])
+    }
     assert set(by_title) == {
         "Weekly review",
         "Clear the inbox",
@@ -452,7 +455,7 @@ def test_the_next_occurrence_copies_the_subtask_tree_not_completed(
     # The completed occurrence keeps its own tree, untouched.
     old = {
         t["title"]: t
-        for t in _tasks(client, headers, completed=True)
+        for t in _tasks(client, headers, status=["done"])
         if t["id"] != task["id"]
     }
     assert old["Clear the inbox"]["parent_id"] == task["id"]
@@ -465,12 +468,13 @@ def test_leaving_subtasks_uncompleted_still_starts_the_next_tree_fresh(
     task = _create_recurring(client, headers, date(2026, 3, 2))
     _create_task(client, headers, "Fill the can", parent_id=task["id"])
 
-    r = _patch(
-        client, headers, task["id"], completed=True, subtasks="leave_uncompleted"
-    )
+    r = _patch(client, headers, task["id"], status="done", subtasks="leave_uncompleted")
     assert r.status_code == 200, r.text
 
-    open_titles = sorted(t["title"] for t in _tasks(client, headers, completed=False))
+    open_titles = sorted(
+        t["title"]
+        for t in _tasks(client, headers, status=["todo", "in_progress", "waiting"])
+    )
     assert open_titles == ["Fill the can", "Fill the can", "Water the plants"]
 
 
@@ -533,7 +537,7 @@ def test_a_superseded_occurrence_cannot_be_reopened(
     task = _create_recurring(client, headers, date(2026, 3, 2))
     _complete(client, headers, task["id"])
 
-    r = _patch(client, headers, task["id"], completed=False)
+    r = _patch(client, headers, task["id"], status="todo")
     assert r.status_code == 409
     assert r.json()["detail"]["code"] == "occurrence_superseded"
 
@@ -549,7 +553,7 @@ def test_the_latest_occurrence_can_be_reopened_once_its_successor_is_deleted(
 
     r = client.delete(f"{API}/tasks/{successor['id']}", headers=headers)
     assert r.status_code == 200
-    r = _patch(client, headers, task["id"], completed=False)
+    r = _patch(client, headers, task["id"], status="todo")
     assert r.status_code == 200, r.text
 
     # Completing it again lands on the same place in the schedule.
@@ -568,7 +572,7 @@ def test_the_database_refuses_a_second_open_occurrence(
     db.expire_all()
     stored = db.get(Task, uuid.UUID(task["id"]))
     assert stored is not None
-    stored.completed = False
+    stored.status = TaskStatus.TODO
     db.add(stored)
     with pytest.raises(Exception, match="ix_task_one_open_occurrence"):
         db.commit()
@@ -586,12 +590,12 @@ def test_completion_and_the_next_occurrence_commit_together(
 
     monkeypatch.setattr(crud, "_stage_next_occurrence", fail)
     with pytest.raises(RuntimeError):
-        _patch(client, headers, task["id"], completed=True)
+        _patch(client, headers, task["id"], status="done")
     monkeypatch.undo()
 
     remaining = _tasks(client, headers)
     assert [t["id"] for t in remaining] == [task["id"]]
-    assert remaining[0]["completed"] is False
+    assert remaining[0]["status"] == "todo"
 
 
 # --- Moving the due date of an open occurrence --------------------------------
@@ -748,7 +752,7 @@ def test_rescheduling_and_completing_in_one_request(
         first["id"],
         due_date="2026-03-04",
         due_date_scope="this_and_following",
-        completed=True,
+        status="done",
     )
     assert r.status_code == 200, r.text
 

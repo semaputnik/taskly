@@ -25,6 +25,11 @@ function describeBatch(changes: Record<string, unknown>): string {
   if ("completed" in changes) {
     said.push(changes.completed ? "completed" : "reopened")
   }
+  if ("status" in changes) {
+    said.push(
+      changes.status === "done" ? "completed" : `moved to ${changes.status}`,
+    )
+  }
   if ("priority" in changes) {
     said.push(
       changes.priority ? `priority ${changes.priority}` : "priority cleared",

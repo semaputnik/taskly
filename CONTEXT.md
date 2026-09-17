@@ -20,20 +20,38 @@ restorable from there. Deleting a task or project also deletes everything it
 contains (subtasks, or a project's tasks).
 _Avoid_: "archived" for this state.
 
+**Status**:
+Where a task stands: **To do**, **In progress**, **Waiting** or **Done** — four
+fixed values, not user-defined. Every rule that cares whether work is finished
+only asks whether the task is **open** or Done.
+_Avoid_: "state", "stage", "column".
+
+**Open** (task):
+A task whose status is To do, In progress or Waiting — anything but Done.
+Overdue, "has open subtasks" and "the open occurrence" all mean this.
+_Avoid_: "not completed", "incomplete", "active".
+
+**Waiting**:
+An open status for a task whose next move belongs to someone or something
+other than the owner: a reply, a delivery, the result of someone else's work.
+It is still open — waiting on something is not the work being finished — but it
+is not work the owner can move right now.
+_Avoid_: "blocked", "on hold", "control".
+
 **Recurring task**:
-A task whose completion spawns its next occurrence as a new task, on a
+A task whose move to Done spawns its next occurrence as a new task, on a
 fixed-interval schedule (daily/weekly/monthly/every N days). Each occurrence
 is its own task, not a status of one persistent task. At most one occurrence
-of a given recurring task is open (not completed) at a time — the next one is
+of a given recurring task is **open** at a time — the next one is
 never created while the current one is still open.
 _Avoid_: treating a recurring task as a single task that "resets" — it does
-not; completing it produces a new task.
+not; moving it to Done produces a new task.
 
 **Series**:
 The occurrences of one recurring task, in order, and the schedule they keep
 to. The schedule is anchored to a due date, and each occurrence's due date is a
 whole number of intervals from that anchor — never counted from when the
-previous one was completed. Moving one occurrence's due date "only this
+previous one was done. Moving one occurrence's due date "only this
 occurrence" leaves the anchor where it was; "this and all following" moves it.
 Only the latest occurrence of a series can be open.
 _Avoid_: "template" or "parent" for the series — no occurrence is special, and

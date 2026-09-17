@@ -52,7 +52,7 @@ export function useTaskUpdate(task: TaskPublic) {
     // unchanged rule is ambiguous.
     const reschedules =
       task.recurrence &&
-      !task.completed &&
+      task.status !== "done" &&
       body.due_date !== undefined &&
       body.due_date !== (task.due_date ?? null) &&
       sameRecurrence(body.recurrence ?? task.recurrence, task.recurrence)

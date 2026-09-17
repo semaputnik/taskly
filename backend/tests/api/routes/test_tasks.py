@@ -50,7 +50,7 @@ def test_create_task_without_project_lands_in_inbox(
     task = r.json()
     assert task["title"] == "Buy milk"
     assert task["project_id"] == inbox_id
-    assert task["completed"] is False
+    assert task["status"] == "todo"
     assert task["priority"] is None
     assert task["due_date"] is None
 
@@ -143,18 +143,18 @@ def test_complete_and_return_to_not_completed(client: TestClient, db: Session) -
     r = client.patch(
         f"{settings.API_V1_STR}/tasks/{task_id}",
         headers=headers,
-        json={"completed": True},
+        json={"status": "done"},
     )
     assert r.status_code == 200
-    assert r.json()["completed"] is True
+    assert r.json()["status"] == "done"
 
     r = client.patch(
         f"{settings.API_V1_STR}/tasks/{task_id}",
         headers=headers,
-        json={"completed": False},
+        json={"status": "todo"},
     )
     assert r.status_code == 200
-    assert r.json()["completed"] is False
+    assert r.json()["status"] == "todo"
 
 
 def test_move_task_between_projects(client: TestClient, db: Session) -> None:

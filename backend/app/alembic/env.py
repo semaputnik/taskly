@@ -61,7 +61,18 @@ def run_migrations_online():
     In this scenario we need to create an Engine
     and associate a connection with the context.
 
+    A connection handed over in `config.attributes` is used as it is, so a
+    test can run the migrations against a database of its own.
     """
+    connection = config.attributes.get("connection")
+    if connection is not None:
+        context.configure(
+            connection=connection, target_metadata=target_metadata, compare_type=True
+        )
+        with context.begin_transaction():
+            context.run_migrations()
+        return
+
     configuration = config.get_section(config.config_ini_section)
     assert configuration is not None
     configuration["sqlalchemy.url"] = get_url()

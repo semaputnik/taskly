@@ -1,7 +1,12 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { useState } from "react"
 
-import { type SubtaskCompletion, type TaskPublic, TasksService } from "@/client"
+import {
+  type SubtaskCompletion,
+  type TaskPublic,
+  type TaskStatus,
+  TasksService,
+} from "@/client"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
@@ -33,7 +38,7 @@ export function CompleteTask({ task }: CompleteTaskProps) {
   const { showErrorToast } = useCustomToast()
 
   const mutation = useMutation({
-    mutationFn: (body: { completed: boolean; subtasks?: SubtaskCompletion }) =>
+    mutationFn: (body: { status: TaskStatus; subtasks?: SubtaskCompletion }) =>
       TasksService.updateTask({ path: { task_id: task.id }, body }),
     onSuccess: () => {
       setIsPrompting(false)
@@ -56,13 +61,13 @@ export function CompleteTask({ task }: CompleteTaskProps) {
         // Round: a square check in this table selects a row, and completion
         // is neither a selection nor a value — it is the state of the task.
         className="rounded-full"
-        checked={task.completed}
+        checked={task.status === "done"}
         disabled={mutation.isPending}
         onCheckedChange={(checked) =>
-          mutation.mutate({ completed: checked === true })
+          mutation.mutate({ status: checked === true ? "done" : "todo" })
         }
         aria-label={
-          task.completed ? "Mark as not completed" : "Mark as completed"
+          task.status === "done" ? "Mark as not completed" : "Mark as completed"
         }
       />
 
@@ -81,7 +86,7 @@ export function CompleteTask({ task }: CompleteTaskProps) {
               disabled={mutation.isPending}
               onClick={() =>
                 mutation.mutate({
-                  completed: true,
+                  status: "done",
                   subtasks: "complete",
                 })
               }
@@ -93,7 +98,7 @@ export function CompleteTask({ task }: CompleteTaskProps) {
               disabled={mutation.isPending}
               onClick={() =>
                 mutation.mutate({
-                  completed: true,
+                  status: "done",
                   subtasks: "leave_uncompleted",
                 })
               }

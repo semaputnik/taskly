@@ -15,8 +15,11 @@ function openTasks(query: Record<string, unknown>) {
   return {
     queryKey: ["tasks", query],
     queryFn: async () =>
-      (await TasksService.readTasks({ query: { ...query, completed: false } }))
-        .data,
+      (
+        await TasksService.readTasks({
+          query: { ...query, status: ["todo", "in_progress", "waiting"] },
+        })
+      ).data,
   }
 }
 
