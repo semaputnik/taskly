@@ -180,9 +180,9 @@ export function TaskBulkActions({
           count={count}
           pending={writes.isPending}
           onDelete={async () => {
-            const deleted = await writes.remove()
+            const { deleted, settled } = await writes.remove()
             if (deleted) onDone()
-            return deleted
+            return settled
           }}
         />
 
@@ -230,7 +230,10 @@ function DeleteSelection({
 }: {
   count: number
   pending: boolean
-  /** Resolves once the batch is settled; a refusal is listed by the bar. */
+  /**
+   * Resolves to whether the batch is settled — deleted, or refused with the
+   * tasks in the way listed by the bar — which is when the dialog closes.
+   */
   onDelete: () => Promise<boolean>
 }) {
   const [isOpen, setIsOpen] = useState(false)
@@ -267,8 +270,7 @@ function DeleteSelection({
             variant="destructive"
             loading={pending}
             onClick={async () => {
-              await onDelete()
-              setIsOpen(false)
+              if (await onDelete()) setIsOpen(false)
             }}
           >
             Delete

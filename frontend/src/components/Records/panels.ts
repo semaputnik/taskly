@@ -16,10 +16,11 @@ import { botQuery, projectQuery, tagQuery, taskQuery } from "@/lib/serverState"
  * Record panels: every kind of record that opens in a panel, declared once.
  *
  * A panel is addressed by the URL (The Real Address Rule) and only one is
- * open at a time (The Stay-Put Rule). From the one list below come the URL
- * keys and their validation, closing every panel, opening one, what a panel
- * is called while it loads or fails, and every link to a record. A record
- * kind supplies only its own body and, if it has one, its capture form.
+ * open at a time, over whatever screen the reader is on (The Stay-Put Rule).
+ * From the one list below come the URL keys and their validation, closing
+ * every panel, opening one, what a panel is called while it loads or fails,
+ * and every link to a record. A record kind supplies only its own panel body,
+ * which renders its capture form if it has one.
  */
 
 /** Records by the kind of panel they open in. */

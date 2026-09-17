@@ -339,12 +339,21 @@ export function useBulkTaskWrites(selected: string[], known: TaskPublic[]) {
         count(outcome.saved ? outcome.data.updated : 0, "changed"),
       )
     },
+    /**
+     * Delete the selection. `settled` says the question is answered: deleted,
+     * or refused with the tasks in the way listed. A failure that says
+     * nothing about the tasks leaves it open.
+     */
     remove: async () => {
       const outcome = await run((report) => bulkDelete(report, selected))
-      return settle(
+      const deleted = settle(
         outcome,
         count(outcome.saved ? outcome.data.deleted : 0, "deleted"),
       )
+      return {
+        deleted,
+        settled: deleted || (!outcome.saved && outcome.reason === "batch"),
+      }
     },
   }
 }

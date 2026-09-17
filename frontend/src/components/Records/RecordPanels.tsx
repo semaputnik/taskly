@@ -8,7 +8,7 @@ import { useCaptureShortcut } from "@/components/Tasks/capture"
 import { TaskDetail } from "@/components/Tasks/TaskDetail"
 import { RECORD_KINDS, type RecordKind, useRecordPanels } from "./panels"
 
-/** Each record kind's panel: its body, and its capture form if it has one. */
+/** Each record kind's panel body, which holds its capture form if it has one. */
 const PANELS: Record<RecordKind, ComponentType> = {
   task: TaskDetail,
   project: ProjectPanel,

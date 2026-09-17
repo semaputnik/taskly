@@ -168,7 +168,7 @@ export function deleteTask(
 export function repeatingRefusals(tasks: TaskPublic[]): BatchRefusal[] {
   return tasks.filter(isRecurring).map((task) => ({
     task_id: task.id,
-    code: "task_repeats",
+    code: Refusal.TASK_REPEATS,
     message: `“${task.title}” repeats. Move its due date from the task itself, where the rest of the series can be settled.`,
   }))
 }

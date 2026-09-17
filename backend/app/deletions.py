@@ -16,8 +16,9 @@ from collections import defaultdict
 from collections.abc import Collection, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Any
+from typing import Any, NamedTuple
 
+import sqlalchemy as sa
 from sqlalchemy import orm
 from sqlmodel import Session, col, select
 
@@ -155,7 +156,20 @@ def _by_id[T: Task | Project](
     return {row.id: row for row in rows}
 
 
-def _target[T: Task | Project](rows: dict[uuid.UUID, T], row_id: uuid.UUID | None) -> T:
+class _Marked(NamedTuple):
+    """What deciding a restore needs to know about a task an event marks."""
+
+    id: uuid.UUID
+    deletion_id: uuid.UUID | None
+    parent_id: uuid.UUID | None
+    series_id: uuid.UUID | None
+    status: TaskStatus
+    title: str
+
+
+def _named_row[T: Task | Project](
+    rows: dict[uuid.UUID, T], row_id: uuid.UUID | None
+) -> T:
     """The row an event names, which the event's kind says it has."""
     assert row_id is not None
     return rows[row_id]
@@ -175,12 +189,8 @@ def restorability(
             col(Deletion.id).in_(set(deletion_ids)), Deletion.owner_id == owner_id
         )
     ).all()
-    marked: dict[uuid.UUID, list[Task]] = defaultdict(list)
-    for task in session.exec(
-        select(Task)
-        .where(col(Task.deletion_id).in_([event.id for event in events]))
-        .order_by(col(Task.created_at), col(Task.id))
-    ).all():
+    marked: dict[uuid.UUID, list[_Marked]] = defaultdict(list)
+    for task in _marked_rows(session, [event.id for event in events]):
         assert task.deletion_id is not None
         marked[task.deletion_id].append(task)
     targets = _by_id(
@@ -192,11 +202,11 @@ def restorability(
 
     # The tasks whose surroundings decide a task or batch restore: the task an
     # event named, or each task of a batch whose parent the batch did not take.
-    checked: dict[uuid.UUID, list[Task]] = {}
+    checked: dict[uuid.UUID, list[_Marked]] = {}
     for deletion in events:
         rows = marked[deletion.id]
-        if kind_of(deletion) is DeletionKind.TASK and rows:
-            checked[deletion.id] = [_target(targets, deletion.task_id)]
+        if kind_of(deletion) is DeletionKind.TASK:
+            checked[deletion.id] = [t for t in rows if t.id == deletion.task_id]
         elif kind_of(deletion) is DeletionKind.BATCH:
             taken = {task.id for task in rows}
             checked[deletion.id] = [t for t in rows if t.parent_id not in taken]
@@ -215,7 +225,7 @@ def restorability(
     projects.update(_by_id(session, Project, set(project_of.values()) - set(projects)))
     open_series = _open_series(session, marked.values())
 
-    def reopens_a_series(rows: Sequence[Task]) -> bool:
+    def reopens_a_series(rows: Sequence[_Marked]) -> bool:
         return any(
             task.series_id in open_series
             for task in rows
@@ -227,7 +237,7 @@ def restorability(
         kind = kind_of(deletion)
         rows = marked[deletion.id]
         if kind is DeletionKind.PROJECT:
-            project = _target(projects, deletion.project_id)
+            project = _named_row(projects, deletion.project_id)
             verdicts[deletion.id] = _project_verdict(
                 deletion, project, reopens_a_series(rows)
             )
@@ -235,7 +245,7 @@ def restorability(
         if not rows:
             gone = (
                 kind is DeletionKind.TASK
-                and _target(targets, deletion.task_id).deletion_id is not None
+                and _named_row(targets, deletion.task_id).deletion_id is not None
             )
             verdicts[deletion.id] = Restorability(
                 kind,
@@ -260,8 +270,31 @@ def restorability(
     return verdicts
 
 
+def _marked_rows(
+    session: orm.Session, deletion_ids: Sequence[uuid.UUID]
+) -> list[_Marked]:
+    """
+    The tasks the events still mark, oldest first, with only the columns a
+    restore decision needs: a deleted project can have taken thousands of
+    tasks down with it.
+    """
+    statement = (
+        sa.select(
+            col(Task.id),
+            col(Task.deletion_id),
+            col(Task.parent_id),
+            col(Task.series_id),
+            col(Task.status),
+            col(Task.title),
+        )
+        .where(col(Task.deletion_id).in_(deletion_ids))
+        .order_by(col(Task.created_at), col(Task.id))
+    )
+    return [_Marked(*row) for row in session.execute(statement).all()]
+
+
 def _open_series(
-    session: Session, marked: Collection[Sequence[Task]]
+    session: Session, marked: Collection[Sequence[_Marked]]
 ) -> set[uuid.UUID]:
     """
     The series among the marked open tasks that already have an open
@@ -313,7 +346,7 @@ def _project_verdict(
 
 def _task_verdict(
     kind: DeletionKind,
-    task: Task,
+    task: _Marked,
     parent: Task | None,
     project: Project,
     reopens_a_series: bool,

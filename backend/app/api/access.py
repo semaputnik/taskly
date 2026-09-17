@@ -209,23 +209,28 @@ def authorize_tag_names(
 # Projects
 
 
+def archived_refusal(project: Project) -> HTTPException:
+    """How a change to an archived project, or to anything in it, is refused."""
+    return HTTPException(
+        status_code=PROJECT_ARCHIVED_STATUS,
+        detail={
+            "code": PROJECT_ARCHIVED_CODE,
+            "message": (
+                f"The project “{project.name}” is archived, so it and its "
+                "tasks are read-only. Unarchive it to make changes."
+            ),
+            "project_id": str(project.id),
+        },
+    )
+
+
 def require_project_writable(project: Project) -> None:
     """
     Refuse any change to an archived project or to anything in it: archiving
     freezes the project whole until it is unarchived (FR-05.12).
     """
     if project.is_archived:
-        raise HTTPException(
-            status_code=PROJECT_ARCHIVED_STATUS,
-            detail={
-                "code": PROJECT_ARCHIVED_CODE,
-                "message": (
-                    f"The project “{project.name}” is archived, so it and its "
-                    "tasks are read-only. Unarchive it to make changes."
-                ),
-                "project_id": str(project.id),
-            },
-        )
+        raise archived_refusal(project)
 
 
 def _authorize(caller: Caller, action: TaskAction, project: Project) -> None:

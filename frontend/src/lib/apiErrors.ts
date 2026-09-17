@@ -16,6 +16,8 @@ export const Refusal = {
   HAS_SUBTASKS: "task_has_subtasks",
   /** The name asked for is already one of the user's tags. */
   TAG_EXISTS: "tag_exists",
+  /** A batch cannot move a recurring task's due date. */
+  TASK_REPEATS: "task_repeats",
   /** A batch could not be done whole; the refusals say which tasks and why. */
   BULK_REFUSED: "bulk_refused",
 } as const

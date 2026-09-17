@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException, Query
 from sqlmodel import col, func, select
 
 from app import crud, deletions
-from app.api.access import require_project_writable
+from app.api.access import archived_refusal
 from app.api.deps import CurrentUser, SessionDep
 from app.deletions import DeletionKind, Restorability, RestoreRefusal
 from app.models import (
@@ -235,11 +235,7 @@ def _refusal(verdict: Restorability) -> HTTPException:
             # Restoring writes into the project, so an archived one refuses
             # it the same way it refuses any other change.
             assert verdict.project is not None
-            try:
-                require_project_writable(verdict.project)
-            except HTTPException as refused:
-                return refused
-            raise AssertionError("an archived project refuses writes")
+            return archived_refusal(verdict.project)
         case RestoreRefusal.PARENT_DELETED:
             return _refuse(
                 PARENT_DELETED_CODE,
