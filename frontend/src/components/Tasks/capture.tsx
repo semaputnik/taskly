@@ -109,7 +109,6 @@ export function useTaskCapture(
     },
     /** Read by a screen reader; the sighted reader has the record itself. */
     announcement,
-    isPending: mutation.isPending,
   }
 }
 

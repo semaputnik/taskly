@@ -351,9 +351,6 @@ class TaskStatus(StrEnum):
     DONE = "done"
 
 
-OPEN_STATUSES = (TaskStatus.TODO, TaskStatus.IN_PROGRESS, TaskStatus.WAITING)
-
-
 class TaskSort(StrEnum):
     DUE_DATE = "due_date"
     PRIORITY = "priority"
@@ -432,9 +429,9 @@ class TaskQuery(SQLModel):
     # An inclusive range: both ends are listed.
     due_from: date | None = None
     due_to: date | None = None
-    # Open work whose due date has passed: a done task is never overdue.
-    # Narrowing to particular open statuses is the status filter's business: every filter owns one dimension, so they
-    # can be combined without one quietly overriding another.
+    # Open work whose due date has passed: a done task is never late, so this
+    # filter leaves done out on its own. Narrowing further, to particular open
+    # statuses, is the status filter's business.
     overdue: bool = False
     # Which side of the archive to list: live work by default, or only the
     # tasks of archived projects when the archive is asked for explicitly

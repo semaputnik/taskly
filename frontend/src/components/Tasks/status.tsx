@@ -34,13 +34,13 @@ import {
 } from "@/components/ui/dropdown-menu"
 import useCustomToast from "@/hooks/useCustomToast"
 import { cn } from "@/lib/utils"
-import { handleError, isUncompletedSubtasksError } from "@/utils"
+import { handleError, isOpenSubtasksError } from "@/utils"
 import { STATUS_LABELS, STATUSES } from "./statuses"
 
 export { OPEN_STATUSES, STATUS_LABELS, STATUSES } from "./statuses"
 
 /**
- * One glyph per status, told apart by shape alone (The One Signal Rule):
+ * One glyph per status, told apart by shape alone (The Four-Glyph Rule):
  * an empty dashed ring, a half-filled one, a ring with a clock hand, and a
  * ring with a check. They stay ink; no status earns a hue.
  */
@@ -49,10 +49,6 @@ const STATUS_ICONS: Record<TaskStatus, LucideIcon> = {
   in_progress: Contrast,
   waiting: Clock3,
   done: CircleCheck,
-}
-
-export function statusIcon(status: TaskStatus): LucideIcon {
-  return STATUS_ICONS[status]
 }
 
 /**
@@ -106,7 +102,7 @@ export function useTaskStatus(task: TaskPublic) {
       setAnnouncement(`${task.title} moved to ${STATUS_LABELS[body.status]}`)
     },
     onError: (error: Error) => {
-      if (isUncompletedSubtasksError(error)) {
+      if (isOpenSubtasksError(error)) {
         setIsPrompting(true)
         return
       }

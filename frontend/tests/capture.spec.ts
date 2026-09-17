@@ -516,6 +516,7 @@ test("The chord from the description creates, clears the words and keeps the set
   const panel = capturePanel(page)
   await panel.getByRole("combobox", { name: "Priority" }).click()
   await page.getByRole("option", { name: "P1" }).click()
+  await panel.locator('input[type="date"]').fill("2031-10-02")
   await panel.getByRole("button", { name: "Add tag" }).click()
   await page
     .getByRole("combobox", { name: "Search or create a tag" })
@@ -559,6 +560,7 @@ test("The chord from the description creates, clears the words and keeps the set
     const row = page.getByRole("row", { name: new RegExp(title) })
     await expect(row).toContainText("P1")
     await expect(row).toContainText("errands")
+    await expect(row).toContainText("2031")
   }
 })
 

@@ -1,7 +1,8 @@
+import { useQuery } from "@tanstack/react-query"
 import { useBlocker } from "@tanstack/react-router"
 import { useEffect, useRef, useState } from "react"
 
-import type { TaskPublic } from "@/client"
+import { ProjectsService, type TaskPublic } from "@/client"
 import {
   ghost,
   RecordHeader,
@@ -129,8 +130,23 @@ export function NewTask({
     enableBeforeUnload: () => guarded.current && !leaving.current,
   })
 
+  // Unset already means the Inbox to the API, so choosing the Inbox is kept
+  // as unset: picking what is already shown is not a change to the draft.
+  const { data: projects } = useQuery({
+    queryKey: ["projects"],
+    queryFn: async () =>
+      (await ProjectsService.readProjects({ query: { skip: 0, limit: 100 } }))
+        .data,
+  })
+  const inboxId = projects?.data.find((project) => project.is_inbox)?.id
   const change = (patch: Partial<TaskFields>) =>
-    setDraft((previous) => ({ ...previous, ...patch }))
+    setDraft((previous) => ({
+      ...previous,
+      ...patch,
+      ...("project_id" in patch && patch.project_id === inboxId
+        ? { project_id: undefined }
+        : {}),
+    }))
 
   const commit = async (stay: boolean) => {
     const sent = draft
@@ -235,7 +251,7 @@ export function NewTask({
 
       {/* The one commit, pinned where a thumb reaches it. */}
       <div className="bg-card sticky bottom-0 mt-auto flex items-center justify-end gap-3 border-t px-6 py-3">
-        <span className="text-muted-foreground hidden text-xs sm:inline">
+        <span className="text-muted-foreground text-xs">
           <kbd className="font-sans">{CHORD}</kbd> creates and starts another
         </span>
         <Button

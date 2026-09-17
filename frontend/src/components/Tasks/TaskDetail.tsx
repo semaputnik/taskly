@@ -206,9 +206,9 @@ export function TaskDetail({
                 </p>
               )}
               {/* Adding a subtask belongs with the subtasks, not in a menu
-                    somewhere else on the panel — and it is the same one-field
-                    capture as anywhere else, because a subtask is a full task
-                    rather than a checklist item. */}
+                    somewhere else on the panel. It stays one field: the reader
+                    is working down a list here, and each child opens as a full
+                    task to set the rest. */}
               <SubtaskCapture parent={task} />
             </TabsContent>
 

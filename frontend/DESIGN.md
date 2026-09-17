@@ -671,7 +671,7 @@ record type the product has: tasks, projects, tags and bot users. A right-hand
   its middle. Tags are the case: the chips, then a ghost **+ Add tag** button
   that opens a popover to search, choose and create. Anything that needs room
   to find or create a value goes in a popover anchored to the value, never
-  stacked under the row. The popover is Paper with a hairline and the floating
+  stacked under the row. The popover is Paper with a hairline and the Menu
   shadow; its highlighted row is Surface Quiet and its check is Ink.
 - **The corner is for dismissal only.** Close sits alone in the top-right, a
   32px target under a mouse and 44px under a thumb, like every dismiss control

@@ -341,6 +341,19 @@ def test_bulk_sets_a_status(client: TestClient, owner: Headers) -> None:
     ]
 
 
+def test_bulk_refuses_to_reopen_an_earlier_occurrence(
+    client: TestClient, owner: Headers
+) -> None:
+    task = _recurring(client, owner)
+    _patch(client, owner, task["id"], status="done")
+
+    r = _bulk(client, owner, task_ids=[task["id"]], status="in_progress")
+    assert r.status_code == 409
+    [refusal] = r.json()["detail"]["refusals"]
+    assert refusal["code"] == "occurrence_superseded"
+    assert _status(client, owner, task["id"]) == "done"
+
+
 def test_bulk_open_moves_ignore_open_subtasks(
     client: TestClient, owner: Headers
 ) -> None:

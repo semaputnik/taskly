@@ -96,8 +96,8 @@ function IconAction({
 /**
  * The app's primary action: start capture.
  *
- * It opens the task's own panel rather than a form — writing a task down is
- * one field, and everything else about it is set in the panel afterwards. The
+ * It opens the task's own panel rather than a form, as a draft: the title and
+ * every property are there at once, and one commit creates the task. The
  * label says the intent, which has not changed.
  */
 function CaptureAction() {

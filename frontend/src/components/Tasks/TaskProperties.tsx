@@ -4,6 +4,7 @@ import {
   CalendarPlus,
   Flag,
   FolderKanban,
+  ListTodo,
   Repeat,
   Tag,
   User as UserIcon,
@@ -45,13 +46,7 @@ import {
   MIN_INTERVAL_DAYS,
   NO_RECURRENCE,
 } from "./recurrence"
-import {
-  STATUS_LABELS,
-  STATUSES,
-  StatusGlyph,
-  statusIcon,
-  useTaskStatus,
-} from "./status"
+import { STATUS_LABELS, STATUSES, StatusGlyph, useTaskStatus } from "./status"
 import { TagPicker } from "./TagPicker"
 import { useTaskUpdate } from "./useTaskUpdate"
 
@@ -289,11 +284,9 @@ export function TaskProperties({ task }: { task: TaskPublic }) {
         isSubtask={Boolean(task.parent_id)}
         currentBot={task.assignee_bot_user}
         before={
-          <PropertyRow
-            icon={statusIcon(task.status)}
-            label="Status"
-            htmlFor={`${ids}-status`}
-          >
+          // The row's icon is fixed like every other row's; the value carries
+          // the status's own glyph.
+          <PropertyRow icon={ListTodo} label="Status" htmlFor={`${ids}-status`}>
             <Select
               value={task.status}
               onValueChange={(value) => status.change(value as TaskStatus)}

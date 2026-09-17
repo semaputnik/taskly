@@ -33,8 +33,8 @@ function hasErrorCode(err: Error, code: string): boolean {
   return detail?.code === code
 }
 
-/** Completing this task needs a decision about its open subtasks. */
-export function isUncompletedSubtasksError(err: Error): boolean {
+/** Moving this task to done needs a decision about its open subtasks. */
+export function isOpenSubtasksError(err: Error): boolean {
   return hasErrorCode(err, "task_has_uncompleted_subtasks")
 }
 

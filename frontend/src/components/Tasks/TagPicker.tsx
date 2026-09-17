@@ -226,7 +226,11 @@ export function TagPicker({
   const [open, setOpen] = useState(false)
   const [current, setCurrent] = useState(value)
   const [announcement, setAnnouncement] = useState("")
-  useEffect(() => setCurrent(value), [value])
+  // Follow the saved tags when they change, not whenever the array is a new
+  // one: a re-render must not drop a choice whose save is still on its way.
+  const saved = value.join("\u0000")
+  // biome-ignore lint/correctness/useExhaustiveDependencies: keyed on content.
+  useEffect(() => setCurrent(value), [saved])
 
   const set = (next: string[], said: string) => {
     setCurrent(next)

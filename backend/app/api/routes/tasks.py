@@ -426,6 +426,26 @@ def bulk_update_tasks(
                 )
             )
             continue
+        if (
+            changes.status is not None
+            and changes.status is not TaskStatus.DONE
+            and task.status is TaskStatus.DONE
+            and crud.is_superseded(session=session, task=task)
+        ):
+            # A later occurrence is already open: reopening this one would
+            # leave its series with two (FR-01.16).
+            refusals.append(
+                TaskRefusal(
+                    task_id=task.id,
+                    code=OCCURRENCE_SUPERSEDED_CODE,
+                    message=(
+                        f"“{task.title}” is an earlier occurrence of a "
+                        "recurring task. Only the latest occurrence can be "
+                        "reopened."
+                    ),
+                )
+            )
+            continue
         if "due_date" in changes.model_fields_set and task.series_id is not None:
             # Moving one occurrence of a series asks how far the move reaches
             # (FR-01.17), which is a question for that task's own panel.
