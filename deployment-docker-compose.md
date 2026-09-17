@@ -118,6 +118,64 @@ See GitHub's guides for [adding a self-hosted runner](https://docs.github.com/en
 
 When the runner is online, open the repository's **Actions** tab, select **Deploy with Docker Compose**, and select **Run workflow**.
 
+## Publish a Release Image
+
+The `.github/workflows/publish-docker-image.yml` workflow builds the application image and pushes it to Docker Hub when a version tag is pushed:
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+The tag `v1.2.3` publishes `1.2.3`, `1.2` and `latest`. A pre-release tag such as `v1.2.3-rc.1` publishes only `1.2.3-rc.1` and leaves `latest` pointing at the last stable release.
+
+The published image is the one `compose.yml` builds: a single image carrying the API and the prebuilt frontend.
+
+### Configure the Docker Hub Account
+
+In the repository, go to **Settings** > **Secrets and variables** > **Actions** and add the `DOCKERHUB_USERNAME` repository variable, which names both the account the workflow logs in as and the namespace the image is pushed to, so the image is published as `docker.io/$DOCKERHUB_USERNAME/taskly`.
+
+Add the `DOCKERHUB_TOKEN` repository secret: a Docker Hub [access token](https://docs.docker.com/security/for-developers/access-tokens/) with **Read & Write** permission.
+
+## Run a Published Image on a Server
+
+The `compose.release.yml` file runs the published image instead of building from source. It is self-contained: the server needs only this file and an `.env` beside it, so there is no checkout to keep in sync and no build to wait for.
+
+Copy the two files to the server:
+
+```bash
+scp compose.release.yml .env.release.example root@your-server.example.com:/root/taskly/
+```
+
+On the server, create the `.env` and replace every placeholder in it:
+
+```bash
+cd /root/taskly
+mv .env.release.example .env
+```
+
+Set `TASKLY_IMAGE` to the published image, such as `docker.io/your-account/taskly`, and `TASKLY_TAG` to the released version, such as `1.2.3`. Pinning the version rather than `latest` means a restart brings back the same image. The application refuses to start while `SECRET_KEY`, `FIRST_SUPERUSER_PASSWORD` or `POSTGRES_PASSWORD` is still `changethis`.
+
+For an image in a private Docker Hub repository, log in on the server first with `docker login`.
+
+Then pull the image, prepare the database, and start the application:
+
+```bash
+docker compose -f compose.release.yml pull
+docker compose -f compose.release.yml run --rm backend bash scripts/prestart.sh
+docker compose -f compose.release.yml up -d
+```
+
+To release a new version, set `TASKLY_TAG` to it and repeat those three commands.
+
+This stack runs no Adminer: a database admin panel on a public subdomain is guarded by the Postgres password alone, which is a poor trade for a tool needed a few times a month. Reach the database over SSH instead:
+
+```bash
+docker compose -f compose.release.yml exec db psql -U postgres app
+```
+
+The stack is named `taskly`, so its volumes are `taskly_app-db-data` and `taskly_attachments-data` wherever the file is placed. A server already running the build-from-source stack from `/root/code/app` keeps its data under that directory's project name instead, so moving to `compose.release.yml` there starts from empty volumes unless the data is migrated across.
+
 ## URLs
 
 Replace `fastapi-project.example.com` with your domain.
@@ -126,4 +184,4 @@ Application (frontend and API): `https://fastapi-project.example.com`
 
 Interactive API docs: `https://fastapi-project.example.com/docs`
 
-Adminer: `https://adminer.fastapi-project.example.com`
+Adminer: `https://adminer.fastapi-project.example.com`, for the stack built from source. The `compose.release.yml` stack does not run it.
