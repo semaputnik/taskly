@@ -1,10 +1,12 @@
 import datetime
+import uuid
 
 from sqlmodel import Session
 
 from app import crud
 from app.models import (
     ProjectCreate,
+    Task,
     TaskCreate,
     TaskPriority,
     TaskStatus,
@@ -136,3 +138,79 @@ def test_move_task_to_another_project(db: Session) -> None:
     )
 
     assert moved.project_id == other_project.id
+
+
+def _tree(db: Session, depth: int) -> tuple[uuid.UUID, list[Task]]:
+    """A chain of `depth` tasks, the first a root in a new project."""
+    user = crud.create_user(
+        session=db,
+        user_create=UserCreate(email=random_email(), password=random_lower_string()),
+    )
+    project = crud.create_project(
+        session=db, project_create=ProjectCreate(name="Deep"), owner_id=user.id
+    )
+    chain = [
+        crud.create_task(
+            session=db,
+            task_create=TaskCreate(title="Level 0"),
+            project_id=project.id,
+            owner_id=user.id,
+        )
+    ]
+    for level in range(1, depth):
+        chain.append(
+            crud.create_task(
+                session=db,
+                task_create=TaskCreate(title=f"Level {level}", parent_id=chain[-1].id),
+                project_id=None,
+                owner_id=user.id,
+            )
+        )
+    return project.id, chain
+
+
+def test_task_project_ids_resolve_a_deep_subtask_through_its_root(
+    db: Session,
+) -> None:
+    project_id, chain = _tree(db, depth=6)
+
+    resolved = crud.get_task_project_ids(
+        session=db, owner_id=chain[0].owner_id, task_ids=[chain[-1].id, chain[2].id]
+    )
+
+    # Only what was asked about, each at its root's project.
+    assert resolved == {chain[-1].id: project_id, chain[2].id: project_id}
+
+
+def test_task_project_ids_leave_out_tasks_under_a_deleted_ancestor(
+    db: Session,
+) -> None:
+    project_id, chain = _tree(db, depth=4)
+    crud.delete_task(session=db, task=chain[1])
+    db.commit()
+
+    resolved = crud.get_task_project_ids(
+        session=db,
+        owner_id=chain[0].owner_id,
+        task_ids=[task.id for task in chain],
+    )
+
+    assert resolved == {chain[0].id: project_id}
+
+
+def test_task_project_ids_do_not_reach_another_users_tasks(db: Session) -> None:
+    _, chain = _tree(db, depth=2)
+    stranger = crud.create_user(
+        session=db,
+        user_create=UserCreate(email=random_email(), password=random_lower_string()),
+    )
+
+    assert (
+        crud.get_task_project_ids(
+            session=db, owner_id=stranger.id, task_ids=[task.id for task in chain]
+        )
+        == {}
+    )
+    assert (
+        crud.get_task_project_ids(session=db, owner_id=stranger.id, task_ids=[]) == {}
+    )

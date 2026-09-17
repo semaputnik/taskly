@@ -206,7 +206,11 @@ def read_tasks(
         query=query,
         project_ids=caller.project_ids if caller.bot else None,
     )
-    project_ids = crud.get_task_project_ids(session=session, owner_id=caller.owner_id)
+    project_ids = crud.get_task_project_ids(
+        session=session,
+        owner_id=caller.owner_id,
+        task_ids=[task.id for task in tasks],
+    )
     tags = crud.get_task_tags(session=session, task_ids=[task.id for task in tasks])
     recurrences = crud.get_recurrences(session=session, tasks=tasks)
     bot_users = crud.get_bot_user_refs(
@@ -314,12 +318,16 @@ def _projects_of(
     session: SessionDep, current_user: CurrentUser, tasks: list[Task]
 ) -> dict[uuid.UUID, Project]:
     """
-    The project each task resolves to, in one walk down the user's trees
-    rather than one per task: a batch may name hundreds.
+    The project each task resolves to, in one walk up from the batch rather
+    than one per task: a batch may name hundreds.
     """
     if not tasks:
         return {}
-    project_ids = crud.get_task_project_ids(session=session, owner_id=current_user.id)
+    project_ids = crud.get_task_project_ids(
+        session=session,
+        owner_id=current_user.id,
+        task_ids=[task.id for task in tasks],
+    )
     projects = {
         project.id: project
         for project in session.exec(

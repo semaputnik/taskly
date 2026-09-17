@@ -136,16 +136,42 @@ def _locate(
     keyed by entity id. An entity that is gone, or hangs off a task that is,
     has no entry here, so its log entry carries no link.
     """
-    task_projects = crud.get_task_project_ids(session=session, owner_id=owner_id)
     by_type: dict[str, set[uuid.UUID]] = {}
     for entry in entries:
         by_type.setdefault(entry.entity_type, set()).add(entry.entity_id)
 
+    # The task each comment and attachment hangs off, so that one lookup
+    # resolves every task this page of the log touches.
+    parents: dict[uuid.UUID, uuid.UUID] = {}
+    for model, entity_type in (
+        (Comment, ActivityEntityType.COMMENT),
+        (Attachment, ActivityEntityType.ATTACHMENT),
+    ):
+        if ids := by_type.get(entity_type):
+            parents.update(
+                session.exec(
+                    select(model.id, model.task_id).where(col(model.id).in_(ids))
+                ).all()
+            )
+    task_ids = by_type.get(ActivityEntityType.TASK, set())
+    task_projects = crud.get_task_project_ids(
+        session=session,
+        owner_id=owner_id,
+        task_ids=task_ids | set(parents.values()),
+    )
+
     locations = {
         task_id: task_projects[task_id]
-        for task_id in by_type.get(ActivityEntityType.TASK, set())
+        for task_id in task_ids
         if task_id in task_projects
     }
+    locations.update(
+        {
+            row_id: task_projects[task_id]
+            for row_id, task_id in parents.items()
+            if task_id in task_projects
+        }
+    )
     if project_ids := by_type.get(ActivityEntityType.PROJECT):
         live = session.exec(
             select(Project.id).where(
@@ -153,21 +179,6 @@ def _locate(
             )
         ).all()
         locations.update({project_id: project_id for project_id in live})
-    for model, entity_type in (
-        (Comment, ActivityEntityType.COMMENT),
-        (Attachment, ActivityEntityType.ATTACHMENT),
-    ):
-        if ids := by_type.get(entity_type):
-            rows = session.exec(
-                select(model.id, model.task_id).where(col(model.id).in_(ids))
-            ).all()
-            locations.update(
-                {
-                    row_id: task_projects[task_id]
-                    for row_id, task_id in rows
-                    if task_id in task_projects
-                }
-            )
     return locations
 
 
