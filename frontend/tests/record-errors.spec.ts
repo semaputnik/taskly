@@ -77,8 +77,13 @@ test("A failure that may pass offers to try again", async ({ page }) => {
   await expect(panel).toContainText("could not be loaded", { timeout: 3_000 })
   await expect(panel.locator("[data-slot=skeleton]")).toHaveCount(0)
 
+  // The request is let through only once the button can take the click:
+  // released any earlier, the query's own retry can load the task while the
+  // panel is still sliding in, and the button is gone before it is pressed.
+  const tryAgain = panel.getByRole("button", { name: "Try again" })
+  await tryAgain.click({ trial: true })
   failing = false
-  await panel.getByRole("button", { name: "Try again" }).click()
+  await tryAgain.click()
   await expect(page.getByRole("dialog", { name: "Book the vet" })).toBeVisible()
   await expect(page.getByRole("textbox", { name: "Task title" })).toHaveValue(
     "Book the vet",
