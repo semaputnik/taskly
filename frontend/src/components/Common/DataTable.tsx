@@ -177,7 +177,7 @@ export function DataTable<TData extends RowData>({
                       <button
                         type="button"
                         onClick={() => sorting.onSort(field)}
-                        className="hover:text-foreground focus-visible:ring-ring -mx-1 flex items-center gap-1 rounded px-1 outline-none focus-visible:ring-2"
+                        className="hover:text-foreground focus-visible:ring-ring -mx-1 flex items-center gap-1 rounded px-1 tracking-[inherit] uppercase outline-none focus-visible:ring-2"
                       >
                         {content}
                         {active ? (

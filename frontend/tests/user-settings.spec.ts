@@ -41,7 +41,7 @@ test.describe("Edit user profile", () => {
   test("Edit user name with a valid name", async ({ page }) => {
     const updatedName = "Test User 2"
 
-    await page.getByRole("button", { name: "Edit" }).click()
+    await page.getByRole("button", { name: "Edit profile" }).click()
     await page.getByLabel("Full name").fill(updatedName)
     await page.getByRole("button", { name: "Save" }).click()
 
@@ -54,7 +54,7 @@ test.describe("Edit user profile", () => {
   test("Edit user email with an invalid email shows error", async ({
     page,
   }) => {
-    await page.getByRole("button", { name: "Edit" }).click()
+    await page.getByRole("button", { name: "Edit profile" }).click()
     await page.getByLabel("Email").fill("")
     // Validation runs on blur. Leave the field directly rather than clicking
     // the middle of the page for it: where that lands depends on the layout.
@@ -77,7 +77,7 @@ test.describe("Edit user email", () => {
     await page.goto("/settings")
     await page.getByRole("tab", { name: "My profile" }).click()
 
-    await page.getByRole("button", { name: "Edit" }).click()
+    await page.getByRole("button", { name: "Edit profile" }).click()
     await page.getByLabel("Email").fill(updatedEmail)
     await page.getByRole("button", { name: "Save" }).click()
 
@@ -99,7 +99,7 @@ test.describe("Cancel edit actions", () => {
     await logInUser(page, email, password)
     await page.goto("/settings")
     await page.getByRole("tab", { name: "My profile" }).click()
-    await page.getByRole("button", { name: "Edit" }).click()
+    await page.getByRole("button", { name: "Edit profile" }).click()
     await page.getByLabel("Full name").fill("Test User")
     await page.getByRole("button", { name: "Cancel" }).first().click()
 
@@ -116,7 +116,7 @@ test.describe("Cancel edit actions", () => {
     await logInUser(page, email, password)
     await page.goto("/settings")
     await page.getByRole("tab", { name: "My profile" }).click()
-    await page.getByRole("button", { name: "Edit" }).click()
+    await page.getByRole("button", { name: "Edit profile" }).click()
     await page.getByLabel("Email").fill(randomEmail())
     await page.getByRole("button", { name: "Cancel" }).first().click()
 

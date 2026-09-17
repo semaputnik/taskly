@@ -287,10 +287,12 @@ function MoreLink({
     <RouterLink
       to="/tasks"
       search={search}
-      className="text-muted-foreground hover:bg-muted/50 hover:text-foreground flex items-center gap-1.5 border-b px-4 py-2.5 text-sm transition-colors last:border-b-0"
+      className="hover:bg-muted/50 flex items-center justify-between gap-2 border-b px-4 py-3 text-sm transition-colors last:border-b-0"
     >
-      {count > 0 ? `${count} more` : label}
-      <ArrowRight className="size-3.5" aria-hidden />
+      <span className="text-muted-foreground">
+        {count > 0 ? `${count} more` : label}
+      </span>
+      <ArrowRight className="text-muted-foreground size-4" aria-hidden />
     </RouterLink>
   )
 }

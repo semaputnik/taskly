@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react"
 
 import { ProjectsService, type TaskPublic } from "@/client"
 import {
+  DescriptionSection,
   ghost,
   RecordHeader,
   titleFieldClass,
@@ -22,7 +23,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
 import { type CaptureTarget, useTaskCapture } from "./capture"
 import { carryOver, emptyDraft, isTouched, type TaskFields } from "./draft"
-import { DescriptionSection, TaskPropertyRows } from "./TaskProperties"
+import { TaskPropertyRows } from "./TaskProperties"
 
 // The commit chord, named the way the reader's keyboard names it.
 const CHORD =

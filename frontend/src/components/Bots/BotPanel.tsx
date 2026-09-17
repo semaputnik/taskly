@@ -19,11 +19,13 @@ import {
   RecordPanel,
   recordLoad,
   titleFieldClass,
+  valueInset,
 } from "@/components/Records/RecordPanel"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import useCustomToast from "@/hooks/useCustomToast"
 import { formatDateTime, formatDayOf } from "@/lib/dates"
+import { cn } from "@/lib/utils"
 import { handleError } from "@/utils"
 import { BotConsole } from "./BotConsole"
 import { scopeProjectsQueryOptions } from "./BotFormFields"
@@ -160,7 +162,7 @@ function BotRecord({ bot }: { bot: BotUserPublic }) {
 
       <PropertyList>
         <PropertyRow icon={KeyRound} label="Token">
-          <div className="flex flex-wrap items-center gap-2 px-2">
+          <div className={cn("flex flex-wrap items-center gap-2", valueInset)}>
             <span>{STATUS_TEXT[status]}</span>
             {/* Issuing keeps its dialog: the token is shown once and cannot be
                 read back, so it is a deliberate step, not a click (FR-08.13). */}
@@ -206,7 +208,7 @@ function BotRecord({ bot }: { bot: BotUserPublic }) {
         </PropertyRow>
 
         <PropertyRow icon={FolderKanban} label="Projects">
-          <div className="flex flex-col gap-2 px-2 py-1">
+          <div className={cn("flex flex-col gap-2 py-1", valueInset)}>
             {(projects ?? []).map((project) => {
               const id = `scope-${bot.id}-${project.id}`
               return (
@@ -239,7 +241,7 @@ function BotRecord({ bot }: { bot: BotUserPublic }) {
         </PropertyRow>
 
         <PropertyRow icon={ShieldCheck} label="Permissions">
-          <div className="flex flex-col gap-3 px-2 py-1">
+          <div className={cn("flex flex-col gap-3 py-1", valueInset)}>
             {PERMISSION_GROUPS.map((group) => (
               <fieldset key={group.title} className="flex flex-col gap-2">
                 <legend className="text-muted-foreground text-xs">
