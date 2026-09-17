@@ -4,7 +4,7 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, HTTPException, Query
 
-from app import activity, crud
+from app import activity, crud, deletions
 from app.api import access
 from app.api.access import TaskAction
 from app.api.deps import Caller, CallerDep, CurrentUser, SessionDep
@@ -423,8 +423,8 @@ def bulk_delete_tasks(
     if refusals:
         raise _bulk_refusal(refusals)
 
-    deleted = crud.bulk_delete_tasks(session=session, tasks=tasks)
-    return BulkResult(deleted=deleted)
+    deletion_id = deletions.delete_tasks(session, tasks)
+    return BulkResult(deleted=len(deletions.marked_task_ids(session, deletion_id)))
 
 
 @router.get("/{task_id}", response_model=TaskPublic)
@@ -645,5 +645,5 @@ def delete_task(
             },
         )
 
-    crud.delete_task(session=session, task=task)
+    deletions.delete_task(session, task)
     return Message(message="Task deleted successfully")

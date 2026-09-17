@@ -13,7 +13,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import event
 from sqlmodel import Session
 
-from app import crud
+from app import crud, deletions
 from app.api import access
 from app.api.access import TaskAction
 from app.api.deps import Caller
@@ -87,12 +87,12 @@ def world(db: Session) -> World:
     outside_task = _task(db, owner.id, project=outside)
 
     deleted = _task(db, owner.id, project=live)
-    crud.delete_task(session=db, task=deleted)
+    deletions.delete_task(db, deleted)
     # A live-looking task under a deleted ancestor: the ancestor was deleted
     # on its own, after its subtask had been restored from an earlier event.
     doomed = _task(db, owner.id, project=live)
     under_deleted = _task(db, owner.id, parent=doomed)
-    crud.delete_task(session=db, task=doomed)
+    deletions.delete_task(db, doomed)
     under_deleted.deletion_id = None
     db.add(under_deleted)
     db.commit()

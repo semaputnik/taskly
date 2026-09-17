@@ -5,9 +5,10 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Query
 from sqlmodel import col, func, select
 
-from app import crud
+from app import crud, deletions
 from app.api.access import require_project_writable
 from app.api.deps import CurrentUser, SessionDep
+from app.deletions import DeletionKind, Restorability, RestoreRefusal
 from app.models import (
     ActivityAction,
     ActivityEntityType,
@@ -17,10 +18,8 @@ from app.models import (
     Attachment,
     BotUser,
     Comment,
-    Deletion,
     Message,
     Project,
-    Task,
 )
 
 router = APIRouter(prefix="/activity-log", tags=["activity"])
@@ -92,22 +91,17 @@ def read_activity_log(
             )
         ).all()
     )
-    # The deletion events on this page that still have rows to bring back.
-    deletion_ids = {
-        entry.deletion_id
-        for entry in entries
-        if entry.action in _DELETIONS and entry.deletion_id
-    }
-    still_deleted: set[uuid.UUID | None] = set()
-    if deletion_ids:
-        for model in (Task, Project):
-            still_deleted.update(
-                session.exec(
-                    select(model.deletion_id).where(
-                        col(model.deletion_id).in_(deletion_ids)
-                    )
-                ).all()
-            )
+    # The deletion events on this page, and whether each still has something
+    # to bring back: the same answer a restore of it would act on.
+    verdicts = deletions.restorability(
+        session,
+        current_user.id,
+        {
+            entry.deletion_id
+            for entry in entries
+            if entry.action in _DELETIONS and entry.deletion_id
+        },
+    )
 
     return ActivityEntriesPublic(
         data=[
@@ -116,8 +110,7 @@ def read_activity_log(
                 update={
                     "entity_exists": entry.entity_id in locations,
                     "entity_project_id": locations.get(entry.entity_id),
-                    "restorable": entry.action in _DELETIONS
-                    and entry.deletion_id in still_deleted,
+                    "restorable": _restorable(entry, verdicts),
                     "actor_bot_user_name": bot_names.get(entry.actor_bot_user_id)
                     if entry.actor_bot_user_id
                     else None,
@@ -127,6 +120,17 @@ def read_activity_log(
         ],
         count=count,
     )
+
+
+def _restorable(
+    entry: ActivityEntry, verdicts: dict[uuid.UUID, deletions.Restorability]
+) -> bool:
+    """Whether the entry is a deletion that still has something to bring back."""
+    deletion_id = entry.deletion_id
+    if entry.action not in _DELETIONS or deletion_id is None:
+        return False
+    verdict = verdicts.get(deletion_id)
+    return verdict is not None and verdict.restorable
 
 
 def _locate(
@@ -203,102 +207,65 @@ def restore_from_activity_entry(
     if entry.action not in _DELETIONS or entry.deletion_id is None:
         raise HTTPException(status_code=400, detail="Only a deletion can be restored")
 
-    deletion = session.get_one(Deletion, entry.deletion_id)
-    tasks = crud.get_deletion_rows(session=session, deletion_id=deletion.id)
-    if deletion.project_id is not None:
-        project = session.get_one(Project, deletion.project_id)
-        if project.deletion_id is None:
-            return Message(message="Already restored")
-        _check_project_restore(session, deletion, project, tasks)
-        crud.restore_deletion(session=session, tasks=tasks, project=project)
-        return Message(message="Project restored")
-
-    if deletion.task_id is None:
-        # A batch: the event names no single task, so every task it took down
-        # on its own account is checked, and they come back together or not at
-        # all — the act being undone was one act (semaputnik/taskly#66).
-        if not tasks:
-            return Message(message="Already restored")
-        for restored in tasks:
-            if restored.parent_id is None or restored.parent_id not in {
-                task.id for task in tasks
-            }:
-                _check_task_restore(session, restored, tasks)
-        crud.restore_deletion(session=session, tasks=tasks)
-        return Message(message="Tasks restored")
-
-    task = session.get_one(Task, deletion.task_id)
-    if not tasks:
-        if task.deletion_id is None:
-            return Message(message="Already restored")
-        raise _refuse(
-            DELETED_AGAIN_CODE,
-            "This task was restored and then deleted again. Restore it from "
-            "the later deletion instead.",
-        )
-    _check_task_restore(session, task, tasks)
-    crud.restore_deletion(session=session, tasks=tasks)
-    return Message(message="Task restored")
+    verdict = deletions.restore(session, current_user.id, entry.deletion_id)
+    if verdict.refusal is RestoreRefusal.ALREADY_RESTORED:
+        return Message(message="Already restored")
+    if verdict.refusal is not None:
+        raise _refusal(verdict)
+    return Message(message=_RESTORED[verdict.kind])
 
 
-def _check_task_restore(session: SessionDep, task: Task, tasks: Sequence[Task]) -> None:
-    """Refuse a task restore that has nowhere to come back to."""
-    if task.parent_id is not None:
-        parent = session.get_one(Task, task.parent_id)
-        if parent.deletion_id is not None:
-            raise _refuse(
+_RESTORED = {
+    DeletionKind.TASK: "Task restored",
+    DeletionKind.PROJECT: "Project restored",
+    DeletionKind.BATCH: "Tasks restored",
+}
+
+
+def _refusal(verdict: Restorability) -> HTTPException:
+    """A restore that cannot go ahead, said the way the API says it."""
+    subject = verdict.subject
+    match verdict.refusal:
+        case RestoreRefusal.PROJECT_ARCHIVED:
+            # Restoring writes into the project, so an archived one refuses
+            # it the same way it refuses any other change.
+            assert verdict.project is not None
+            try:
+                require_project_writable(verdict.project)
+            except HTTPException as refused:
+                return refused
+            raise AssertionError("an archived project refuses writes")
+        case RestoreRefusal.PARENT_DELETED:
+            return _refuse(
                 PARENT_DELETED_CODE,
-                f"“{task.title}” is a subtask of “{parent.title}”, which is "
+                f"“{subject}” is a subtask of “{verdict.parent}”, which is "
                 "deleted. Restore that task first.",
             )
-
-    # The task is deleted, so the walk up to its project goes through
-    # deleted tasks too.
-    project_id = crud.get_task_project_ids(
-        session=session,
-        owner_id=task.owner_id,
-        task_ids=[task.id],
-        including_deleted=True,
-    )[task.id]
-    project = session.get_one(Project, project_id)
-    if project.deletion_id is not None:
-        raise _refuse(
-            PROJECT_DELETED_CODE,
-            f"“{task.title}” belongs to the project “{project.name}”, which is "
-            "deleted. Restore the project first.",
-        )
-    # Restoring writes into the project, so an archived one refuses it the
-    # same way it refuses any other change.
-    require_project_writable(project)
-
-    if crud.restoring_reopens_a_series(session=session, tasks=tasks):
-        raise _refuse(
-            SERIES_HAS_OPEN_OCCURRENCE_CODE,
-            f"“{task.title}” repeats, and another occurrence of it is already "
-            "open. Complete or delete that one first.",
-        )
-
-
-def _check_project_restore(
-    session: SessionDep, deletion: Deletion, project: Project, tasks: Sequence[Task]
-) -> None:
-    """
-    Refuse a project restore that cannot be done whole.
-
-    A project comes back archived if it was archived when deleted: the two
-    states are independent (FR-05.10), so that is no reason to refuse.
-    """
-    if project.deletion_id != deletion.id:
-        raise _refuse(
-            DELETED_AGAIN_CODE,
-            "This project was restored and then deleted again. Restore it "
-            "from the later deletion instead.",
-        )
-    if crud.restoring_reopens_a_series(session=session, tasks=tasks):
-        # Refused as a whole: bringing the project back without one of its
-        # tasks would be a restore nobody asked for.
-        raise _refuse(
-            SERIES_HAS_OPEN_OCCURRENCE_CODE,
-            f"A repeating task in “{project.name}” has another occurrence "
-            "already open. Complete or delete that one first.",
-        )
+        case RestoreRefusal.PROJECT_DELETED:
+            assert verdict.project is not None
+            return _refuse(
+                PROJECT_DELETED_CODE,
+                f"“{subject}” belongs to the project “{verdict.project.name}”, "
+                "which is deleted. Restore the project first.",
+            )
+        case RestoreRefusal.SERIES_HAS_OPEN_OCCURRENCE if (
+            verdict.kind is DeletionKind.PROJECT
+        ):
+            return _refuse(
+                SERIES_HAS_OPEN_OCCURRENCE_CODE,
+                f"A repeating task in “{subject}” has another occurrence "
+                "already open. Complete or delete that one first.",
+            )
+        case RestoreRefusal.SERIES_HAS_OPEN_OCCURRENCE:
+            return _refuse(
+                SERIES_HAS_OPEN_OCCURRENCE_CODE,
+                f"“{subject}” repeats, and another occurrence of it is already "
+                "open. Complete or delete that one first.",
+            )
+        case _:
+            what = "project" if verdict.kind is DeletionKind.PROJECT else "task"
+            return _refuse(
+                DELETED_AGAIN_CODE,
+                f"This {what} was restored and then deleted again. Restore it "
+                "from the later deletion instead.",
+            )

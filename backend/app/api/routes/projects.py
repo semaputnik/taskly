@@ -4,7 +4,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException
 from sqlmodel import col, func, select
 
-from app import crud
+from app import crud, deletions
 from app.api import access
 from app.api.access import TaskAction
 from app.api.deps import Caller, CallerDep, CurrentUser, SessionDep
@@ -185,5 +185,5 @@ def delete_project(
         raise HTTPException(
             status_code=400, detail="The Inbox project cannot be deleted"
         )
-    crud.delete_project(session=session, project=project)
+    deletions.delete_project(session, project)
     return Message(message="Project deleted successfully")

@@ -29,7 +29,6 @@ from app.models import (
     Comment,
     CommentCreate,
     CommentUpdate,
-    Deletion,
     DueDateScope,
     Project,
     ProjectCreate,
@@ -1166,116 +1165,9 @@ def _stage_tag_changes(
         _stage_task_tags(session=session, task=task, names=wanted)
 
 
-def bulk_delete_tasks(*, session: Session, tasks: Sequence[Task]) -> int:
-    """
-    Soft-delete several tasks and their subtrees as one event, so that one act
-    is one thing to undo (FR-10.4).
-
-    The event names no single task: the user pointed at a selection, and the
-    rows carrying the event are the whole of what went down.
-    """
-    deletion = Deletion(owner_id=tasks[0].owner_id)
-    session.add(deletion)
-    session.flush()
-
-    for task in tasks:
-        subtree = _subtree_cte(task.id)
-        _mark_deleted(session=session, task_ids=select(subtree.c.id), deletion=deletion)
-        task.deletion_id = deletion.id
-        session.add(task)
-    session.flush()
-    deleted = session.exec(
-        select(func.count()).select_from(Task).where(Task.deletion_id == deletion.id)
-    ).one()
-    session.commit()
-    return deleted
-
-
-def delete_task(*, session: Session, task: Task) -> None:
-    """
-    Soft-delete a task and its subtree as a single event (FR-01.8, FR-01.11). Nothing is removed: every row keeps its data and points at the
-    event that took it down, so a later restore can bring back exactly these
-    rows — and only these.
-    """
-    deletion = Deletion(owner_id=task.owner_id, task_id=task.id)
-    session.add(deletion)
-    # The event row has to exist before anything can point at it.
-    session.flush()
-
-    subtree = _subtree_cte(task.id)
-    _mark_deleted(session=session, task_ids=select(subtree.c.id), deletion=deletion)
-    task.deletion_id = deletion.id
-    session.add(task)
-    session.commit()
-
-
-def delete_project(*, session: Session, project: Project) -> None:
-    """
-    Soft-delete a project and every task in it as a single event (FR-05.8,
-    FR-05.9).
-    """
-    deletion = Deletion(owner_id=project.owner_id, project_id=project.id)
-    session.add(deletion)
-    session.flush()
-
-    _mark_deleted(
-        session=session, task_ids=project_task_ids(project.id), deletion=deletion
-    )
-    project.deletion_id = deletion.id
-    session.add(project)
-    session.commit()
-
-
-def get_deletion_rows(*, session: Session, deletion_id: uuid.UUID) -> Sequence[Task]:
-    """The tasks a deletion event took down that are still deleted by it."""
-    return session.exec(select(Task).where(Task.deletion_id == deletion_id)).all()
-
-
-def restoring_reopens_a_series(*, session: Session, tasks: Sequence[Task]) -> bool:
-    """
-    Whether bringing these tasks back would leave a recurring series with two
-    open occurrences (FR-01.16): one of them is open, and its series already
-    has another open occurrence that is not deleted.
-    """
-    restoring = [task.id for task in tasks]
-    for task in tasks:
-        if task.series_id is None or task.status is TaskStatus.DONE:
-            continue
-        statement = (
-            select(Task.id)
-            .where(
-                Task.series_id == task.series_id,
-                is_open(Task),
-                not_deleted(Task),
-                col(Task.id).not_in(restoring),
-            )
-            .limit(1)
-        )
-        if session.exec(statement).first() is not None:
-            return True
-    return False
-
-
-def restore_deletion(
-    *, session: Session, tasks: Sequence[Task], project: Project | None = None
-) -> None:
-    """
-    Bring back the rows of one deletion event (FR-10.4, FR-01.10, FR-05.9).
-
-    Clearing the marker is the whole restore, for a task and its subtasks and
-    for a project and its tasks alike: nothing is re-created, so each row comes
-    back as itself, with its comments, attachments, tags and history. Only the
-    rows still marked by this event come back, which is what leaves anything
-    deleted on its own beforehand deleted. Archiving is a separate state and is
-    left as it was.
-    """
-    for task in tasks:
-        task.deletion_id = None
-        session.add(task)
-    if project is not None:
-        project.deletion_id = None
-        session.add(project)
-    session.commit()
+def subtree_ids(root_id: uuid.UUID) -> Any:
+    """Selects the ids of every live descendant of `root_id`."""
+    return select(_subtree_cte(root_id).c.id)
 
 
 def project_task_ids(project_id: uuid.UUID) -> Any:
@@ -1334,13 +1226,6 @@ def _tree_walk(start_condition: Any, *, name: str) -> Any:
         .join(tree, col(child.parent_id) == tree.c.id)
         .where(not_deleted(child))
     )
-
-
-def _mark_deleted(*, session: Session, task_ids: Any, deletion: Deletion) -> None:
-    statement = select(Task).where(col(Task.id).in_(task_ids))
-    for task in session.exec(statement):
-        task.deletion_id = deletion.id
-        session.add(task)
 
 
 def complete_subtasks(*, session: Session, task: Task) -> None:
