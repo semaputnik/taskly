@@ -178,7 +178,7 @@ export function CaptureField({
 
 /** Elements that own the keyboard while they are open. */
 const KEYBOARD_OWNERS =
-  '[data-slot="dialog-content"],[data-slot="sheet-content"],[data-slot="select-content"],[data-slot="dropdown-menu-content"]'
+  '[data-slot="dialog-content"],[data-slot="sheet-content"],[data-slot="select-content"],[data-slot="dropdown-menu-content"],[data-slot="popover-content"]'
 
 /**
  * The one key that starts capture from anywhere in the app.

@@ -49,7 +49,7 @@ import {
   statusIcon,
   useTaskStatus,
 } from "./status"
-import { TagsField } from "./TagsField"
+import { TagPicker } from "./TagPicker"
 import { useTaskUpdate } from "./useTaskUpdate"
 
 const NO_PRIORITY = "none"
@@ -190,12 +190,10 @@ export function TaskProperties({ task }: { task: TaskPublic }) {
           />
         </PropertyRow>
 
-        <PropertyRow icon={Tag} label="Tags" htmlFor={`${ids}-tags`}>
-          <TagsField
-            id={`${ids}-tags`}
+        <PropertyRow icon={Tag} label="Tags">
+          <TagPicker
             value={task.tags ?? []}
             onChange={(tags) => save({ tags })}
-            className={cn(ghost, "w-full")}
           />
         </PropertyRow>
 

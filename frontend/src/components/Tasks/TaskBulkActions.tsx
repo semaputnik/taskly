@@ -35,7 +35,7 @@ import {
 import useCustomToast from "@/hooks/useCustomToast"
 import { handleError } from "@/utils"
 import { StatusMenuItems } from "./status"
-import { TagsField } from "./TagsField"
+import { BulkTagPicker } from "./TagPicker"
 
 /**
  * What a selection can be done to, in one bar.
@@ -75,14 +75,18 @@ export function TaskBulkActions({
   const [dueDate, setDueDate] = useState("")
 
   const change = useMutation({
-    mutationFn: (body: Omit<TaskBulkUpdate, "task_ids">) =>
+    mutationFn: ({
+      keepSelection: _keep,
+      ...body
+    }: Omit<TaskBulkUpdate, "task_ids"> & { keepSelection?: boolean }) =>
       TasksService.bulkUpdateTasks({ body: { ...body, task_ids: selected } }),
-    onSuccess: ({ data }) => {
+    onSuccess: ({ data }, { keepSelection }) => {
       setRefused([])
       showSuccessToast(
         `${data.updated} ${data.updated === 1 ? "task" : "tasks"} changed`,
       )
-      onDone()
+      // Tagging keeps the selection, so several tags go on in one visit.
+      if (!keepSelection) onDone()
     },
     onError: (error: Error) => {
       // A batch lands whole or not at all, so a refusal names the rows that
@@ -160,16 +164,11 @@ export function TaskBulkActions({
           }}
         />
 
-        <div className="w-48">
-          <TagsField
-            value={[]}
-            floatingHint
-            aria-label="Add a tag to the selection"
-            onChange={(tags) =>
-              tags.length > 0 && change.mutate({ add_tags: tags })
-            }
-          />
-        </div>
+        <BulkTagPicker
+          onAdd={(tag) =>
+            change.mutate({ add_tags: [tag], keepSelection: true })
+          }
+        />
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

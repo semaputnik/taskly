@@ -665,6 +665,14 @@ record type the product has: tasks, projects, tags and bot users. A right-hand
   row. An unset value reads *Not set* in italic Ink Muted, never blank. The
   record's own history belongs here too: when it was created is a property, not
   a footnote.
+- **A value that wraps keeps its label on its first line.** The label and the
+  value are each at least one control tall and top-aligned, so a single-line
+  row reads as it always did and a row of chips does not pull its label into
+  its middle. Tags are the case: the chips, then a ghost **+ Add tag** button
+  that opens a popover to search, choose and create. Anything that needs room
+  to find or create a value goes in a popover anchored to the value, never
+  stacked under the row. The popover is Paper with a hairline and the floating
+  shadow; its highlighted row is Surface Quiet and its check is Ink.
 - **The corner is for dismissal only.** Close sits alone in the top-right, a
   32px target under a mouse and 44px under a thumb, like every dismiss control
   in the product. The corner of a sheet is muscle memory for *dismiss*, so

@@ -251,6 +251,11 @@ export function RecordHeader({
  *
  * The label column is proportional until there is room for a fixed one — on a
  * phone, 8rem of label leaves a third of the screen for the value it labels.
+ *
+ * The label sits beside the value's first line, not the middle of it: a value
+ * that wraps — a task's tags — keeps its label where the eye expects it. Both
+ * sides are at least one control tall, so a single-line row is centred as it
+ * always was.
  */
 export function PropertyRow({
   icon: Icon,
@@ -264,15 +269,17 @@ export function PropertyRow({
   children: React.ReactNode
 }) {
   return (
-    <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,3fr)] items-center gap-2 py-1 md:grid-cols-[8rem_1fr]">
+    <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,3fr)] items-start gap-2 py-1 md:grid-cols-[8rem_1fr]">
       <label
         htmlFor={htmlFor}
-        className="text-muted-foreground flex items-center gap-2 text-sm"
+        className="text-muted-foreground flex min-h-9 items-center gap-2 text-sm pointer-coarse:min-h-11"
       >
         <Icon className="size-4 shrink-0" aria-hidden />
         {label}
       </label>
-      <div className="min-w-0 text-sm">{children}</div>
+      <div className="grid min-h-9 min-w-0 items-center text-sm pointer-coarse:min-h-11">
+        {children}
+      </div>
     </div>
   )
 }
