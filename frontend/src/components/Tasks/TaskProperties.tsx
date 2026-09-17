@@ -1,9 +1,7 @@
 import { useQuery } from "@tanstack/react-query"
 import {
   Calendar,
-  CircleCheck,
-  CircleDashed,
-  Clock,
+  CalendarPlus,
   Flag,
   FolderKanban,
   Repeat,
@@ -16,6 +14,7 @@ import {
   ProjectsService,
   type RecurrenceFrequency,
   type TaskPublic,
+  type TaskStatus,
   type TaskUpdate,
 } from "@/client"
 import { DayField } from "@/components/Common/DayField"
@@ -43,6 +42,13 @@ import {
   MIN_INTERVAL_DAYS,
   NO_RECURRENCE,
 } from "./recurrence"
+import {
+  STATUS_LABELS,
+  STATUSES,
+  StatusGlyph,
+  statusIcon,
+  useTaskStatus,
+} from "./status"
 import { TagsField } from "./TagsField"
 import { useTaskUpdate } from "./useTaskUpdate"
 
@@ -59,6 +65,8 @@ const NO_PRIORITY = "none"
 export function TaskProperties({ task }: { task: TaskPublic }) {
   const { user: currentUser } = useAuth()
   const update = useTaskUpdate(task)
+  // Status has its own path: moving to done may need the subtasks prompt.
+  const status = useTaskStatus(task)
   const ids = useId()
 
   // A subtask has no project or schedule of its own: it follows the task at
@@ -79,16 +87,27 @@ export function TaskProperties({ task }: { task: TaskPublic }) {
     <>
       <PropertyList>
         <PropertyRow
-          icon={task.status === "done" ? CircleCheck : CircleDashed}
+          icon={statusIcon(task.status)}
           label="Status"
+          htmlFor={`${ids}-status`}
         >
-          <span className="px-2">
-            {task.status === "done" ? (
-              <span className="font-medium">Completed</span>
-            ) : (
-              "Not completed"
-            )}
-          </span>
+          <Select
+            value={task.status}
+            onValueChange={(value) => status.change(value as TaskStatus)}
+            disabled={status.isPending}
+          >
+            <SelectTrigger id={`${ids}-status`} className={cn(ghost, "w-full")}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {STATUSES.map((value) => (
+                <SelectItem key={value} value={value}>
+                  <StatusGlyph status={value} />
+                  {STATUS_LABELS[value]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </PropertyRow>
 
         <PropertyRow
@@ -236,7 +255,7 @@ export function TaskProperties({ task }: { task: TaskPublic }) {
           )}
         </PropertyRow>
 
-        <PropertyRow icon={Clock} label="Created">
+        <PropertyRow icon={CalendarPlus} label="Created">
           <ReadOnlyValue>
             {task.created_at ? (
               <time dateTime={task.created_at}>
@@ -261,6 +280,8 @@ export function TaskProperties({ task }: { task: TaskPublic }) {
           }}
         />
       </div>
+
+      {status.prompt}
 
       <DueDateScopeDialog
         open={update.scopeNeeded}

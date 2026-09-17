@@ -1,7 +1,8 @@
 import { Link } from "@tanstack/react-router"
 import type { ReactNode } from "react"
 
-import type { ActivityEntryPublic } from "@/client"
+import type { ActivityEntryPublic, TaskStatus } from "@/client"
+import { STATUS_LABELS } from "@/components/Tasks/statuses"
 import { formatDay } from "@/lib/dates"
 
 interface ProjectRef {
@@ -22,12 +23,14 @@ const FIELD_LABELS: Record<string, string> = {
 /** What a batch did, in the words the reader will recognise. */
 function describeBatch(changes: Record<string, unknown>): string {
   const said: string[] = []
+  // Batches from before statuses recorded `completed`.
   if ("completed" in changes) {
     said.push(changes.completed ? "completed" : "reopened")
   }
   if ("status" in changes) {
+    const status = changes.status as TaskStatus
     said.push(
-      changes.status === "done" ? "completed" : `moved to ${changes.status}`,
+      status === "done" ? "completed" : `moved to ${STATUS_LABELS[status]}`,
     )
   }
   if ("priority" in changes) {
@@ -162,7 +165,15 @@ export function ActivityDescription({
     case "task_completed":
       return <>Completed {subject}</>
     case "task_reopened":
-      return <>Marked {subject} as not completed</>
+      return <>Reopened {subject}</>
+    case "task_status_changed": {
+      const to = detail<TaskStatus>(entry, "to")
+      return (
+        <>
+          Moved {subject} to {to ? STATUS_LABELS[to] : "another status"}
+        </>
+      )
+    }
     case "task_deleted": {
       // A batch names no single task: what it deleted is the selection, and
       // the count is what the entry has to say.

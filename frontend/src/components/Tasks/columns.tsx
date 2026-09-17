@@ -9,6 +9,7 @@ import { formatDay } from "@/lib/dates"
 import { cn } from "@/lib/utils"
 import { CompleteTask } from "./CompleteTask"
 import { describeRecurrence } from "./recurrence"
+import { STATUS_LABELS, StatusGlyph, StatusMenu } from "./status"
 
 interface ColumnOptions {
   /**
@@ -37,9 +38,7 @@ export function getColumns(
               className="rounded-full"
               checked={row.original.status === "done"}
               disabled
-              aria-label={
-                row.original.status === "done" ? "Completed" : "Not completed"
-              }
+              aria-label={STATUS_LABELS[row.original.status]}
             />
           ) : (
             <CompleteTask task={row.original} />
@@ -71,6 +70,26 @@ export function getColumns(
           )}
         </div>
       ),
+    },
+    {
+      // Next to the title it describes. A glyph that is told apart by shape,
+      // with its label, so the column reads without colour.
+      id: "status",
+      header: "Status",
+      cell: ({ row }) =>
+        readOnly ? (
+          <span className="text-muted-foreground flex items-center gap-1.5">
+            <StatusGlyph status={row.original.status} />
+            <span className="hidden sm:inline">
+              {STATUS_LABELS[row.original.status]}
+            </span>
+            <span className="sr-only sm:hidden">
+              {STATUS_LABELS[row.original.status]}
+            </span>
+          </span>
+        ) : (
+          <StatusMenu task={row.original} />
+        ),
     },
     {
       id: "project",

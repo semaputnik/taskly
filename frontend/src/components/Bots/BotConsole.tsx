@@ -9,6 +9,7 @@ import {
 } from "@/client"
 import { ActivityDescription } from "@/components/Activity/ActivityDescription"
 import { useRecordPanels } from "@/components/Records/panels"
+import { OPEN_STATUSES, StatusGlyph } from "@/components/Tasks/status"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import useAuth from "@/hooks/useAuth"
@@ -113,7 +114,13 @@ function BotActivity({ bot }: { bot: BotUserPublic }) {
 
 function BotTasks({ bot }: { bot: BotUserPublic }) {
   const { openTask } = useRecordPanels()
-  const query = { assignee_id: bot.id, skip: 0, limit: PREVIEW }
+  // What it is on: its open work, whatever stage that work is at.
+  const query = {
+    assignee_id: bot.id,
+    status: OPEN_STATUSES,
+    skip: 0,
+    limit: PREVIEW,
+  }
   const { data, isPending } = useQuery({
     queryKey: ["tasks", query],
     queryFn: async () => (await TasksService.readTasks({ query })).data,
@@ -124,8 +131,8 @@ function BotTasks({ bot }: { bot: BotUserPublic }) {
   if (data.count === 0) {
     return (
       <Empty>
-        No tasks are assigned to this bot user. Assign one from a task's panel
-        to make this agent responsible for it.
+        No open tasks are assigned to this bot user. Assign one from a task's
+        panel to make this agent responsible for it.
       </Empty>
     )
   }
@@ -145,15 +152,8 @@ function BotTasks({ bot }: { bot: BotUserPublic }) {
               onClick={() => openTask(task.id)}
               className="hover:bg-accent flex w-full items-center gap-3 rounded-md border px-3 py-2 text-left text-sm transition-colors"
             >
-              <span
-                className={`min-w-0 flex-1 truncate ${
-                  task.status === "done"
-                    ? "text-muted-foreground line-through"
-                    : ""
-                }`}
-              >
-                {task.title}
-              </span>
+              <StatusGlyph status={task.status} labelled />
+              <span className="min-w-0 flex-1 truncate">{task.title}</span>
               {task.due_date && (
                 <span className="text-muted-foreground shrink-0 text-xs">
                   {formatDay(task.due_date)}
@@ -165,7 +165,7 @@ function BotTasks({ bot }: { bot: BotUserPublic }) {
       </ul>
       <HandOff
         to="/tasks"
-        search={{ assignee: bot.id }}
+        search={{ assignee: bot.id, status: OPEN_STATUSES }}
         count={data.count}
         shown={data.data.length}
         one="task"
@@ -190,7 +190,7 @@ function HandOff({
   where,
 }: {
   to: "/activity" | "/tasks"
-  search: Record<string, string>
+  search: Record<string, unknown>
   count: number
   shown: number
   /** English does not pluralise by rule, so both words are given. */

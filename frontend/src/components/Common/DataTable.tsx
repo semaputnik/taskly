@@ -89,6 +89,23 @@ interface DataTableProps<TData extends RowData> {
  */
 const INTERACTIVE = 'button, a, input, select, textarea, [role="checkbox"]'
 
+/**
+ * A cell's content, called rather than mounted when it is a plain function.
+ *
+ * `flexRender` mounts a function as a component, and the column definitions
+ * are rebuilt on every render of the table, so each render would hand React a
+ * new component type and remount every cell — dropping whatever a control in
+ * it was holding, like an open prompt or an announcement.
+ */
+function renderCell<TProps extends object>(
+  cell: unknown,
+  context: TProps,
+): React.ReactNode {
+  return typeof cell === "function"
+    ? (cell as (props: TProps) => React.ReactNode)(context)
+    : flexRender(cell as never, context)
+}
+
 function fromRowItself(event: React.MouseEvent<HTMLElement>): boolean {
   const target = event.target as HTMLElement | null
   return !target?.closest(INTERACTIVE)
@@ -243,7 +260,7 @@ export function DataTable<TData extends RowData>({
                   )}
                   {row.getAllCells().map((cell) => (
                     <TableCell key={cell.id}>
-                      {flexRender(
+                      {renderCell(
                         cell.column.columnDef.cell,
                         cell.getContext(),
                       )}

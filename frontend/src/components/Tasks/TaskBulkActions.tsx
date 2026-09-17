@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query"
-import { Trash2, X } from "lucide-react"
+import { ChevronDown, Trash2, X } from "lucide-react"
 import { useState } from "react"
 
 import {
@@ -18,6 +18,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { LoadingButton } from "@/components/ui/loading-button"
 import {
@@ -29,6 +34,7 @@ import {
 } from "@/components/ui/select"
 import useCustomToast from "@/hooks/useCustomToast"
 import { handleError } from "@/utils"
+import { StatusMenuItems } from "./status"
 import { TagsField } from "./TagsField"
 
 /**
@@ -165,6 +171,29 @@ export function TaskBulkActions({
           />
         </div>
 
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm">
+              Set status
+              <ChevronDown className="text-muted-foreground" aria-hidden />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
+            <StatusMenuItems
+              onChoose={(status) =>
+                // Done takes the subtasks with it, as Complete does: a batch
+                // has no one task to ask about.
+                change.mutate(
+                  status === "done"
+                    ? { status, subtasks: "complete" }
+                    : { status },
+                )
+              }
+            />
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        {/* The shortcut to done, kept beside the menu. */}
         <Button
           variant="outline"
           size="sm"

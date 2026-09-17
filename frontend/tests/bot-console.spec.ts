@@ -137,7 +137,9 @@ test("A bot user that has done nothing says what would appear", async ({
 
   await expect(panel).toContainText("Every change this bot user makes")
   await panel.getByRole("tab", { name: "Tasks" }).click()
-  await expect(panel).toContainText("No tasks are assigned to this bot user")
+  await expect(panel).toContainText(
+    "No open tasks are assigned to this bot user",
+  )
 })
 
 test("Token health is stated in words, not in timestamps", async ({ page }) => {

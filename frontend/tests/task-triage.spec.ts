@@ -274,11 +274,11 @@ test("Completion still works from the row, beside the title", async ({
 
   await page.goto("/tasks")
   await row(page, "Task 00")
-    .getByRole("checkbox", { name: "Mark as completed" })
+    .getByRole("checkbox", { name: "Mark as done" })
     .click()
   await expect(
     row(page, "Task 00").getByRole("checkbox", {
-      name: "Mark as not completed",
+      name: "Reopen task",
     }),
   ).toBeVisible()
   // The selection checkbox is a different control, and did not move.

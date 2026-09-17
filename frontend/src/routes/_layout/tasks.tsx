@@ -3,12 +3,7 @@ import { createFileRoute, Link as RouterLink } from "@tanstack/react-router"
 import { CheckSquare, SearchX } from "lucide-react"
 import { useState } from "react"
 
-import {
-  ProjectsService,
-  type TaskPublic,
-  type TaskStatus,
-  TasksService,
-} from "@/client"
+import { ProjectsService, type TaskPublic, TasksService } from "@/client"
 import { DataTable } from "@/components/Common/DataTable"
 import { EmptyState } from "@/components/Common/EmptyState"
 import { useRecordPanels, withoutPanelState } from "@/components/Records/panels"
@@ -42,20 +37,9 @@ const EMPTY: ReadonlySet<string> = new Set()
 const SORT_FIELDS = { due_date: "due_date", priority: "priority" }
 
 function getTasksQueryOptions(search: TaskListSearch, currentUserId?: string) {
-  const {
-    assignee,
-    completed,
-    page = 1,
-    ...filters
-  } = withoutPanelState(search)
+  const { assignee, page = 1, ...filters } = withoutPanelState(search)
   const query = {
     ...filters,
-    status:
-      completed === undefined
-        ? undefined
-        : completed
-          ? (["done"] satisfies TaskStatus[])
-          : (["todo", "in_progress", "waiting"] satisfies TaskStatus[]),
     // "Me" needs the id the API filters on, a bot user is named by its own
     // id, and "unassigned" is a flag of its own.
     assignee_id:
