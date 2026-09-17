@@ -10,9 +10,8 @@ import {
 import { Button } from "@/components/ui/button"
 import { LoadingButton } from "@/components/ui/loading-button"
 import { Separator } from "@/components/ui/separator"
-import useCustomToast from "@/hooks/useCustomToast"
 import { attachmentsQuery, useReportChange } from "@/lib/serverState"
-import { handleError } from "@/utils"
+import { toastError } from "@/lib/toasts"
 import { DeleteAttachment } from "./DeleteAttachment"
 
 interface TaskAttachmentsProps {
@@ -33,7 +32,6 @@ function formatSize(bytes: number): string {
 export const TaskAttachments = ({ task }: TaskAttachmentsProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const reportChange = useReportChange()
-  const { showErrorToast } = useCustomToast()
 
   const { data: attachments, isLoading } = useQuery(attachmentsQuery(task.id))
 
@@ -46,7 +44,7 @@ export const TaskAttachments = ({ task }: TaskAttachmentsProps) => {
         path: { task_id: task.id },
         body: { file },
       }),
-    onError: handleError.bind(showErrorToast),
+    onError: (error) => toastError(error),
     onSettled: invalidate,
   })
 
@@ -69,7 +67,7 @@ export const TaskAttachments = ({ task }: TaskAttachmentsProps) => {
       link.remove()
       setTimeout(() => URL.revokeObjectURL(url), 0)
     } catch (error) {
-      handleError.call(showErrorToast, error as Error)
+      toastError(error)
     }
   }
 

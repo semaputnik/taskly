@@ -26,9 +26,8 @@ import {
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { LoadingButton } from "@/components/ui/loading-button"
-import useCustomToast from "@/hooks/useCustomToast"
 import { scopeProjectsQuery, useReportChange } from "@/lib/serverState"
-import { handleError } from "@/utils"
+import { toastError } from "@/lib/toasts"
 import {
   type BotFormData,
   BotFormFields,
@@ -47,7 +46,6 @@ const AddBotUser = () => {
   const [isOpen, setIsOpen] = useState(false)
   const showIssuedToken = useShowIssuedToken()
   const reportChange = useReportChange()
-  const { showErrorToast } = useCustomToast()
 
   const { data: projects } = useQuery({
     ...scopeProjectsQuery(),
@@ -86,7 +84,7 @@ const AddBotUser = () => {
       setIsOpen(false)
       showIssuedToken(result)
     },
-    onError: handleError.bind(showErrorToast),
+    onError: (error) => toastError(error),
     onSettled: () => reportChange({ type: "bot user changed" }),
   })
 

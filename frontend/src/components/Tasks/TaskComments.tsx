@@ -7,10 +7,9 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { LoadingButton } from "@/components/ui/loading-button"
 import { Textarea } from "@/components/ui/textarea"
-import useCustomToast from "@/hooks/useCustomToast"
 import { formatDateTime } from "@/lib/dates"
 import { commentsQuery, useReportChange } from "@/lib/serverState"
-import { handleError } from "@/utils"
+import { toastError } from "@/lib/toasts"
 import { useCommentDeletion } from "./commentDeletion"
 import { useCommentDraft } from "./commentDraft"
 
@@ -28,7 +27,6 @@ export const TaskComments = ({ task }: TaskCommentsProps) => {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editDraft, setEditDraft] = useState("")
   const reportChange = useReportChange()
-  const { showErrorToast } = useCustomToast()
 
   const { data: comments, isLoading } = useQuery(commentsQuery(task.id))
 
@@ -42,7 +40,7 @@ export const TaskComments = ({ task }: TaskCommentsProps) => {
         body: { body },
       }),
     onSuccess: () => draft.clear(),
-    onError: handleError.bind(showErrorToast),
+    onError: (error) => toastError(error),
     onSettled: invalidate,
   })
 
@@ -53,7 +51,7 @@ export const TaskComments = ({ task }: TaskCommentsProps) => {
         body: { body },
       }),
     onSuccess: () => setEditingId(null),
-    onError: handleError.bind(showErrorToast),
+    onError: (error) => toastError(error),
     onSettled: invalidate,
   })
 

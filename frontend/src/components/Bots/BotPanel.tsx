@@ -23,15 +23,14 @@ import {
 } from "@/components/Records/RecordPanel"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
-import useCustomToast from "@/hooks/useCustomToast"
 import { formatDateTime, formatDayOf } from "@/lib/dates"
 import {
   botQuery,
   scopeProjectsQuery,
   useReportChange,
 } from "@/lib/serverState"
+import { toastError } from "@/lib/toasts"
 import { cn } from "@/lib/utils"
-import { handleError } from "@/utils"
 import { BotConsole } from "./BotConsole"
 import DeleteBotUser from "./DeleteBotUser"
 import { ago, until } from "./health"
@@ -292,7 +291,6 @@ function BotRecord({ bot }: { bot: BotUserPublic }) {
  */
 function useBotUpdate(bot: BotUserPublic) {
   const reportChange = useReportChange()
-  const { showErrorToast } = useCustomToast()
 
   const mutation = useMutation({
     mutationFn: ({ scope, name }: { scope?: BotScope; name?: string }) =>
@@ -300,7 +298,7 @@ function useBotUpdate(bot: BotUserPublic) {
         path: { bot_user_id: bot.id },
         body: { scope, name },
       }),
-    onError: handleError.bind(showErrorToast),
+    onError: (error) => toastError(error),
     // A renamed bot user is named on its tasks and in the log.
     onSettled: () => reportChange({ type: "bot user changed", botId: bot.id }),
   })

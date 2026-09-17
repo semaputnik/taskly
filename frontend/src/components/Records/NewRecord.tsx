@@ -2,9 +2,8 @@ import { useMutation } from "@tanstack/react-query"
 import { useState } from "react"
 
 import { CaptureField } from "@/components/Tasks/capture"
-import useCustomToast from "@/hooks/useCustomToast"
 import { type Change, useReportChange } from "@/lib/serverState"
-import { handleError } from "@/utils"
+import { toastError } from "@/lib/toasts"
 import { RecordHeader, titleFieldClass } from "./RecordPanel"
 
 /**
@@ -35,7 +34,6 @@ export function NewRecord<T extends { id: string }>({
   onCreated: (record: T) => void
 }) {
   const reportChange = useReportChange()
-  const { showErrorToast } = useCustomToast()
   const [announcement, setAnnouncement] = useState("")
 
   const mutation = useMutation({
@@ -44,7 +42,7 @@ export function NewRecord<T extends { id: string }>({
       setAnnouncement(`${kind} created`)
       onCreated(data)
     },
-    onError: (error: Error) => handleError.call(showErrorToast, error),
+    onError: (error: Error) => toastError(error),
     onSettled: () => reportChange(change),
   })
 

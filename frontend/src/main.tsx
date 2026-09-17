@@ -5,13 +5,12 @@ import {
   QueryClientProvider,
 } from "@tanstack/react-query"
 import { createRouter, RouterProvider } from "@tanstack/react-router"
-import { AxiosError } from "axios"
 import { StrictMode } from "react"
 import ReactDOM from "react-dom/client"
 import { client } from "./client/client.gen"
 import { ThemeProvider } from "./components/theme-provider"
 import { Toaster } from "./components/ui/sonner"
-import { isRefusal } from "./lib/apiErrors"
+import { isRefusal, isSessionGone } from "./lib/apiErrors"
 import { configureServerState } from "./lib/serverState"
 import "./index.css"
 import { routeTree } from "./routeTree.gen"
@@ -21,17 +20,14 @@ client.setConfig({
   auth: () => localStorage.getItem("access_token") || "",
 })
 
-/** Whether the API turned the request away for who the caller is. */
-const isCredentialError = (error: Error): boolean =>
-  error instanceof AxiosError &&
-  [401, 403].includes(error.response?.status ?? 0)
-
 // Every query on a screen is refused at once, and each fresh assignment to
 // `location.href` aborts the navigation the previous one started.
 let redirectingToLogin = false
 
 const handleApiError = (error: Error) => {
-  if (!isCredentialError(error) || redirectingToLogin) return
+  // Only a session that is gone sends the reader to sign in: a 403 refuses
+  // something the signed-in reader asked for, and is said where it happened.
+  if (!isSessionGone(error) || redirectingToLogin) return
   redirectingToLogin = true
   localStorage.removeItem("access_token")
   window.location.href = "/login"

@@ -14,9 +14,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { LoadingButton } from "@/components/ui/loading-button"
-import useCustomToast from "@/hooks/useCustomToast"
 import { useReportChange } from "@/lib/serverState"
-import { handleError } from "@/utils"
+import { toastError, toastSuccess } from "@/lib/toasts"
 import { allTasks, totalTasks } from "./counts"
 
 interface DeleteTagProps {
@@ -40,16 +39,15 @@ function tasksLosingIt(tag: TagPublic): string {
 const DeleteTag = ({ tag, onSuccess }: DeleteTagProps) => {
   const [isOpen, setIsOpen] = useState(false)
   const reportChange = useReportChange()
-  const { showSuccessToast, showErrorToast } = useCustomToast()
 
   const mutation = useMutation({
     mutationFn: () => TagsService.deleteTag({ path: { tag_id: tag.id } }),
     onSuccess: () => {
-      showSuccessToast(`“${tag.name}” was deleted`)
+      toastSuccess(`“${tag.name}” was deleted`)
       setIsOpen(false)
       onSuccess()
     },
-    onError: handleError.bind(showErrorToast),
+    onError: (error) => toastError(error),
     onSettled: () => reportChange({ type: "tag changed" }),
   })
 

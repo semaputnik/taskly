@@ -22,11 +22,10 @@ import {
 } from "@/components/Records/RecordPanel"
 import { taskCountLabel } from "@/components/Tags/counts"
 import { LoadingButton } from "@/components/ui/loading-button"
-import useCustomToast from "@/hooks/useCustomToast"
 import { formatDayOf } from "@/lib/dates"
 import { projectQuery, useReportChange } from "@/lib/serverState"
+import { toastError, toastSuccess } from "@/lib/toasts"
 import { cn } from "@/lib/utils"
-import { handleError } from "@/utils"
 import DeleteProject from "./DeleteProject"
 
 /**
@@ -182,7 +181,6 @@ function ProjectRecord({ project }: { project: ProjectPublic }) {
  */
 function ArchiveToggle({ project }: { project: ProjectPublic }) {
   const reportChange = useReportChange()
-  const { showSuccessToast, showErrorToast } = useCustomToast()
 
   const mutation = useMutation({
     mutationFn: () =>
@@ -190,12 +188,12 @@ function ArchiveToggle({ project }: { project: ProjectPublic }) {
         ? ProjectsService.unarchiveProject({ path: { project_id: project.id } })
         : ProjectsService.archiveProject({ path: { project_id: project.id } }),
     onSuccess: () =>
-      showSuccessToast(
+      toastSuccess(
         project.is_archived
           ? `“${project.name}” is back in your projects`
           : `“${project.name}” moved to the archive`,
       ),
-    onError: handleError.bind(showErrorToast),
+    onError: (error) => toastError(error),
     onSettled: () =>
       reportChange({ type: "project changed", projectId: project.id }),
   })
@@ -222,7 +220,6 @@ function ArchiveToggle({ project }: { project: ProjectPublic }) {
 /** Saving one field of a project, the way the panel saves every field. */
 function useProjectUpdate(project: ProjectPublic) {
   const reportChange = useReportChange()
-  const { showErrorToast } = useCustomToast()
 
   const mutation = useMutation({
     mutationFn: (body: ProjectUpdate) =>
@@ -230,7 +227,7 @@ function useProjectUpdate(project: ProjectPublic) {
         path: { project_id: project.id },
         body,
       }),
-    onError: handleError.bind(showErrorToast),
+    onError: (error) => toastError(error),
     // A project's name shows on every task in it.
     onSettled: () =>
       reportChange({ type: "project changed", projectId: project.id }),

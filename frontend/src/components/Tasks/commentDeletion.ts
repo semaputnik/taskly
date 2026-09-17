@@ -3,10 +3,9 @@ import { useCallback, useSyncExternalStore } from "react"
 import { toast } from "sonner"
 
 import { type CommentPublic, CommentsService } from "@/client"
-import useCustomToast from "@/hooks/useCustomToast"
 import { PANEL_TOASTER_ID, settleWhenPanelCloses } from "@/lib/panelNotices"
 import { commentsQuery, reportChange } from "@/lib/serverState"
-import { handleError } from "@/utils"
+import { toastError } from "@/lib/toasts"
 
 /** How long a deleted comment can still be brought back. */
 export const UNDO_WINDOW_MS = 10_000
@@ -45,7 +44,6 @@ function subscribe(listener: () => void) {
  */
 export function useCommentDeletion(taskId: string) {
   const queryClient = useQueryClient()
-  const { showErrorToast } = useCustomToast()
   const hidden = useSyncExternalStore(subscribe, () => pending)
 
   const remove = useCallback(
@@ -85,13 +83,7 @@ export function useCommentDeletion(taskId: string) {
               },
           )
         } catch (error) {
-          handleError.call(
-            (message) =>
-              showErrorToast(
-                `The comment could not be deleted, so it is back. ${message}`,
-              ),
-            error as Error,
-          )
+          toastError(error, "The comment could not be deleted, so it is back.")
         } finally {
           setPending((ids) => ids.delete(comment.id))
           reportChange(queryClient, { type: "comments changed", taskId })
@@ -107,7 +99,7 @@ export function useCommentDeletion(taskId: string) {
         onDismiss: () => void send(),
       })
     },
-    [queryClient, showErrorToast, taskId],
+    [queryClient, taskId],
   )
 
   return {

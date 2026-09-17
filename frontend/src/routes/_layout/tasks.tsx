@@ -21,9 +21,8 @@ import { TaskFilters } from "@/components/Tasks/TaskFilters"
 import { buildTaskTree } from "@/components/Tasks/tree"
 import { Button } from "@/components/ui/button"
 import useAuth from "@/hooks/useAuth"
-import useCustomToast from "@/hooks/useCustomToast"
 import { projectsQuery, tasksQuery } from "@/lib/serverState"
-import { handleError } from "@/utils"
+import { toastError } from "@/lib/toasts"
 
 const PAGE_SIZE = 25
 
@@ -79,7 +78,6 @@ function Tasks() {
   const navigate = Route.useNavigate()
   const { openTask, capture } = useRecordPanels()
   const { user: currentUser } = useAuth()
-  const { showErrorToast } = useCustomToast()
   const page = search.page ?? 1
 
   // Which tasks are selected, gathered across pages of one filter set. A
@@ -193,7 +191,7 @@ function Tasks() {
                 () => new Set((all.data?.data ?? []).map((task) => task.id)),
               )
             } catch (error) {
-              handleError.call(showErrorToast, error as Error)
+              toastError(error)
             }
           }}
         />

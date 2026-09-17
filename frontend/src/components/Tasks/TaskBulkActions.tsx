@@ -32,9 +32,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import useCustomToast from "@/hooks/useCustomToast"
+import { batchRefusals } from "@/lib/apiErrors"
 import { useReportChange } from "@/lib/serverState"
-import { handleError } from "@/utils"
+import { toastError, toastSuccess } from "@/lib/toasts"
 import { StatusMenuItems } from "./status"
 import { BulkTagPicker } from "./TagPicker"
 
@@ -69,7 +69,6 @@ export function TaskBulkActions({
   onClear: () => void
 }) {
   const reportChange = useReportChange()
-  const { showSuccessToast, showErrorToast } = useCustomToast()
   const [refused, setRefused] = useState<
     { task_id: string; message: string }[]
   >([])
@@ -83,7 +82,7 @@ export function TaskBulkActions({
       TasksService.bulkUpdateTasks({ body: { ...body, task_ids: selected } }),
     onSuccess: ({ data }, { keepSelection }) => {
       setRefused([])
-      showSuccessToast(
+      toastSuccess(
         `${data.updated} ${data.updated === 1 ? "task" : "tasks"} changed`,
       )
       // Tagging keeps the selection, so several tags go on in one visit.
@@ -92,12 +91,12 @@ export function TaskBulkActions({
     onError: (error: Error) => {
       // A batch lands whole or not at all, so a refusal names the rows that
       // stood in the way and leaves everything as it was (story 29).
-      const refusals = refusalsOf(error)
+      const refusals = batchRefusals(error)
       if (refusals) {
         setRefused(refusals)
         return
       }
-      handleError.call(showErrorToast, error)
+      toastError(error)
     },
     onSettled: () => reportChange({ type: "tasks changed in bulk" }),
   })
@@ -257,7 +256,6 @@ function DeleteSelection({
 }) {
   const [isOpen, setIsOpen] = useState(false)
   const reportChange = useReportChange()
-  const { showSuccessToast, showErrorToast } = useCustomToast()
 
   const remove = useMutation({
     mutationFn: (delete_subtasks: boolean) =>
@@ -265,20 +263,20 @@ function DeleteSelection({
         body: { task_ids: selected, delete_subtasks },
       }),
     onSuccess: ({ data }) => {
-      showSuccessToast(
+      toastSuccess(
         `${data.deleted} ${data.deleted === 1 ? "task" : "tasks"} deleted`,
       )
       setIsOpen(false)
       onDone()
     },
     onError: (error: Error) => {
-      const refusals = refusalsOf(error)
+      const refusals = batchRefusals(error)
       if (refusals) {
         onRefused(refusals)
         setIsOpen(false)
         return
       }
-      handleError.call(showErrorToast, error)
+      toastError(error)
     },
     onSettled: () => reportChange({ type: "tasks changed in bulk" }),
   })
@@ -322,15 +320,4 @@ function DeleteSelection({
       </DialogContent>
     </Dialog>
   )
-}
-
-/** The tasks a batch refused, when that is what came back. */
-function refusalsOf(
-  error: Error,
-): { task_id: string; message: string }[] | null {
-  const detail = (error as { response?: { data?: { detail?: unknown } } })
-    .response?.data?.detail as
-    | { code?: string; refusals?: { task_id: string; message: string }[] }
-    | undefined
-  return detail?.code === "bulk_refused" ? (detail.refusals ?? []) : null
 }

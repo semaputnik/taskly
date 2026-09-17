@@ -15,13 +15,13 @@ import {
   valueInset,
 } from "@/components/Records/RecordPanel"
 import { Button } from "@/components/ui/button"
-import useCustomToast from "@/hooks/useCustomToast"
+import { Refusal, refusalCode } from "@/lib/apiErrors"
 import {
   tagQuery,
   tagVocabularyQuery,
   useReportChange,
 } from "@/lib/serverState"
-import { handleError, isTagExistsError } from "@/utils"
+import { toastError } from "@/lib/toasts"
 import { BotCreator } from "./BotCreator"
 import DeleteTag from "./DeleteTag"
 import { MergeTags } from "./MergeTags"
@@ -148,12 +148,11 @@ function TagRecord({
   onNameTaken: (taken: TagPublic) => void
 }) {
   const reportChange = useReportChange()
-  const { showErrorToast } = useCustomToast()
 
   const rename = useMutation({
     mutationFn: (name: string) =>
       TagsService.renameTag({ path: { tag_id: tag.id }, body: { name } }),
-    onError: handleError.bind(showErrorToast),
+    onError: (error) => toastError(error),
     // Renaming a tag renames it on every task carrying it (FR-01.24).
     onSettled: () => reportChange({ type: "tag changed" }),
   })
@@ -177,7 +176,7 @@ function TagRecord({
                 // and the toast says which name is taken (FR-01.22). Putting
                 // the two together is a merge, which is offered here as the
                 // separate, confirmed act it is — never done by the rename.
-                if (isTagExistsError(error as Error)) {
+                if (refusalCode(error) === Refusal.TAG_EXISTS) {
                   const holder = (
                     await TagsService.readTags({
                       query: { near: trimmed, skip: 0, limit: 100 },

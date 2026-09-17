@@ -7,9 +7,8 @@ import {
   TasksService,
   type TaskUpdate,
 } from "@/client"
-import useCustomToast from "@/hooks/useCustomToast"
 import { useReportChange } from "@/lib/serverState"
-import { handleError } from "@/utils"
+import { toastError } from "@/lib/toasts"
 import { sameRecurrence } from "./recurrence"
 
 /**
@@ -28,7 +27,6 @@ export function useTaskUpdate(task: TaskPublic) {
   // An update held back until the user says how far a new due date reaches.
   const [awaitingScope, setAwaitingScope] = useState<TaskUpdate | null>(null)
   const reportChange = useReportChange()
-  const { showErrorToast } = useCustomToast()
 
   const mutation = useMutation({
     mutationFn: (body: TaskUpdate) =>
@@ -36,7 +34,7 @@ export function useTaskUpdate(task: TaskPublic) {
     onSuccess: () => setAwaitingScope(null),
     onError: (error: Error) => {
       setAwaitingScope(null)
-      handleError.call(showErrorToast, error)
+      toastError(error)
     },
     onSettled: () => reportChange({ type: "task changed", taskId: task.id }),
   })

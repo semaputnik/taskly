@@ -12,8 +12,7 @@ import {
   currentUserQuery,
   useReportChange,
 } from "@/lib/serverState"
-import { handleError } from "@/utils"
-import useCustomToast from "./useCustomToast"
+import { toastError } from "@/lib/toasts"
 
 const isLoggedIn = () => {
   return localStorage.getItem("access_token") !== null
@@ -23,7 +22,6 @@ const useAuth = () => {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const reportChange = useReportChange()
-  const { showErrorToast } = useCustomToast()
 
   const { data: user } = useQuery({
     ...currentUserQuery(),
@@ -36,7 +34,7 @@ const useAuth = () => {
     onSuccess: () => {
       navigate({ to: "/login" })
     },
-    onError: handleError.bind(showErrorToast),
+    onError: (error) => toastError(error),
     onSettled: () => {
       reportChange({ type: "users changed" })
     },
@@ -54,7 +52,7 @@ const useAuth = () => {
     onSuccess: () => {
       navigate({ to: "/" })
     },
-    onError: handleError.bind(showErrorToast),
+    onError: (error) => toastError(error),
   })
 
   const logout = () => {

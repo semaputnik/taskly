@@ -14,9 +14,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { LoadingButton } from "@/components/ui/loading-button"
-import useCustomToast from "@/hooks/useCustomToast"
 import { useReportChange } from "@/lib/serverState"
-import { handleError } from "@/utils"
+import { toastError, toastSuccess } from "@/lib/toasts"
 
 /**
  * Revokes a bot user's token. Unlike most things here it cuts an integration
@@ -25,16 +24,15 @@ import { handleError } from "@/utils"
 const RevokeToken = ({ bot }: { bot: BotUserPublic }) => {
   const [isOpen, setIsOpen] = useState(false)
   const reportChange = useReportChange()
-  const { showSuccessToast, showErrorToast } = useCustomToast()
 
   const mutation = useMutation({
     mutationFn: () =>
       BotsService.revokeBotUserToken({ path: { bot_user_id: bot.id } }),
     onSuccess: () => {
-      showSuccessToast(`The token for “${bot.name}” was revoked`)
+      toastSuccess(`The token for “${bot.name}” was revoked`)
       setIsOpen(false)
     },
-    onError: handleError.bind(showErrorToast),
+    onError: (error) => toastError(error),
     // Without the panel's copy refreshed too, it would still say the token
     // is active.
     onSettled: () => reportChange({ type: "bot token changed", botId: bot.id }),

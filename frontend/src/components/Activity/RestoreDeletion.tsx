@@ -14,9 +14,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { LoadingButton } from "@/components/ui/loading-button"
-import useCustomToast from "@/hooks/useCustomToast"
 import { useReportChange } from "@/lib/serverState"
-import { handleError } from "@/utils"
+import { toastError, toastSuccess } from "@/lib/toasts"
 
 interface RestoreDeletionProps {
   entry: ActivityEntryPublic
@@ -74,7 +73,6 @@ function describe(entry: ActivityEntryPublic) {
 export function RestoreDeletion({ entry }: RestoreDeletionProps) {
   const [isOpen, setIsOpen] = useState(false)
   const reportChange = useReportChange()
-  const { showSuccessToast, showErrorToast } = useCustomToast()
   const { heading, name, comesBack } = describe(entry)
 
   const mutation = useMutation({
@@ -83,12 +81,12 @@ export function RestoreDeletion({ entry }: RestoreDeletionProps) {
         path: { entry_id: entry.id },
       }),
     onSuccess: () => {
-      showSuccessToast(`“${name}” restored`)
+      toastSuccess(`“${name}” restored`)
       setIsOpen(false)
     },
     onError: (error: Error) => {
       setIsOpen(false)
-      handleError.call(showErrorToast, error)
+      toastError(error)
     },
     onSettled: () => reportChange({ type: "deletion restored" }),
   })

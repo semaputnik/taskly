@@ -32,10 +32,10 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import useCustomToast from "@/hooks/useCustomToast"
+import { Refusal, refusalCode } from "@/lib/apiErrors"
 import { useReportChange } from "@/lib/serverState"
+import { toastError } from "@/lib/toasts"
 import { cn } from "@/lib/utils"
-import { handleError, isOpenSubtasksError } from "@/utils"
 import { STATUS_LABELS, STATUSES } from "./statuses"
 
 export { OPEN_STATUSES, STATUS_LABELS, STATUSES } from "./statuses"
@@ -93,7 +93,6 @@ export function useTaskStatus(task: TaskPublic) {
   const [isPrompting, setIsPrompting] = useState(false)
   const [announcement, setAnnouncement] = useState("")
   const reportChange = useReportChange()
-  const { showErrorToast } = useCustomToast()
 
   const mutation = useMutation({
     mutationFn: (body: { status: TaskStatus; subtasks?: SubtaskCompletion }) =>
@@ -103,11 +102,11 @@ export function useTaskStatus(task: TaskPublic) {
       setAnnouncement(`${task.title} moved to ${STATUS_LABELS[body.status]}`)
     },
     onError: (error: Error) => {
-      if (isOpenSubtasksError(error)) {
+      if (refusalCode(error) === Refusal.OPEN_SUBTASKS) {
         setIsPrompting(true)
         return
       }
-      handleError.call(showErrorToast, error)
+      toastError(error)
     },
     onSettled: () => reportChange({ type: "task changed", taskId: task.id }),
   })

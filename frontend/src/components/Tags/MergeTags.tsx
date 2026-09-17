@@ -21,9 +21,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import useCustomToast from "@/hooks/useCustomToast"
 import { tagMergePreviewQuery, useReportChange } from "@/lib/serverState"
-import { handleError } from "@/utils"
+import { toastError, toastSuccess } from "@/lib/toasts"
 import {
   archivedNote,
   type TaskCounts,
@@ -80,7 +79,6 @@ export function MergeTags({
   const [members, setMembers] = useState(tags)
   const [survivorId, setSurvivorId] = useState(initialSurvivorId ?? tags[0]?.id)
   const reportChange = useReportChange()
-  const { showSuccessToast, showErrorToast } = useCustomToast()
   const groupName = useId()
 
   const survivor = members.find((tag) => tag.id === survivorId) ?? members[0]
@@ -99,13 +97,13 @@ export function MergeTags({
         body: { source_ids: sourceIds },
       }),
     onSuccess: ({ data }) => {
-      showSuccessToast(
+      toastSuccess(
         `${quoted(sources.map((tag) => tag.name))} merged into “${data.name}”`,
       )
       onClose()
       onMerged?.(data)
     },
-    onError: handleError.bind(showErrorToast),
+    onError: (error) => toastError(error),
     onSettled: () => reportChange({ type: "tag changed" }),
   })
 

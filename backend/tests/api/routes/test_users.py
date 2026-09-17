@@ -57,6 +57,26 @@ def test_a_token_outliving_its_user_is_unauthorized(
     assert r.json()["detail"] == "User not found"
 
 
+def test_a_malformed_or_expired_token_is_unauthorized(
+    client: TestClient, db: Session
+) -> None:
+    """
+    A human token that does not validate means the session is gone: 401 with
+    a Bearer challenge, so the client signs in again. 403 stays for requests
+    the caller is known to be refused.
+    """
+    user = create_random_user(db)
+    expired = security.create_access_token(user.id, expires_delta=timedelta(-1))
+    for token in ("not-a-jwt", expired):
+        r = client.get(
+            f"{settings.API_V1_STR}/users/me",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert r.status_code == 401
+        assert r.json()["detail"] == "Could not validate credentials"
+        assert r.headers["www-authenticate"] == "Bearer"
+
+
 def test_retrieve_users(
     client: TestClient, superuser_token_headers: dict[str, str], db: Session
 ) -> None:

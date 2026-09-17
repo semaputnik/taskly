@@ -14,10 +14,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { LoadingButton } from "@/components/ui/loading-button"
-import useCustomToast from "@/hooks/useCustomToast"
 import { useReportChange } from "@/lib/serverState"
+import { toastError } from "@/lib/toasts"
 import { cn } from "@/lib/utils"
-import { handleError } from "@/utils"
 
 /**
  * Deleting an attachment, behind a confirmation that names the file.
@@ -35,7 +34,6 @@ export function DeleteAttachment({
 }) {
   const [isOpen, setIsOpen] = useState(false)
   const reportChange = useReportChange()
-  const { showErrorToast } = useCustomToast()
 
   const mutation = useMutation({
     mutationFn: () =>
@@ -45,7 +43,7 @@ export function DeleteAttachment({
     // The list on screen is the receipt; only a failure is worth a toast, and
     // the file stays where it was.
     onSuccess: () => setIsOpen(false),
-    onError: handleError.bind(showErrorToast),
+    onError: (error) => toastError(error),
     onSettled: () =>
       reportChange({
         type: "attachments changed",

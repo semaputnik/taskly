@@ -4,9 +4,8 @@ import { useState } from "react"
 
 import { type TagPublic, TagsService } from "@/client"
 import { Button } from "@/components/ui/button"
-import useCustomToast from "@/hooks/useCustomToast"
 import { tagDuplicatesQuery, useReportChange } from "@/lib/serverState"
-import { handleError } from "@/utils"
+import { toastError } from "@/lib/toasts"
 import { taskCountLabel, totalTasks } from "./counts"
 import { MergeTags } from "./MergeTags"
 
@@ -25,7 +24,6 @@ export function DuplicateGroups({
   onOpenTag: (tagId: string) => void
 }) {
   const reportChange = useReportChange()
-  const { showErrorToast } = useCustomToast()
   const [merging, setMerging] = useState<TagPublic[] | null>(null)
 
   // Suspends with the tag table, so the two arrive together: suggestions
@@ -37,7 +35,7 @@ export function DuplicateGroups({
       TagsService.dismissTagDuplicates({
         body: { tag_ids: tags.map((tag) => tag.id) },
       }),
-    onError: handleError.bind(showErrorToast),
+    onError: (error) => toastError(error),
     onSettled: () => reportChange({ type: "tag duplicates dismissed" }),
   })
 

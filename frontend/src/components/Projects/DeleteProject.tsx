@@ -14,9 +14,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { LoadingButton } from "@/components/ui/loading-button"
-import useCustomToast from "@/hooks/useCustomToast"
 import { useReportChange } from "@/lib/serverState"
-import { handleError } from "@/utils"
+import { toastError, toastSuccess } from "@/lib/toasts"
 
 /**
  * Deleting a project, behind a confirmation that names the cascade.
@@ -35,17 +34,16 @@ export default function DeleteProject({
 }) {
   const [isOpen, setIsOpen] = useState(false)
   const reportChange = useReportChange()
-  const { showSuccessToast, showErrorToast } = useCustomToast()
 
   const mutation = useMutation({
     mutationFn: () =>
       ProjectsService.deleteProject({ path: { project_id: project.id } }),
     onSuccess: () => {
-      showSuccessToast(`“${project.name}” was deleted`)
+      toastSuccess(`“${project.name}” was deleted`)
       setIsOpen(false)
       onSuccess()
     },
-    onError: handleError.bind(showErrorToast),
+    onError: (error) => toastError(error),
     onSettled: () =>
       reportChange({ type: "project changed", projectId: project.id }),
   })

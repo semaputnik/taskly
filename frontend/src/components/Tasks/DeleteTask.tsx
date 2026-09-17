@@ -14,9 +14,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { LoadingButton } from "@/components/ui/loading-button"
-import useCustomToast from "@/hooks/useCustomToast"
+import { Refusal, refusalCode } from "@/lib/apiErrors"
 import { useReportChange } from "@/lib/serverState"
-import { handleError, isSubtaskCascadeError } from "@/utils"
+import { toastError, toastSuccess } from "@/lib/toasts"
 
 interface DeleteTaskProps {
   task: TaskPublic
@@ -36,7 +36,6 @@ const DeleteTask = ({ task, onSuccess }: DeleteTaskProps) => {
   // warns and, on the next attempt, confirms the cascade.
   const [cascadeWarned, setCascadeWarned] = useState(false)
   const reportChange = useReportChange()
-  const { showSuccessToast, showErrorToast } = useCustomToast()
 
   const mutation = useMutation({
     mutationFn: (confirmCascade: boolean) =>
@@ -45,18 +44,18 @@ const DeleteTask = ({ task, onSuccess }: DeleteTaskProps) => {
         query: { delete_subtasks: confirmCascade },
       }),
     onSuccess: () => {
-      showSuccessToast(
+      toastSuccess(
         `“${task.title}” was deleted. It can be restored from the activity log.`,
       )
       setIsOpen(false)
       onSuccess()
     },
     onError: (error: Error) => {
-      if (isSubtaskCascadeError(error)) {
+      if (refusalCode(error) === Refusal.HAS_SUBTASKS) {
         setCascadeWarned(true)
         return
       }
-      handleError.call(showErrorToast, error)
+      toastError(error)
     },
     onSettled: () => reportChange({ type: "task deleted", taskId: task.id }),
   })

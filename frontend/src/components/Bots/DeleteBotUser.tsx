@@ -14,9 +14,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { LoadingButton } from "@/components/ui/loading-button"
-import useCustomToast from "@/hooks/useCustomToast"
 import { useReportChange } from "@/lib/serverState"
-import { handleError } from "@/utils"
+import { toastError, toastSuccess } from "@/lib/toasts"
 
 interface DeleteBotUserProps {
   bot: BotUserPublic
@@ -31,17 +30,16 @@ interface DeleteBotUserProps {
 const DeleteBotUser = ({ bot, onSuccess }: DeleteBotUserProps) => {
   const [isOpen, setIsOpen] = useState(false)
   const reportChange = useReportChange()
-  const { showSuccessToast, showErrorToast } = useCustomToast()
 
   const mutation = useMutation({
     mutationFn: () =>
       BotsService.deleteBotUser({ path: { bot_user_id: bot.id } }),
     onSuccess: () => {
-      showSuccessToast(`“${bot.name}” was deleted`)
+      toastSuccess(`“${bot.name}” was deleted`)
       setIsOpen(false)
       onSuccess()
     },
-    onError: handleError.bind(showErrorToast),
+    onError: (error) => toastError(error),
     // Its own record still reads — marked deleted now (FR-08.19) — and the
     // tasks assigned to it now show it as deleted.
     onSettled: () => reportChange({ type: "bot user changed", botId: bot.id }),

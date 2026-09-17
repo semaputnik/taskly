@@ -256,3 +256,23 @@ test("Selected mode is preserved across sessions", async ({ page }) => {
   )
   expect(isDarkMode).toBe(true)
 })
+
+test("A refused account deletion keeps the superuser signed in", async ({
+  page,
+}) => {
+  await page.goto("/settings")
+  await page.getByRole("tab", { name: "Danger zone" }).click()
+  await page.getByRole("button", { name: "Delete Account" }).click()
+  await page.getByRole("button", { name: "Delete my account" }).click()
+
+  // A 403 refuses what was asked; it does not end the session.
+  await expect(
+    page.getByText("Super users are not allowed to delete themselves"),
+  ).toBeVisible()
+  await expect(page).toHaveURL(/\/settings/)
+  await page.waitForTimeout(500)
+  await expect(page).toHaveURL(/\/settings/)
+  expect(
+    await page.evaluate(() => localStorage.getItem("access_token")),
+  ).not.toBeNull()
+})
