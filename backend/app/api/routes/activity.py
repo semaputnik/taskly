@@ -6,7 +6,8 @@ from fastapi import APIRouter, HTTPException, Query
 from sqlmodel import col, func, select
 
 from app import crud
-from app.api.deps import CurrentUser, SessionDep, require_project_writable
+from app.api.access import require_project_writable
+from app.api.deps import CurrentUser, SessionDep
 from app.models import (
     ActivityAction,
     ActivityEntityType,
@@ -251,9 +252,15 @@ def _check_task_restore(session: SessionDep, task: Task, tasks: Sequence[Task]) 
                 "deleted. Restore that task first.",
             )
 
-    project = session.get_one(
-        Project, crud.get_task_project_id(session=session, task=task)
-    )
+    # The task is deleted, so the walk up to its project goes through
+    # deleted tasks too.
+    project_id = crud.get_task_project_ids(
+        session=session,
+        owner_id=task.owner_id,
+        task_ids=[task.id],
+        including_deleted=True,
+    )[task.id]
+    project = session.get_one(Project, project_id)
     if project.deletion_id is not None:
         raise _refuse(
             PROJECT_DELETED_CODE,

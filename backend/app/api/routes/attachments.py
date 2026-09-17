@@ -6,14 +6,9 @@ from fastapi import APIRouter, HTTPException, UploadFile
 from fastapi.responses import Response
 
 from app import crud
-from app.api import authorization
-from app.api.authorization import TaskAction
-from app.api.deps import (
-    AttachmentStorageDep,
-    CallerDep,
-    SessionDep,
-    require_task_writable,
-)
+from app.api import access
+from app.api.access import TaskAction
+from app.api.deps import AttachmentStorageDep, CallerDep, SessionDep
 from app.core.config import settings
 from app.models import AttachmentPublic, AttachmentsPublic, Message
 
@@ -86,7 +81,7 @@ def read_attachments(
     Retrieve a task's attachments (FR-04.1). A bot user lists them wherever it
     can read the task (FR-08.11).
     """
-    authorization.get_task(session, caller, task_id, TaskAction.READ)
+    access.get_task(session, caller, task_id, TaskAction.READ)
     attachments, count = crud.get_attachments(session=session, task_id=task_id)
     return AttachmentsPublic(data=attachments, count=count)
 
@@ -107,8 +102,7 @@ def upload_attachment(
 
     A bot user adds attachments wherever it can update the task (FR-08.11).
     """
-    authorization.get_task(session, caller, task_id, TaskAction.UPDATE)
-    require_task_writable(session, task_id)
+    access.get_task(session, caller, task_id, TaskAction.UPDATE)
 
     # Checked against Starlette's own accounting first so an oversized upload
     # is turned away without also paying for a full in-memory copy of it.
@@ -143,9 +137,7 @@ def download_attachment(
     Download an attachment's exact bytes. A bot user downloads wherever it can
     read the task (FR-08.11).
     """
-    attachment = authorization.get_attachment(
-        session, caller, attachment_id, TaskAction.READ
-    )
+    attachment = access.get_attachment(session, caller, attachment_id, TaskAction.READ)
     try:
         data = storage.get(str(attachment.id))
     except FileNotFoundError:
@@ -172,10 +164,9 @@ def delete_attachment(
     Delete an attachment and release its bytes from storage. A bot user
     deletes wherever it can update the task (FR-08.11).
     """
-    attachment = authorization.get_attachment(
+    attachment = access.get_attachment(
         session, caller, attachment_id, TaskAction.UPDATE
     )
-    require_task_writable(session, attachment.task_id)
     # The bytes go first: if that fails, the row is still there to retry
     # against. The other way round, a failure after the row is gone would
     # leave the bytes orphaned with nothing left to name them.

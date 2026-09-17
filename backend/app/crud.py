@@ -6,7 +6,7 @@ from collections.abc import Collection, Iterable, Sequence
 from datetime import UTC, date, datetime, timedelta
 from typing import Any, NamedTuple
 
-from sqlalchemy import case, nullslast, or_
+from sqlalchemy import and_, case, nullslast, or_
 from sqlalchemy.orm import aliased
 from sqlmodel import Session, col, func, select
 
@@ -969,79 +969,62 @@ def _subtree_cte(root_id: uuid.UUID) -> Any:
     deletion always takes a whole subtree, so nothing that is still there hides
     under a deleted one.
     """
-    subtree = (
-        select(Task.id, Task.status)
-        .where(Task.parent_id == root_id, not_deleted(Task))
-        .cte("subtree", recursive=True)
-    )
-    child = aliased(Task)
-    return subtree.union_all(
-        select(child.id, child.status)
-        .join(subtree, col(child.parent_id) == subtree.c.id)
-        .where(not_deleted(child))
-    )
+    return _tree_walk(Task.parent_id == root_id, name="subtree")
 
 
-def get_task_project_id(*, session: Session, task: Task) -> uuid.UUID:
+def task_ancestry(
+    *,
+    owner_id: uuid.UUID,
+    task_ids: Collection[uuid.UUID],
+    including_deleted: bool = False,
+) -> Any:
     """
-    Resolve the project a task belongs to: its own if it is a root task, its
-    root ancestor's if it is a subtask (FR-02.4).
+    The one walk up the task tree: from each of `task_ids` to its root, as
+    (task_id, parent_id, project_id) rows. The row whose `parent_id` is None
+    carries the project the task resolves to (FR-02.4).
+
+    The cost follows the tasks asked about and their depth, not the size of
+    the account. A task that is deleted, or that hangs under a deleted
+    ancestor, never reaches a root, which is how callers tell a live task from
+    one that is gone. `including_deleted` walks through deleted tasks instead,
+    for the one question that is asked about deleted tasks: where restoring
+    them would bring them back to.
     """
-    if task.project_id is not None:
-        return task.project_id
-
-    ancestors = (
-        select(Task.id, Task.parent_id, Task.project_id)
-        .where(Task.id == task.parent_id)
-        .cte("ancestors", recursive=True)
-    )
-    parent = aliased(Task)
-    ancestors = ancestors.union_all(
-        select(parent.id, parent.parent_id, parent.project_id).join(
-            ancestors, ancestors.c.parent_id == parent.id
-        )
-    )
-    statement = select(ancestors.c.project_id).where(
-        ancestors.c.project_id.is_not(None)
-    )
-    project_id: uuid.UUID = session.exec(statement).one()
-    return project_id
-
-
-def get_task_project_ids(
-    *, session: Session, owner_id: uuid.UUID, task_ids: Collection[uuid.UUID]
-) -> dict[uuid.UUID, uuid.UUID]:
-    """
-    The project each of `task_ids` belongs to, keyed by task id.
-
-    One walk up from those tasks to their roots, in a single query: the cost
-    follows the tasks asked about and their depth, not the size of the
-    account, and listing tasks does not cost a query per subtask.
-
-    A task that is deleted, or that hangs under a deleted ancestor, is left
-    out: the walk stops at the first deleted task, so it never reaches a root.
-    Callers rely on that to tell a live task from one that is gone.
-    """
-    if not task_ids:
-        return {}
+    live: list[Any] = [] if including_deleted else [not_deleted(Task)]
     walk = (
         select(
             col(Task.id).label("task_id"),
             col(Task.parent_id).label("parent_id"),
             col(Task.project_id).label("project_id"),
         )
-        .where(
-            col(Task.id).in_(set(task_ids)),
-            Task.owner_id == owner_id,
-            not_deleted(Task),
-        )
+        .where(col(Task.id).in_(set(task_ids)), Task.owner_id == owner_id, *live)
         .cte("task_ancestry", recursive=True)
     )
     parent = aliased(Task)
-    walk = walk.union_all(
+    live_parent: list[Any] = [] if including_deleted else [not_deleted(parent)]
+    return walk.union_all(
         select(walk.c.task_id, parent.parent_id, parent.project_id)
         .join(walk, col(parent.id) == walk.c.parent_id)
-        .where(not_deleted(parent))
+        .where(*live_parent)
+    )
+
+
+def get_task_project_ids(
+    *,
+    session: Session,
+    owner_id: uuid.UUID,
+    task_ids: Collection[uuid.UUID],
+    including_deleted: bool = False,
+) -> dict[uuid.UUID, uuid.UUID]:
+    """
+    The project each of `task_ids` belongs to, keyed by task id, in one
+    `task_ancestry` walk. A task that is gone is left out, unless
+    `including_deleted` asks about deleted tasks too.
+    """
+    if not task_ids:
+        return {}
+    walk = task_ancestry(
+        owner_id=owner_id, task_ids=task_ids, including_deleted=including_deleted
     )
     rows = session.exec(
         select(walk.c.task_id, walk.c.project_id).where(walk.c.parent_id.is_(None))
@@ -1076,17 +1059,7 @@ def get_project_task_counts(
             return {}
         roots.append(col(Task.project_id).in_(project_ids))
 
-    tree = (
-        select(Task.id, Task.project_id)
-        .where(*roots)
-        .cte("project_task_counts", recursive=True)
-    )
-    child = aliased(Task)
-    tree = tree.union_all(
-        select(child.id, tree.c.project_id)
-        .join(tree, col(child.parent_id) == tree.c.id)
-        .where(not_deleted(child))
-    )
+    tree = _tree_walk(and_(*roots), name="project_task_counts")
     rows = session.exec(
         select(tree.c.project_id, func.count()).group_by(tree.c.project_id)
     ).all()
@@ -1335,23 +1308,32 @@ def _task_trees(root_condition: Any, *, name: str) -> Any:
     """
     Selects the ids of the root tasks matching `root_condition` and of every
     task under them, leaving deleted ones out.
+    """
+    return select(_tree_walk(root_condition, name=name).c.id)
+
+
+def _tree_walk(start_condition: Any, *, name: str) -> Any:
+    """
+    The one walk down the task tree: the tasks matching `start_condition` and
+    every task under them, leaving deleted ones out, as (id, status,
+    project_id) rows. `project_id` is carried down from the starting task, so
+    a walk that starts at root tasks says which project each row resolves to.
 
     Subtasks hold no project of their own, so the tasks of a project are only
     reachable by walking down from its root tasks. `name` names the CTE, which
     has to be unique among the ones a single statement uses.
     """
-    tasks = (
-        select(Task.id)
-        .where(root_condition, not_deleted(Task))
+    tree = (
+        select(Task.id, Task.status, Task.project_id)
+        .where(start_condition, not_deleted(Task))
         .cte(name, recursive=True)
     )
     child = aliased(Task)
-    tasks = tasks.union_all(
-        select(child.id)
-        .join(tasks, col(child.parent_id) == tasks.c.id)
+    return tree.union_all(
+        select(child.id, child.status, tree.c.project_id)
+        .join(tree, col(child.parent_id) == tree.c.id)
         .where(not_deleted(child))
     )
-    return select(tasks.c.id)
 
 
 def _mark_deleted(*, session: Session, task_ids: Any, deletion: Deletion) -> None:

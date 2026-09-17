@@ -5,7 +5,8 @@ from fastapi import APIRouter, HTTPException
 from sqlmodel import col, func, select
 
 from app import crud
-from app.api.deps import CurrentUser, SessionDep, get_project_of
+from app.api import access
+from app.api.deps import Caller, CurrentUser, SessionDep
 from app.models import (
     BotPermissions,
     BotScope,
@@ -127,7 +128,9 @@ def create_bot_user(
     It has no token yet; issuing one is a step of its own.
     """
     for project_id in bot_user_in.scope.project_ids:
-        get_project_of(session, current_user.id, project_id)
+        access.get_project(
+            session, Caller(owner_id=current_user.id), project_id, action=None
+        )
     bot = crud.create_bot_user(
         session=session, bot_user_create=bot_user_in, owner_id=current_user.id
     )
@@ -153,7 +156,9 @@ def update_bot_user(
     bot = _get_owned_bot_user(session, current_user, bot_user_id)
     if bot_user_in.scope is not None:
         for project_id in bot_user_in.scope.project_ids:
-            get_project_of(session, current_user.id, project_id)
+            access.get_project(
+                session, Caller(owner_id=current_user.id), project_id, action=None
+            )
     bot = crud.update_bot_user(session=session, bot=bot, bot_user_update=bot_user_in)
     return _public(
         bot, crud.get_bot_user_project_ids(session=session, bot_ids=[bot.id])[bot.id]
