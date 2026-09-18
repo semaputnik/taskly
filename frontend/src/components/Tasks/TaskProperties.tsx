@@ -41,6 +41,7 @@ import { projectsQuery } from "@/lib/serverState"
 import { cn } from "@/lib/utils"
 import { AssigneeSelect, assigneeFormValue, toAssigneeId } from "./assignee"
 import type { TaskFields } from "./draft"
+import { PriorityOption } from "./priority"
 import {
   IntervalDaysField,
   MIN_INTERVAL_DAYS,
@@ -156,7 +157,7 @@ export function TaskPropertyRows({
             <SelectItem value={NO_PRIORITY}>No priority</SelectItem>
             {PRIORITIES.map((priority) => (
               <SelectItem key={priority} value={priority}>
-                {priority}
+                <PriorityOption priority={priority} />
               </SelectItem>
             ))}
           </SelectContent>

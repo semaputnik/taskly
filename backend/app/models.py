@@ -711,6 +711,10 @@ class TaskPublic(TaskBase):
     assignee_bot_user: BotUserRef | None = None
     recurrence: Recurrence | None = None
     created_at: datetime | None = None
+    # Its own subtasks, one level down, and how many of those are done: enough
+    # for a list row to say "2/5" without fetching the tree.
+    subtask_count: int = 0
+    subtasks_done: int = 0
 
 
 class TasksPublic(SQLModel):

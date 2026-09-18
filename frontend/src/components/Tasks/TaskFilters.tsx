@@ -1,10 +1,11 @@
 import { useQuery } from "@tanstack/react-query"
-import { SlidersHorizontal, X } from "lucide-react"
+import { List, SlidersHorizontal, Table2, X } from "lucide-react"
 import { useState } from "react"
 
 import type { TaskStatus } from "@/client"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { ButtonGroup } from "@/components/ui/button-group"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -15,7 +16,9 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { projectsQuery, tagsQuery } from "@/lib/serverState"
+import { cn } from "@/lib/utils"
 import { useBotUsers } from "./assignee"
+import { PriorityOption } from "./priority"
 import { clearedFilters, hasActiveFilters, type TaskSearch } from "./search"
 import {
   describeStatusFilter,
@@ -35,14 +38,62 @@ const OPEN = "open"
 // nothing a user types can collide with it.
 const ANY = "any"
 
+// The list's own order — subtasks under their parents — which no sort names.
+const DEFAULT_ORDER = "default"
+
 interface TaskFiltersProps {
   search: TaskSearch
   onChange: (next: Partial<TaskSearch>) => void
+  /** Switch between the table and compact rows, without touching filters. */
+  onViewChange: (view: TaskSearch["view"]) => void
+}
+
+/**
+ * Table or compact rows. The current one is marked the way the sidebar marks
+ * where the reader is — a quiet fill, not the teal — since it is a place, not
+ * an action.
+ */
+function ViewSwitch({
+  view,
+  onChange,
+}: {
+  view: TaskSearch["view"]
+  onChange: (view: TaskSearch["view"]) => void
+}) {
+  const choices = [
+    { value: undefined, label: "Table", icon: Table2 },
+    { value: "compact" as const, label: "Compact", icon: List },
+  ]
+  return (
+    <ButtonGroup aria-label="View">
+      {choices.map(({ value, label, icon: Icon }) => {
+        const current = view === value
+        return (
+          <Button
+            key={label}
+            variant="outline"
+            aria-pressed={current}
+            onClick={() => onChange(value)}
+            className={cn(
+              "aria-pressed:bg-accent aria-pressed:text-accent-foreground",
+              !current && "text-muted-foreground",
+            )}
+          >
+            <Icon aria-hidden />
+            <span className="hidden sm:inline">{label}</span>
+            <span className="sr-only sm:hidden">{label}</span>
+          </Button>
+        )
+      })}
+    </ButtonGroup>
+  )
 }
 
 interface Option {
   value: string
   label: string
+  /** Drawn in the menu in place of the label, where the label needs a mark. */
+  display?: React.ReactNode
 }
 
 function FilterSelect({
@@ -72,7 +123,7 @@ function FilterSelect({
           <SelectItem value={ANY}>{anyLabel}</SelectItem>
           {options.map((option) => (
             <SelectItem key={option.value} value={option.value}>
-              {option.label}
+              {option.display ?? option.label}
             </SelectItem>
           ))}
         </SelectContent>
@@ -115,14 +166,17 @@ function statusValue(statuses: TaskStatus[] | undefined): string | undefined {
 /** One active filter, named in the reader's words, with the way to drop it. */
 function ActiveChip({
   label,
+  display,
   onRemove,
 }: {
   label: string
+  /** Drawn in place of the label; the label still names the remove button. */
+  display?: React.ReactNode
   onRemove: () => void
 }) {
   return (
     <Badge variant="secondary" className="gap-1 py-1 pr-1 pl-2.5">
-      {label}
+      {display ?? label}
       <button
         type="button"
         aria-label={`Remove filter: ${label}`}
@@ -151,7 +205,11 @@ function ActiveChip({
  * active filter is always named on a chip that can drop it, because a list
  * silently narrowed by a control you cannot see is the worst outcome here.
  */
-export function TaskFilters({ search, onChange }: TaskFiltersProps) {
+export function TaskFilters({
+  search,
+  onChange,
+  onViewChange,
+}: TaskFiltersProps) {
   const [isOpen, setIsOpen] = useState(false)
   const { data: bots } = useBotUsers()
   const { data: projects } = useQuery(projectsQuery())
@@ -175,7 +233,12 @@ export function TaskFilters({ search, onChange }: TaskFiltersProps) {
   }
 
   /** Each active filter as a label plus the change that removes it. */
-  const chips: { key: string; label: string; clear: Partial<TaskSearch> }[] = []
+  const chips: {
+    key: string
+    label: string
+    display?: React.ReactNode
+    clear: Partial<TaskSearch>
+  }[] = []
   if (search.project_id)
     chips.push({
       key: "project_id",
@@ -198,6 +261,11 @@ export function TaskFilters({ search, onChange }: TaskFiltersProps) {
     chips.push({
       key: "priority",
       label: `Priority: ${search.priority}`,
+      display: (
+        <span className="flex items-center gap-1">
+          Priority: <PriorityOption priority={search.priority} />
+        </span>
+      ),
       clear: { priority: undefined },
     })
   const statusLabel = describeStatusFilter(search.status)
@@ -263,6 +331,35 @@ export function TaskFilters({ search, onChange }: TaskFiltersProps) {
         >
           Overdue
         </Button>
+
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          {/* The table sorts from its headers; compact rows have none, so
+              the same two orders are offered here instead. */}
+          {search.view === "compact" && (
+            <Select
+              value={search.sort ?? DEFAULT_ORDER}
+              onValueChange={(next) =>
+                onChange({
+                  sort:
+                    next === DEFAULT_ORDER
+                      ? undefined
+                      : (next as TaskSearch["sort"]),
+                  order: undefined,
+                })
+              }
+            >
+              <SelectTrigger className="w-40" aria-label="Sort by">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={DEFAULT_ORDER}>Default order</SelectItem>
+                <SelectItem value="due_date">Due date</SelectItem>
+                <SelectItem value="priority">Priority</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
+          <ViewSwitch view={search.view} onChange={onViewChange} />
+        </div>
       </div>
 
       {isOpen && (
@@ -311,6 +408,7 @@ export function TaskFilters({ search, onChange }: TaskFiltersProps) {
             options={PRIORITIES.map((priority) => ({
               value: priority,
               label: priority,
+              display: <PriorityOption priority={priority} />,
             }))}
             onChange={(value) =>
               onChange({ priority: value as TaskSearch["priority"] })
@@ -357,6 +455,7 @@ export function TaskFilters({ search, onChange }: TaskFiltersProps) {
             <ActiveChip
               key={chip.key}
               label={chip.label}
+              display={chip.display}
               onRemove={() => onChange(chip.clear)}
             />
           ))}

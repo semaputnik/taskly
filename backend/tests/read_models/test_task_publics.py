@@ -150,3 +150,33 @@ def test_serialising_costs_the_same_for_one_task_and_fifty(
         return len(recorded)
 
     assert cost(ids[:1]) == cost(ids[1:])
+
+
+def test_a_task_counts_its_own_subtasks_and_how_many_are_done(
+    client: TestClient, db: Session, owner: Headers
+) -> None:
+    root = create_task(client, owner, title="Root")
+    done = create_task(client, owner, parent_id=root, title="Done")
+    open_child = create_task(client, owner, parent_id=root, title="Open")
+    # A grandchild is its parent's subtask, not the root's.
+    create_task(client, owner, parent_id=open_child, title="Grandchild")
+    deleted = create_task(client, owner, parent_id=root, title="Deleted")
+    lone = create_task(client, owner, title="Lone")
+
+    r = client.patch(f"{API}/tasks/{done}", headers=owner, json={"status": "done"})
+    assert r.status_code == 200, r.text
+    r = client.delete(f"{API}/tasks/{deleted}", headers=owner)
+    assert r.status_code == 200, r.text
+
+    shown = {
+        task_id: _as_api_shows(client, owner, task_id)
+        for task_id in (root, open_child, lone)
+    }
+
+    assert (shown[root]["subtask_count"], shown[root]["subtasks_done"]) == (2, 1)
+    assert (shown[open_child]["subtask_count"], shown[open_child]["subtasks_done"]) == (
+        1,
+        0,
+    )
+    assert (shown[lone]["subtask_count"], shown[lone]["subtasks_done"]) == (0, 0)
+    assert _modelled(db, list(shown)) == list(shown.values())

@@ -26,6 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { PriorityOption } from "./priority"
 import { StatusMenuItems } from "./status"
 import { BulkTagPicker } from "./TagPicker"
 import { useBulkTaskWrites } from "./useTaskWrites"
@@ -104,7 +105,7 @@ export function TaskBulkActions({
             <SelectItem value={NONE}>No priority</SelectItem>
             {PRIORITIES.map((priority) => (
               <SelectItem key={priority} value={priority}>
-                {priority}
+                <PriorityOption priority={priority} />
               </SelectItem>
             ))}
           </SelectContent>

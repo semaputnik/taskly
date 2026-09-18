@@ -175,6 +175,9 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
   subtasks.
 - **FR-02.8** Closing all subtasks does not close the parent task
   automatically.
+- **FR-02.9** Every task, wherever the REST API returns it, reports how many
+  subtasks it has one level down and how many of those are Done
+  (`subtask_count`, `subtasks_done`). Deleted subtasks are not counted.
 
 ### F-03. Comments
 
@@ -244,6 +247,15 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
 - **FR-06.3** Filters can be combined; a task must match all active filters.
 - **FR-06.4** The task list can be sorted, at minimum by due date and by
   priority.
+- **FR-06.5** The task list can be shown as a table or as compact rows. A
+  compact row shows the title, and beneath it the task's subtask progress, due
+  date, recurrence and tags. The choice is part of the list's URL and does not
+  change its filters, order or page.
+- **FR-06.6** Priorities are told apart by colour as well as by name: P1 red,
+  P2 amber/yellow, P3 blue, and P4 (or no priority) uncoloured. A compact row
+  shows its task's priority as the colour of its completion checkbox.
+- **FR-06.7** The dashboard shows the user's In progress tasks in a panel of
+  their own, highest priority first, alongside what is overdue and due today.
 
 ### F-07. REST API
 

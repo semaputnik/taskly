@@ -18,17 +18,6 @@ export const today = () => isoDay(new Date())
 export const tomorrow = () => isoDay(shiftDays(1))
 export const inAWeek = () => isoDay(shiftDays(7))
 
-/** "3 days ago" for an overdue date, in whole days. */
-export function daysLate(dueDate: string): string {
-  const due = new Date(`${dueDate}T00:00:00`)
-  const start = new Date()
-  start.setHours(0, 0, 0, 0)
-  const days = Math.round((start.getTime() - due.getTime()) / 86_400_000)
-  if (days <= 0) return "due today"
-  if (days === 1) return "1 day late"
-  return `${days} days late`
-}
-
 /** "4h ago" for an activity timestamp, shrinking to a date after a week. */
 export function timeAgo(timestamp: string): string {
   const then = new Date(timestamp)

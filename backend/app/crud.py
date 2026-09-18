@@ -901,6 +901,37 @@ def get_task_tags(
     return {task_id: sorted(names, key=str.lower) for task_id, names in tags.items()}
 
 
+class SubtaskCounts(NamedTuple):
+    total: int
+    done: int
+
+
+def get_subtask_counts(
+    *, session: Session, task_ids: Sequence[uuid.UUID]
+) -> dict[uuid.UUID, SubtaskCounts]:
+    """
+    How many live subtasks each of the given tasks has one level down, and how
+    many of those are done, keyed by task id. A deleted subtask is not counted.
+    """
+    if not task_ids:
+        return {}
+
+    statement = (
+        select(
+            Task.parent_id,
+            func.count(),
+            func.count().filter(col(Task.status) == TaskStatus.DONE),
+        )
+        .where(col(Task.parent_id).in_(task_ids), col(Task.deletion_id).is_(None))
+        .group_by(col(Task.parent_id))
+    )
+    counts = dict.fromkeys(task_ids, SubtaskCounts(0, 0))
+    for parent_id, total, done in session.exec(statement).all():
+        if parent_id is not None:
+            counts[parent_id] = SubtaskCounts(total, done)
+    return counts
+
+
 def _stage_task_tags(*, session: Session, task: Task, names: Sequence[str]) -> None:
     """
     Replace a task's tags with `names`, creating the ones the user does not

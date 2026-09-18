@@ -1601,6 +1601,16 @@ export const TaskPublicSchema = {
                 }
             ],
             title: 'Created At'
+        },
+        subtask_count: {
+            type: 'integer',
+            title: 'Subtask Count',
+            default: 0
+        },
+        subtasks_done: {
+            type: 'integer',
+            title: 'Subtasks Done',
+            default: 0
         }
     },
     type: 'object',

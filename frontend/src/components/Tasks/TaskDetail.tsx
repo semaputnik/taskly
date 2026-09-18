@@ -9,7 +9,6 @@ import {
   RecordPanel,
   titleFieldClass,
 } from "@/components/Records/RecordPanel"
-import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   projectsQuery,
@@ -21,6 +20,7 @@ import { CompleteTask } from "./CompleteTask"
 import { CaptureField, useCaptureTarget } from "./capture"
 import DeleteTask from "./DeleteTask"
 import { NewTask } from "./NewTask"
+import { PriorityBadge } from "./priority"
 import { TaskAttachments } from "./TaskAttachments"
 import { TaskComments } from "./TaskComments"
 import { TaskProperties } from "./TaskProperties"
@@ -169,9 +169,10 @@ export function TaskDetail() {
                         {child.title}
                       </button>
                       {child.priority && (
-                        <Badge variant="outline" className="shrink-0">
-                          {child.priority}
-                        </Badge>
+                        <PriorityBadge
+                          priority={child.priority}
+                          className="shrink-0"
+                        />
                       )}
                     </li>
                   ))}

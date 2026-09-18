@@ -876,6 +876,14 @@ export type TaskPublic = {
      * Created At
      */
     created_at?: string | null;
+    /**
+     * Subtask Count
+     */
+    subtask_count?: number;
+    /**
+     * Subtasks Done
+     */
+    subtasks_done?: number;
 };
 
 /**
