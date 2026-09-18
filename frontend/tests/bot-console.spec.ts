@@ -235,7 +235,9 @@ test("The assigned tasks hand off to the task list filtered to the bot", async (
     .click()
 
   await expect(page).toHaveURL(new RegExp(`assignee=${bot.id}`))
-  await expect(page.getByRole("row", { name: /Assigned 0/ })).toBeVisible()
+  await expect(
+    page.getByRole("link", { name: "Assigned 0", exact: true }),
+  ).toBeVisible()
 })
 
 test("A deleted bot user still reads, and says it is gone", async ({

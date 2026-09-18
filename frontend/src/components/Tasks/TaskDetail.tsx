@@ -16,6 +16,7 @@ import {
   tasksQuery,
   useReportChange,
 } from "@/lib/serverState"
+import { toastSuccess } from "@/lib/toasts"
 import { CompleteTask } from "./CompleteTask"
 import { CaptureField, useCaptureTarget } from "./capture"
 import DeleteTask from "./DeleteTask"
@@ -86,9 +87,15 @@ export function TaskDetail() {
         <NewTask
           target={captureTarget}
           onCreated={(created, stay) => {
-            // A run of captures holds the panel still; a single one hands the
-            // reader the record it just made, at its own address.
-            if (!stay) panels.openTask(created.id)
+            // A run of captures holds the panel still. A single one is done:
+            // the panel closes on the screen it was opened over, and the
+            // notice is the receipt, with the way to the record it made.
+            if (stay) return
+            panels.close()
+            toastSuccess(`“${created.title}” created`, {
+              label: "Open",
+              onClick: () => panels.openTask(created.id),
+            })
           }}
         />
       ) : !task ? null : (

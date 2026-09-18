@@ -19,7 +19,12 @@ import { projectsQuery, tagsQuery } from "@/lib/serverState"
 import { cn } from "@/lib/utils"
 import { useBotUsers } from "./assignee"
 import { PriorityOption } from "./priority"
-import { clearedFilters, hasActiveFilters, type TaskSearch } from "./search"
+import {
+  clearedFilters,
+  hasActiveFilters,
+  isCompact,
+  type TaskSearch,
+} from "./search"
 import {
   describeStatusFilter,
   isOpenFilter,
@@ -49,7 +54,7 @@ interface TaskFiltersProps {
 }
 
 /**
- * Table or compact rows. The current one is marked the way the sidebar marks
+ * Compact rows or the table. The current one is marked the way the sidebar marks
  * where the reader is — a quiet fill, not the teal — since it is a place, not
  * an action.
  */
@@ -61,11 +66,11 @@ function ViewSwitch({
   onChange: (view: TaskSearch["view"]) => void
 }) {
   const choices = [
-    { value: undefined, label: "Table", icon: Table2 },
-    { value: "compact" as const, label: "Compact", icon: List },
+    { value: undefined, label: "Compact", icon: List },
+    { value: "table" as const, label: "Table", icon: Table2 },
   ]
   return (
-    <ButtonGroup aria-label="View">
+    <ButtonGroup aria-label="View" className="ml-auto">
       {choices.map(({ value, label, icon: Icon }) => {
         const current = view === value
         return (
@@ -332,10 +337,20 @@ export function TaskFilters({
           Overdue
         </Button>
 
-        <div className="ml-auto flex flex-wrap items-center gap-2">
+        {/* On a phone the order and the view take a line of their own, the
+            order stretching to fill it, so the bar wraps into two rows that
+            line up rather than a ragged second one. */}
+        <div
+          className={cn(
+            "ml-auto flex items-center gap-2",
+            // The table has no order control here, and the view alone fits
+            // on the first line.
+            isCompact(search) && "w-full sm:w-auto",
+          )}
+        >
           {/* The table sorts from its headers; compact rows have none, so
               the same two orders are offered here instead. */}
-          {search.view === "compact" && (
+          {isCompact(search) && (
             <Select
               value={search.sort ?? DEFAULT_ORDER}
               onValueChange={(next) =>
@@ -348,7 +363,10 @@ export function TaskFilters({
                 })
               }
             >
-              <SelectTrigger className="w-40" aria-label="Sort by">
+              <SelectTrigger
+                className="min-w-0 flex-1 sm:w-40 sm:flex-none"
+                aria-label="Sort by"
+              >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>

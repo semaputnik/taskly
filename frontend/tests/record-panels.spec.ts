@@ -160,7 +160,7 @@ test("A tag is renamed and deleted from its panel", async ({ page }) => {
   await expect(row(page, "errands")).toHaveCount(0)
 
   // And it is off the task that carried it.
-  await page.goto("/tasks")
+  await page.goto("/tasks?view=table")
   await expect(row(page, "Buy stamps")).not.toContainText("errands")
 })
 

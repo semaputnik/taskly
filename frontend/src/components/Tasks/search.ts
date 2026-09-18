@@ -30,10 +30,11 @@ export const taskSearchSchema = z.object({
   // The page of results being read. Like the sort, it is not a filter: it is
   // where in the results the reader is.
   page: z.number().int().min(1).optional().catch(undefined),
-  // How the rows are drawn: the table, or two-line compact rows. Neither a
-  // filter nor an order, so switching it keeps the page and the selection's
+  // How the rows are drawn: two-line compact rows, or the table, which is
+  // the one named in the URL since compact is what the list opens in. Neither
+  // a filter nor an order, so switching it keeps the page and the selection's
   // filters as they are.
-  view: z.literal("compact").optional().catch(undefined),
+  view: z.literal("table").optional().catch(undefined),
 })
 
 export type TaskSearch = z.infer<typeof taskSearchSchema>
@@ -66,4 +67,9 @@ export function hasActiveFilters(search: TaskSearch): boolean {
 
 export function clearedFilters(): Partial<TaskSearch> {
   return Object.fromEntries(FILTER_KEYS.map((key) => [key, undefined]))
+}
+
+/** Whether the list is in compact rows, which it opens in unless told otherwise. */
+export function isCompact(search: Pick<TaskSearch, "view">): boolean {
+  return search.view !== "table"
 }

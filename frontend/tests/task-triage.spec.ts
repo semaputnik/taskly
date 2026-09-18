@@ -51,7 +51,7 @@ test("The footer counts what matches, and every task is reachable by paging", as
   await newUser(page)
   await seedTasks(page, 28)
 
-  await page.goto("/tasks")
+  await page.goto("/tasks?view=table")
   await expect(page.getByText("28 tasks · page 1 of 2")).toBeVisible()
   await expect(row(page, "Task 00")).toBeVisible()
   await expect(row(page, "Task 27")).toHaveCount(0)
@@ -76,7 +76,7 @@ test("A column header sorts the whole result set, both ways", async ({
     due_date: `2026-${String(Math.floor((27 - index) / 28) + 1).padStart(2, "0")}-${String(((27 - index) % 28) + 1).padStart(2, "0")}`,
   }))
 
-  await page.goto("/tasks")
+  await page.goto("/tasks?view=table")
   await page.getByRole("button", { name: "Due date" }).click()
   await expect(page).toHaveURL(/sort=due_date/)
 
@@ -113,7 +113,7 @@ test("Changing a filter returns to the first page", async ({ page }) => {
     data: { title: "In the project", project_id: project.id },
   })
 
-  await page.goto("/tasks?page=2")
+  await page.goto("/tasks?view=table&page=2")
   await expect(page.getByText("page 2 of 2")).toBeVisible()
 
   await page.getByRole("button", { name: "Filters" }).click()
@@ -137,7 +137,7 @@ test("A selection is counted, survives paging and is cleared by a filter", async
   ).json()
   await seedTasks(page, 28)
 
-  await page.goto("/tasks")
+  await page.goto("/tasks?view=table")
   await page.getByRole("checkbox", { name: "Select Task 00" }).check()
   await expect(page.getByText("1 selected")).toBeVisible()
 
@@ -159,7 +159,7 @@ test("Select-all takes the page, and offers every matching task", async ({
   await newUser(page)
   await seedTasks(page, 28)
 
-  await page.goto("/tasks")
+  await page.goto("/tasks?view=table")
   await page
     .getByRole("checkbox", { name: "Select every task on this page" })
     .check()
@@ -178,7 +178,7 @@ test("A batch changes exactly the tasks selected", async ({ page }) => {
   await newUser(page)
   await seedTasks(page, 3)
 
-  await page.goto("/tasks")
+  await page.goto("/tasks?view=table")
   await page.getByRole("checkbox", { name: "Select Task 00" }).check()
   await page.getByRole("checkbox", { name: "Select Task 01" }).check()
 
@@ -219,7 +219,7 @@ test("A batch that cannot be done whole names the rows in the way", async ({
     data: { title: "Child task", parent_id: parent.id },
   })
 
-  await page.goto("/tasks")
+  await page.goto("/tasks?view=table")
   await page
     .getByRole("checkbox", { name: "Select every task on this page" })
     .check()
@@ -240,7 +240,7 @@ test("A batch delete confirms with the count, and restores as one act", async ({
   await newUser(page)
   await seedTasks(page, 3)
 
-  await page.goto("/tasks")
+  await page.goto("/tasks?view=table")
   await page
     .getByRole("checkbox", { name: "Select every task on this page" })
     .check()
@@ -262,7 +262,7 @@ test("A batch delete confirms with the count, and restores as one act", async ({
   await restore.getByRole("button", { name: "Restore", exact: true }).click()
   await expect(page.getByText("“3 tasks” restored")).toBeVisible()
 
-  await page.goto("/tasks")
+  await page.goto("/tasks?view=table")
   await expect(page.getByText("3 tasks", { exact: true })).toBeVisible()
 })
 
@@ -272,7 +272,7 @@ test("Completion still works from the row, beside the title", async ({
   await newUser(page)
   await seedTasks(page, 1)
 
-  await page.goto("/tasks")
+  await page.goto("/tasks?view=table")
   await row(page, "Task 00")
     .getByRole("checkbox", { name: "Mark as done" })
     .click()
@@ -292,7 +292,7 @@ test("On a narrow screen the table says it continues sideways", async ({
   await seedTasks(page, 2)
   await page.setViewportSize({ width: 500, height: 800 })
 
-  await page.goto("/tasks")
+  await page.goto("/tasks?view=table")
   const scroller = page.getByRole("region", {
     name: "Tasks, scrollable sideways",
   })
@@ -322,7 +322,7 @@ test("A batch can clear a priority, and the selection drops with the filters", a
     })
   }
 
-  await page.goto("/tasks")
+  await page.goto("/tasks?view=table")
   await page
     .getByRole("checkbox", { name: "Select every task on this page" })
     .check()

@@ -24,7 +24,7 @@ for (const theme of ["light", "dark"] as const) {
     })
 
     test("The primary action is readable on its fill", async ({ page }) => {
-      await page.goto("/tasks")
+      await page.goto("/tasks?view=table")
       const add = page.getByRole("button", { name: "Add Task" }).first()
       expect(await textOnFill(add)).toBeGreaterThanOrEqual(AA)
     })
@@ -48,7 +48,7 @@ for (const theme of ["light", "dark"] as const) {
     test("A modal layer visibly demotes the page behind it", async ({
       page,
     }) => {
-      await page.goto("/tasks")
+      await page.goto("/tasks?view=table")
       const ground = await pageGround(page)
       await page.getByRole("button", { name: "Add Task" }).first().click()
       const overlay = page.locator("[data-slot=sheet-overlay]")
@@ -65,7 +65,7 @@ for (const theme of ["light", "dark"] as const) {
     })
 
     test("Native controls follow the theme", async ({ page }) => {
-      await page.goto("/tasks")
+      await page.goto("/tasks?view=table")
       const scheme = await page.evaluate(
         () => getComputedStyle(document.documentElement).colorScheme,
       )

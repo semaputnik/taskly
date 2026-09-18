@@ -54,7 +54,7 @@ test("A bot user's comment names the bot and offers no edit or delete", async ({
   })
   expect(commented.ok()).toBe(true)
 
-  await page.goto(`/tasks?project_id=${project.id}`)
+  await page.goto(`/tasks?view=table&project_id=${project.id}`)
   await page
     .getByRole("row", { name: /Ship 1\.2/ })
     .getByText("Ship 1.2")

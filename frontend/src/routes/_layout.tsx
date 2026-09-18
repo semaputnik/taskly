@@ -2,6 +2,7 @@ import { createFileRoute, Outlet, redirect } from "@tanstack/react-router"
 import { panelSearchSchema } from "@/components/Records/panels"
 import { RecordPanels } from "@/components/Records/RecordPanels"
 import AppSidebar from "@/components/Sidebar/AppSidebar"
+import { AddTaskButton } from "@/components/Tasks/AddTaskButton"
 import {
   SidebarInset,
   SidebarProvider,
@@ -37,8 +38,10 @@ function Layout() {
         <header className="bg-background sticky top-0 z-10 flex h-14 shrink-0 items-center border-b px-4 md:hidden">
           <SidebarTrigger className="text-muted-foreground -ml-1" />
         </header>
-        {/* SidebarInset is already the page's one `main` landmark. */}
-        <div className="flex-1 p-6 md:p-8">
+        {/* SidebarInset is already the page's one `main` landmark. On a phone
+            the foot is kept clear of the Add Task button, so the last row can
+            always be scrolled out from under it. */}
+        <div className="flex-1 p-6 pb-28 md:p-8">
           <div className="mx-auto max-w-7xl">
             <Outlet />
           </div>
@@ -47,6 +50,7 @@ function Layout() {
       {/* Mounted once: a record opens over whatever screen the reader is on,
           and capture starts from any of them. */}
       <RecordPanels />
+      <AddTaskButton />
     </SidebarProvider>
   )
 }

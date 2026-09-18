@@ -11,7 +11,7 @@ test("A comment draft survives switching tabs and following a subtask", async ({
   const task = await api.create("/tasks/", { title: "Move house" })
   await api.create("/tasks/", { title: "Pack the books", parent_id: task.id })
 
-  await page.goto(`/tasks?task=${task.id}`)
+  await page.goto(`/tasks?view=table&task=${task.id}`)
   const panel = page.getByRole("dialog", { name: "Move house" })
   const draft = panel.getByPlaceholder("Add a comment")
   await draft.fill("Movers booked for the 12th, still need")
@@ -57,7 +57,7 @@ test("Only the tab on screen fetches its collection", async ({ page }) => {
   page.on("request", (r) => {
     if (r.url().includes("/attachments/")) attachmentRequests.push(r.url())
   })
-  await page.goto(`/tasks?task=${task.id}`)
+  await page.goto(`/tasks?view=table&task=${task.id}`)
   const panel = page.getByRole("dialog", { name: "Move house" })
   await expect(panel.getByText("No comments yet.")).toBeVisible()
   expect(attachmentRequests).toEqual([])

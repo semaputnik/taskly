@@ -8,8 +8,8 @@ import { createRouter, RouterProvider } from "@tanstack/react-router"
 import { StrictMode } from "react"
 import ReactDOM from "react-dom/client"
 import { client } from "./client/client.gen"
+import { AppToaster } from "./components/Common/AppToaster"
 import { ThemeProvider } from "./components/theme-provider"
-import { Toaster } from "./components/ui/sonner"
 import { isRefusal, isSessionGone } from "./lib/apiErrors"
 import { configureServerState } from "./lib/serverState"
 import "./index.css"
@@ -69,7 +69,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
     <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
       <QueryClientProvider client={queryClient}>
         <RouterProvider router={router} />
-        <Toaster richColors closeButton />
+        <AppToaster />
       </QueryClientProvider>
     </ThemeProvider>
   </StrictMode>,

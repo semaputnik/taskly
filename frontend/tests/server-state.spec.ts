@@ -1,5 +1,6 @@
 import { expect, type Page, test } from "@playwright/test"
 import { newUser, userApi } from "./utils/account"
+import { openCaptured } from "./utils/capture"
 import { createUser } from "./utils/privateApi.ts"
 import { randomEmail, randomPassword } from "./utils/random"
 
@@ -52,6 +53,7 @@ test("A captured task counts on the Projects list at once", async ({
   const title = page.getByRole("textbox", { name: "Task title" })
   await title.fill("Prune the roses")
   await title.press("Enter")
+  await openCaptured(page)
   await expect(
     page.getByRole("dialog", { name: "Prune the roses" }),
   ).toBeVisible()

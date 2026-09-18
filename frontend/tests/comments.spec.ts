@@ -16,7 +16,7 @@ async function openComment(page: Page, { clock = true } = {}) {
     body: "Landlord wants it signed by Friday",
   })
 
-  await page.goto(`/tasks?task=${task.id}`)
+  await page.goto(`/tasks?view=table&task=${task.id}`)
   const panel = page.getByRole("dialog", { name: "Renew the lease" })
   const shown = panel
     .locator("div.rounded-md")

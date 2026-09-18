@@ -95,7 +95,7 @@ test("A date reads the same in the table and in the panel's date field", async (
 
   // The panel shows the day the same way the table does, whatever language
   // the browser's own date picker speaks.
-  await page.goto(`/tasks?task=${task.id}`)
+  await page.goto(`/tasks?view=table&task=${task.id}`)
   const field = page
     .getByRole("dialog", { name: "Renew the lease" })
     .getByRole("button", { name: /^Due date:/ })
@@ -107,7 +107,7 @@ test("A date reads the same in the table and in the panel's date field", async (
   await expect(row).not.toContainText("2026-09-01")
 
   // Moments in the panel share one format, to the minute and no further.
-  await page.goto(`/tasks?task=${task.id}`)
+  await page.goto(`/tasks?view=table&task=${task.id}`)
   const panel = page.getByRole("dialog", { name: "Renew the lease" })
   const created = await panel.locator("time").first().textContent()
   const commented = await panel
@@ -152,7 +152,7 @@ test("Heading levels descend without skipping on every screen", async ({
   for (const path of SIGNED_IN) await check(path)
   // A panel's title is the h2 under whatever opened it.
   const task = (await (await api.get("/tasks/")).json()).data[0]
-  await page.goto(`/tasks?task=${task.id}`)
+  await page.goto(`/tasks?view=table&task=${task.id}`)
   const panel = page.getByRole("dialog")
   await expect(panel).toBeVisible()
   const inPanel = await panel.evaluate((node) =>

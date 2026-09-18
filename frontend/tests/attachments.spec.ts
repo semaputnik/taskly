@@ -23,7 +23,7 @@ async function openFiles(page: Page) {
   )
   expect(uploaded.ok()).toBe(true)
 
-  await page.goto(`/tasks?task=${task.id}`)
+  await page.goto(`/tasks?view=table&task=${task.id}`)
   const panel = page.getByRole("dialog", { name: "File the taxes" })
   await panel.getByRole("tab", { name: "Files" }).click()
   await expect(panel.getByText("receipts-2025.pdf")).toBeVisible()

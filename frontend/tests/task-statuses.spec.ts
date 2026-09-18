@@ -51,7 +51,7 @@ test("The checkbox is checked only for Done, and sends done or todo", async ({
     { title: "Started", status: "in_progress" },
     { title: "Parked", status: "waiting" },
   ])
-  await page.goto("/tasks")
+  await page.goto("/tasks?view=table")
 
   for (const title of ["Started", "Parked"]) {
     const box = row(page, title).getByRole("checkbox", { name: "Mark as done" })
@@ -77,7 +77,7 @@ test("A status is changed from the list column and from the panel", async ({
 }) => {
   await newUser(page)
   await seed(page, [{ title: "Call the bank" }])
-  await page.goto("/tasks")
+  await page.goto("/tasks?view=table")
 
   await expect(page.getByRole("columnheader", { name: "Status" })).toBeVisible()
   await expect(statusTrigger(page, "Call the bank")).toContainText("To do")
@@ -119,7 +119,7 @@ test("Done asks about open subtasks from the checkbox and from the menu", async 
     parent_id: ids["Other parent"],
     status: "in_progress",
   })
-  await page.goto("/tasks")
+  await page.goto("/tasks?view=table")
 
   await row(page, "Move house")
     .getByRole("checkbox", { name: "Mark as done" })
@@ -152,7 +152,7 @@ test("The list filters by Open and by a single status", async ({ page }) => {
     { title: "Parked", status: "waiting" },
     { title: "Finished", status: "done" },
   ])
-  await page.goto("/tasks")
+  await page.goto("/tasks?view=table")
 
   await page.getByRole("button", { name: "Filters" }).click()
   const filter = page.getByRole("combobox", { name: "Status" })
@@ -185,7 +185,7 @@ test("The list filters by Open and by a single status", async ({ page }) => {
 test("Bulk Set status moves every selected task", async ({ page }) => {
   await newUser(page)
   await seed(page, [{ title: "One" }, { title: "Two" }])
-  await page.goto("/tasks")
+  await page.goto("/tasks?view=table")
 
   await page
     .getByRole("checkbox", { name: "Select every task on this page" })
@@ -246,7 +246,7 @@ test("On a phone the status column is a glyph with a 44px target", async ({
   await newUser(page)
   await seed(page, [{ title: "Water the plants", status: "in_progress" }])
   await page.setViewportSize({ width: 375, height: 812 })
-  await page.goto("/tasks")
+  await page.goto("/tasks?view=table")
 
   const trigger = statusTrigger(page, "Water the plants")
   await expect(trigger).toHaveAccessibleName(/In progress/)

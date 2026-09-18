@@ -16,6 +16,7 @@ import {
   clearedFilters,
   FILTER_KEYS,
   hasActiveFilters,
+  isCompact,
   type TaskListSearch,
   type TaskSearch,
   taskSearchSchema,
@@ -222,7 +223,7 @@ function Tasks() {
 
       {/* Choosing many is the table's job: compact rows cannot show what is
           selected, so the bar waits until the table is back. */}
-      {selected.size > 0 && search.view !== "compact" && (
+      {selected.size > 0 && !isCompact(search) && (
         <TaskBulkActions
           selected={[...selected]}
           known={[...selected].flatMap((id) => seen.current.get(id) ?? [])}
@@ -251,7 +252,7 @@ function Tasks() {
         />
       )}
 
-      {search.view === "compact" ? (
+      {isCompact(search) ? (
         <CompactList
           tasks={rows}
           projectNames={projectNames}
@@ -353,19 +354,27 @@ function CompactList({
 }) {
   return (
     <div className="bg-card overflow-hidden rounded-lg border">
-      {pending
-        ? Array.from({ length: pendingRows }).map((_, index) => (
-            <CompactTaskRowPending key={index} />
-          ))
-        : tasks.length > 0
-          ? tasks.map((task) => (
+      {pending ? (
+        Array.from({ length: pendingRows }).map((_, index) => (
+          <CompactTaskRowPending key={index} />
+        ))
+      ) : tasks.length > 0 ? (
+        // A list, so assistive technology hears how many tasks there are and
+        // where each begins. Each row sits alone in its item, so the last
+        // row's rule is taken off here rather than by the row itself.
+        <ul aria-label="Tasks" className="[&>li:last-child>div]:border-b-0">
+          {tasks.map((task) => (
+            <li key={task.id}>
               <CompactTaskRow
-                key={task.id}
                 task={task}
                 projectName={projectNames[task.project_id]}
               />
-            ))
-          : empty}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        empty
+      )}
     </div>
   )
 }
