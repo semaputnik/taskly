@@ -2,7 +2,7 @@
 Read models: records as the API shows them, assembled in one place.
 
 A `TaskPublic` is more than its row: the project its tree resolves to, its
-tags, its recurrence and its assignee all come from elsewhere. Every route
+tags, its recurrence, its assignee and its subtask counts all come from elsewhere. Every route
 that returns tasks hands them here, so a field added to `TaskPublic` is added
 once, and serialising a page of tasks costs a fixed number of queries however
 many tasks it holds.
@@ -45,6 +45,9 @@ def task_publics(
     if unread := [task for task in tasks if task.id not in known_recurrences]:
         known_recurrences.update(crud.get_recurrences(session=session, tasks=unread))
     tags = crud.get_task_tags(session=session, task_ids=[task.id for task in tasks])
+    subtasks = crud.get_subtask_counts(
+        session=session, task_ids=[task.id for task in tasks]
+    )
     bot_users = crud.get_bot_user_refs(
         session=session, bot_user_ids=[task.assignee_bot_user_id for task in tasks]
     )
@@ -60,6 +63,8 @@ def task_publics(
                 "assignee_bot_user": bot_users.get(task.assignee_bot_user_id)
                 if task.assignee_bot_user_id
                 else None,
+                "subtask_count": subtasks[task.id].total,
+                "subtasks_done": subtasks[task.id].done,
             },
         )
         for task in tasks

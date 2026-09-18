@@ -2,6 +2,11 @@ import { usePrefetchQuery } from "@tanstack/react-query"
 import { createFileRoute } from "@tanstack/react-router"
 import { Suspense } from "react"
 
+import {
+  InProgress,
+  InProgressPending,
+  inProgressQuery,
+} from "@/components/Dashboard/InProgress"
 import { NeedsYou, NeedsYouPending } from "@/components/Dashboard/NeedsYou"
 import {
   recentActivityQuery,
@@ -34,8 +39,10 @@ function greetingName(fullName?: string | null, email?: string): string {
 function Dashboard() {
   const { user: currentUser } = useAuth()
   // Started here, beside the queue's own requests, rather than after the
-  // queue has suspended and resumed.
+  // queue has suspended and resumed: the sheets beside it are not rendered
+  // until it resumes.
   usePrefetchQuery(recentActivityQuery())
+  usePrefetchQuery(inProgressQuery())
 
   return (
     <div className="flex flex-col gap-6">
@@ -49,20 +56,28 @@ function Dashboard() {
         </p>
       </div>
 
-      {/* The queue leads; the log is context beside it, not below the fold. */}
+      {/* The queue leads; beside it, what is already under way, then the log
+          as context — not below the fold. On a phone the three stack in that
+          order. */}
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
-        {/* One boundary: both cards appear in the same frame, so neither moves
-            the other once it is drawn. */}
+        {/* One boundary: every sheet appears in the same frame, so none moves
+            another once it is drawn. */}
         <Suspense
           fallback={
             <>
               <NeedsYouPending />
-              <WhileYouWereAwayPending />
+              <div className="flex flex-col gap-6">
+                <InProgressPending />
+                <WhileYouWereAwayPending />
+              </div>
             </>
           }
         >
           <NeedsYou />
-          <WhileYouWereAway />
+          <div className="flex flex-col gap-6">
+            <InProgress />
+            <WhileYouWereAway />
+          </div>
         </Suspense>
       </div>
     </div>

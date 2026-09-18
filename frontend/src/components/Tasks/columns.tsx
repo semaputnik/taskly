@@ -8,6 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { formatDay } from "@/lib/dates"
 import { cn } from "@/lib/utils"
 import { CompleteTask } from "./CompleteTask"
+import { PriorityBadge } from "./priority"
 import { describeRecurrence } from "./recurrence"
 import { STATUS_LABELS, StatusGlyph, StatusMenu } from "./status"
 
@@ -136,7 +137,7 @@ export function getColumns(
       cell: ({ row }) => {
         const priority = row.original.priority
         return priority ? (
-          <Badge variant="outline">{priority}</Badge>
+          <PriorityBadge priority={priority} />
         ) : (
           <span className="text-muted-foreground italic">No priority</span>
         )

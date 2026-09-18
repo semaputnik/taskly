@@ -7,6 +7,10 @@ import { type TaskPublic, TasksService } from "@/client"
 import { DataTable } from "@/components/Common/DataTable"
 import { EmptyState } from "@/components/Common/EmptyState"
 import { useRecordPanels, withoutPanelState } from "@/components/Records/panels"
+import {
+  CompactTaskRow,
+  CompactTaskRowPending,
+} from "@/components/Tasks/CompactTaskRow"
 import { getColumns } from "@/components/Tasks/columns"
 import {
   clearedFilters,
@@ -38,7 +42,12 @@ const SORT_FIELDS = { due_date: "due_date", priority: "priority" }
 
 /** What the list's filters ask the API for, before any paging. */
 function filtersQuery(search: TaskListSearch, currentUserId?: string) {
-  const { assignee, page: _page, ...filters } = withoutPanelState(search)
+  const {
+    assignee,
+    page: _page,
+    view: _view,
+    ...filters
+  } = withoutPanelState(search)
   return {
     ...filters,
     // "Me" needs the id the API filters on, a bot user is named by its own
@@ -130,6 +139,9 @@ function Tasks() {
         page: next === 1 ? undefined : next,
       }),
     })
+  // The view is how the rows are drawn, so it keeps the page the reader is on.
+  const setView = (view: TaskSearch["view"]) =>
+    navigate({ search: (previous) => ({ ...previous, view }) })
   const sortBy = (field: string) =>
     navigate({
       search: (previous) => ({
@@ -165,6 +177,36 @@ function Tasks() {
     : []
   const depths = tasks && !search.sort ? buildTaskTree(tasks.data).depths : {}
 
+  const empty = hasActiveFilters(search) ? (
+    <EmptyState
+      icon={SearchX}
+      title="No tasks match these filters"
+      description="Every filter narrows the list further. Widen one, or start over."
+      action={
+        <Button
+          variant="outline"
+          onClick={() => applyFilters(clearedFilters())}
+        >
+          Clear filters
+        </Button>
+      }
+    />
+  ) : (
+    <EmptyState
+      icon={CheckSquare}
+      title="No tasks yet"
+      description="Writing one down takes a title — or let a bot user file them for you through the REST API."
+      action={
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          <Button onClick={() => capture("task")}>Add a task</Button>
+          <Button variant="outline" asChild>
+            <RouterLink to="/bots">Set up a bot user</RouterLink>
+          </Button>
+        </div>
+      }
+    />
+  )
+
   return (
     <div className="flex flex-col gap-6">
       <div>
@@ -172,9 +214,15 @@ function Tasks() {
         <p className="text-muted-foreground">Everything you need to get done</p>
       </div>
 
-      <TaskFilters search={search} onChange={applyFilters} />
+      <TaskFilters
+        search={search}
+        onChange={applyFilters}
+        onViewChange={setView}
+      />
 
-      {selected.size > 0 && (
+      {/* Choosing many is the table's job: compact rows cannot show what is
+          selected, so the bar waits until the table is back. */}
+      {selected.size > 0 && search.view !== "compact" && (
         <TaskBulkActions
           selected={[...selected]}
           known={[...selected].flatMap((id) => seen.current.get(id) ?? [])}
@@ -203,73 +251,53 @@ function Tasks() {
         />
       )}
 
-      <DataTable
-        scrollLabel="Tasks, scrollable sideways"
-        columns={getColumns(projectNames, depths)}
-        data={rows}
-        pending={isPending || waitingForMe}
-        pendingRows={Math.min(PAGE_SIZE, Math.max(count, 5)) || 5}
-        rowLabel={(task) => `Open ${task.title}`}
-        onRowClick={(task) => openTask(task.id)}
-        selection={{
-          ids: selected,
-          idOf: (task) => task.id,
-          label: (task) => `Select ${task.title}`,
-          onToggle: (id, isSelected) =>
-            setSelected((previous) => {
-              const next = new Set(previous)
-              if (isSelected) next.add(id)
-              else next.delete(id)
-              return next
-            }),
-          onTogglePage: (ids, isSelected) =>
-            setSelected((previous) => {
-              const next = new Set(previous)
-              for (const id of ids) {
+      {search.view === "compact" ? (
+        <CompactList
+          tasks={rows}
+          projectNames={projectNames}
+          pending={isPending || waitingForMe}
+          pendingRows={Math.min(PAGE_SIZE, Math.max(count, 5)) || 5}
+          empty={empty}
+        />
+      ) : (
+        <DataTable
+          scrollLabel="Tasks, scrollable sideways"
+          columns={getColumns(projectNames, depths)}
+          data={rows}
+          pending={isPending || waitingForMe}
+          pendingRows={Math.min(PAGE_SIZE, Math.max(count, 5)) || 5}
+          rowLabel={(task) => `Open ${task.title}`}
+          onRowClick={(task) => openTask(task.id)}
+          selection={{
+            ids: selected,
+            idOf: (task) => task.id,
+            label: (task) => `Select ${task.title}`,
+            onToggle: (id, isSelected) =>
+              setSelected((previous) => {
+                const next = new Set(previous)
                 if (isSelected) next.add(id)
                 else next.delete(id)
-              }
-              return next
-            }),
-        }}
-        sorting={{
-          fields: SORT_FIELDS,
-          field: search.sort,
-          descending: search.order === "desc",
-          onSort: sortBy,
-        }}
-        empty={
-          hasActiveFilters(search) ? (
-            <EmptyState
-              icon={SearchX}
-              title="No tasks match these filters"
-              description="Every filter narrows the list further. Widen one, or start over."
-              action={
-                <Button
-                  variant="outline"
-                  onClick={() => applyFilters(clearedFilters())}
-                >
-                  Clear filters
-                </Button>
-              }
-            />
-          ) : (
-            <EmptyState
-              icon={CheckSquare}
-              title="No tasks yet"
-              description="Writing one down takes a title — or let a bot user file them for you through the REST API."
-              action={
-                <div className="flex flex-wrap items-center justify-center gap-2">
-                  <Button onClick={() => capture("task")}>Add a task</Button>
-                  <Button variant="outline" asChild>
-                    <RouterLink to="/bots">Set up a bot user</RouterLink>
-                  </Button>
-                </div>
-              }
-            />
-          )
-        }
-      />
+                return next
+              }),
+            onTogglePage: (ids, isSelected) =>
+              setSelected((previous) => {
+                const next = new Set(previous)
+                for (const id of ids) {
+                  if (isSelected) next.add(id)
+                  else next.delete(id)
+                }
+                return next
+              }),
+          }}
+          sorting={{
+            fields: SORT_FIELDS,
+            field: search.sort,
+            descending: search.order === "desc",
+            onSort: sortBy,
+          }}
+          empty={empty}
+        />
+      )}
 
       {count > 0 && (
         <div className="flex flex-wrap items-center justify-between gap-4">
@@ -301,6 +329,43 @@ function Tasks() {
           )}
         </div>
       )}
+    </div>
+  )
+}
+
+/**
+ * The list as compact rows: the same page, filters and order as the table,
+ * in the row the dashboard uses. It reads and closes tasks; choosing many at
+ * once is the table's job, so it has no selection of its own.
+ */
+function CompactList({
+  tasks,
+  projectNames,
+  pending,
+  pendingRows,
+  empty,
+}: {
+  tasks: TaskPublic[]
+  projectNames: Record<string, string>
+  pending: boolean
+  pendingRows: number
+  empty: React.ReactNode
+}) {
+  return (
+    <div className="bg-card overflow-hidden rounded-lg border">
+      {pending
+        ? Array.from({ length: pendingRows }).map((_, index) => (
+            <CompactTaskRowPending key={index} />
+          ))
+        : tasks.length > 0
+          ? tasks.map((task) => (
+              <CompactTaskRow
+                key={task.id}
+                task={task}
+                projectName={projectNames[task.project_id]}
+              />
+            ))
+          : empty}
     </div>
   )
 }

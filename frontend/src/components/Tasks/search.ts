@@ -30,6 +30,10 @@ export const taskSearchSchema = z.object({
   // The page of results being read. Like the sort, it is not a filter: it is
   // where in the results the reader is.
   page: z.number().int().min(1).optional().catch(undefined),
+  // How the rows are drawn: the table, or two-line compact rows. Neither a
+  // filter nor an order, so switching it keeps the page and the selection's
+  // filters as they are.
+  view: z.literal("compact").optional().catch(undefined),
 })
 
 export type TaskSearch = z.infer<typeof taskSearchSchema>

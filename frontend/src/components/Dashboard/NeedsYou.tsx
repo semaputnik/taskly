@@ -2,17 +2,14 @@ import { useSuspenseQueries } from "@tanstack/react-query"
 import { Link as RouterLink } from "@tanstack/react-router"
 import { ArrowRight, CheckCheck } from "lucide-react"
 
-import type { TaskPublic, TaskStatus } from "@/client"
-import { recordLink } from "@/components/Records/panels"
-import { CompleteTask } from "@/components/Tasks/CompleteTask"
-import { Badge } from "@/components/ui/badge"
-import { Skeleton } from "@/components/ui/skeleton"
-import { formatDay } from "@/lib/dates"
+import type { TaskStatus } from "@/client"
+import {
+  CompactTaskRow,
+  CompactTaskRowPending,
+} from "@/components/Tasks/CompactTaskRow"
 import { projectsQuery, tasksQuery } from "@/lib/serverState"
-import { cn } from "@/lib/utils"
-import { daysLate, inAWeek, today, tomorrow } from "./when"
-
-const PREVIEW_ROWS = 5
+import { Group, MoreLink, PREVIEW_ROWS } from "./sheet"
+import { inAWeek, today, tomorrow } from "./when"
 
 // The work the owner can move themselves. A waiting task is open too, but its
 // next move is someone else's, so it has a band of its own rather than
@@ -27,86 +24,6 @@ const tasksIn = (status: TaskStatus[], query: TasksQuery) =>
 
 const actionable = (query: TasksQuery) => tasksIn(ACTIONABLE, query)
 
-/** Late in Alert Red, as in Overdue; otherwise just the day it is due. */
-function WaitingDue({ dueDate }: { dueDate?: string | null }) {
-  if (!dueDate) return null
-  if (dueDate < today()) {
-    return <span className="text-destructive">{daysLate(dueDate)}</span>
-  }
-  return <span className="text-muted-foreground">{formatDay(dueDate)}</span>
-}
-
-/**
- * A band of rows under its own label. Group headers borrow the table's
- * uppercase micro type because that is exactly what they are — a header over
- * a set of rows — and inventing a second treatment for the same job would
- * read as an inconsistency, not a distinction.
- */
-function Group({
-  label,
-  count,
-  tone = "default",
-  children,
-}: {
-  label: string
-  count: number
-  tone?: "default" | "alert"
-  children: React.ReactNode
-}) {
-  return (
-    <section>
-      <h2 className="bg-muted/50 flex items-center gap-2 border-b px-4 py-2.5 text-xs font-semibold tracking-wider uppercase">
-        <span className={cn(tone === "alert" && "text-destructive")}>
-          {label}
-        </span>
-        <span className="text-muted-foreground font-normal tabular-nums">
-          {count}
-        </span>
-      </h2>
-      {children}
-    </section>
-  )
-}
-
-function TaskRow({
-  task,
-  projectName,
-  trailing,
-}: {
-  task: TaskPublic
-  projectName?: string
-  trailing?: React.ReactNode
-}) {
-  return (
-    <div className="hover:bg-muted/50 flex items-center gap-3 border-b px-4 py-3 transition-colors last:border-b-0">
-      <CompleteTask task={task} />
-      {/* The title is the link, not the whole row: the row also holds the
-          completion control, and a checkbox inside a link is a trap. */}
-      <RouterLink
-        {...recordLink("task", task.id)}
-        className="min-w-0 flex-1 truncate text-sm font-medium underline-offset-4 hover:underline"
-      >
-        {task.title}
-      </RouterLink>
-      {projectName && (
-        // Capped and truncated: a long project name must not squeeze the
-        // task's own title out of its row.
-        <span className="text-muted-foreground hidden max-w-[40%] shrink-0 truncate text-sm sm:inline">
-          {projectName}
-        </span>
-      )}
-      <span className="w-8 shrink-0 text-right">
-        {task.priority && <Badge variant="outline">{task.priority}</Badge>}
-      </span>
-      {/* Reserved whether or not this group has anything to put here, so the
-          priority column stays put from one group to the next. */}
-      <span className="w-20 shrink-0 text-right text-xs whitespace-nowrap">
-        {trailing}
-      </span>
-    </div>
-  )
-}
-
 /** The sheet while its bands are on their way. */
 export function NeedsYouPending() {
   return (
@@ -114,13 +31,7 @@ export function NeedsYouPending() {
       {["Overdue", "Due today"].map((label) => (
         <Group key={label} label={label} count={0}>
           {Array.from({ length: 2 }).map((_, index) => (
-            <div
-              key={index}
-              className="flex items-center gap-3 border-b px-4 py-3"
-            >
-              <Skeleton className="size-4 rounded-[4px]" />
-              <Skeleton className="h-4 w-48" />
-            </div>
+            <CompactTaskRowPending key={index} />
           ))}
         </Group>
       ))}
@@ -176,17 +87,10 @@ export function NeedsYou() {
           {overdueCount > 0 && (
             <Group label="Overdue" count={overdueCount} tone="alert">
               {overdue.data.data.map((task) => (
-                <TaskRow
+                <CompactTaskRow
                   key={task.id}
                   task={task}
                   projectName={names[task.project_id]}
-                  trailing={
-                    task.due_date && (
-                      <span className="text-destructive">
-                        {daysLate(task.due_date)}
-                      </span>
-                    )
-                  }
                 />
               ))}
               {overdueCount > PREVIEW_ROWS && (
@@ -201,7 +105,7 @@ export function NeedsYou() {
           {dueCount > 0 && (
             <Group label="Due today" count={dueCount}>
               {due.data.data.map((task) => (
-                <TaskRow
+                <CompactTaskRow
                   key={task.id}
                   task={task}
                   projectName={names[task.project_id]}
@@ -246,11 +150,10 @@ export function NeedsYou() {
         <div className="border-t">
           <Group label="Waiting on others" count={waitingCount}>
             {waiting.data.data.map((task) => (
-              <TaskRow
+              <CompactTaskRow
                 key={task.id}
                 task={task}
                 projectName={names[task.project_id]}
-                trailing={<WaitingDue dueDate={task.due_date} />}
               />
             ))}
             <MoreLink
@@ -262,29 +165,5 @@ export function NeedsYou() {
         </div>
       )}
     </div>
-  )
-}
-
-function MoreLink({
-  count,
-  label,
-  search,
-}: {
-  count: number
-  /** Said instead of the count when there is nothing more to count. */
-  label?: string
-  search: Record<string, unknown>
-}) {
-  return (
-    <RouterLink
-      to="/tasks"
-      search={search}
-      className="hover:bg-muted/50 flex items-center justify-between gap-2 border-b px-4 py-3 text-sm transition-colors last:border-b-0"
-    >
-      <span className="text-muted-foreground">
-        {count > 0 ? `${count} more` : label}
-      </span>
-      <ArrowRight className="text-muted-foreground size-4" aria-hidden />
-    </RouterLink>
   )
 }

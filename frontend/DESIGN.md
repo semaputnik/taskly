@@ -17,6 +17,12 @@ colors:
   focus-ring: "oklch(0.708 0 0)"
   alert-red: "oklch(0.577 0.245 27.325)"
   alert-red-lifted: "oklch(0.704 0.191 22.216)"
+  priority-p1: "oklch(0.55 0.2 20)"
+  priority-p2: "oklch(0.54 0.115 70)"
+  priority-p3: "oklch(0.53 0.17 255)"
+  priority-p1-night: "oklch(0.72 0.17 20)"
+  priority-p2-night: "oklch(0.84 0.16 85)"
+  priority-p3-night: "oklch(0.74 0.13 250)"
   night-ground: "oklch(0.21 0 0)"
   night-panel: "oklch(0.26 0 0)"
   night-quiet: "oklch(0.32 0 0)"
@@ -176,6 +182,7 @@ the rule the rest of the system defers to.
 
 **Key Characteristics:**
 - One accent, used sparingly: teal marks action, location, and focus — nothing else.
+- One coloured category: priority. P1 red, P2 amber, P3 blue; P4 stays ink.
 - Neutral achromatic base (chroma 0) for every surface, border, and text tone.
 - Fixed control height of 36px (2.25rem) across buttons, inputs, and selects.
 - Tables are the primary content form; cards are not part of the shipped vocabulary.
@@ -185,8 +192,8 @@ the rule the rest of the system defers to.
 ## Colors
 
 An achromatic grey field with a single chromatic voice: every surface, border,
-and text tone sits at chroma 0, so the teal accent and the red alert are the
-only saturated things a screen can contain.
+and text tone sits at chroma 0, so the teal accent, the red alert and the three
+priority hues are the only saturated things a screen can contain.
 
 ### Primary
 - **Signal Teal** — the sole accent. It marks the primary button (including the
@@ -215,6 +222,21 @@ only saturated things a screen can contain.
   decorates. In dark mode it shifts to
   `alert-red-lifted`, which is lighter and noticeably less saturated, because
   full-chroma red on a dark ground reads as an emergency rather than a warning.
+
+### Priority
+- **Priority P1 / P2 / P3** (`--priority-p1..p3`, `text-priority-p1` and so on)
+  — the one category the system gives a colour of its own: red, amber and
+  blue, in the order of how much they press. P4 and no priority have no hue and
+  stay ink, as every priority did before; the ordinary case is not coloured.
+  They appear as the ring and a 10% tint (15% in dark) of the compact row's
+  checkbox, as the text and a 40% border of the priority badge, and as the flag
+  beside a priority wherever one is chosen or filtered on. Each is both a text
+  colour and a ring, so each clears 4.5:1 on every ground it is laid on; the
+  pairs are in `index.css`. P2 is amber rather than yellow in light, because
+  yellow cannot carry text on white, and yellow in dark, where it can.
+  **P1 is not Alert Red.** They are separate tokens because urgent and late are
+  different facts: a P1 task that is also overdue shows both, the red ring for
+  its priority and the Alert Red days-late count for its date.
 
 ### Neutral
 - **Ground** — the surface the work area rests on, and nothing else. Every
@@ -256,9 +278,16 @@ only saturated things a screen can contain.
 **The One Signal Rule.** Teal appears at most a few times per screen and always
 answers one of three questions: *what do I press*, *where am I*, or *what am I
 typing in*. A teal fill that answers none of those is decoration and must be
-removed. Status, category, priority, and tag are communicated with neutrals and
-shape — never by spending the accent, and never by a second hue: an active
-account is a filled ink dot, an inactive one a hollow muted ring.
+removed. Status, category and tag are communicated with neutrals and shape —
+never by spending the accent, and never by a second hue: an active account is
+a filled ink dot, an inactive one a hollow muted ring.
+
+**The Priority Hue Rule.** Priority is the one exception, and it is a narrow
+one: three hues for P1–P3, never teal, never a fill larger than the checkbox's
+tint, and never on anything but the priority itself — not the row, not the
+title, not the band. A priority hue is always doubled by words where words are
+read: the badge says "P1", and the compact checkbox names its priority to
+assistive technology.
 
 **The Chroma Zero Rule.** Every structural token — surface, border, text,
 skeleton, divider — has chroma exactly `0`. There are no warm greys and no cool
@@ -501,7 +530,8 @@ colour, never weight.
 - **Secondary** (Surface Quiet fill, no border) is the tag chip.
 - **Outline** (transparent fill, hairline border, ink text) is the metadata chip:
   priority, recurrence rule. Outline reads lighter than secondary, which is
-  correct — a priority is a property, a tag is an assignment.
+  correct — a priority is a property, a tag is an assignment. A P1–P3 badge
+  takes its hue for text and border (`PriorityBadge`); P4 stays ink.
 - **Default** (teal fill) exists in the API but is not used in the product
   surface, and should not be: see The One Signal Rule.
 
@@ -635,8 +665,10 @@ rather than a table.
   `muted/50` band carrying its name in `micro` type and its count in Ink Muted
   tabular figures; the rows follow, separated by hairlines, the last one losing
   its rule.
-- Rows reserve their trailing columns whether or not a group fills them, so the
-  priority badge does not move from one group to the next.
+- Rows are compact task rows (below), so the priority rides on the checkbox and
+  the due day on the second line; nothing sits in a trailing column to drift
+  from one group to the next. The project name alone ends the title line, from
+  `sm` up.
 - A sheet never grows past about five rows per group. Past that it ends in a
   full-width "N more" row that hands off to the filtered table, because the
   table is where long lists belong.
@@ -648,6 +680,30 @@ rather than a table.
   waiting, and it stands even when the bands above are clear. Overdue, Due today
   and This week hold only To do and In progress work, because a waiting task's
   next move is not the reader's.
+- **In progress** is a sheet of its own, heading the column beside the queue,
+  above the activity log; on a phone it follows the queue. It lists In progress
+  tasks by priority, P1 first, up to five, then "N more" to the list filtered
+  to In progress. It is drawn even when empty, with one quiet line, so the
+  column keeps its shape. It does not take its tasks out of Overdue or Due
+  today: being started is not being on time.
+
+### Compact task row
+Two short lines for a task, used by every dashboard band and by the task list's
+Compact view (`view=compact`, switched from the filter bar and kept in the URL).
+- **Line one:** the round completion checkbox at 18px, its ring and tint in the
+  priority's hue (The Priority Hue Rule), then the title as the link that opens
+  the task — never the whole row, since the row also holds the checkbox — and
+  the project name in Ink Muted `xs`, from `sm` up. A subtask is marked with the
+  same corner arrow as the table.
+- **Line two**, `xs` Ink Muted with 14px icons, in this order: subtask progress
+  (`1/2`, done over total, direct subtasks only), the due day, the recurrence
+  rule, then each tag behind its own tag icon. The due day is said, not
+  written: Today, Tomorrow, a weekday within the week, a short date beyond it,
+  and once missed "Yesterday" or "3 days late". Only a missed day is Alert Red;
+  today is ink, the rest muted. A task with none of these has no second line.
+- The compact view reads and closes tasks. Selecting many is the table's job,
+  so it has no selection column; the view switch marks the current view with a
+  quiet fill, as navigation marks location.
 
 ### Detail panel
 A record's one address, opened by clicking its row — the same surface for every
@@ -846,8 +902,9 @@ the icon and the copy — the toast body itself does not change colour.
   label.
 
 ### Don't:
-- **Don't** introduce a second accent hue. Status, priority, and category are
-  communicated with neutrals and shape.
+- **Don't** introduce a second accent hue. Status and category are communicated
+  with neutrals and shape; priority's three hues are the one exception, and
+  stay on the priority itself. See The Priority Hue Rule.
 - **Don't** put a shadow on a table, filter bar, header, sidebar, or content
   container.
 - **Don't** reach for the `Card` component. The shipped container vocabulary is
