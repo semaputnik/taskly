@@ -55,7 +55,9 @@ test("A tag is created, renamed and deleted on the Tags page", async ({
   await expect(page).toHaveURL(/tag=errands/)
   for (const title of ["Buy stamps", "Return the parcel"]) {
     await expect(
-      page.getByRole("row", { name: new RegExp(title) }),
+      page
+        .getByRole("listitem")
+        .filter({ has: page.getByRole("link", { name: title }) }),
     ).toContainText("errands")
   }
 
@@ -74,7 +76,7 @@ test("A tag is created, renamed and deleted on the Tags page", async ({
   await expect(renamed).toHaveCount(0)
   await expect(page.getByRole("row", { name: "Open weekend" })).toBeVisible()
 
-  await page.goto("/tasks")
+  await page.goto("/tasks?view=table")
   const task = page.getByRole("row", { name: /Buy stamps/ })
   await expect(task).toContainText("weekend")
   await expect(task).not.toContainText("errands")

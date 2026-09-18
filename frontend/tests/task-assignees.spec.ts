@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test"
+import { openCaptured } from "./utils/capture"
 import { createUser } from "./utils/privateApi.ts"
 import { randomEmail, randomPassword } from "./utils/random"
 import { logInUser } from "./utils/user"
@@ -30,13 +31,14 @@ test("A task is assigned to a bot user from the task form and found by it", asyn
   )
   expect(created.ok()).toBe(true)
 
-  await page.goto("/tasks")
+  await page.goto("/tasks?view=table")
   // Captured in one field, then assigned in the panel that capture leaves
   // open — the same controls that edit a task any other day.
   await page.getByRole("button", { name: "Add Task" }).click()
   const title = page.getByRole("textbox", { name: "Task title" })
   await title.fill("Sort the inbox")
   await title.press("Enter")
+  await openCaptured(page)
   const panel = page.getByRole("dialog", { name: "Sort the inbox" })
   await panel.getByRole("combobox", { name: "Assignee" }).click()
   await page.getByRole("option", { name: "Triage bot" }).click()
@@ -48,6 +50,7 @@ test("A task is assigned to a bot user from the task form and found by it", asyn
   await page.getByRole("button", { name: "Add Task" }).click()
   await title.fill("Call the bank")
   await title.press("Enter")
+  await openCaptured(page)
   await expect(
     page.getByRole("dialog", { name: "Call the bank" }),
   ).toBeVisible()

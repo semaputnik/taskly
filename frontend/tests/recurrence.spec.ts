@@ -20,7 +20,7 @@ test("Every N days holds the same minimum in the panel and the API", async ({
   })
   expect(refused.status()).toBe(422)
 
-  await page.goto(`/tasks?task=${task.id}`)
+  await page.goto(`/tasks?view=table&task=${task.id}`)
   const panel = page.getByRole("dialog", { name: "Water the ferns" })
   const days = panel.getByRole("spinbutton", { name: "Days between repeats" })
   await expect(days).toHaveValue("3")

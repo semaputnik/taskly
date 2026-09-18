@@ -36,7 +36,7 @@ test("A link to a record that is not there says so, for every panel", async ({
   await expectCannotOpen(page, "/bots", `bot=${UNKNOWN}`)
   // Something that is not an id at all is not a record to open: the screen
   // behind it simply shows, with nothing left waiting.
-  await page.goto("/tasks?task=not-a-task")
+  await page.goto("/tasks?view=table&task=not-a-task")
   await expect(page.getByRole("heading", { name: "Tasks" })).toBeVisible()
   await expect(page.getByRole("dialog")).toHaveCount(0)
 })
@@ -71,7 +71,7 @@ test("A failure that may pass offers to try again", async ({ page }) => {
       ? route.fulfill({ status: 503, body: "unavailable" })
       : route.fallback(),
   )
-  await page.goto(`/tasks?task=${task.id}`)
+  await page.goto(`/tasks?view=table&task=${task.id}`)
   const panel = page.getByRole("dialog")
   // Said after the first failed attempt, while retries carry on behind it.
   await expect(panel).toContainText("could not be loaded", { timeout: 3_000 })
@@ -104,7 +104,7 @@ test("A task the list filters out still opens from its link", async ({
     (p: { is_inbox: boolean }) => p.is_inbox,
   )
 
-  await page.goto(`/tasks?project_id=${inbox.id}&task=${task.id}`)
+  await page.goto(`/tasks?view=table&project_id=${inbox.id}&task=${task.id}`)
   await expect(
     page.getByRole("dialog", { name: "Prune the roses" }),
   ).toBeVisible()

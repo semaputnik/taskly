@@ -8,8 +8,12 @@ import { refusalMessage } from "./apiErrors"
  * "Success!" above the words that actually say what happened.
  */
 
-export function toastSuccess(message: string) {
-  toast.success(message)
+export function toastSuccess(
+  message: string,
+  /** A way onward from what was done, such as opening what was made. */
+  action?: { label: string; onClick: () => void },
+) {
+  toast.success(message, action ? { action } : undefined)
 }
 
 /** Something the reader tried did not work, said without an API behind it. */

@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test"
+import { openCaptured } from "./utils/capture"
 import { createUser } from "./utils/privateApi.ts"
 import { randomEmail, randomPassword } from "./utils/random"
 import { logInUser } from "./utils/user"
@@ -13,11 +14,12 @@ test("A user's own changes appear on the Activity page, newest first", async ({
   await createUser({ email, password })
   await logInUser(page, email, password)
 
-  await page.goto("/tasks")
+  await page.goto("/tasks?view=table")
   await page.getByRole("button", { name: "Add Task" }).click()
   const title = page.getByRole("textbox", { name: "Task title" })
   await title.fill("Renew the passport")
   await title.press("Enter")
+  await openCaptured(page)
   await expect(
     page.getByRole("dialog", { name: "Renew the passport" }),
   ).toBeVisible()
@@ -57,15 +59,18 @@ test("A deleted task can be restored from the Activity page", async ({
   await createUser({ email, password })
   await logInUser(page, email, password)
 
-  await page.goto("/tasks")
+  await page.goto("/tasks?view=table")
   await page.getByRole("button", { name: "Add Task" }).click()
   const title = page.getByRole("textbox", { name: "Task title" })
   await title.fill("Cancel the gym")
   await title.press("Enter")
+  await openCaptured(page)
   await expect(
     page.getByRole("dialog", { name: "Cancel the gym" }),
   ).toBeVisible()
   await page.keyboard.press("Escape")
+  // Gone before the row behind it is clicked, not still fading out over it.
+  await expect(page.getByRole("dialog")).toHaveCount(0)
 
   const taskRow = page.getByRole("row", { name: /Cancel the gym/ })
   await taskRow.getByText("Cancel the gym").click()
@@ -95,7 +100,7 @@ test("A deleted task can be restored from the Activity page", async ({
   // Its rows are back, so the deletion offers nothing more to restore.
   await expect(deletion.getByRole("button", { name: "Restore" })).toHaveCount(0)
 
-  await page.goto("/tasks")
+  await page.goto("/tasks?view=table")
   await expect(page.getByRole("row", { name: /Cancel the gym/ })).toBeVisible()
 })
 

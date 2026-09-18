@@ -15,7 +15,9 @@ in the browser and nothing is sent while it is filled in. It is committed by
 one explicit, visible act — Enter in the title, or a **Create task** button —
 and that act sends one create request with the whole draft, which the API
 already accepted. ⌘/Ctrl+Enter commits and starts another draft, carrying the
-properties over.
+properties over. A single commit closes the panel and leaves a notice with an
+**Open** action for the new task, rather than turning the panel into the new
+record: the reader was writing something down, not starting to edit it.
 
 This keeps #63's guarantees without its restriction. No request means no
 half-written task for a bot user to see and nothing left by an accidental

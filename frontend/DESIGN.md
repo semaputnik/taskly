@@ -361,7 +361,9 @@ call site never formats a date itself. A stored day that can be edited is
 shown by the product (`DayField`), with the browser's picker only doing the
 picking: a native date field writes its value in the browser's interface
 language, which need not match the page, so the same day would read two ways
-side by side.
+side by side. On a touch screen the native field lies invisibly over the
+shown day and takes the tap itself, because iOS opens no date picker from
+script.
 
 **The Two-Weight Rule.** Text is 400 or 500 in the body of the interface; 600
 and 700 are reserved for the four headline roles above. A third weight inside a
@@ -688,8 +690,9 @@ rather than a table.
   today: being started is not being on time.
 
 ### Compact task row
-Two short lines for a task, used by every dashboard band and by the task list's
-Compact view (`view=compact`, switched from the filter bar and kept in the URL).
+Two short lines for a task, used by every dashboard band and by the task list,
+which opens in them. The table is the other view (`view=table`, switched from
+the filter bar and kept in the URL); compact rows need no parameter.
 - **Line one:** the round completion checkbox at 18px, its ring and tint in the
   priority's hue (The Priority Hue Rule), then the title as the link that opens
   the task — never the whole row, since the row also holds the checkbox — and
@@ -701,9 +704,14 @@ Compact view (`view=compact`, switched from the filter bar and kept in the URL).
   written: Today, Tomorrow, a weekday within the week, a short date beyond it,
   and once missed "Yesterday" or "3 days late". Only a missed day is Alert Red;
   today is ink, the rest muted. A task with none of these has no second line.
-- The compact view reads and closes tasks. Selecting many is the table's job,
-  so it has no selection column; the view switch marks the current view with a
-  quiet fill, as navigation marks location.
+- The compact view reads and closes tasks, as a list (`ul`), so assistive
+  technology hears how many there are. Selecting many is the table's job, so
+  it has no selection column and the bulk bar waits for the table; the view
+  switch marks the current view with a quiet fill, as navigation marks
+  location. With no headers to sort from, the bar offers the order as a select
+  (Default order, Due date, Priority).
+- On a phone the bar wraps into two aligned rows: Filters and Overdue, then
+  the order stretching to fill the line with the view switch at its end.
 
 ### Detail panel
 A record's one address, opened by clicking its row — the same surface for every
@@ -826,8 +834,10 @@ already edits, and the reader would have to learn both.
 - **Nothing is written until a title is committed.** Opening capture sends no
   request: an empty record would reach the activity log, the REST API a bot
   user reads, and the list, for the cost of an accidental keystroke. Enter
-  commits; the modifier chord commits and holds capture open for the next
-  thought, so a burst of them costs one gesture each.
+  commits and closes the panel on the screen it was opened over, leaving a
+  notice — "“Title” created" — whose **Open** is the way to the record; the
+  modifier chord commits and holds capture open for the next thought, so a
+  burst of them costs one gesture each.
 - **Escape before the commit cancels silently** — no request, no record, no
   toast. After it, the task exists and dismissal only closes the panel:
   deleting is the control at the panel's foot, never a side effect of leaving.
@@ -838,6 +848,11 @@ already edits, and the reader would have to learn both.
 - **One key opens capture from anywhere** in the authenticated app. It stands
   down while a field is being typed into or a dialog, panel or menu is open, so
   it never eats a keystroke meant for something else.
+- **One tap opens it on a phone.** Below `md` the sidebar's Add Task is behind
+  the menu, so a floating Add Task button sits in the bottom-right corner of
+  every screen, above the safe area: Signal Teal, 56px, a rounded square (a
+  control, not data), with a real shadow because it floats. The page keeps its
+  foot clear of it, toasts sit above it, and an open panel's scrim covers it.
 
 **Keep view state out of the query.** The open panel is view state, not a
 filter, so it must be stripped before the search object becomes an API query.

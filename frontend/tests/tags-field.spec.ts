@@ -9,7 +9,7 @@ async function openTask(page: Page, tags: string[] = []) {
   await api.create("/tags/", { name: "errands" })
   await api.create("/tags/", { name: "deploy" })
   const task = await api.create("/tasks/", { title: "Buy stamps", tags })
-  await page.goto(`/tasks?task=${task.id}`)
+  await page.goto(`/tasks?view=table&task=${task.id}`)
   const panel = page.getByRole("dialog", { name: "Buy stamps" })
   const vocabulary = async () =>
     (await (await api.get("/tags/")).json()).data
@@ -176,7 +176,7 @@ test("Bulk Add tag adds each chosen tag to every selected task", async ({
   await api.create("/tags/", { name: "errands" })
   const first = await api.create("/tasks/", { title: "One", tags: ["deploy"] })
   const second = await api.create("/tasks/", { title: "Two" })
-  await page.goto("/tasks")
+  await page.goto("/tasks?view=table")
 
   await page
     .getByRole("checkbox", { name: "Select every task on this page" })

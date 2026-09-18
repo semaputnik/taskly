@@ -83,15 +83,13 @@ test("A compact row shows subtasks, due day and tags, and its priority on the ch
   ).toHaveClass(/border-priority-p3/)
 })
 
-test("The task list switches to compact rows and back, keeping its filters", async ({
+test("The task list opens in compact rows, and switches to the table and back, keeping its filters", async ({
   page,
 }) => {
   await newUser(page)
   await seedStarted(page)
   await page.goto("/tasks?status=%5B%22in_progress%22%5D")
 
-  await page.getByRole("button", { name: "Compact" }).click()
-  await expect(page).toHaveURL(/view=compact/)
   await expect(page.getByRole("button", { name: "Compact" })).toHaveAttribute(
     "aria-pressed",
     "true",
@@ -110,8 +108,13 @@ test("The task list switches to compact rows and back, keeping its filters", asy
   ).toHaveText(["File the taxes", "Tidy the shed"])
 
   await page.getByRole("button", { name: "Table" }).click()
-  await expect(page).not.toHaveURL(/view=compact/)
+  await expect(page).toHaveURL(/view=table/)
   await expect(page.getByRole("table")).toBeVisible()
+  await expect(page.getByText("Status: In progress")).toBeVisible()
+
+  await page.getByRole("button", { name: "Compact" }).click()
+  await expect(page).not.toHaveURL(/view=/)
+  await expect(page.getByRole("table")).toHaveCount(0)
 })
 
 test("A priority badge in the table carries its hue; P4 stays ink", async ({
@@ -121,7 +124,7 @@ test("A priority badge in the table carries its hue; P4 stays ink", async ({
   const api = await userApi(page)
   await api.create("/tasks/", { title: "Urgent", priority: "P1" })
   await api.create("/tasks/", { title: "Someday", priority: "P4" })
-  await page.goto("/tasks")
+  await page.goto("/tasks?view=table")
 
   const urgent = page.getByRole("row", { name: "Open Urgent" })
   await expect(urgent.getByText("P1", { exact: true })).toHaveClass(

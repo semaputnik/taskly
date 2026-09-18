@@ -25,8 +25,10 @@ test("A tag's count on the Tags page matches the list it opens", async ({
 
   await row.getByRole("link", { name: "1 task" }).click()
   await expect(page).toHaveURL(/tag=outdoors/)
-  await expect(page.getByRole("row", { name: /Sweep the yard/ })).toBeVisible()
-  await expect(page.getByRole("row", { name: /Mend the fence/ })).toHaveCount(0)
+  await expect(page.getByRole("link", { name: "Sweep the yard" })).toBeVisible()
+  await expect(page.getByRole("link", { name: "Mend the fence" })).toHaveCount(
+    0,
+  )
   await expect(page.getByText("1 task", { exact: true })).toBeVisible()
 
   // Deleting it says it reaches the archived task too.

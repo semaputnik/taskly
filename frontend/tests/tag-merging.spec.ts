@@ -80,7 +80,7 @@ test("Merging from a tag's panel moves its tasks and removes it", async ({
     .click()
   for (const title of ["Ship 1.2", "Ship 1.3", "Ship 1.4"]) {
     await expect(
-      page.getByRole("row", { name: new RegExp(title) }),
+      page.getByRole("link", { name: title, exact: true }),
     ).toBeVisible()
   }
 
