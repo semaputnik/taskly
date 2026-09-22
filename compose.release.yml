@@ -6,14 +6,40 @@
 # it carries both the API and the prebuilt frontend.
 #
 #   docker compose -f compose.release.yml pull
-#   docker compose -f compose.release.yml run --rm backend bash scripts/prestart.sh
 #   docker compose -f compose.release.yml up -d
+#
+# Migrations are not a step to remember: the `prestart` service below runs
+# them, and the application is not started until it has finished.
 #
 # See deployment-docker-compose.md for the full procedure.
 
 # Named explicitly so the volumes below keep their names wherever the file is
 # placed on the server.
 name: taskly
+
+# What the migration step and the application both run: the same image, the
+# same settings, the same attachment store. Held once rather than copied, so
+# a setting added later cannot reach one of them and not the other — which is
+# the shape of bug this file is fixing.
+x-taskly: &taskly
+  # Pin TASKLY_TAG to the released version, such as 1.2.3, so that a restart
+  # brings back the same image rather than whatever latest points at now.
+  image: ${TASKLY_IMAGE:?Variable not set}:${TASKLY_TAG:-latest}
+  environment:
+    PROJECT_NAME: ${PROJECT_NAME:?Variable not set}
+    SECRET_KEY: ${SECRET_KEY:?Variable not set}
+    FIRST_SUPERUSER: ${FIRST_SUPERUSER:?Variable not set}
+    FIRST_SUPERUSER_PASSWORD: ${FIRST_SUPERUSER_PASSWORD:?Variable not set}
+    SMTP_HOST: ${SMTP_HOST}
+    SMTP_USER: ${SMTP_USER:-}
+    SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+    EMAILS_FROM_EMAIL: ${EMAILS_FROM_EMAIL}
+    DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:?Variable not set}@db:5432/app
+    SENTRY_DSN: ${SENTRY_DSN:-}
+    ATTACHMENTS_DIR: /data/attachments
+    FRONTEND_HOST: https://${DOMAIN:?Variable not set}
+  volumes:
+    - attachments-data:/data/attachments
 
 services:
 
@@ -66,30 +92,33 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?Variable not set}
       - POSTGRES_DB=app
 
+  # The database brought to the schema this image expects, and the first
+  # superuser created, before anything serves a request. It runs to
+  # completion and stays exited; `backend` waits for that.
+  #
+  # A step in the deployment instructions was not enough: skipping it
+  # published an image whose code wanted a column the database did not have,
+  # and the application crash-looped on every request (#124). This is also
+  # why it is a service of its own rather than the backend's own command —
+  # the application runs four workers, and four of them racing on `alembic
+  # upgrade` is a different way to break the same thing.
+  prestart:
+    <<: *taskly
+    restart: "no"
+    depends_on:
+      db:
+        condition: service_healthy
+    command: ["bash", "scripts/prestart.sh"]
+
   backend:
-    # Pin TASKLY_TAG to the released version, such as 1.2.3, so that a restart
-    # brings back the same image rather than whatever latest points at now.
-    image: ${TASKLY_IMAGE:?Variable not set}:${TASKLY_TAG:-latest}
+    <<: *taskly
     restart: always
     depends_on:
       db:
         condition: service_healthy
         restart: true
-    environment:
-      PROJECT_NAME: ${PROJECT_NAME:?Variable not set}
-      SECRET_KEY: ${SECRET_KEY:?Variable not set}
-      FIRST_SUPERUSER: ${FIRST_SUPERUSER:?Variable not set}
-      FIRST_SUPERUSER_PASSWORD: ${FIRST_SUPERUSER_PASSWORD:?Variable not set}
-      SMTP_HOST: ${SMTP_HOST}
-      SMTP_USER: ${SMTP_USER:-}
-      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
-      EMAILS_FROM_EMAIL: ${EMAILS_FROM_EMAIL}
-      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:?Variable not set}@db:5432/app
-      SENTRY_DSN: ${SENTRY_DSN:-}
-      ATTACHMENTS_DIR: /data/attachments
-      FRONTEND_HOST: https://${DOMAIN:?Variable not set}
-    volumes:
-      - attachments-data:/data/attachments
+      prestart:
+        condition: service_completed_successfully
 
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/utils/health-check/"]
