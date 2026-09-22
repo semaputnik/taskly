@@ -251,3 +251,81 @@ def test_a_task_in_a_list_names_its_reporter(
     assert by_title["Mine"]["reporter_id"] == _me(client, owner)
     assert by_title["Theirs"]["reporter_id"] == bot_user["id"]
     assert by_title["Theirs"]["reporter_bot_user"]["name"] == "Filing agent"
+
+
+# --- Narrowing the list to one actor's own filings ------------------------------
+
+
+def test_filter_by_reporter_keeps_only_what_that_actor_filed(
+    client: TestClient, owner: Headers
+) -> None:
+    project_id = create_project(client, owner)
+    bot_user, bot = _bot(client, owner, project_id)
+    create_task(client, owner, project_id=project_id, title="Mine")
+    create_task(client, bot, project_id=project_id, title="Theirs")
+
+    def titles(reporter_id: str) -> list[str]:
+        r = client.get(
+            f"{API}/tasks/", headers=owner, params={"reporter_id": reporter_id}
+        )
+        assert r.status_code == 200, r.text
+        return [t["title"] for t in r.json()["data"]]
+
+    assert titles(_me(client, owner)) == ["Mine"]
+    assert titles(bot_user["id"]) == ["Theirs"]
+
+
+def test_the_reporter_filter_narrows_alongside_the_others(
+    client: TestClient, owner: Headers
+) -> None:
+    """Filters combine with AND: adding one always narrows (FR-06.3)."""
+    project_id = create_project(client, owner)
+    _, bot = _bot(client, owner, project_id)
+    elsewhere = create_project(client, owner, "Elsewhere")
+    create_task(client, bot, project_id=project_id, title="Bot here")
+    create_task(client, owner, project_id=project_id, title="Mine here")
+    create_task(client, owner, project_id=elsewhere, title="Mine elsewhere")
+
+    me = _me(client, owner)
+    r = client.get(
+        f"{API}/tasks/",
+        headers=owner,
+        params={"reporter_id": me, "project_id": project_id},
+    )
+    assert r.status_code == 200, r.text
+    assert [t["title"] for t in r.json()["data"]] == ["Mine here"]
+
+
+def test_the_reporter_filter_counts_what_it_narrowed_to(
+    client: TestClient, owner: Headers
+) -> None:
+    """Paging a narrowed list must page the narrowing, not the whole list."""
+    project_id = create_project(client, owner)
+    bot_user, bot = _bot(client, owner, project_id)
+    for n in range(3):
+        create_task(client, bot, project_id=project_id, title=f"Bot {n}")
+    create_task(client, owner, project_id=project_id, title="Mine")
+
+    r = client.get(
+        f"{API}/tasks/",
+        headers=owner,
+        params={"reporter_id": bot_user["id"], "limit": 2},
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["count"] == 3
+    assert len(r.json()["data"]) == 2
+
+
+def test_a_reporter_filter_reaches_nothing_outside_the_callers_own_tasks(
+    client: TestClient, db: Session, owner: Headers
+) -> None:
+    """The filter narrows; it never widens past whose tasks these are."""
+    stranger = create_user_headers(client, db)
+    stranger_project = create_project(client, stranger, "Theirs")
+    create_task(client, stranger, project_id=stranger_project, title="Not yours")
+
+    r = client.get(
+        f"{API}/tasks/", headers=owner, params={"reporter_id": _me(client, stranger)}
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["count"] == 0

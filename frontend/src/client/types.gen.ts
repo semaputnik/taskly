@@ -1612,6 +1612,10 @@ export type tasksReadTasksData = {
          */
         unassigned?: boolean;
         /**
+         * Reporter Id
+         */
+        reporter_id?: string | null;
+        /**
          * Tag
          */
         tag?: string | null;

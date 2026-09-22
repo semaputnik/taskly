@@ -433,6 +433,10 @@ class TaskQuery(SQLModel):
     assignee_id: uuid.UUID | None = None
     # The other half of the assignee filter: tasks with nobody on them.
     unassigned: bool = False
+    # Who filed the task: the owner, or one of their bot users, named by the
+    # same id either way. It has no "unassigned" counterpart — every task has
+    # a reporter (FR-01.29).
+    reporter_id: uuid.UUID | None = None
     tag: str | None = None
     priority: TaskPriority | None = None
     # Any of the listed statuses matches; none listed means every status. A

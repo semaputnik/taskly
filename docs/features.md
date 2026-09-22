@@ -252,6 +252,8 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
 - **FR-06.2** The task list can be filtered by:
   - project
   - assignee
+  - reporter — the user, or one of their bot users (FR-01.29); there is no
+    "nobody" to filter for, since every task has one
   - tag
   - priority
   - status: any one of the three open statuses

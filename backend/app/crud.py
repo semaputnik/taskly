@@ -563,6 +563,16 @@ def _task_filters(*, owner_id: uuid.UUID, query: TaskQuery) -> list[Any]:
             )
         )
 
+    if query.reporter_id is not None:
+        # The owner or a bot user: the id names one or the other, as it does
+        # for the assignee.
+        conditions.append(
+            or_(
+                col(Task.reporter_id) == query.reporter_id,
+                col(Task.reporter_bot_user_id) == query.reporter_id,
+            )
+        )
+
     if query.tag is not None:
         tagged = (
             select(TaskTag.task_id)

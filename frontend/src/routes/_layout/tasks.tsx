@@ -51,6 +51,7 @@ const SORT_FIELDS = {
 function filtersQuery(search: TaskListSearch, currentUserId?: string) {
   const {
     assignee,
+    reporter,
     page: _page,
     view: _view,
     ...filters
@@ -70,6 +71,9 @@ function filtersQuery(search: TaskListSearch, currentUserId?: string) {
           ? undefined
           : assignee,
     unassigned: assignee === "unassigned" ? true : undefined,
+    // The same shape as the assignee, minus the nobody case: a bot user is
+    // named by its own id, and "me" needs the id the API filters on.
+    reporter_id: reporter === "me" ? currentUserId : reporter,
   }
 }
 
@@ -122,7 +126,8 @@ function Tasks() {
 
   // Filtering by "me" needs the id to filter on: listing before it arrives
   // would show everything, which is the opposite of what was asked for.
-  const waitingForMe = search.assignee === "me" && !currentUser
+  const waitingForMe =
+    (search.assignee === "me" || search.reporter === "me") && !currentUser
   const filters = filtersQuery(search, currentUser?.id)
   const { data: tasks, isPending } = useQuery({
     ...tasksQuery({

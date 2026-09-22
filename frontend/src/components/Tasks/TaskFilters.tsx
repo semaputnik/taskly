@@ -201,7 +201,7 @@ function ActiveChip({
  * never OR (FR-06.3) — and each one lives in the URL, so a view can be shared
  * or reloaded.
  *
- * All eight filters at once is a wall of controls that mostly say "any", so
+ * All nine filters at once is a wall of controls that mostly say "any", so
  * the panel is closed by default. What is closed is never hidden, though: an
  * active filter is always named on a chip that can drop it, because a list
  * silently narrowed by a control you cannot see is the worst outcome here.
@@ -232,6 +232,10 @@ export function TaskFilters({
     if (value === "unassigned") return "Unassigned"
     return bots?.data.find((bot) => bot.id === value)?.name ?? "A bot user"
   }
+  const reporterName = (value: string) =>
+    value === "me"
+      ? "Me"
+      : (bots?.data.find((bot) => bot.id === value)?.name ?? "A bot user")
 
   /** Each active filter as a label plus the change that removes it. */
   const chips: {
@@ -251,6 +255,12 @@ export function TaskFilters({
       key: "assignee",
       label: `Assignee: ${assigneeName(search.assignee)}`,
       clear: { assignee: undefined },
+    })
+  if (search.reporter)
+    chips.push({
+      key: "reporter",
+      label: `Created by: ${reporterName(search.reporter)}`,
+      clear: { reporter: undefined },
     })
   if (search.tag)
     chips.push({
@@ -400,6 +410,24 @@ export function TaskFilters({
             ]}
             onChange={(value) =>
               onChange({ assignee: value as TaskSearch["assignee"] })
+            }
+          />
+          {/* Beside Assignee, because the two ask the same kind of question:
+              who owes the work, and who put it here. No "unassigned" among
+              the choices — every task has a reporter. */}
+          <FilterSelect
+            label="Created by"
+            anyLabel="Anyone"
+            value={search.reporter}
+            options={[
+              { value: "me", label: "Me" },
+              ...(bots?.data ?? []).map((bot) => ({
+                value: bot.id,
+                label: bot.name,
+              })),
+            ]}
+            onChange={(value) =>
+              onChange({ reporter: value as TaskSearch["reporter"] })
             }
           />
           <FilterSelect

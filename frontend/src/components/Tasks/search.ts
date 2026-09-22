@@ -17,6 +17,12 @@ export const taskSearchSchema = z.object({
     .union([z.enum(["me", "unassigned"]), z.string().uuid()])
     .optional()
     .catch(undefined),
+  // "me", or the id of one of the user's bot users. No "unassigned"
+  // counterpart: every task has a reporter.
+  reporter: z
+    .union([z.literal("me"), z.string().uuid()])
+    .optional()
+    .catch(undefined),
   tag: z.string().optional().catch(undefined),
   priority: z.enum(PRIORITIES).optional().catch(undefined),
   // The API's repeatable `status`, narrowed to the open statuses: the list
@@ -67,6 +73,7 @@ export type TaskListSearch = TaskSearch & PanelSearch
 export const FILTER_KEYS = [
   "project_id",
   "assignee",
+  "reporter",
   "tag",
   "priority",
   "status",
