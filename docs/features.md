@@ -37,6 +37,7 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
 | **Comment** | A text note attached to a task. |
 | **Attachment** | A file attached to a task. |
 | **Assignee** | The actor responsible for a task: the user or one of their bot users. Optional. |
+| **Reporter** | Who filed a task: the user or one of their bot users. Always set, and never changed. Called *Created by* in the interface. |
 | **Activity log** | The record of changes made in Taskly. Also called the *event feed*; the two are the same thing. |
 
 ## 3. Roles
@@ -58,6 +59,7 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
   - due date (date only, no time of day)
   - priority
   - assignee
+  - reporter (see FR-01.29)
   - tags
 - **FR-01.3** Priority takes one of four values: `P1`, `P2`, `P3`, `P4`.
   `P1` is the highest priority, `P4` the lowest. Priority is optional; a task
@@ -74,6 +76,16 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
   checkbox), and undoing it returns the task to To do.
 - **FR-01.6** A task has at most one assignee. A task can have no assignee.
 - **FR-01.7** The assignee is either the user or one of the user's bot users.
+- **FR-01.29** A task records its **reporter**: who filed it, either the user
+  or one of the user's bot users. Every task has exactly one — unlike the
+  assignee, it can be neither absent nor ambiguous. It is taken from whoever
+  made the request that created the task and is never read from a request
+  body, so no caller can file a task as somebody else, and a bot user's work
+  is never recorded as its owner's. It cannot be changed after the task is
+  created. The interface calls it **Created by**. A bot user deleted later is
+  still named on what it filed (FR-08.19). Each occurrence of a recurring task
+  carries the reporter of the occurrence before it (FR-01.14). Tasks that
+  predate this requirement name the user.
 
 #### Tags
 
@@ -240,13 +252,19 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
 - **FR-06.2** The task list can be filtered by:
   - project
   - assignee
+  - reporter — the user, or one of their bot users (FR-01.29); there is no
+    "nobody" to filter for, since every task has one
   - tag
   - priority
-  - status: Open, or any one or more of the four statuses
+  - status: any one of the three open statuses
   - due date
 - **FR-06.3** Filters can be combined; a task must match all active filters.
-- **FR-06.4** The task list can be sorted, at minimum by due date and by
-  priority.
+- **FR-06.4** The task list can be sorted by due date, by priority and by
+  when each task was filed. Each order has a natural direction it runs in
+  when none is named: soonest first, P1 first, and newest first. Choosing an
+  order gives that direction; choosing it again reverses it. The order and
+  any reversal live in the list's URL, and the list's default order — most
+  pressing first, subtasks under their root task — is none of these.
 - **FR-06.5** The task list can be shown as compact rows, which it opens in,
   or as a table. A compact row shows the title, and beneath it the task's
   subtask progress, due date, recurrence and tags. The choice is part of the
@@ -256,6 +274,19 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
   shows its task's priority as the colour of its completion checkbox.
 - **FR-06.7** The dashboard shows the user's In progress tasks in a panel of
   their own, highest priority first, alongside what is overdue and due today.
+- **FR-06.8** The task list shows open tasks only. A Done task is not listed
+  and cannot be filtered for; completed work is read in the activity log
+  (FR-10.8, ADR-0006). Open work is the list's baseline rather than a filter
+  on it, so clearing the filters returns to it and no chip offers to remove
+  it. This governs the task list alone: an archived project's tasks
+  (FR-05.14), the subtasks shown inside a task, and the activity log all keep
+  showing Done tasks.
+- **FR-06.9** Completing a task from the task list takes its row out of the
+  list, so the change is confirmed by a notice naming the task and offering to
+  undo it, which returns the task to To do (FR-01.5). Changing a status
+  anywhere the task stays on screen is not announced.
+- **FR-06.10** A user whose tasks are all Done is told so, and pointed at the
+  activity log — not told that they have no tasks.
 
 ### F-07. REST API
 
@@ -386,6 +417,16 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
 - **FR-10.6** Bot users cannot read the activity log.
 - **FR-10.7** A user sees only their own activity log. The superuser is not an
   exception: they see only their own log, not other users'.
+- **FR-10.8** The log can be narrowed to one kind of change: Completed,
+  Created, Changed, Deleted & restored, Comments & files, or Tags. The kinds
+  do not overlap, so an entry answers to exactly one of them. Completing
+  several tasks at once is one act and is logged as one entry (FR-10.9); that
+  entry is Completed, not Changed. The narrowing is a visible control, lives
+  in the URL, and combines with the narrowing to one bot user (FR-10.2).
+  Neither narrowing ever widens the log past the reader's own entries
+  (FR-10.7).
+- **FR-10.9** One act over many tasks is one log entry naming what the act
+  did, not one entry per task it touched.
 
 ### F-11. Webhooks — *Deferred*
 

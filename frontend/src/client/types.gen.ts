@@ -85,6 +85,23 @@ export type ActivityEntryPublic = {
 };
 
 /**
+ * ActivityKind
+ *
+ * How a reader groups the log's actions in order to narrow it.
+ *
+ * Coarser than `ActivityAction` on purpose: someone asks the log what they
+ * finished, filed or threw away — not which of two dozen action names an
+ * entry happens to carry. The groups do not overlap, so an entry answers to
+ * exactly one of them and a reader never meets the same change twice.
+ *
+ * The grouping is the server's rather than a set of actions the client
+ * sends, because `COMPLETED` is not a set of actions at all: closing tasks
+ * in a batch writes one `TASKS_BULK_CHANGED` entry naming the new status,
+ * not a completion per task, so the group has to read that entry's details.
+ */
+export type ActivityKind = 'completed' | 'created' | 'changed' | 'deleted' | 'comments' | 'tags';
+
+/**
  * AttachmentPublic
  */
 export type AttachmentPublic = {
@@ -871,6 +888,11 @@ export type TaskPublic = {
      */
     assignee_id?: string | null;
     assignee_bot_user?: BotUserRef | null;
+    /**
+     * Reporter Id
+     */
+    reporter_id?: string | null;
+    reporter_bot_user?: BotUserRef | null;
     recurrence?: Recurrence | null;
     /**
      * Created At
@@ -888,8 +910,15 @@ export type TaskPublic = {
 
 /**
  * TaskSort
+ *
+ * How a task list can be ordered, and which way round each one naturally
+ * runs when the request names no direction (FR-06.4).
+ *
+ * Due date means soonest first and priority means P1 first, because that is
+ * the work to reach for. Creation means newest first, because the reason to
+ * order by it is to see what has just arrived.
  */
-export type TaskSort = 'due_date' | 'priority';
+export type TaskSort = 'due_date' | 'priority' | 'created_at';
 
 /**
  * TaskStatus
@@ -1583,6 +1612,10 @@ export type tasksReadTasksData = {
          */
         unassigned?: boolean;
         /**
+         * Reporter Id
+         */
+        reporter_id?: string | null;
+        /**
          * Tag
          */
         tag?: string | null;
@@ -1614,7 +1647,10 @@ export type tasksReadTasksData = {
          * Sort
          */
         sort?: TaskSort | null;
-        order?: SortOrder;
+        /**
+         * Order
+         */
+        order?: SortOrder | null;
         /**
          * Skip
          */
@@ -2332,6 +2368,10 @@ export type activityReadActivityLogData = {
          * Actor Bot User Id
          */
         actor_bot_user_id?: string | null;
+        /**
+         * Kind
+         */
+        kind?: ActivityKind | null;
     };
     url: '/api/v1/activity-log/';
 };

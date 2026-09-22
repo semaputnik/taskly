@@ -5,7 +5,7 @@ import type { TaskPublic } from "@/client"
 import type { DataTableFeatures } from "@/components/Common/DataTable"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
-import { formatDay } from "@/lib/dates"
+import { formatDay, formatDayOf } from "@/lib/dates"
 import { cn } from "@/lib/utils"
 import { CompleteTask } from "./CompleteTask"
 import { PriorityBadge } from "./priority"
@@ -18,12 +18,17 @@ interface ColumnOptions {
    * are read-only until it is unarchived (FR-05.12).
    */
   readOnly?: boolean
+  /**
+   * Completing a task takes its row out of this table, so the checkbox
+   * confirms the move and offers the way back (ADR-0006).
+   */
+  receipt?: boolean
 }
 
 export function getColumns(
   projectNames: Record<string, string>,
   _depths: Record<string, number>,
-  { readOnly = false }: ColumnOptions = {},
+  { readOnly = false, receipt = false }: ColumnOptions = {},
 ): ColumnDef<DataTableFeatures, TaskPublic>[] {
   const columns: ColumnDef<DataTableFeatures, TaskPublic>[] = [
     {
@@ -42,7 +47,7 @@ export function getColumns(
               aria-label={STATUS_LABELS[row.original.status]}
             />
           ) : (
-            <CompleteTask task={row.original} />
+            <CompleteTask task={row.original} receipt={receipt} />
           )}
           {/* A subtask says so for itself. Indenting it instead would claim a
               parent–child relationship the row above may not have: sorting or
@@ -140,6 +145,21 @@ export function getColumns(
           <PriorityBadge priority={priority} />
         ) : (
           <span className="text-muted-foreground italic">No priority</span>
+        )
+      },
+    },
+    {
+      // Last, after the columns a reader scans. The table already scrolls
+      // sideways, so the scroll should cost the least-read column, not the
+      // title or the due date. The day here; the panel gives the moment.
+      accessorKey: "created_at",
+      header: "Created",
+      cell: ({ row }) => {
+        const createdAt = row.original.created_at
+        return (
+          <span className={cn("text-muted-foreground", !createdAt && "italic")}>
+            {createdAt ? formatDayOf(createdAt) : "Unknown"}
+          </span>
         )
       },
     },

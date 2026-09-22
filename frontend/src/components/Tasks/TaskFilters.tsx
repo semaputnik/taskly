@@ -2,7 +2,6 @@ import { useQuery } from "@tanstack/react-query"
 import { List, SlidersHorizontal, Table2, X } from "lucide-react"
 import { useState } from "react"
 
-import type { TaskStatus } from "@/client"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { ButtonGroup } from "@/components/ui/button-group"
@@ -28,15 +27,11 @@ import {
 import {
   describeStatusFilter,
   isOpenFilter,
-  OPEN_STATUSES,
+  OPEN_STATUS_VALUES,
+  type OpenStatus,
   STATUS_LABELS,
-  STATUSES,
 } from "./statuses"
 import { PRIORITIES } from "./writes"
-
-// The status filter's choices: Open, or one status. Open is written to the
-// URL as its three statuses, which is what the API filters on.
-const OPEN = "open"
 
 // A Select cannot hold an empty value, so "no filter" needs a name of its own.
 // Everything selectable here is an id or a fixed keyword, never free text, so
@@ -159,12 +154,13 @@ function DateFilter({
 }
 
 /**
- * Which choice the status select shows. A URL naming some other set of
- * statuses matches none of them; its chip still says what it filters.
+ * Which choice the status select shows. Every open status is the baseline, so
+ * it shows as no narrowing at all. A URL naming some other set of them
+ * matches no single choice; its chip still says what it filters.
  */
-function statusValue(statuses: TaskStatus[] | undefined): string | undefined {
+function statusValue(statuses: OpenStatus[] | undefined): string | undefined {
   if (!statuses) return undefined
-  if (isOpenFilter(statuses)) return OPEN
+  if (isOpenFilter(statuses)) return undefined
   return statuses.length === 1 ? statuses[0] : undefined
 }
 
@@ -205,7 +201,7 @@ function ActiveChip({
  * never OR (FR-06.3) — and each one lives in the URL, so a view can be shared
  * or reloaded.
  *
- * All eight filters at once is a wall of controls that mostly say "any", so
+ * All nine filters at once is a wall of controls that mostly say "any", so
  * the panel is closed by default. What is closed is never hidden, though: an
  * active filter is always named on a chip that can drop it, because a list
  * silently narrowed by a control you cannot see is the worst outcome here.
@@ -236,6 +232,10 @@ export function TaskFilters({
     if (value === "unassigned") return "Unassigned"
     return bots?.data.find((bot) => bot.id === value)?.name ?? "A bot user"
   }
+  const reporterName = (value: string) =>
+    value === "me"
+      ? "Me"
+      : (bots?.data.find((bot) => bot.id === value)?.name ?? "A bot user")
 
   /** Each active filter as a label plus the change that removes it. */
   const chips: {
@@ -255,6 +255,12 @@ export function TaskFilters({
       key: "assignee",
       label: `Assignee: ${assigneeName(search.assignee)}`,
       clear: { assignee: undefined },
+    })
+  if (search.reporter)
+    chips.push({
+      key: "reporter",
+      label: `Created by: ${reporterName(search.reporter)}`,
+      clear: { reporter: undefined },
     })
   if (search.tag)
     chips.push({
@@ -284,8 +290,7 @@ export function TaskFilters({
     chips.push({
       key: "overdue",
       label: "Overdue",
-      // Overdue asked for open work with it, so dropping it puts both back.
-      clear: { overdue: undefined, status: undefined },
+      clear: { overdue: undefined },
     })
   if (search.due_from)
     chips.push({
@@ -322,16 +327,12 @@ export function TaskFilters({
           )}
         </Button>
 
-        {/* Late work is open work, and the button says so in the URL as the
-            Open status filter, where the reader can see and change it. */}
+        {/* Late work is open work, which the list shows and nothing else, so
+            the button no longer has to say so in the status filter too. */}
         <Button
           variant={search.overdue ? "default" : "outline"}
           onClick={() =>
-            onChange(
-              search.overdue
-                ? { overdue: undefined, status: undefined }
-                : { overdue: true, status: OPEN_STATUSES },
-            )
+            onChange({ overdue: search.overdue ? undefined : true })
           }
         >
           Overdue
@@ -373,6 +374,9 @@ export function TaskFilters({
                 <SelectItem value={DEFAULT_ORDER}>Default order</SelectItem>
                 <SelectItem value="due_date">Due date</SelectItem>
                 <SelectItem value="priority">Priority</SelectItem>
+                {/* Newest first, which is this order's natural direction, so
+                    it needs no direction control of its own here. */}
+                <SelectItem value="created_at">Created</SelectItem>
               </SelectContent>
             </Select>
           )}
@@ -408,6 +412,24 @@ export function TaskFilters({
               onChange({ assignee: value as TaskSearch["assignee"] })
             }
           />
+          {/* Beside Assignee, because the two ask the same kind of question:
+              who owes the work, and who put it here. No "unassigned" among
+              the choices — every task has a reporter. */}
+          <FilterSelect
+            label="Created by"
+            anyLabel="Anyone"
+            value={search.reporter}
+            options={[
+              { value: "me", label: "Me" },
+              ...(bots?.data ?? []).map((bot) => ({
+                value: bot.id,
+                label: bot.name,
+              })),
+            ]}
+            onChange={(value) =>
+              onChange({ reporter: value as TaskSearch["reporter"] })
+            }
+          />
           <FilterSelect
             label="Tag"
             anyLabel="Any tag"
@@ -432,25 +454,21 @@ export function TaskFilters({
               onChange({ priority: value as TaskSearch["priority"] })
             }
           />
+          {/* Done is not among the choices: the list holds open work, and
+              finished work is read in the activity log (ADR-0006). "Any open
+              status" is both the default and what used to be called Open —
+              one choice now, because they are the same thing. */}
           <FilterSelect
             label="Status"
-            anyLabel="Any status"
+            anyLabel="Any open status"
             value={statusValue(search.status)}
-            options={[
-              { value: OPEN, label: "Open" },
-              ...STATUSES.map((status) => ({
-                value: status,
-                label: STATUS_LABELS[status],
-              })),
-            ]}
+            options={OPEN_STATUS_VALUES.map((status) => ({
+              value: status,
+              label: STATUS_LABELS[status],
+            }))}
             onChange={(value) =>
               onChange({
-                status:
-                  value === undefined
-                    ? undefined
-                    : value === OPEN
-                      ? OPEN_STATUSES
-                      : [value as TaskStatus],
+                status: value === undefined ? undefined : [value as OpenStatus],
               })
             }
           />

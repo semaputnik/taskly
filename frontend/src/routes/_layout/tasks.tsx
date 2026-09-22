@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query"
 import { createFileRoute, Link as RouterLink } from "@tanstack/react-router"
-import { CheckSquare, SearchX } from "lucide-react"
-import { useRef, useState } from "react"
+import { CheckCheck, CheckSquare, SearchX } from "lucide-react"
+import { useEffect, useRef, useState } from "react"
 
 import { type TaskPublic, TasksService } from "@/client"
 import { DataTable } from "@/components/Common/DataTable"
@@ -17,6 +17,8 @@ import {
   FILTER_KEYS,
   hasActiveFilters,
   isCompact,
+  listedStatuses,
+  NATURAL_ORDER,
   type TaskListSearch,
   type TaskSearch,
   taskSearchSchema,
@@ -37,20 +39,29 @@ const MAX_BATCH = 500
 // One empty set, so a cleared selection is the same value every render.
 const EMPTY: ReadonlySet<string> = new Set()
 
-// Which column sorts by what. Only these two order the list; the rest are
+// Which column sorts by what. Only these three order the list; the rest are
 // read, not scanned in order.
-const SORT_FIELDS = { due_date: "due_date", priority: "priority" }
+const SORT_FIELDS = {
+  due_date: "due_date",
+  priority: "priority",
+  created_at: "created_at",
+}
 
 /** What the list's filters ask the API for, before any paging. */
 function filtersQuery(search: TaskListSearch, currentUserId?: string) {
   const {
     assignee,
+    reporter,
     page: _page,
     view: _view,
     ...filters
   } = withoutPanelState(search)
   return {
     ...filters,
+    // Open work, always: the list holds what is left to do, and finished
+    // work is read in the activity log (ADR-0006). A chosen status narrows
+    // within that rather than reaching outside it.
+    status: listedStatuses(search),
     // "Me" needs the id the API filters on, a bot user is named by its own
     // id, and "unassigned" is a flag of its own.
     assignee_id:
@@ -60,6 +71,9 @@ function filtersQuery(search: TaskListSearch, currentUserId?: string) {
           ? undefined
           : assignee,
     unassigned: assignee === "unassigned" ? true : undefined,
+    // The same shape as the assignee, minus the nobody case: a bot user is
+    // named by its own id, and "me" needs the id the API filters on.
+    reporter_id: reporter === "me" ? currentUserId : reporter,
   }
 }
 
@@ -112,7 +126,8 @@ function Tasks() {
 
   // Filtering by "me" needs the id to filter on: listing before it arrives
   // would show everything, which is the opposite of what was asked for.
-  const waitingForMe = search.assignee === "me" && !currentUser
+  const waitingForMe =
+    (search.assignee === "me" || search.reporter === "me") && !currentUser
   const filters = filtersQuery(search, currentUser?.id)
   const { data: tasks, isPending } = useQuery({
     ...tasksQuery({
@@ -126,6 +141,18 @@ function Tasks() {
     enabled: !waitingForMe,
   })
   const { data: projects } = useQuery(projectsQuery())
+
+  const count = tasks?.count ?? 0
+  const noFilters = !hasActiveFilters(search)
+  // An empty list is two different things, and only the API can tell them
+  // apart: no tasks at all, or nothing left open. The question is asked only
+  // when the list is empty and nothing narrows it, so the ordinary case costs
+  // nothing. It asks the API for done work directly — the list's own URL has
+  // no way to say that any more, but the API still answers it.
+  const { data: finished } = useQuery({
+    ...tasksQuery({ status: ["done"], skip: 0, limit: 1 }),
+    enabled: !isPending && !waitingForMe && count === 0 && noFilters,
+  })
 
   const applyFilters = (next: Partial<TaskSearch>) =>
     // Any change to what is being shown returns to the first page: the page
@@ -145,25 +172,40 @@ function Tasks() {
     navigate({ search: (previous) => ({ ...previous, view }) })
   const sortBy = (field: string) =>
     navigate({
-      search: (previous) => ({
-        ...previous,
-        sort: field as TaskSearch["sort"],
-        // The same header again reverses it: direction costs no control of
-        // its own (story 6).
-        order:
-          previous.sort === field && previous.order !== "desc"
-            ? ("desc" as const)
+      search: (previous) => {
+        const sort = field as NonNullable<TaskSearch["sort"]>
+        const natural = NATURAL_ORDER[sort]
+        // The first click on a header gives that order its natural direction;
+        // the same header again reverses it, so direction costs no control of
+        // its own (story 6). Only the reversal is written down.
+        const reversed =
+          previous.sort === sort && (previous.order ?? natural) === natural
+        return {
+          ...previous,
+          sort,
+          order: reversed
+            ? natural === "asc"
+              ? ("desc" as const)
+              : ("asc" as const)
             : undefined,
-        page: undefined,
-      }),
+          page: undefined,
+        }
+      },
     })
+
+  // Closing the last task on the last page leaves the reader standing on a
+  // page that no longer exists. Changing a filter already returns to the
+  // first page; this covers the list shrinking under a reader who changed
+  // nothing (ADR-0006).
+  useEffect(() => {
+    if (tasks && page > lastPage) goToPage(lastPage)
+  })
 
   // Every task this list has shown, so a batch can be checked against what
   // the selected tasks are before it is sent — a selection outlives pages.
   const seen = useRef(new Map<string, TaskPublic>())
   for (const task of tasks?.data ?? []) seen.current.set(task.id, task)
 
-  const count = tasks?.count ?? 0
   const lastPage = Math.max(1, Math.ceil(count / PAGE_SIZE))
   const projectNames = Object.fromEntries(
     (projects?.data ?? []).map((project) => [project.id, project.name]),
@@ -190,6 +232,25 @@ function Tasks() {
         >
           Clear filters
         </Button>
+      }
+    />
+  ) : finished && finished.count > 0 ? (
+    // Nothing open, but work has been done: saying "no tasks yet" here would
+    // tell someone who has just cleared their list that they have never had
+    // one. What they finished is in the activity log (ADR-0006).
+    <EmptyState
+      icon={CheckCheck}
+      title="Nothing left open"
+      description="Everything here is done. What you finished is kept in the activity log."
+      action={
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          <Button onClick={() => capture("task")}>Add a task</Button>
+          <Button variant="outline" asChild>
+            <RouterLink to="/activity" search={{ kind: "completed" as const }}>
+              See what you finished
+            </RouterLink>
+          </Button>
+        </div>
       }
     />
   ) : (
@@ -263,7 +324,7 @@ function Tasks() {
       ) : (
         <DataTable
           scrollLabel="Tasks, scrollable sideways"
-          columns={getColumns(projectNames, depths)}
+          columns={getColumns(projectNames, depths, { receipt: true })}
           data={rows}
           pending={isPending || waitingForMe}
           pendingRows={Math.min(PAGE_SIZE, Math.max(count, 5)) || 5}
@@ -293,7 +354,9 @@ function Tasks() {
           sorting={{
             fields: SORT_FIELDS,
             field: search.sort,
-            descending: search.order === "desc",
+            descending: search.sort
+              ? (search.order ?? NATURAL_ORDER[search.sort]) === "desc"
+              : false,
             onSort: sortBy,
           }}
           empty={empty}
@@ -368,6 +431,7 @@ function CompactList({
               <CompactTaskRow
                 task={task}
                 projectName={projectNames[task.project_id]}
+                receipt
               />
             </li>
           ))}

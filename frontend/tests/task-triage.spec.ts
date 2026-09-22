@@ -276,12 +276,14 @@ test("Completion still works from the row, beside the title", async ({
   await row(page, "Task 00")
     .getByRole("checkbox", { name: "Mark as done" })
     .click()
+  // Round check, beside the title: it closes the task, so the row leaves a
+  // list of open work (ADR-0006) and the notice says so.
+  await expect(row(page, "Task 00")).toHaveCount(0)
   await expect(
-    row(page, "Task 00").getByRole("checkbox", {
-      name: "Reopen task",
-    }),
+    page.locator("[data-sonner-toast]").filter({ hasText: "Task 00" }),
   ).toBeVisible()
-  // The selection checkbox is a different control, and did not move.
+  // The selection checkbox is a different control: closing a task is not
+  // selecting one, so nothing was selected.
   await expect(page.getByText("selected")).toHaveCount(0)
 })
 

@@ -96,6 +96,17 @@ def _resolve_assignee(
     return assignee
 
 
+def _reporter(caller: Caller) -> crud.Reporter:
+    """
+    Who is filing this task: the caller, and nobody the request can name
+    instead (FR-01.29). A bot user's work is recorded as its own, never as
+    its owner's, so the two are never interchangeable here.
+    """
+    if caller.bot is not None:
+        return crud.Reporter(bot_user_id=caller.bot.id)
+    return crud.Reporter(user_id=caller.owner_id)
+
+
 def _check_recurrence(
     *,
     parent_id: uuid.UUID | None,
@@ -214,6 +225,7 @@ def create_task(*, session: SessionDep, caller: CallerDep, task_in: TaskCreate) 
         # A subtask's own project is derived from its parent's tree.
         project_id=None if is_subtask else project.id,
         owner_id=caller.owner_id,
+        reporter=_reporter(caller),
         assignee=assignee,
         tag_names=tag_names,
     )

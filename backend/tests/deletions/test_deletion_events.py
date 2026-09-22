@@ -60,6 +60,7 @@ def _task(
         ),
         project_id=project.id if project else None,
         owner_id=owner.id,
+        reporter=crud.Reporter(user_id=owner.id),
     )
 
 

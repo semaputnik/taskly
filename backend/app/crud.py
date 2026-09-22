@@ -156,12 +156,24 @@ class Assignee(NamedTuple):
     bot_user_id: uuid.UUID | None = None
 
 
+class Reporter(NamedTuple):
+    """
+    Who filed a task, as the two columns that hold it. Exactly one is set:
+    every task has an author, so unlike `Assignee` there is no empty value
+    and no default — a caller has to say who is filing.
+    """
+
+    user_id: uuid.UUID | None = None
+    bot_user_id: uuid.UUID | None = None
+
+
 def create_task(
     *,
     session: Session,
     task_create: TaskCreate,
     project_id: uuid.UUID | None,
     owner_id: uuid.UUID,
+    reporter: Reporter,
     assignee: Assignee = Assignee(),
     tag_names: Sequence[str] = (),
 ) -> Task:
@@ -178,6 +190,8 @@ def create_task(
             "owner_id": owner_id,
             "assignee_id": assignee.user_id,
             "assignee_bot_user_id": assignee.bot_user_id,
+            "reporter_id": reporter.user_id,
+            "reporter_bot_user_id": reporter.bot_user_id,
         },
     )
     session.add(db_obj)
@@ -433,6 +447,11 @@ def _stage_copy(
         priority=source.priority,
         assignee_id=source.assignee_id,
         assignee_bot_user_id=source.assignee_bot_user_id,
+        # The series was filed once. Each occurrence is that same work
+        # recurring, not something new filed by whoever completed the last
+        # one, so the author comes along with everything else it copies.
+        reporter_id=source.reporter_id,
+        reporter_bot_user_id=source.reporter_bot_user_id,
         due_date=due_date,
         parent_id=parent_id,
         project_id=project_id,
@@ -544,6 +563,16 @@ def _task_filters(*, owner_id: uuid.UUID, query: TaskQuery) -> list[Any]:
             )
         )
 
+    if query.reporter_id is not None:
+        # The owner or a bot user: the id names one or the other, as it does
+        # for the assignee.
+        conditions.append(
+            or_(
+                col(Task.reporter_id) == query.reporter_id,
+                col(Task.reporter_bot_user_id) == query.reporter_id,
+            )
+        )
+
     if query.tag is not None:
         tagged = (
             select(TaskTag.task_id)
@@ -579,24 +608,43 @@ def _task_filters(*, owner_id: uuid.UUID, query: TaskQuery) -> list[Any]:
     return conditions
 
 
+# Which way each sort runs when the request names no direction. Only the
+# created order reads backwards: the point of it is what has just arrived.
+_NATURAL_ORDER = {
+    TaskSort.DUE_DATE: SortOrder.ASC,
+    TaskSort.PRIORITY: SortOrder.ASC,
+    TaskSort.CREATED_AT: SortOrder.DESC,
+}
+
+
 def _task_ordering(query: TaskQuery) -> list[Any]:
     """
     How the list is ordered. Without a sort it stays as it was: the most
     pressing work first, oldest first within a priority.
     """
     if query.sort is None:
-        return [_PRIORITY_RANK, Task.created_at]
+        return [_PRIORITY_RANK, Task.created_at, Task.id]
 
-    descending = query.order is SortOrder.DESC
+    descending = (query.order or _NATURAL_ORDER[query.sort]) is SortOrder.DESC
+    created_at = col(Task.created_at)
+    # Annotated because the branches build expressions over columns of
+    # different types, which mypy will not unify on its own.
+    ordering: Any
     if query.sort is TaskSort.DUE_DATE:
         due_date = col(Task.due_date)
         # A task with no due date is not early or late, so it goes last either
         # way rather than leading one of the two orders.
         ordering = nullslast(due_date.desc() if descending else due_date.asc())
+    elif query.sort is TaskSort.CREATED_AT:
+        ordering = created_at.desc() if descending else created_at.asc()
     else:
         ordering = _PRIORITY_RANK.desc() if descending else _PRIORITY_RANK.asc()
 
-    return [ordering, Task.created_at]
+    # Two tasks filed in the same instant would otherwise come back in
+    # whatever order the database found them, which can differ between the
+    # queries that fetch two pages of one list: a task shown twice, and
+    # another never shown at all.
+    return [ordering, created_at, Task.id]
 
 
 def get_tags(

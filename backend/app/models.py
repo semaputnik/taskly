@@ -352,8 +352,18 @@ class TaskStatus(StrEnum):
 
 
 class TaskSort(StrEnum):
+    """
+    How a task list can be ordered, and which way round each one naturally
+    runs when the request names no direction (FR-06.4).
+
+    Due date means soonest first and priority means P1 first, because that is
+    the work to reach for. Creation means newest first, because the reason to
+    order by it is to see what has just arrived.
+    """
+
     DUE_DATE = "due_date"
     PRIORITY = "priority"
+    CREATED_AT = "created_at"
 
 
 class SortOrder(StrEnum):
@@ -423,6 +433,10 @@ class TaskQuery(SQLModel):
     assignee_id: uuid.UUID | None = None
     # The other half of the assignee filter: tasks with nobody on them.
     unassigned: bool = False
+    # Who filed the task: the owner, or one of their bot users, named by the
+    # same id either way. It has no "unassigned" counterpart — every task has
+    # a reporter (FR-01.29).
+    reporter_id: uuid.UUID | None = None
     tag: str | None = None
     priority: TaskPriority | None = None
     # Any of the listed statuses matches; none listed means every status. A
@@ -442,7 +456,11 @@ class TaskQuery(SQLModel):
     # ordinary view through some other filter.
     archived: bool = False
     sort: TaskSort | None = None
-    order: SortOrder = SortOrder.ASC
+    # Unset means each sort's own natural direction rather than ascending, so
+    # asking for the created order plainly returns the newest first. Naming a
+    # direction always wins, and the two orders that predate this both run
+    # ascending naturally, so requests written before it mean what they did.
+    order: SortOrder | None = None
     # Paging rides along with the rest of the query: FastAPI only unpacks a
     # query model when it is the whole of the endpoint's query.
     skip: int = Field(default=0, ge=0)
@@ -641,6 +659,12 @@ class Task(TaskBase, table=True):
             "assignee_id IS NULL OR assignee_bot_user_id IS NULL",
             name="task_one_assignee",
         ),
+        # Exactly one reporter, where the assignee allows neither: a task can
+        # be nobody's to do, but never nobody's doing.
+        CheckConstraint(
+            "(reporter_id IS NULL) <> (reporter_bot_user_id IS NULL)",
+            name="task_one_reporter",
+        ),
     )
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
@@ -676,6 +700,22 @@ class Task(TaskBase, table=True):
     assignee_bot_user_id: uuid.UUID | None = Field(
         default=None, foreign_key="botuser.id", nullable=True, ondelete="SET NULL"
     )
+    # Who filed the task: its owner, or one of the owner's bot users. Exactly
+    # one of the two is set — every task has an author, and a bot user's is
+    # never recorded as its owner's (FR-01.29).
+    #
+    # Unlike the assignee, neither can be cleared: `SET NULL` would leave the
+    # row failing its own constraint. Nor may either cascade — a bot user is
+    # soft-deleted and stays named on what it filed (FR-08.19), so the link is
+    # never exercised by a real delete, and must not be able to take the task
+    # down with it if it ever were. The owner's own deletion already takes
+    # their tasks through `owner_id`.
+    reporter_id: uuid.UUID | None = Field(
+        default=None, foreign_key="user.id", nullable=True
+    )
+    reporter_bot_user_id: uuid.UUID | None = Field(
+        default=None, foreign_key="botuser.id", nullable=True
+    )
     # Set once the task is deleted; None means it is live (FR-01.8).
     deletion_id: uuid.UUID | None = Field(
         default=None,
@@ -709,6 +749,11 @@ class TaskPublic(TaskBase):
     # bot user, `assignee_bot_user` says which, and whether it is deleted.
     assignee_id: uuid.UUID | None = None
     assignee_bot_user: BotUserRef | None = None
+    # Who filed the task, in the same shape as the assignee, and always set.
+    # Read-only: it names who made the request that created the task, and no
+    # request body can set or change it.
+    reporter_id: uuid.UUID | None = None
+    reporter_bot_user: BotUserRef | None = None
     recurrence: Recurrence | None = None
     created_at: datetime | None = None
     # Its own subtasks, one level down, and how many of those are done: enough
@@ -859,6 +904,29 @@ class ActivityAction(StrEnum):
     TAG_MERGED = "tag_merged"
 
 
+class ActivityKind(StrEnum):
+    """
+    How a reader groups the log's actions in order to narrow it.
+
+    Coarser than `ActivityAction` on purpose: someone asks the log what they
+    finished, filed or threw away — not which of two dozen action names an
+    entry happens to carry. The groups do not overlap, so an entry answers to
+    exactly one of them and a reader never meets the same change twice.
+
+    The grouping is the server's rather than a set of actions the client
+    sends, because `COMPLETED` is not a set of actions at all: closing tasks
+    in a batch writes one `TASKS_BULK_CHANGED` entry naming the new status,
+    not a completion per task, so the group has to read that entry's details.
+    """
+
+    COMPLETED = "completed"
+    CREATED = "created"
+    CHANGED = "changed"
+    DELETED = "deleted"
+    COMMENTS = "comments"
+    TAGS = "tags"
+
+
 class ActivityEntityType(StrEnum):
     TASK = "task"
     PROJECT = "project"
@@ -886,6 +954,15 @@ class ActivityEntry(SQLModel, table=True):
             "ix_activityentry_owner_id_actor_bot_user_id_position",
             "owner_id",
             "actor_bot_user_id",
+            "position",
+        ),
+        # One kind of change, newest first. Same reasoning as the feed above:
+        # a log kept for ever (FR-10.5) must not be walked end to end to find
+        # the handful of entries a narrow kind gathers.
+        Index(
+            "ix_activityentry_owner_id_action_position",
+            "owner_id",
+            "action",
             "position",
         ),
         # A change is made by exactly one actor: a user, or a bot user.
