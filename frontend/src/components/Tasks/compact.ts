@@ -21,17 +21,35 @@ function localDay(day: string): Date {
   return new Date(year, month - 1, date)
 }
 
+/** A day written out plainly, carrying the year only when it is not this one. */
+function plainDay(due: Date, now: Date): string {
+  return due.toLocaleDateString(undefined, {
+    day: "numeric",
+    month: "short",
+    ...(due.getFullYear() !== now.getFullYear() && { year: "numeric" }),
+  })
+}
+
 /**
  * A due day in words, measured from `today` (both `YYYY-MM-DD`): "Today",
  * "Tomorrow", a weekday within the week, "3 days late" once missed, and a
  * short date past that, with the year only when it is not this one.
+ *
+ * A done task's due day is read plainly instead, at every distance. The
+ * relative wording and the alert tone both say the same thing — this is still
+ * owed — and neither is true of work that is finished. Said of a done task,
+ * "3 days late" is also a number that grows for as long as the task is kept.
  */
 export function describeDue(
   dueDate: string,
   today: string,
+  { done = false }: { done?: boolean } = {},
 ): { text: string; tone: DueTone } {
   const due = localDay(dueDate)
   const now = localDay(today)
+
+  if (done) return { text: plainDay(due, now), tone: "later" }
+
   const days = Math.round((due.getTime() - now.getTime()) / DAY_MS)
 
   if (days < -1) return { text: `${-days} days late`, tone: "late" }
@@ -44,14 +62,7 @@ export function describeDue(
       tone: "soon",
     }
   }
-  return {
-    text: due.toLocaleDateString(undefined, {
-      day: "numeric",
-      month: "short",
-      ...(due.getFullYear() !== now.getFullYear() && { year: "numeric" }),
-    }),
-    tone: "later",
-  }
+  return { text: plainDay(due, now), tone: "later" }
 }
 
 /** "1/3" for a task with subtasks; nothing for one without. */

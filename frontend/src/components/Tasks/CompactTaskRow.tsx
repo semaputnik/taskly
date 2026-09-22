@@ -44,7 +44,7 @@ export function CompactTaskRow({
   const done = task.status === "done"
   const progress = subtaskProgress(task)
   const due = task.due_date
-    ? describeDue(task.due_date, isoDay(new Date()))
+    ? describeDue(task.due_date, isoDay(new Date()), { done })
     : null
   const tags = task.tags ?? []
   const hasMeta = progress || due || task.recurrence || tags.length > 0
