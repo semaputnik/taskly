@@ -1594,6 +1594,28 @@ export const TaskPublicSchema = {
                 }
             ]
         },
+        reporter_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Reporter Id'
+        },
+        reporter_bot_user: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/BotUserRef'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
         recurrence: {
             anyOf: [
                 {

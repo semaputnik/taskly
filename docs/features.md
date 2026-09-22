@@ -74,6 +74,16 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
   checkbox), and undoing it returns the task to To do.
 - **FR-01.6** A task has at most one assignee. A task can have no assignee.
 - **FR-01.7** The assignee is either the user or one of the user's bot users.
+- **FR-01.29** A task records its **reporter**: who filed it, either the user
+  or one of the user's bot users. Every task has exactly one — unlike the
+  assignee, it can be neither absent nor ambiguous. It is taken from whoever
+  made the request that created the task and is never read from a request
+  body, so no caller can file a task as somebody else, and a bot user's work
+  is never recorded as its owner's. It cannot be changed after the task is
+  created. The interface calls it **Created by**. A bot user deleted later is
+  still named on what it filed (FR-08.19). Each occurrence of a recurring task
+  carries the reporter of the occurrence before it (FR-01.14). Tasks that
+  predate this requirement name the user.
 
 #### Tags
 

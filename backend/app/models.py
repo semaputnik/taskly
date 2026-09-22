@@ -641,6 +641,12 @@ class Task(TaskBase, table=True):
             "assignee_id IS NULL OR assignee_bot_user_id IS NULL",
             name="task_one_assignee",
         ),
+        # Exactly one reporter, where the assignee allows neither: a task can
+        # be nobody's to do, but never nobody's doing.
+        CheckConstraint(
+            "(reporter_id IS NULL) <> (reporter_bot_user_id IS NULL)",
+            name="task_one_reporter",
+        ),
     )
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
@@ -676,6 +682,22 @@ class Task(TaskBase, table=True):
     assignee_bot_user_id: uuid.UUID | None = Field(
         default=None, foreign_key="botuser.id", nullable=True, ondelete="SET NULL"
     )
+    # Who filed the task: its owner, or one of the owner's bot users. Exactly
+    # one of the two is set — every task has an author, and a bot user's is
+    # never recorded as its owner's (FR-01.29).
+    #
+    # Unlike the assignee, neither can be cleared: `SET NULL` would leave the
+    # row failing its own constraint. Nor may either cascade — a bot user is
+    # soft-deleted and stays named on what it filed (FR-08.19), so the link is
+    # never exercised by a real delete, and must not be able to take the task
+    # down with it if it ever were. The owner's own deletion already takes
+    # their tasks through `owner_id`.
+    reporter_id: uuid.UUID | None = Field(
+        default=None, foreign_key="user.id", nullable=True
+    )
+    reporter_bot_user_id: uuid.UUID | None = Field(
+        default=None, foreign_key="botuser.id", nullable=True
+    )
     # Set once the task is deleted; None means it is live (FR-01.8).
     deletion_id: uuid.UUID | None = Field(
         default=None,
@@ -709,6 +731,11 @@ class TaskPublic(TaskBase):
     # bot user, `assignee_bot_user` says which, and whether it is deleted.
     assignee_id: uuid.UUID | None = None
     assignee_bot_user: BotUserRef | None = None
+    # Who filed the task, in the same shape as the assignee, and always set.
+    # Read-only: it names who made the request that created the task, and no
+    # request body can set or change it.
+    reporter_id: uuid.UUID | None = None
+    reporter_bot_user: BotUserRef | None = None
     recurrence: Recurrence | None = None
     created_at: datetime | None = None
     # Its own subtasks, one level down, and how many of those are done: enough

@@ -888,6 +888,11 @@ export type TaskPublic = {
      */
     assignee_id?: string | null;
     assignee_bot_user?: BotUserRef | null;
+    /**
+     * Reporter Id
+     */
+    reporter_id?: string | null;
+    reporter_bot_user?: BotUserRef | null;
     recurrence?: Recurrence | null;
     /**
      * Created At

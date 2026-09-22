@@ -59,6 +59,7 @@ def _task(
         task_create=TaskCreate(title=title, parent_id=parent.id if parent else None),
         project_id=project.id if project else None,
         owner_id=owner_id,
+        reporter=crud.Reporter(user_id=owner_id),
     )
 
 

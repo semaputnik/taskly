@@ -1,10 +1,12 @@
 import { useQuery } from "@tanstack/react-query"
 import {
+  Bot,
   Calendar,
   CalendarPlus,
   Flag,
   FolderKanban,
   ListTodo,
+  PenLine,
   Repeat,
   Tag,
   User as UserIcon,
@@ -250,6 +252,36 @@ export function TaskPropertyRows({
  * field saves on its own — a select when it changes, text when you leave it —
  * so there is nothing to submit and nothing to discard.
  */
+/**
+ * Who filed the task: you, or the bot user that did — named with the same
+ * glyph the assignee row gives a bot, so the two rows read as one question
+ * asked twice. A bot user deleted since keeps its place on what it filed
+ * (FR-08.19) and says so.
+ */
+function ReporterValue({
+  task,
+  currentUserEmail,
+}: {
+  task: TaskPublic
+  currentUserEmail?: string
+}) {
+  const bot = task.reporter_bot_user
+  if (bot) {
+    return (
+      <span className="flex min-w-0 items-center gap-1.5">
+        <Bot className="text-muted-foreground size-4 shrink-0" aria-hidden />
+        <span className="truncate">
+          {bot.deleted ? `${bot.name} (deleted)` : bot.name}
+        </span>
+      </span>
+    )
+  }
+  // Tasks filed before the reporter was recorded name nobody at all, rather
+  // than claiming an author the database never held.
+  if (!task.reporter_id) return <>Unknown</>
+  return <>{currentUserEmail ? `You (${currentUserEmail})` : "You"}</>
+}
+
 export function TaskProperties({ task }: { task: TaskPublic }) {
   const { user: currentUser } = useAuth()
   const update = useTaskUpdate(task)
@@ -309,17 +341,31 @@ export function TaskProperties({ task }: { task: TaskPublic }) {
           </PropertyRow>
         }
         after={
-          <PropertyRow icon={CalendarPlus} label="Created">
-            <ReadOnlyValue>
-              {task.created_at ? (
-                <time dateTime={task.created_at}>
-                  {formatDateTime(task.created_at)}
-                </time>
-              ) : (
-                "Unknown"
-              )}
-            </ReadOnlyValue>
-          </PropertyRow>
+          <>
+            <PropertyRow icon={CalendarPlus} label="Created">
+              <ReadOnlyValue>
+                {task.created_at ? (
+                  <time dateTime={task.created_at}>
+                    {formatDateTime(task.created_at)}
+                  </time>
+                ) : (
+                  "Unknown"
+                )}
+              </ReadOnlyValue>
+            </PropertyRow>
+            {/* Beside the moment it was filed, the hand that filed it. Read
+                only, and not because it is awkward to edit: it records who
+                made the request that created the task, which no later request
+                gets to revise (FR-01.29). */}
+            <PropertyRow icon={PenLine} label="Created by">
+              <ReadOnlyValue>
+                <ReporterValue
+                  task={task}
+                  currentUserEmail={currentUser?.email}
+                />
+              </ReadOnlyValue>
+            </PropertyRow>
+          </>
         }
       />
 

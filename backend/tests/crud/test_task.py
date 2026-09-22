@@ -38,7 +38,11 @@ def test_create_task(db: Session) -> None:
         priority=TaskPriority.P2,
     )
     task = crud.create_task(
-        session=db, task_create=task_in, project_id=inbox.id, owner_id=user.id
+        session=db,
+        task_create=task_in,
+        project_id=inbox.id,
+        owner_id=user.id,
+        reporter=crud.Reporter(user_id=user.id),
     )
 
     assert task.title == "Buy milk"
@@ -61,6 +65,7 @@ def test_create_task_with_no_priority_stays_unset(db: Session) -> None:
         task_create=TaskCreate(title="Untitled priority"),
         project_id=inbox.id,
         owner_id=user.id,
+        reporter=crud.Reporter(user_id=user.id),
     )
 
     assert task.priority is None
@@ -75,6 +80,7 @@ def test_update_task_fields(db: Session) -> None:
         task_create=TaskCreate(title="Old title"),
         project_id=inbox.id,
         owner_id=user.id,
+        reporter=crud.Reporter(user_id=user.id),
     )
 
     updated = crud.update_task(
@@ -104,6 +110,7 @@ def test_complete_and_return_to_not_completed(db: Session) -> None:
         task_create=TaskCreate(title="Do the thing"),
         project_id=inbox.id,
         owner_id=user.id,
+        reporter=crud.Reporter(user_id=user.id),
     )
 
     completed = crud.update_task(
@@ -129,6 +136,7 @@ def test_move_task_to_another_project(db: Session) -> None:
         task_create=TaskCreate(title="Move me"),
         project_id=inbox.id,
         owner_id=user.id,
+        reporter=crud.Reporter(user_id=user.id),
     )
 
     moved = crud.update_task(
@@ -155,6 +163,7 @@ def _tree(db: Session, depth: int) -> tuple[uuid.UUID, list[Task]]:
             task_create=TaskCreate(title="Level 0"),
             project_id=project.id,
             owner_id=user.id,
+            reporter=crud.Reporter(user_id=user.id),
         )
     ]
     for level in range(1, depth):
@@ -164,6 +173,7 @@ def _tree(db: Session, depth: int) -> tuple[uuid.UUID, list[Task]]:
                 task_create=TaskCreate(title=f"Level {level}", parent_id=chain[-1].id),
                 project_id=None,
                 owner_id=user.id,
+                reporter=crud.Reporter(user_id=user.id),
             )
         )
     return project.id, chain

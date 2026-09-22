@@ -48,8 +48,16 @@ def task_publics(
     subtasks = crud.get_subtask_counts(
         session=session, task_ids=[task.id for task in tasks]
     )
+    # Both bot-user references in one lookup: a task can name one bot user as
+    # its assignee and another as the one that filed it, and asking twice
+    # would cost a query per role rather than per page.
     bot_users = crud.get_bot_user_refs(
-        session=session, bot_user_ids=[task.assignee_bot_user_id for task in tasks]
+        session=session,
+        bot_user_ids=[
+            bot_user_id
+            for task in tasks
+            for bot_user_id in (task.assignee_bot_user_id, task.reporter_bot_user_id)
+        ],
     )
 
     return [
@@ -62,6 +70,10 @@ def task_publics(
                 "assignee_id": task.assignee_id or task.assignee_bot_user_id,
                 "assignee_bot_user": bot_users.get(task.assignee_bot_user_id)
                 if task.assignee_bot_user_id
+                else None,
+                "reporter_id": task.reporter_id or task.reporter_bot_user_id,
+                "reporter_bot_user": bot_users.get(task.reporter_bot_user_id)
+                if task.reporter_bot_user_id
                 else None,
                 "subtask_count": subtasks[task.id].total,
                 "subtasks_done": subtasks[task.id].done,

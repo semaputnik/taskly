@@ -653,6 +653,7 @@ def test_a_change_made_outside_a_request_is_attributed_to_the_owner(
         task_create=TaskCreate(title="From a script"),
         project_id=inbox.id,
         owner_id=user.id,
+        reporter=crud.Reporter(user_id=user.id),
     )
 
     [entry] = db.exec(
@@ -675,6 +676,7 @@ def test_a_change_committed_without_a_flush_of_its_own_is_logged(
         task_create=TaskCreate(title="Before"),
         project_id=inbox.id,
         owner_id=user.id,
+        reporter=crud.Reporter(user_id=user.id),
     )
 
     # Nothing flushes between the change and the commit.

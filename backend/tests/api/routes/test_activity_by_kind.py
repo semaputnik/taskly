@@ -18,7 +18,14 @@ from fastapi.testclient import TestClient
 from sqlmodel import Session
 
 from app.core.config import settings
-from tests.utils.bot import create_project, create_task, create_user_headers
+from tests.utils.bot import (
+    ALL_PERMISSIONS,
+    create_bot_user,
+    create_project,
+    create_task,
+    create_user_headers,
+    token_headers,
+)
 
 API = settings.API_V1_STR
 
@@ -41,9 +48,7 @@ def _actions(page: Any) -> list[str]:
 
 
 def _complete(client: TestClient, headers: Headers, task_id: str) -> None:
-    r = client.patch(
-        f"{API}/tasks/{task_id}", headers=headers, json={"status": "done"}
-    )
+    r = client.patch(f"{API}/tasks/{task_id}", headers=headers, json={"status": "done"})
     assert r.status_code == 200, r.text
 
 
@@ -119,17 +124,13 @@ def test_completed_leaves_out_creations_and_reopenings(
     project_id = create_project(client, owner)
     task_id = create_task(client, owner, project_id=project_id)
     _complete(client, owner, task_id)
-    r = client.patch(
-        f"{API}/tasks/{task_id}", headers=owner, json={"status": "todo"}
-    )
+    r = client.patch(f"{API}/tasks/{task_id}", headers=owner, json={"status": "todo"})
     assert r.status_code == 200, r.text
 
     assert _actions(_log(client, owner, kind="completed")) == ["task_completed"]
 
 
-def test_created_gathers_tasks_and_projects(
-    client: TestClient, owner: Headers
-) -> None:
+def test_created_gathers_tasks_and_projects(client: TestClient, owner: Headers) -> None:
     project_id = create_project(client, owner, "Roadmap")
     create_task(client, owner, project_id=project_id)
 
@@ -216,15 +217,13 @@ def test_the_count_is_the_narrowed_count(client: TestClient, owner: Headers) -> 
 
 
 def test_kind_combines_with_the_bot_user_filter(
-    client: TestClient, db: Session, owner: Headers
+    client: TestClient, owner: Headers
 ) -> None:
     """
     Each narrowing holds on its own, and together they narrow further: what
     this integration finished, as opposed to what it did or what anyone
     finished.
     """
-    from tests.utils.bot import ALL_PERMISSIONS, create_bot_user, token_headers
-
     project_id = create_project(client, owner)
     bot_user = create_bot_user(
         client, owner, project_ids=[project_id], permissions=ALL_PERMISSIONS

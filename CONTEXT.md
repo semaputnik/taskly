@@ -102,6 +102,19 @@ on their behalf. Only the user renames, merges or deletes tags.
 _Avoid_: treating a tag as text copied onto each task, or as something scoped
 to a project.
 
+**Reporter**:
+Who filed a task — the user, or one of their **bot users**. The interface
+calls it **Created by**. Every task has exactly one, and it is never the
+request's to choose: it is whoever made the request that created the task.
+Nothing changes it afterwards, so it is the only field on a task that no
+edit can reach. Each **occurrence** of a recurring task carries the reporter
+of the one before it — the **series** was filed once, and its occurrences are
+that same work recurring.
+_Avoid_: "author" (a **comment** has one of those, and it is a different
+question), "creator", and treating it as a second **assignee** — the assignee
+is who owes the work and can be changed; the reporter is a record of how the
+task got here.
+
 **Bot user**:
 An identity a user creates for an AI agent or other integration, deliberately
 far weaker than a human user. It works only through the REST API with its

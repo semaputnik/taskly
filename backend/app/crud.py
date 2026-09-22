@@ -156,12 +156,24 @@ class Assignee(NamedTuple):
     bot_user_id: uuid.UUID | None = None
 
 
+class Reporter(NamedTuple):
+    """
+    Who filed a task, as the two columns that hold it. Exactly one is set:
+    every task has an author, so unlike `Assignee` there is no empty value
+    and no default — a caller has to say who is filing.
+    """
+
+    user_id: uuid.UUID | None = None
+    bot_user_id: uuid.UUID | None = None
+
+
 def create_task(
     *,
     session: Session,
     task_create: TaskCreate,
     project_id: uuid.UUID | None,
     owner_id: uuid.UUID,
+    reporter: Reporter,
     assignee: Assignee = Assignee(),
     tag_names: Sequence[str] = (),
 ) -> Task:
@@ -178,6 +190,8 @@ def create_task(
             "owner_id": owner_id,
             "assignee_id": assignee.user_id,
             "assignee_bot_user_id": assignee.bot_user_id,
+            "reporter_id": reporter.user_id,
+            "reporter_bot_user_id": reporter.bot_user_id,
         },
     )
     session.add(db_obj)
@@ -433,6 +447,11 @@ def _stage_copy(
         priority=source.priority,
         assignee_id=source.assignee_id,
         assignee_bot_user_id=source.assignee_bot_user_id,
+        # The series was filed once. Each occurrence is that same work
+        # recurring, not something new filed by whoever completed the last
+        # one, so the author comes along with everything else it copies.
+        reporter_id=source.reporter_id,
+        reporter_bot_user_id=source.reporter_bot_user_id,
         due_date=due_date,
         parent_id=parent_id,
         project_id=project_id,
