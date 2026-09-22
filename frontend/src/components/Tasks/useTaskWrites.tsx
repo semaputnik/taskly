@@ -125,7 +125,20 @@ export function useTaskUpdate(task: TaskPublic) {
  * control goes through here, so that refusal turns into the same prompt
  * wherever it came from. Render `prompt` alongside the control.
  */
-export function useTaskStatus(task: TaskPublic) {
+export function useTaskStatus(
+  task: TaskPublic,
+  {
+    onCompleted,
+  }: {
+    /**
+     * The task reached done, by whichever path — the control directly, or
+     * the prompt that asks about its open subtasks first. It is handed
+     * `reopen` so a receipt can offer the way back without having to reach
+     * for the hook it is being built inside.
+     */
+    onCompleted?: (reopen: () => Promise<boolean>) => void
+  } = {},
+) {
   const { run, isPending } = useWrites()
   const [isPrompting, setIsPrompting] = useState(false)
   const [announcement, setAnnouncement] = useState("")
@@ -137,6 +150,9 @@ export function useTaskStatus(task: TaskPublic) {
     if (outcome.saved) {
       setIsPrompting(false)
       setAnnouncement(`${task.title} moved to ${STATUS_LABELS[status]}`)
+      // Here rather than at the control, so a task closed through the
+      // subtasks prompt is confirmed exactly like one closed in a click.
+      if (status === "done") onCompleted?.(reopen)
     } else if (outcome.reason === "open subtasks") {
       setIsPrompting(true)
     }

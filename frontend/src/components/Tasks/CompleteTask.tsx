@@ -42,23 +42,22 @@ export function CompleteTask({
   receipt = false,
   className,
 }: CompleteTaskProps) {
-  const status = useTaskStatus(task)
+  const status = useTaskStatus(task, {
+    onCompleted: receipt
+      ? (reopen) =>
+          toastSuccess(`“${task.title}” done`, {
+            label: "Undo",
+            // Back to to do, as reopening always is: undoing a close cannot
+            // know which open status the task held before it. `reopen`
+            // rather than `change`, because this notice outlives the row it
+            // came from and still holds the task as it was before the move.
+            onClick: () => void reopen(),
+          })
+      : undefined,
+  })
   const done = task.status === "done"
   const tone = showPriority ? priorityTone(task.priority) : null
   const action = done ? "Reopen task" : "Mark as done"
-
-  const tick = async (checked: boolean) => {
-    const moved = await status.change(checked ? "done" : "todo")
-    if (!receipt || !moved || !checked) return
-    toastSuccess(`“${task.title}” done`, {
-      label: "Undo",
-      // Back to to do, as reopening always is: undoing a close cannot know
-      // which open status the task held before it. `reopen` rather than
-      // `change`, because this notice outlives the row it came from and
-      // still holds the task as it was before the move.
-      onClick: () => void status.reopen(),
-    })
-  }
 
   return (
     <>
@@ -68,7 +67,9 @@ export function CompleteTask({
         className={cn("rounded-full", tone && PRIORITY_CHECK[tone], className)}
         checked={done}
         disabled={status.isPending}
-        onCheckedChange={(checked) => void tick(checked === true)}
+        onCheckedChange={(checked) =>
+          void status.change(checked === true ? "done" : "todo")
+        }
         aria-label={
           showPriority && task.priority
             ? `${action}, priority ${task.priority}`

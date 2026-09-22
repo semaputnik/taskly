@@ -245,14 +245,6 @@ export function TaskPropertyRows({
 }
 
 /**
- * A task's fields, edited where they are read.
- *
- * There is no separate edit screen: a form that restates the record you are
- * already looking at makes you read it twice and choose between them. Each
- * field saves on its own — a select when it changes, text when you leave it —
- * so there is nothing to submit and nothing to discard.
- */
-/**
  * Who filed the task: you, or the bot user that did — named with the same
  * glyph the assignee row gives a bot, so the two rows read as one question
  * asked twice. A bot user deleted since keeps its place on what it filed
@@ -282,6 +274,14 @@ function ReporterValue({
   return <>{currentUserEmail ? `You (${currentUserEmail})` : "You"}</>
 }
 
+/**
+ * A task's fields, edited where they are read.
+ *
+ * There is no separate edit screen: a form that restates the record you are
+ * already looking at makes you read it twice and choose between them. Each
+ * field saves on its own — a select when it changes, text when you leave it —
+ * so there is nothing to submit and nothing to discard.
+ */
 export function TaskProperties({ task }: { task: TaskPublic }) {
   const { user: currentUser } = useAuth()
   const update = useTaskUpdate(task)
