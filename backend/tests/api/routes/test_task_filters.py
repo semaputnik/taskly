@@ -314,9 +314,7 @@ def test_sort_by_priority_both_ways(client: TestClient, db: Session) -> None:
     ]
 
 
-def test_sort_by_creation_date_is_newest_first(
-    client: TestClient, db: Session
-) -> None:
+def test_sort_by_creation_date_is_newest_first(client: TestClient, db: Session) -> None:
     """
     Each order has a natural direction, and for the created order it is
     newest first: asking for it without naming a direction means what a

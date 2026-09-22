@@ -28,3 +28,6 @@ backend/data/
 # Design references gathered while working: third-party mockups and personal
 # screenshots that do not belong in a public history.
 /docs/reference/
+
+# JetBrains IDE project settings.
+/.idea/
