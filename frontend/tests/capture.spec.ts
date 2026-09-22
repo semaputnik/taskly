@@ -90,8 +90,10 @@ test("Escape before a title is committed creates nothing", async ({ page }) => {
     .click()
   await expect(capturePanel(page)).toBeHidden()
 
-  // Silently: nothing was created, so there is nothing to announce.
-  await expect(page.getByText(/created/i)).toHaveCount(0)
+  // Silently: nothing was created, so there is nothing to announce. Asked of
+  // the notices rather than of the page, which has a Created column of its
+  // own to say when each task was filed.
+  await expect(page.locator("[data-sonner-toast]")).toHaveCount(0)
   await expect(page.getByText("No tasks yet")).toBeVisible()
   await page.goto("/activity")
   await expect(

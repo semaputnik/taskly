@@ -29,11 +29,11 @@ test("A user's own changes appear on the Activity page, newest first", async ({
     .getByRole("row", { name: /Renew the passport/ })
     .getByRole("checkbox", { name: "Mark as done" })
     .click()
+  // The list holds open work, so the task leaves it once it is done
+  // (ADR-0006). Where it went is the point of the rest of this test.
   await expect(
-    page
-      .getByRole("row", { name: /Renew the passport/ })
-      .getByRole("checkbox", { name: "Reopen task" }),
-  ).toBeVisible()
+    page.getByRole("row", { name: /Renew the passport/ }),
+  ).toHaveCount(0)
 
   await page.goto("/activity")
   const rows = page.getByRole("row").filter({ hasText: "Renew the passport" })

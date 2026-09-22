@@ -35,15 +35,22 @@ function nextUpdate(page: Page) {
     .then((request) => request.postDataJSON())
 }
 
-test("The Open filter is its three statuses, and one status reads as itself", () => {
+test("Every open status is the baseline, and one status reads as itself", () => {
   expect(OPEN_STATUSES).toEqual(["todo", "in_progress", "waiting"])
-  expect(describeStatusFilter(["waiting", "todo", "in_progress"])).toBe("Open")
+  // The list holds open work, so naming every open status narrows nothing:
+  // it reads as no filter at all, and gets no chip offering to remove it
+  // (ADR-0006). URLs written before that spell the baseline out this way.
+  expect(
+    describeStatusFilter(["waiting", "todo", "in_progress"]),
+  ).toBeUndefined()
   expect(describeStatusFilter(["waiting"])).toBe("Waiting")
-  expect(describeStatusFilter(["todo", "done"])).toBe("To do, Done")
+  expect(describeStatusFilter(["todo", "in_progress"])).toBe(
+    "To do, In progress",
+  )
   expect(describeStatusFilter(undefined)).toBeUndefined()
 })
 
-test("The checkbox is checked only for Done, and sends done or todo", async ({
+test("Completing sends done, takes the row away, and undoes to To do", async ({
   page,
 }) => {
   await newUser(page)
@@ -59,14 +66,19 @@ test("The checkbox is checked only for Done, and sends done or todo", async ({
     const sent = nextUpdate(page)
     await box.click()
     expect(await sent).toEqual({ status: "done" })
-    const reopen = row(page, title).getByRole("checkbox", {
-      name: "Reopen task",
-    })
-    await expect(reopen).toBeChecked()
 
-    // Unchecking cannot know the status before, so it is always To do.
+    // The list holds open work, so the row goes. The row used to be its own
+    // receipt; with it gone the notice takes that job, and carries the way
+    // back (ADR-0006).
+    await expect(row(page, title)).toHaveCount(0)
+    const notice = page
+      .locator("[data-sonner-toast]")
+      .filter({ hasText: title })
+    await expect(notice).toBeVisible()
+
+    // Undoing cannot know the status before, so it is always To do.
     const back = nextUpdate(page)
-    await reopen.click()
+    await notice.getByRole("button", { name: "Undo" }).click()
     expect(await back).toEqual({ status: "todo" })
     await expect(statusTrigger(page, title)).toContainText("To do")
   }
@@ -132,7 +144,13 @@ test("Done asks about open subtasks from the checkbox and from the menu", async 
     .getByRole("button", { name: "Mark the subtasks done too" })
     .click()
   await expect(prompt).toBeHidden()
-  await expect(statusTrigger(page, "Pack books")).toContainText("Done")
+  // Both went to done, so both leave the list of open work — and the parent
+  // is confirmed, the same as a task closed in one click.
+  await expect(row(page, "Move house")).toHaveCount(0)
+  await expect(row(page, "Pack books")).toHaveCount(0)
+  await expect(
+    page.locator("[data-sonner-toast]").filter({ hasText: "Move house" }),
+  ).toBeVisible()
 
   await statusTrigger(page, "Other parent").click()
   await page.getByRole("menuitemradio", { name: "Done" }).click()
@@ -141,36 +159,43 @@ test("Done asks about open subtasks from the checkbox and from the menu", async 
   await prompt
     .getByRole("button", { name: "Leave the subtasks as they are" })
     .click()
-  await expect(statusTrigger(page, "Other parent")).toContainText("Done")
+  await expect(row(page, "Other parent")).toHaveCount(0)
+  // Left as it was, so it is still open and still listed.
   await expect(statusTrigger(page, "Pack plates")).toContainText("In progress")
 })
 
-test("The list filters by Open and by a single status", async ({ page }) => {
+test("The list holds open work, and narrows to a single open status", async ({
+  page,
+}) => {
   await newUser(page)
+  // The list asks for open work without being told to (ADR-0006), so the
+  // request goes out before any filter is touched.
+  const listed = page.waitForRequest(
+    (request) =>
+      request.url().includes("/tasks/?") &&
+      request.url().includes("status=todo&status=in_progress&status=waiting"),
+  )
   await seed(page, [
     { title: "Planned" },
     { title: "Parked", status: "waiting" },
     { title: "Finished", status: "done" },
   ])
   await page.goto("/tasks?view=table")
-
-  await page.getByRole("button", { name: "Filters" }).click()
-  const filter = page.getByRole("combobox", { name: "Status" })
-
-  const listed = page.waitForRequest(
-    (request) =>
-      request.url().includes("/tasks/?") &&
-      request.url().includes("status=todo&status=in_progress&status=waiting"),
-  )
-  await filter.click()
-  await page.getByRole("option", { name: "Open" }).click()
   await listed
-  await expect(page.getByText("Status: Open")).toBeVisible()
+
   await expect(row(page, "Planned")).toBeVisible()
   await expect(row(page, "Parked")).toBeVisible()
   await expect(row(page, "Finished")).toHaveCount(0)
 
+  await page.getByRole("button", { name: "Filters" }).click()
+  const filter = page.getByRole("combobox", { name: "Status" })
+  // The baseline is the default, and it is not a filter: no chip.
+  await expect(filter).toContainText("Any open status")
+  await expect(page.getByText(/^Status:/)).toHaveCount(0)
+
   await filter.click()
+  // Done is not a view of this list to ask for.
+  await expect(page.getByRole("option", { name: "Done" })).toHaveCount(0)
   await page.getByRole("option", { name: "Waiting" }).click()
   await expect(page.getByText("Status: Waiting")).toBeVisible()
   await expect(row(page, "Parked")).toBeVisible()
