@@ -18,12 +18,17 @@ interface ColumnOptions {
    * are read-only until it is unarchived (FR-05.12).
    */
   readOnly?: boolean
+  /**
+   * Completing a task takes its row out of this table, so the checkbox
+   * confirms the move and offers the way back (ADR-0006).
+   */
+  receipt?: boolean
 }
 
 export function getColumns(
   projectNames: Record<string, string>,
   _depths: Record<string, number>,
-  { readOnly = false }: ColumnOptions = {},
+  { readOnly = false, receipt = false }: ColumnOptions = {},
 ): ColumnDef<DataTableFeatures, TaskPublic>[] {
   const columns: ColumnDef<DataTableFeatures, TaskPublic>[] = [
     {
@@ -42,7 +47,7 @@ export function getColumns(
               aria-label={STATUS_LABELS[row.original.status]}
             />
           ) : (
-            <CompleteTask task={row.original} />
+            <CompleteTask task={row.original} receipt={receipt} />
           )}
           {/* A subtask says so for itself. Indenting it instead would claim a
               parent–child relationship the row above may not have: sorting or

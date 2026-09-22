@@ -37,6 +37,7 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
 | **Comment** | A text note attached to a task. |
 | **Attachment** | A file attached to a task. |
 | **Assignee** | The actor responsible for a task: the user or one of their bot users. Optional. |
+| **Reporter** | Who filed a task: the user or one of their bot users. Always set, and never changed. Called *Created by* in the interface. |
 | **Activity log** | The record of changes made in Taskly. Also called the *event feed*; the two are the same thing. |
 
 ## 3. Roles
@@ -58,6 +59,7 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
   - due date (date only, no time of day)
   - priority
   - assignee
+  - reporter (see FR-01.29)
   - tags
 - **FR-01.3** Priority takes one of four values: `P1`, `P2`, `P3`, `P4`.
   `P1` is the highest priority, `P4` the lowest. Priority is optional; a task
@@ -252,7 +254,7 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
   - assignee
   - tag
   - priority
-  - status: Open, or any one or more of the four statuses
+  - status: any one of the three open statuses
   - due date
 - **FR-06.3** Filters can be combined; a task must match all active filters.
 - **FR-06.4** The task list can be sorted, at minimum by due date and by
@@ -266,6 +268,19 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
   shows its task's priority as the colour of its completion checkbox.
 - **FR-06.7** The dashboard shows the user's In progress tasks in a panel of
   their own, highest priority first, alongside what is overdue and due today.
+- **FR-06.8** The task list shows open tasks only. A Done task is not listed
+  and cannot be filtered for; completed work is read in the activity log
+  (FR-10.8, ADR-0006). Open work is the list's baseline rather than a filter
+  on it, so clearing the filters returns to it and no chip offers to remove
+  it. This governs the task list alone: an archived project's tasks
+  (FR-05.14), the subtasks shown inside a task, and the activity log all keep
+  showing Done tasks.
+- **FR-06.9** Completing a task from the task list takes its row out of the
+  list, so the change is confirmed by a notice naming the task and offering to
+  undo it, which returns the task to To do (FR-01.5). Changing a status
+  anywhere the task stays on screen is not announced.
+- **FR-06.10** A user whose tasks are all Done is told so, and pointed at the
+  activity log — not told that they have no tasks.
 
 ### F-07. REST API
 

@@ -36,10 +36,16 @@ const DUE_TONE: Record<DueTone, string> = {
 export function CompactTaskRow({
   task,
   projectName,
+  receipt = false,
 }: {
   task: TaskPublic
   /** Shown at the end of the title line, from `sm` up. */
   projectName?: string
+  /**
+   * Completing the task takes this row off the list it is in, so the
+   * checkbox confirms the move and offers the way back (ADR-0006).
+   */
+  receipt?: boolean
 }) {
   const done = task.status === "done"
   const progress = subtaskProgress(task)
@@ -55,6 +61,7 @@ export function CompactTaskRow({
       <CompleteTask
         task={task}
         showPriority
+        receipt={receipt}
         className="mt-px size-[1.125rem]"
       />
       <div className="min-w-0 flex-1">

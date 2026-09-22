@@ -1,7 +1,7 @@
 import { z } from "zod"
 
 import type { PanelSearch } from "@/components/Records/panels"
-import { STATUSES } from "./statuses"
+import { OPEN_STATUS_VALUES, OPEN_STATUSES, type OpenStatus } from "./statuses"
 import { PRIORITIES } from "./writes"
 
 /**
@@ -19,9 +19,16 @@ export const taskSearchSchema = z.object({
     .catch(undefined),
   tag: z.string().optional().catch(undefined),
   priority: z.enum(PRIORITIES).optional().catch(undefined),
-  // The API's repeatable `status`: Open is its three statuses, not a keyword,
-  // so the URL says exactly what the list asks for.
-  status: z.array(z.enum(STATUSES)).nonempty().optional().catch(undefined),
+  // The API's repeatable `status`, narrowed to the open statuses: the list
+  // holds open work, so Done is not a view of it to ask for (ADR-0006). A URL
+  // naming Done — a bookmark from before, or a hand edit — names a status
+  // this list has no way to show, and drops its filter like any other
+  // unusable value, leaving the open baseline.
+  status: z
+    .array(z.enum(OPEN_STATUS_VALUES))
+    .nonempty()
+    .optional()
+    .catch(undefined),
   due_from: z.string().optional().catch(undefined),
   due_to: z.string().optional().catch(undefined),
   overdue: z.literal(true).optional().catch(undefined),
@@ -66,7 +73,22 @@ export function hasActiveFilters(search: TaskSearch): boolean {
 }
 
 export function clearedFilters(): Partial<TaskSearch> {
+  // Clearing returns the list to what it shows without a filter, which is
+  // open work — not to every status, which it has no way to show.
   return Object.fromEntries(FILTER_KEYS.map((key) => [key, undefined]))
+}
+
+/**
+ * The statuses the list asks the API for: whichever open status was chosen,
+ * or every open one.
+ *
+ * The narrowing lives here rather than in the URL, so the address stays about
+ * what the reader chose. Done work is read in the activity log (ADR-0006).
+ */
+export function listedStatuses(
+  search: Pick<TaskSearch, "status">,
+): OpenStatus[] {
+  return search.status ?? OPEN_STATUSES
 }
 
 /** Whether the list is in compact rows, which it opens in unless told otherwise. */

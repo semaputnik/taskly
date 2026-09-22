@@ -22,13 +22,16 @@ If any of these files don't exist, **proceed silently**. Don't flag their absenc
 │   └── adr/
 │       ├── 0001-recurring-tasks-new-instance.md
 │       ├── 0002-attachment-storage-backend.md
-│       └── 0003-tags-are-managed-entities.md
+│       ├── 0003-tags-are-managed-entities.md
+│       ├── 0004-four-fixed-task-statuses.md
+│       ├── 0005-task-capture-is-a-full-draft.md
+│       └── 0006-completed-work-leaves-the-task-list.md
 ├── backend/
 ├── frontend/
 └── packages/
 ```
 
-Next ADR number: **0004**.
+Next ADR number: **0007**.
 
 ## Use the glossary's vocabulary
 

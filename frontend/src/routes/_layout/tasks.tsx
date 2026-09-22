@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query"
 import { createFileRoute, Link as RouterLink } from "@tanstack/react-router"
-import { CheckSquare, SearchX } from "lucide-react"
-import { useRef, useState } from "react"
+import { CheckCheck, CheckSquare, SearchX } from "lucide-react"
+import { useEffect, useRef, useState } from "react"
 
 import { type TaskPublic, TasksService } from "@/client"
 import { DataTable } from "@/components/Common/DataTable"
@@ -17,6 +17,7 @@ import {
   FILTER_KEYS,
   hasActiveFilters,
   isCompact,
+  listedStatuses,
   type TaskListSearch,
   type TaskSearch,
   taskSearchSchema,
@@ -51,6 +52,10 @@ function filtersQuery(search: TaskListSearch, currentUserId?: string) {
   } = withoutPanelState(search)
   return {
     ...filters,
+    // Open work, always: the list holds what is left to do, and finished
+    // work is read in the activity log (ADR-0006). A chosen status narrows
+    // within that rather than reaching outside it.
+    status: listedStatuses(search),
     // "Me" needs the id the API filters on, a bot user is named by its own
     // id, and "unassigned" is a flag of its own.
     assignee_id:
@@ -127,6 +132,18 @@ function Tasks() {
   })
   const { data: projects } = useQuery(projectsQuery())
 
+  const count = tasks?.count ?? 0
+  const noFilters = !hasActiveFilters(search)
+  // An empty list is two different things, and only the API can tell them
+  // apart: no tasks at all, or nothing left open. The question is asked only
+  // when the list is empty and nothing narrows it, so the ordinary case costs
+  // nothing. It asks the API for done work directly — the list's own URL has
+  // no way to say that any more, but the API still answers it.
+  const { data: finished } = useQuery({
+    ...tasksQuery({ status: ["done"], skip: 0, limit: 1 }),
+    enabled: !isPending && !waitingForMe && count === 0 && noFilters,
+  })
+
   const applyFilters = (next: Partial<TaskSearch>) =>
     // Any change to what is being shown returns to the first page: the page
     // a reader was on may not exist under the new filters (story 10).
@@ -158,12 +175,19 @@ function Tasks() {
       }),
     })
 
+  // Closing the last task on the last page leaves the reader standing on a
+  // page that no longer exists. Changing a filter already returns to the
+  // first page; this covers the list shrinking under a reader who changed
+  // nothing (ADR-0006).
+  useEffect(() => {
+    if (tasks && page > lastPage) goToPage(lastPage)
+  })
+
   // Every task this list has shown, so a batch can be checked against what
   // the selected tasks are before it is sent — a selection outlives pages.
   const seen = useRef(new Map<string, TaskPublic>())
   for (const task of tasks?.data ?? []) seen.current.set(task.id, task)
 
-  const count = tasks?.count ?? 0
   const lastPage = Math.max(1, Math.ceil(count / PAGE_SIZE))
   const projectNames = Object.fromEntries(
     (projects?.data ?? []).map((project) => [project.id, project.name]),
@@ -190,6 +214,25 @@ function Tasks() {
         >
           Clear filters
         </Button>
+      }
+    />
+  ) : finished && finished.count > 0 ? (
+    // Nothing open, but work has been done: saying "no tasks yet" here would
+    // tell someone who has just cleared their list that they have never had
+    // one. What they finished is in the activity log (ADR-0006).
+    <EmptyState
+      icon={CheckCheck}
+      title="Nothing left open"
+      description="Everything here is done. What you finished is kept in the activity log."
+      action={
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          <Button onClick={() => capture("task")}>Add a task</Button>
+          <Button variant="outline" asChild>
+            <RouterLink to="/activity" search={{ kind: "completed" as const }}>
+              See what you finished
+            </RouterLink>
+          </Button>
+        </div>
       }
     />
   ) : (
@@ -263,7 +306,7 @@ function Tasks() {
       ) : (
         <DataTable
           scrollLabel="Tasks, scrollable sideways"
-          columns={getColumns(projectNames, depths)}
+          columns={getColumns(projectNames, depths, { receipt: true })}
           data={rows}
           pending={isPending || waitingForMe}
           pendingRows={Math.min(PAGE_SIZE, Math.max(count, 5)) || 5}
@@ -368,6 +411,7 @@ function CompactList({
               <CompactTaskRow
                 task={task}
                 projectName={projectNames[task.project_id]}
+                receipt
               />
             </li>
           ))}

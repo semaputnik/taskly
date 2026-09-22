@@ -143,9 +143,23 @@ export function useTaskStatus(task: TaskPublic) {
     return outcome.saved
   }
 
-  const change = (status: TaskStatus) => {
-    if (status !== task.status) void move(status)
+  // Resolves to whether the task actually moved, so a caller whose row is
+  // about to leave the screen can confirm it — and offer the way back — only
+  // once the move has landed.
+  const change = async (status: TaskStatus): Promise<boolean> => {
+    if (status === task.status) return false
+    return move(status)
   }
+
+  // Reopen, whatever this control last knew the task's status to be.
+  //
+  // `change` declines to write when the task already holds the status asked
+  // for, which is right for a control reading a live task and wrong for one
+  // that has outlived it. The notice raised when a task leaves a list of open
+  // work is exactly that: it holds the task as it was *before* the move, so
+  // asking `change` to put it back to to do would compare to do against to
+  // do and write nothing at all.
+  const reopen = () => move("todo")
 
   const prompt = (
     <>
@@ -164,7 +178,7 @@ export function useTaskStatus(task: TaskPublic) {
     </>
   )
 
-  return { change, isPending, prompt }
+  return { change, reopen, isPending, prompt }
 }
 
 function SubtasksPrompt({
