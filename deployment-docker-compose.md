@@ -58,6 +58,8 @@ docker compose -f compose.yml -f compose.deploy.yml up -d
 
 The `compose.deploy.yml` file adds HTTPS and automatic certificate handling to the shared `compose.yml` configuration. Explicitly listing both files excludes the local settings from `compose.override.yml`.
 
+The middle command is the migration step, and on this path it is still yours to remember: only `compose.release.yml` runs migrations for you (see [Run a Published Image on a Server](#run-a-published-image-on-a-server)). Skipping it starts code against a database that has not caught up with it.
+
 The backend Docker image builds the frontend, so the server does not need Bun or prebuilt frontend files.
 
 ## Deploy with GitHub Actions
@@ -158,15 +160,26 @@ Set `TASKLY_IMAGE` to the published image, such as `docker.io/your-account/taskl
 
 For an image in a private Docker Hub repository, log in on the server first with `docker login`.
 
-Then pull the image, prepare the database, and start the application:
+Then pull the image and start the application:
 
 ```bash
 docker compose -f compose.release.yml pull
-docker compose -f compose.release.yml run --rm backend bash scripts/prestart.sh
 docker compose -f compose.release.yml up -d
 ```
 
-To release a new version, set `TASKLY_TAG` to it and repeat those three commands.
+Migrations are not a step to remember. The stack has a `prestart` service that
+runs them and creates the first superuser, and the application is not started
+until it has finished, so an image whose code expects a column the database
+does not have never reaches a request. It runs on every `up` and does nothing
+when the database is already at the right revision.
+
+To release a new version, set `TASKLY_TAG` to it and repeat those two commands.
+
+To read what the migration step did, or why it stopped:
+
+```bash
+docker compose -f compose.release.yml logs prestart
+```
 
 This stack runs no Adminer: a database admin panel on a public subdomain is guarded by the Postgres password alone, which is a poor trade for a tool needed a few times a month. Reach the database over SSH instead:
 
