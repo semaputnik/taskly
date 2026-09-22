@@ -386,6 +386,16 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
 - **FR-10.6** Bot users cannot read the activity log.
 - **FR-10.7** A user sees only their own activity log. The superuser is not an
   exception: they see only their own log, not other users'.
+- **FR-10.8** The log can be narrowed to one kind of change: Completed,
+  Created, Changed, Deleted & restored, Comments & files, or Tags. The kinds
+  do not overlap, so an entry answers to exactly one of them. Completing
+  several tasks at once is one act and is logged as one entry (FR-10.9); that
+  entry is Completed, not Changed. The narrowing is a visible control, lives
+  in the URL, and combines with the narrowing to one bot user (FR-10.2).
+  Neither narrowing ever widens the log past the reader's own entries
+  (FR-10.7).
+- **FR-10.9** One act over many tasks is one log entry naming what the act
+  did, not one entry per task it touched.
 
 ### F-11. Webhooks — *Deferred*
 

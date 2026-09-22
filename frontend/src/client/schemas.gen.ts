@@ -182,6 +182,20 @@ export const ActivityEntryPublicSchema = {
     title: 'ActivityEntryPublic'
 } as const;
 
+export const ActivityKindSchema = {
+    type: 'string',
+    enum: [
+        'completed',
+        'created',
+        'changed',
+        'deleted',
+        'comments',
+        'tags'
+    ],
+    title: 'ActivityKind',
+    description: 'How a reader groups the log\'s actions in order to narrow it.\n\nCoarser than `ActivityAction` on purpose: someone asks the log what they\nfinished, filed or threw away — not which of two dozen action names an\nentry happens to carry. The groups do not overlap, so an entry answers to\nexactly one of them and a reader never meets the same change twice.\n\nThe grouping is the server\'s rather than a set of actions the client\nsends, because `COMPLETED` is not a set of actions at all: closing tasks\nin a batch writes one `TASKS_BULK_CHANGED` entry naming the new status,\nnot a completion per task, so the group has to read that entry\'s details.'
+} as const;
+
 export const AttachmentPublicSchema = {
     properties: {
         filename: {

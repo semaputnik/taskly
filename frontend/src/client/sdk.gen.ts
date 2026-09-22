@@ -822,6 +822,12 @@ export class ActivityService {
      * whole account (FR-10.2). A deleted bot user's entries stay readable under
      * it (FR-08.19).
      *
+     * `kind` narrows it to one group of changes — what the reader finished,
+     * filed or threw away — so that a log which records everything (FR-10.3)
+     * can still answer one question at a time. The groups do not overlap. The
+     * two narrowings are independent and combine: what this integration
+     * finished is both of them at once.
+     *
      * Always the requesting user's own entries and nothing wider: there is no
      * parameter or role that reaches another user's log, the superuser's
      * included (FR-10.7). Narrowing by a bot user somebody else owns is

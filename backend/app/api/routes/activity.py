@@ -3,6 +3,7 @@ from collections.abc import Sequence
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
+from sqlalchemy import and_, not_
 from sqlmodel import col, func, select
 
 from app import crud, deletions
@@ -15,18 +16,93 @@ from app.models import (
     ActivityEntriesPublic,
     ActivityEntry,
     ActivityEntryPublic,
+    ActivityKind,
     Attachment,
     BotUser,
     Comment,
     Message,
     Project,
     Tag,
+    TaskStatus,
 )
 
 router = APIRouter(prefix="/activity-log", tags=["activity"])
 
 # The entries a restore can start from.
 _DELETIONS = (ActivityAction.TASK_DELETED, ActivityAction.PROJECT_DELETED)
+
+
+# A batch that moved its tasks to done. It is logged as the one act it was —
+# a single entry naming the new status, not a completion per task — so the
+# only way to recognise it as finished work is to read what the batch did.
+#
+# `IS NOT DISTINCT FROM` rather than `=`: a batch that changed something else
+# records no status at all, and comparing that missing key to a string yields
+# NULL rather than false. Under plain `=`, negating this to find the changes
+# would drop every such batch instead of keeping it.
+_BULK_COMPLETION = and_(
+    col(ActivityEntry.action) == ActivityAction.TASKS_BULK_CHANGED,
+    col(ActivityEntry.details)["changes"]["status"].astext.is_not_distinct_from(
+        TaskStatus.DONE.value
+    ),
+)
+
+# Which actions each kind gathers. Every action belongs to exactly one kind:
+# `tests/api/routes/test_activity_by_kind.py` holds the list to that, so a
+# new kind of entry cannot quietly become unreachable from the filter.
+_KIND_ACTIONS: dict[ActivityKind, tuple[ActivityAction, ...]] = {
+    ActivityKind.COMPLETED: (ActivityAction.TASK_COMPLETED,),
+    ActivityKind.CREATED: (
+        ActivityAction.TASK_CREATED,
+        ActivityAction.PROJECT_CREATED,
+    ),
+    ActivityKind.CHANGED: (
+        ActivityAction.TASK_CHANGED,
+        ActivityAction.TASKS_BULK_CHANGED,
+        ActivityAction.TASK_REOPENED,
+        ActivityAction.TASK_STATUS_CHANGED,
+        ActivityAction.TASK_MOVED,
+        ActivityAction.TASK_ASSIGNED,
+        ActivityAction.TASK_UNASSIGNED,
+        ActivityAction.PROJECT_CHANGED,
+    ),
+    ActivityKind.DELETED: (
+        ActivityAction.TASK_DELETED,
+        ActivityAction.TASK_RESTORED,
+        ActivityAction.PROJECT_DELETED,
+        ActivityAction.PROJECT_RESTORED,
+    ),
+    ActivityKind.COMMENTS: (
+        ActivityAction.COMMENT_ADDED,
+        ActivityAction.COMMENT_EDITED,
+        ActivityAction.COMMENT_DELETED,
+        ActivityAction.ATTACHMENT_ADDED,
+        ActivityAction.ATTACHMENT_DELETED,
+    ),
+    ActivityKind.TAGS: (
+        ActivityAction.TAG_CREATED,
+        ActivityAction.TAG_RENAMED,
+        ActivityAction.TAG_DELETED,
+        ActivityAction.TAG_MERGED,
+    ),
+}
+
+
+def _of_kind(kind: ActivityKind) -> Any:
+    """
+    What an entry has to satisfy to belong to `kind`.
+
+    Completing a batch is the one change that two kinds could both claim, so
+    the two say the same thing from opposite sides: it is a completion, and
+    for that reason not one of the changes.
+    """
+    actions = col(ActivityEntry.action).in_(_KIND_ACTIONS[kind])
+    if kind is ActivityKind.COMPLETED:
+        return actions | _BULK_COMPLETION
+    if kind is ActivityKind.CHANGED:
+        return and_(actions, not_(_BULK_COMPLETION))
+    return actions
+
 
 # A restore that cannot go ahead is a state the user can resolve, not a
 # malformed request: each cause has its own code so the client can say which
@@ -51,6 +127,7 @@ def read_activity_log(
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=50, ge=1, le=200),
     actor_bot_user_id: uuid.UUID | None = Query(default=None),
+    kind: ActivityKind | None = Query(default=None),
 ) -> Any:
     """
     Retrieve the current user's activity log, newest first.
@@ -59,6 +136,12 @@ def read_activity_log(
     operator asks when they want to read an integration rather than their
     whole account (FR-10.2). A deleted bot user's entries stay readable under
     it (FR-08.19).
+
+    `kind` narrows it to one group of changes — what the reader finished,
+    filed or threw away — so that a log which records everything (FR-10.3)
+    can still answer one question at a time. The groups do not overlap. The
+    two narrowings are independent and combine: what this integration
+    finished is both of them at once.
 
     Always the requesting user's own entries and nothing wider: there is no
     parameter or role that reaches another user's log, the superuser's
@@ -70,6 +153,8 @@ def read_activity_log(
     where: list[Any] = [ActivityEntry.owner_id == current_user.id]
     if actor_bot_user_id is not None:
         where.append(ActivityEntry.actor_bot_user_id == actor_bot_user_id)
+    if kind is not None:
+        where.append(_of_kind(kind))
 
     count = session.exec(
         select(func.count()).select_from(ActivityEntry).where(*where)

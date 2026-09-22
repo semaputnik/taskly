@@ -2,11 +2,18 @@ import { useQuery } from "@tanstack/react-query"
 import { createFileRoute } from "@tanstack/react-router"
 import { z } from "zod"
 
-import type { ActivityEntryPublic } from "@/client"
+import type { ActivityEntryPublic, ActivityKind } from "@/client"
 import { ActivityDescription } from "@/components/Activity/ActivityDescription"
 import { ActorLabel } from "@/components/Activity/ActorLabel"
 import { RestoreDeletion } from "@/components/Activity/RestoreDeletion"
 import { Button } from "@/components/ui/button"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
   Table,
@@ -22,11 +29,39 @@ import { activityQuery, botQuery } from "@/lib/serverState"
 
 const PAGE_SIZE = 50
 
+// The kinds of change, in the order the log offers them, and the words the
+// reader picks them by. The API groups the actions behind each one; the log
+// never shows a reader an action name.
+const KINDS = [
+  "completed",
+  "created",
+  "changed",
+  "deleted",
+  "comments",
+  "tags",
+] as const satisfies readonly ActivityKind[]
+
+const KIND_LABELS: Record<ActivityKind, string> = {
+  completed: "Completed",
+  created: "Created",
+  changed: "Changed",
+  deleted: "Deleted & restored",
+  comments: "Comments & files",
+  tags: "Tags",
+}
+
+// A Select cannot hold an empty value, so "no filter" needs a name of its
+// own. The kinds are a fixed vocabulary, so nothing can collide with it.
+const ANYTHING = "anything"
+
 const activitySearchSchema = z.object({
   page: z.number().int().min(1).optional().catch(undefined),
   // The log narrowed to one bot user: what its panel hands off to when its
   // feed runs past the preview.
   actor: z.string().uuid().optional().catch(undefined),
+  // The log narrowed to one kind of change. Not a sort and not a page: it is
+  // which of its questions the log is answering.
+  kind: z.enum(KINDS).optional().catch(undefined),
 })
 
 export const Route = createFileRoute("/_layout/activity")({
@@ -80,6 +115,30 @@ function ActivityRows({
   ))
 }
 
+// What each kind says when it has gathered nothing. An empty narrowed log
+// must never claim the account is empty: the reader narrowed it, and the
+// message has to name what they narrowed it to.
+const KIND_EMPTY: Record<ActivityKind, string> = {
+  completed: "Nothing has been completed yet.",
+  created: "Nothing has been created yet.",
+  changed: "Nothing has been changed yet.",
+  deleted: "Nothing has been deleted or restored yet.",
+  comments: "No comments or files yet.",
+  tags: "Nothing has happened to your tags yet.",
+}
+
+function emptyMessage(
+  actor: string | undefined,
+  kind: ActivityKind | undefined,
+): string {
+  if (actor && kind) {
+    return `This bot user has nothing under “${KIND_LABELS[kind]}”.`
+  }
+  if (actor) return "This bot user has not changed anything yet."
+  if (kind) return KIND_EMPTY[kind]
+  return "Nothing has happened in your account yet."
+}
+
 function PendingRows() {
   return Array.from({ length: 5 }).map((_, index) => (
     <TableRow key={index}>
@@ -102,7 +161,7 @@ function PendingRows() {
  * entries: the API offers no way to ask for anyone else's (FR-10.7).
  */
 function Activity() {
-  const { page = 1, actor } = Route.useSearch()
+  const { page = 1, actor, kind } = Route.useSearch()
   const navigate = Route.useNavigate()
   const { user: currentUser } = useAuth()
 
@@ -110,6 +169,7 @@ function Activity() {
     skip: (page - 1) * PAGE_SIZE,
     limit: PAGE_SIZE,
     actor_bot_user_id: actor,
+    kind,
   }
   const { data, isPending } = useQuery(activityQuery(query))
   // Named from the bot user itself rather than from the feed: a filter that
@@ -126,6 +186,12 @@ function Activity() {
         page: next === 1 ? undefined : next,
       }),
     })
+  // Narrowing to another kind returns to the first page: the page the reader
+  // was on may not exist under the new one.
+  const showKind = (next: ActivityKind | undefined) =>
+    navigate({
+      search: (previous) => ({ ...previous, kind: next, page: undefined }),
+    })
 
   return (
     <div className="flex flex-col gap-6">
@@ -135,6 +201,28 @@ function Activity() {
           Every change in your account, newest first
         </p>
       </div>
+
+      {/* The narrowing is a control the reader can see and undo. A log that
+          quietly answers a narrower question than the one being asked is
+          worse than a log with no filter at all. */}
+      <Select
+        value={kind ?? ANYTHING}
+        onValueChange={(next) =>
+          showKind(next === ANYTHING ? undefined : (next as ActivityKind))
+        }
+      >
+        <SelectTrigger className="w-full sm:w-64" aria-label="Show">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value={ANYTHING}>Anything that happened</SelectItem>
+          {KINDS.map((value) => (
+            <SelectItem key={value} value={value}>
+              {KIND_LABELS[value]}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
 
       {actor && (
         // A narrowed log says so where it is read, and offers the way back:
@@ -183,11 +271,7 @@ function Activity() {
             <ActivityRows
               entries={data.data}
               currentUserId={currentUser?.id}
-              empty={
-                actor
-                  ? "This bot user has not changed anything yet."
-                  : "Nothing has happened in your account yet."
-              }
+              empty={emptyMessage(actor, kind)}
             />
           )}
         </TableBody>

@@ -859,6 +859,29 @@ class ActivityAction(StrEnum):
     TAG_MERGED = "tag_merged"
 
 
+class ActivityKind(StrEnum):
+    """
+    How a reader groups the log's actions in order to narrow it.
+
+    Coarser than `ActivityAction` on purpose: someone asks the log what they
+    finished, filed or threw away — not which of two dozen action names an
+    entry happens to carry. The groups do not overlap, so an entry answers to
+    exactly one of them and a reader never meets the same change twice.
+
+    The grouping is the server's rather than a set of actions the client
+    sends, because `COMPLETED` is not a set of actions at all: closing tasks
+    in a batch writes one `TASKS_BULK_CHANGED` entry naming the new status,
+    not a completion per task, so the group has to read that entry's details.
+    """
+
+    COMPLETED = "completed"
+    CREATED = "created"
+    CHANGED = "changed"
+    DELETED = "deleted"
+    COMMENTS = "comments"
+    TAGS = "tags"
+
+
 class ActivityEntityType(StrEnum):
     TASK = "task"
     PROJECT = "project"
@@ -886,6 +909,15 @@ class ActivityEntry(SQLModel, table=True):
             "ix_activityentry_owner_id_actor_bot_user_id_position",
             "owner_id",
             "actor_bot_user_id",
+            "position",
+        ),
+        # One kind of change, newest first. Same reasoning as the feed above:
+        # a log kept for ever (FR-10.5) must not be walked end to end to find
+        # the handful of entries a narrow kind gathers.
+        Index(
+            "ix_activityentry_owner_id_action_position",
+            "owner_id",
+            "action",
             "position",
         ),
         # A change is made by exactly one actor: a user, or a bot user.
