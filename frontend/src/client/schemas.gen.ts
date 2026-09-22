@@ -1663,9 +1663,11 @@ export const TaskSortSchema = {
     type: 'string',
     enum: [
         'due_date',
-        'priority'
+        'priority',
+        'created_at'
     ],
-    title: 'TaskSort'
+    title: 'TaskSort',
+    description: 'How a task list can be ordered, and which way round each one naturally\nruns when the request names no direction (FR-06.4).\n\nDue date means soonest first and priority means P1 first, because that is\nthe work to reach for. Creation means newest first, because the reason to\norder by it is to see what has just arrived.'
 } as const;
 
 export const TaskStatusSchema = {

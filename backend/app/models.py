@@ -352,8 +352,18 @@ class TaskStatus(StrEnum):
 
 
 class TaskSort(StrEnum):
+    """
+    How a task list can be ordered, and which way round each one naturally
+    runs when the request names no direction (FR-06.4).
+
+    Due date means soonest first and priority means P1 first, because that is
+    the work to reach for. Creation means newest first, because the reason to
+    order by it is to see what has just arrived.
+    """
+
     DUE_DATE = "due_date"
     PRIORITY = "priority"
+    CREATED_AT = "created_at"
 
 
 class SortOrder(StrEnum):
@@ -442,7 +452,11 @@ class TaskQuery(SQLModel):
     # ordinary view through some other filter.
     archived: bool = False
     sort: TaskSort | None = None
-    order: SortOrder = SortOrder.ASC
+    # Unset means each sort's own natural direction rather than ascending, so
+    # asking for the created order plainly returns the newest first. Naming a
+    # direction always wins, and the two orders that predate this both run
+    # ascending naturally, so requests written before it mean what they did.
+    order: SortOrder | None = None
     # Paging rides along with the rest of the query: FastAPI only unpacks a
     # query model when it is the whole of the endpoint's query.
     skip: int = Field(default=0, ge=0)

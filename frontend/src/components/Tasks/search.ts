@@ -32,8 +32,15 @@ export const taskSearchSchema = z.object({
   due_from: z.string().optional().catch(undefined),
   due_to: z.string().optional().catch(undefined),
   overdue: z.literal(true).optional().catch(undefined),
-  sort: z.enum(["due_date", "priority"]).optional().catch(undefined),
-  order: z.literal("desc").optional().catch(undefined),
+  sort: z
+    .enum(["due_date", "priority", "created_at"])
+    .optional()
+    .catch(undefined),
+  // Each order runs one way naturally — soonest, P1, newest — and this
+  // appears only when the reader has turned that around. So the URL stays
+  // short, and one written before the created order existed still means what
+  // it meant: those two run ascending naturally.
+  order: z.enum(["asc", "desc"]).optional().catch(undefined),
   // The page of results being read. Like the sort, it is not a filter: it is
   // where in the results the reader is.
   page: z.number().int().min(1).optional().catch(undefined),
@@ -89,6 +96,22 @@ export function listedStatuses(
   search: Pick<TaskSearch, "status">,
 ): OpenStatus[] {
   return search.status ?? OPEN_STATUSES
+}
+
+/**
+ * Which way each order runs when the URL names no direction.
+ *
+ * Due date and priority lead with the work to reach for; created leads with
+ * what has just arrived. The API applies the same defaults, so an order the
+ * list leaves undirected means the same thing on both sides.
+ */
+export const NATURAL_ORDER: Record<
+  NonNullable<TaskSearch["sort"]>,
+  "asc" | "desc"
+> = {
+  due_date: "asc",
+  priority: "asc",
+  created_at: "desc",
 }
 
 /** Whether the list is in compact rows, which it opens in unless told otherwise. */

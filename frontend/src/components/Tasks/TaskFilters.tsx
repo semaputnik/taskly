@@ -364,6 +364,9 @@ export function TaskFilters({
                 <SelectItem value={DEFAULT_ORDER}>Default order</SelectItem>
                 <SelectItem value="due_date">Due date</SelectItem>
                 <SelectItem value="priority">Priority</SelectItem>
+                {/* Newest first, which is this order's natural direction, so
+                    it needs no direction control of its own here. */}
+                <SelectItem value="created_at">Created</SelectItem>
               </SelectContent>
             </Select>
           )}

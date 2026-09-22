@@ -18,6 +18,7 @@ import {
   hasActiveFilters,
   isCompact,
   listedStatuses,
+  NATURAL_ORDER,
   type TaskListSearch,
   type TaskSearch,
   taskSearchSchema,
@@ -38,9 +39,13 @@ const MAX_BATCH = 500
 // One empty set, so a cleared selection is the same value every render.
 const EMPTY: ReadonlySet<string> = new Set()
 
-// Which column sorts by what. Only these two order the list; the rest are
+// Which column sorts by what. Only these three order the list; the rest are
 // read, not scanned in order.
-const SORT_FIELDS = { due_date: "due_date", priority: "priority" }
+const SORT_FIELDS = {
+  due_date: "due_date",
+  priority: "priority",
+  created_at: "created_at",
+}
 
 /** What the list's filters ask the API for, before any paging. */
 function filtersQuery(search: TaskListSearch, currentUserId?: string) {
@@ -162,17 +167,25 @@ function Tasks() {
     navigate({ search: (previous) => ({ ...previous, view }) })
   const sortBy = (field: string) =>
     navigate({
-      search: (previous) => ({
-        ...previous,
-        sort: field as TaskSearch["sort"],
-        // The same header again reverses it: direction costs no control of
-        // its own (story 6).
-        order:
-          previous.sort === field && previous.order !== "desc"
-            ? ("desc" as const)
+      search: (previous) => {
+        const sort = field as NonNullable<TaskSearch["sort"]>
+        const natural = NATURAL_ORDER[sort]
+        // The first click on a header gives that order its natural direction;
+        // the same header again reverses it, so direction costs no control of
+        // its own (story 6). Only the reversal is written down.
+        const reversed =
+          previous.sort === sort && (previous.order ?? natural) === natural
+        return {
+          ...previous,
+          sort,
+          order: reversed
+            ? natural === "asc"
+              ? ("desc" as const)
+              : ("asc" as const)
             : undefined,
-        page: undefined,
-      }),
+          page: undefined,
+        }
+      },
     })
 
   // Closing the last task on the last page leaves the reader standing on a
@@ -336,7 +349,9 @@ function Tasks() {
           sorting={{
             fields: SORT_FIELDS,
             field: search.sort,
-            descending: search.order === "desc",
+            descending: search.sort
+              ? (search.order ?? NATURAL_ORDER[search.sort]) === "desc"
+              : false,
             onSort: sortBy,
           }}
           empty={empty}

@@ -598,24 +598,43 @@ def _task_filters(*, owner_id: uuid.UUID, query: TaskQuery) -> list[Any]:
     return conditions
 
 
+# Which way each sort runs when the request names no direction. Only the
+# created order reads backwards: the point of it is what has just arrived.
+_NATURAL_ORDER = {
+    TaskSort.DUE_DATE: SortOrder.ASC,
+    TaskSort.PRIORITY: SortOrder.ASC,
+    TaskSort.CREATED_AT: SortOrder.DESC,
+}
+
+
 def _task_ordering(query: TaskQuery) -> list[Any]:
     """
     How the list is ordered. Without a sort it stays as it was: the most
     pressing work first, oldest first within a priority.
     """
     if query.sort is None:
-        return [_PRIORITY_RANK, Task.created_at]
+        return [_PRIORITY_RANK, Task.created_at, Task.id]
 
-    descending = query.order is SortOrder.DESC
+    descending = (query.order or _NATURAL_ORDER[query.sort]) is SortOrder.DESC
+    created_at = col(Task.created_at)
+    # Annotated because the branches build expressions over columns of
+    # different types, which mypy will not unify on its own.
+    ordering: Any
     if query.sort is TaskSort.DUE_DATE:
         due_date = col(Task.due_date)
         # A task with no due date is not early or late, so it goes last either
         # way rather than leading one of the two orders.
         ordering = nullslast(due_date.desc() if descending else due_date.asc())
+    elif query.sort is TaskSort.CREATED_AT:
+        ordering = created_at.desc() if descending else created_at.asc()
     else:
         ordering = _PRIORITY_RANK.desc() if descending else _PRIORITY_RANK.asc()
 
-    return [ordering, Task.created_at]
+    # Two tasks filed in the same instant would otherwise come back in
+    # whatever order the database found them, which can differ between the
+    # queries that fetch two pages of one list: a task shown twice, and
+    # another never shown at all.
+    return [ordering, created_at, Task.id]
 
 
 def get_tags(

@@ -314,6 +314,72 @@ def test_sort_by_priority_both_ways(client: TestClient, db: Session) -> None:
     ]
 
 
+def test_sort_by_creation_date_is_newest_first(
+    client: TestClient, db: Session
+) -> None:
+    """
+    Each order has a natural direction, and for the created order it is
+    newest first: asking for it without naming a direction means what a
+    person would expect it to mean.
+    """
+    headers = _headers_for_new_user(client, db)
+    for title in ("Oldest", "Middle", "Newest"):
+        _create_task(client, headers, title)
+
+    assert _titles(client, headers, sort="created_at") == [
+        "Newest",
+        "Middle",
+        "Oldest",
+    ]
+    assert _titles(client, headers, sort="created_at", order="asc") == [
+        "Oldest",
+        "Middle",
+        "Newest",
+    ]
+
+
+def test_the_other_orders_keep_the_direction_they_always_had(
+    client: TestClient, db: Session
+) -> None:
+    """
+    Due date and priority still lead with soonest and P1 when no direction
+    is named, so URLs written before the created order keep their meaning.
+    """
+    headers = _headers_for_new_user(client, db)
+    _create_task(client, headers, "Later", due_date=str(TODAY + timedelta(days=2)))
+    _create_task(client, headers, "Sooner", due_date=str(TODAY))
+    _create_task(client, headers, "Low", priority="P3")
+    _create_task(client, headers, "High", priority="P1")
+
+    assert _titles(client, headers, sort="due_date")[:2] == ["Sooner", "Later"]
+    assert _titles(client, headers, sort="priority")[:1] == ["High"]
+
+
+def test_the_created_order_pages_without_repeating_or_skipping(
+    client: TestClient, db: Session
+) -> None:
+    """
+    Creation timestamps can tie, so the order needs a tiebreak of its own:
+    without one, two pages of the same list can show the same task twice and
+    never show another.
+    """
+    headers = _headers_for_new_user(client, db)
+    for n in range(6):
+        _create_task(client, headers, f"T{n}")
+
+    seen: list[str] = []
+    for skip in (0, 2, 4):
+        r = client.get(
+            f"{settings.API_V1_STR}/tasks/",
+            headers=headers,
+            params={"sort": "created_at", "skip": skip, "limit": 2},
+        )
+        assert r.status_code == 200, r.text
+        seen += [task["title"] for task in r.json()["data"]]
+
+    assert sorted(seen) == [f"T{n}" for n in range(6)]
+
+
 def test_sorting_and_filtering_work_together_with_pagination(
     client: TestClient, db: Session
 ) -> None:

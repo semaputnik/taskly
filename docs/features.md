@@ -257,8 +257,12 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
   - status: any one of the three open statuses
   - due date
 - **FR-06.3** Filters can be combined; a task must match all active filters.
-- **FR-06.4** The task list can be sorted, at minimum by due date and by
-  priority.
+- **FR-06.4** The task list can be sorted by due date, by priority and by
+  when each task was filed. Each order has a natural direction it runs in
+  when none is named: soonest first, P1 first, and newest first. Choosing an
+  order gives that direction; choosing it again reverses it. The order and
+  any reversal live in the list's URL, and the list's default order — most
+  pressing first, subtasks under their root task — is none of these.
 - **FR-06.5** The task list can be shown as compact rows, which it opens in,
   or as a table. A compact row shows the title, and beneath it the task's
   subtask progress, due date, recurrence and tags. The choice is part of the

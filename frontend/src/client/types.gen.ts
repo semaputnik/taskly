@@ -910,8 +910,15 @@ export type TaskPublic = {
 
 /**
  * TaskSort
+ *
+ * How a task list can be ordered, and which way round each one naturally
+ * runs when the request names no direction (FR-06.4).
+ *
+ * Due date means soonest first and priority means P1 first, because that is
+ * the work to reach for. Creation means newest first, because the reason to
+ * order by it is to see what has just arrived.
  */
-export type TaskSort = 'due_date' | 'priority';
+export type TaskSort = 'due_date' | 'priority' | 'created_at';
 
 /**
  * TaskStatus
@@ -1636,7 +1643,10 @@ export type tasksReadTasksData = {
          * Sort
          */
         sort?: TaskSort | null;
-        order?: SortOrder;
+        /**
+         * Order
+         */
+        order?: SortOrder | null;
         /**
          * Skip
          */

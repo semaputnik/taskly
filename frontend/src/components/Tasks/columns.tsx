@@ -5,7 +5,7 @@ import type { TaskPublic } from "@/client"
 import type { DataTableFeatures } from "@/components/Common/DataTable"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
-import { formatDay } from "@/lib/dates"
+import { formatDay, formatDayOf } from "@/lib/dates"
 import { cn } from "@/lib/utils"
 import { CompleteTask } from "./CompleteTask"
 import { PriorityBadge } from "./priority"
@@ -145,6 +145,21 @@ export function getColumns(
           <PriorityBadge priority={priority} />
         ) : (
           <span className="text-muted-foreground italic">No priority</span>
+        )
+      },
+    },
+    {
+      // Last, after the columns a reader scans. The table already scrolls
+      // sideways, so the scroll should cost the least-read column, not the
+      // title or the due date. The day here; the panel gives the moment.
+      accessorKey: "created_at",
+      header: "Created",
+      cell: ({ row }) => {
+        const createdAt = row.original.created_at
+        return (
+          <span className={cn("text-muted-foreground", !createdAt && "italic")}>
+            {createdAt ? formatDayOf(createdAt) : "Unknown"}
+          </span>
         )
       },
     },
