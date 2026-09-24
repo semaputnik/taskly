@@ -3,89 +3,89 @@
 [![Test Backend](../../actions/workflows/test-backend.yml/badge.svg)](../../actions/workflows/test-backend.yml)
 [![Test Docker Compose](../../actions/workflows/test-docker-compose.yml/badge.svg)](../../actions/workflows/test-docker-compose.yml)
 
-Веб-сервис на FastAPI. Основан на [full-stack-fastapi-template](https://github.com/fastapi/full-stack-fastapi-template) (0.12.0+).
+A FastAPI web service. Based on [full-stack-fastapi-template](https://github.com/fastapi/full-stack-fastapi-template) (0.12.0+).
 
-**Стек:** FastAPI + SQLModel + PostgreSQL на бэкенде, React 19 + TanStack Router/Query + Tailwind на фронтенде. Собранный фронтенд раздаёт сам FastAPI, отдельного фронтенд-контейнера нет. JWT-аутентификация, письма через React Email, локально их ловит Mailpit.
+**Stack:** FastAPI + SQLModel + PostgreSQL on the backend, React 19 + TanStack Router/Query + Tailwind on the frontend. FastAPI serves the built frontend itself — there is no separate frontend container. JWT authentication, emails via React Email, caught locally by Mailpit.
 
-## Требования
+## Requirements
 
-| Инструмент | Версия |
+| Tool | Version |
 |---|---|
-| Python | 3.14+ (обязательно: код использует синтаксис 3.14) |
-| [uv](https://docs.astral.sh/uv/) | свежий |
+| Python | 3.14+ (required: the code uses 3.14 syntax) |
+| [uv](https://docs.astral.sh/uv/) | latest |
 | [bun](https://bun.sh) | 1.3+ |
-| Docker | любой актуальный |
+| Docker | any recent version |
 
-## Первый запуск
+## First run
 
 ```bash
-cp .env.example .env        # затем заменить все changethis на реальные значения
+cp .env.example .env        # then replace every changethis with a real value
 docker compose up -d db mailpit
 cd backend
 uv sync
-uv run bash scripts/prestart.sh   # миграции + создание суперпользователя
+uv run bash scripts/prestart.sh   # migrations + superuser creation
 uv run fastapi dev                # http://localhost:8000
 ```
 
-В другом терминале, из корня:
+In another terminal, from the repository root:
 
 ```bash
 bun install
-bun run dev                       # http://localhost:5173, с hot reload
+bun run dev                       # http://localhost:5173, with hot reload
 ```
 
-Логин и пароль суперпользователя — `FIRST_SUPERUSER` и `FIRST_SUPERUSER_PASSWORD` в `.env`.
+The superuser login and password are `FIRST_SUPERUSER` and `FIRST_SUPERUSER_PASSWORD` in `.env`.
 
-## Адреса
+## URLs
 
-| Что | URL |
+| What | URL |
 |---|---|
-| Приложение и API | <http://localhost:8000> |
+| App and API | <http://localhost:8000> |
 | Swagger | <http://localhost:8000/docs> |
 | Vite dev server | <http://localhost:5173> |
 | Mailpit | <http://localhost:8025> |
-| Adminer (только в полном compose-стеке) | <http://localhost:8080> |
+| Adminer (only in the full compose stack) | <http://localhost:8080> |
 
-## Команды на каждый день
+## Everyday commands
 
 ```bash
-# из backend/
-uv run bash scripts/test.sh                                  # тесты + покрытие (в отдельной БД app_test)
+# from backend/
+uv run bash scripts/test.sh                                  # tests + coverage (in a separate app_test database)
 uv run bash scripts/lint.sh                                  # mypy, ty, ruff
-uv run alembic revision --autogenerate -m "описание"         # новая миграция
-uv run alembic upgrade head                                  # применить миграции
+uv run alembic revision --autogenerate -m "description"      # new migration
+uv run alembic upgrade head                                  # apply migrations
 
-# из корня
-bash scripts/generate-client.sh     # перегенерировать TS-клиент после изменений API
-uv run prek run --all-files         # все pre-commit проверки
-bun run lint                        # biome для фронтенда
+# from the repository root
+bash scripts/generate-client.sh     # regenerate the TS client after API changes
+uv run prek run --all-files         # all pre-commit checks
+bun run lint                        # biome for the frontend
 ```
 
-Тесты бэкенда используют отдельную базу `app_test` и не трогают данные разработки. Playwright-тесты (`bunx playwright test`) такой изоляции не имеют и пишут в основную базу.
+Backend tests use a separate `app_test` database and never touch development data. Playwright tests (`bunx playwright test`) have no such isolation and write to the main database.
 
-## Конфигурация и секреты
+## Configuration and secrets
 
-- `.env` — локальные настройки и сгенерированные секреты, **в git не хранится**.
-- `.env.example` — шаблон с плейсхолдерами; CI копирует его как `.env`, поэтому реальных секретов в нём быть не должно. Новые переменные добавляйте в оба файла.
-- `frontend/.env` — только URL бэкенда и Mailpit для Vite, хранится в git.
+- `.env` — local settings and generated secrets, **not stored in git**.
+- `.env.example` — a template with placeholders; CI copies it as `.env`, so it must not contain real secrets. Add new variables to both files.
+- `frontend/.env` — only the backend and Mailpit URLs for Vite, stored in git.
 
-## Документация
+## Documentation
 
-- [development.md](./development.md) — локальная разработка, Docker Compose, pre-commit
-- [backend/README.md](./backend/README.md) — бэкенд, тесты, миграции, шаблоны писем
-- [frontend/README.md](./frontend/README.md) — фронтенд, генерация клиента, Playwright
-- [deployment.md](./deployment.md) — деплой в FastAPI Cloud (workflow пока запускается только вручную)
-- [deployment-docker-compose.md](./deployment-docker-compose.md) — деплой на свой сервер
+- [development.md](./development.md) — local development, Docker Compose, pre-commit
+- [backend/README.md](./backend/README.md) — backend, tests, migrations, email templates
+- [frontend/README.md](./frontend/README.md) — frontend, client generation, Playwright
+- [deployment.md](./deployment.md) — deploying to FastAPI Cloud (the workflow is still triggered manually only)
+- [deployment-docker-compose.md](./deployment-docker-compose.md) — deploying to your own server
 
-## Обновления из шаблона
+## Updates from the template
 
-Remote `upstream` указывает на шаблон и доступен только для чтения:
+The `upstream` remote points at the template and is read-only:
 
 ```bash
 git fetch upstream
 git merge upstream/master
 ```
 
-## Лицензия
+## License
 
-MIT, унаследована от шаблона — см. [LICENSE](./LICENSE).
+MIT, inherited from the template — see [LICENSE](./LICENSE).
