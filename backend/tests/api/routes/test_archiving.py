@@ -10,14 +10,13 @@ from fastapi.testclient import TestClient
 from sqlalchemy import event
 from sqlmodel import Session, func, select
 
-from app import crud
 from app.api.deps import get_attachment_storage
 from app.core.config import settings
 from app.core.db import engine
 from app.main import app
-from app.models import Deletion, Project, UserCreate
+from app.models import Deletion, Project
 from tests.api.routes.test_attachments import InMemoryAttachmentStorage
-from tests.utils.utils import random_email, random_lower_string
+from tests.utils.user import new_user_headers
 
 API = settings.API_V1_STR
 YESTERDAY = date.today() - timedelta(days=1)
@@ -29,18 +28,6 @@ def storage():
     app.dependency_overrides[get_attachment_storage] = lambda: fake_storage
     yield fake_storage
     del app.dependency_overrides[get_attachment_storage]
-
-
-def _headers_for_new_user(client: TestClient, db: Session) -> dict[str, str]:
-    email = random_email()
-    password = random_lower_string()
-    user_in = UserCreate(email=email, password=password)
-    crud.create_user(session=db, user_create=user_in)
-
-    login_data = {"username": email, "password": password}
-    r = client.post(f"{API}/login/access-token", data=login_data)
-    token = r.json()["access_token"]
-    return {"Authorization": f"Bearer {token}"}
 
 
 def _me(client: TestClient, headers: dict[str, str]) -> str:
@@ -147,7 +134,7 @@ def _fill_project(
 
 
 def _account(client: TestClient, db: Session) -> Account:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     live = _create_project(client, headers, "Live")
     archived = _create_project(client, headers, "Shelved")
     _fill_project(client, headers, live, "Live")
@@ -174,7 +161,7 @@ def _account(client: TestClient, db: Session) -> Account:
 def test_archive_and_unarchive_a_project_repeatedly(
     client: TestClient, db: Session
 ) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     project_id = _create_project(client, headers, "Side project")
 
     for _ in range(2):
@@ -192,7 +179,7 @@ def test_archive_and_unarchive_a_project_repeatedly(
 
 
 def test_archiving_is_idempotent(client: TestClient, db: Session) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     project_id = _create_project(client, headers, "Side project")
 
     assert _archive(client, headers, project_id).status_code == 200
@@ -207,7 +194,7 @@ def test_archiving_is_idempotent(client: TestClient, db: Session) -> None:
 
 
 def test_the_inbox_cannot_be_archived(client: TestClient, db: Session) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     inbox_id = _inbox_id(client, headers)
 
     r = _archive(client, headers, inbox_id)
@@ -219,8 +206,8 @@ def test_the_inbox_cannot_be_archived(client: TestClient, db: Session) -> None:
 def test_another_users_project_cannot_be_archived_or_unarchived(
     client: TestClient, db: Session
 ) -> None:
-    owner = _headers_for_new_user(client, db)
-    stranger = _headers_for_new_user(client, db)
+    owner = new_user_headers(client, db)
+    stranger = new_user_headers(client, db)
     project_id = _create_project(client, owner, "Private")
 
     assert _archive(client, stranger, project_id).status_code == 404
@@ -252,7 +239,7 @@ def _statements() -> Iterator[list[str]]:
 def test_archiving_writes_nothing_but_the_project(
     client: TestClient, db: Session
 ) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     project_id = _create_project(client, headers, "Shelved")
     root = _create_task(client, headers, "Root", project_id=project_id)
     _create_task(client, headers, "Child", parent_id=root["id"])
@@ -286,7 +273,7 @@ def test_archiving_hides_every_task_of_the_project_including_subtasks(
 def test_unarchiving_brings_every_task_back_exactly_as_it_was(
     client: TestClient, db: Session
 ) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     project_id = _create_project(client, headers, "Shelved")
     root = _create_task(
         client, headers, "Root", project_id=project_id, tags=["a"], priority="P2"
@@ -597,7 +584,7 @@ def _deletions(db: Session, project_id: str) -> int:
 
 
 def test_archiving_is_not_a_deletion(client: TestClient, db: Session) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     project_id = _create_project(client, headers, "Shelved")
     root = _create_task(client, headers, "Root", project_id=project_id)
 

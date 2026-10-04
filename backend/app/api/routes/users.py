@@ -1,23 +1,25 @@
-from typing import Any
+import uuid
+from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlmodel import col, func, select
 
-from app import crud
+from app import crud, passkeys
 from app.api.deps import (
     AttachmentStorageDep,
     CurrentUser,
     SessionDep,
     get_current_active_superuser,
 )
-from app.core.security import get_password_hash, verify_password
 from app.models import (
+    Confirmation,
     Message,
-    UpdatePassword,
+    PasskeyCredential,
+    PasskeyPublic,
+    PasskeysPublic,
+    RecoveryCodeIssued,
     User,
-    UserCreate,
     UserPublic,
-    UserRegister,
     UsersPublic,
     UserUpdateMe,
 )
@@ -74,27 +76,6 @@ def update_user_me(
     return current_user
 
 
-@router.patch("/me/password", response_model=Message)
-def update_password_me(
-    *, session: SessionDep, body: UpdatePassword, current_user: CurrentUser
-) -> Any:
-    """
-    Update own password.
-    """
-    verified, _ = verify_password(body.current_password, current_user.hashed_password)
-    if not verified:
-        raise HTTPException(status_code=400, detail="Incorrect password")
-    if body.current_password == body.new_password:
-        raise HTTPException(
-            status_code=400, detail="New password cannot be the same as the current one"
-        )
-    hashed_password = get_password_hash(body.new_password)
-    current_user.hashed_password = hashed_password
-    session.add(current_user)
-    session.commit()
-    return Message(message="Password updated successfully")
-
-
 @router.get("/me", response_model=UserPublic)
 def read_user_me(current_user: CurrentUser) -> Any:
     """
@@ -125,19 +106,120 @@ def delete_user_me(
     return Message(message="User deleted successfully")
 
 
-@router.post("/signup", response_model=UserPublic)
-def register_user(session: SessionDep, user_in: UserRegister) -> Any:
+CurrentSuperuser = Annotated[User, Depends(get_current_active_superuser)]
+
+
+@router.post("/me/confirmation/options")
+def confirmation_options(session: SessionDep, current_user: CurrentUser) -> Any:
     """
-    Register an account. Open to anyone, with no invitation or approval: this
-    is how every account other than the seeded superuser comes to exist
-    (FR-09.4).
+    Start a fresh confirmation with one of the caller's own passkeys, which
+    adding or removing a passkey and issuing a recovery code each ask for
+    (FR-12.7, FR-12.16).
     """
-    user = crud.get_user_by_email(session=session, email=user_in.email)
-    if user:
-        raise HTTPException(
-            status_code=400,
-            detail="The user with this email already exists in the system",
+    return passkeys.start_confirmation(session, user=current_user)
+
+
+@router.get("/me/passkeys", response_model=PasskeysPublic)
+def read_passkeys(session: SessionDep, current_user: CurrentUser) -> Any:
+    """The caller's passkeys, each with its name and when it was made and last used (FR-12.6)."""
+    items = passkeys.list_passkeys(session, user=current_user)
+    return PasskeysPublic(
+        data=[PasskeyPublic.model_validate(item) for item in items], count=len(items)
+    )
+
+
+@router.post("/me/passkeys/options")
+def new_passkey_options(
+    session: SessionDep, current_user: CurrentUser, body: Confirmation
+) -> Any:
+    """
+    Start adding a passkey, once the caller has confirmed with one they hold
+    (FR-12.7).
+    """
+    try:
+        return passkeys.start_new_passkey(
+            session, user=current_user, confirmation=body.confirmation
         )
-    user_create = UserCreate.model_validate(user_in)
-    user = crud.create_user(session=session, user_create=user_create)
-    return user
+    except passkeys.PasskeyError as error:
+        raise HTTPException(status_code=400, detail=str(error))
+
+
+@router.post("/me/passkeys", response_model=PasskeyPublic)
+def add_passkey(
+    session: SessionDep,
+    current_user: CurrentUser,
+    body: PasskeyCredential,
+    user_agent: Annotated[str | None, Header()] = None,
+) -> Any:
+    """Finish adding a passkey."""
+    try:
+        return passkeys.finish_new_passkey(
+            session,
+            user=current_user,
+            credential=body.credential,
+            user_agent=user_agent,
+        )
+    except passkeys.PasskeyError as error:
+        raise HTTPException(status_code=400, detail=str(error))
+
+
+@router.delete("/me/passkeys/{passkey_id}", response_model=Message)
+def remove_passkey(
+    session: SessionDep,
+    current_user: CurrentUser,
+    passkey_id: uuid.UUID,
+    body: Confirmation,
+) -> Any:
+    """
+    Remove one of the caller's passkeys, confirmed with a fresh assertion
+    (FR-12.7). The last one stays (FR-12.8), and the sessions it opened are
+    not ended (FR-12.9).
+    """
+    try:
+        passkeys.remove_passkey(
+            session,
+            user=current_user,
+            passkey_id=passkey_id,
+            confirmation=body.confirmation,
+        )
+    except passkeys.PasskeyNotFound as error:
+        raise HTTPException(status_code=404, detail=str(error))
+    except passkeys.PasskeyError as error:
+        raise HTTPException(status_code=400, detail=str(error))
+    return Message(message="Passkey removed")
+
+
+@router.post("/me/sign-out-everywhere", response_model=Message)
+def sign_out_everywhere(session: SessionDep, current_user: CurrentUser) -> Any:
+    """
+    End every session of the caller's account, this one included (FR-12.13).
+    No passkey confirmation is asked for.
+    """
+    passkeys.sign_out_everywhere(session, user=current_user)
+    return Message(message="Signed out everywhere")
+
+
+@router.post("/{user_id}/recovery-code", response_model=RecoveryCodeIssued)
+def issue_recovery_code(
+    session: SessionDep,
+    current_user: CurrentSuperuser,
+    user_id: uuid.UUID,
+    body: Confirmation,
+) -> Any:
+    """
+    Issue a recovery code for a user who has lost every passkey, confirmed
+    with the superuser's own passkey (FR-12.16). The code is shown once. The
+    superuser's own account is refused (FR-12.19).
+    """
+    try:
+        issued = passkeys.issue_recovery_code_for(
+            session,
+            superuser=current_user,
+            user_id=user_id,
+            confirmation=body.confirmation,
+        )
+    except passkeys.PasskeyError as error:
+        raise HTTPException(status_code=400, detail=str(error))
+    if issued is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    return issued

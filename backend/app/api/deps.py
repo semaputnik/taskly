@@ -8,7 +8,7 @@ from typing import Annotated
 
 import jwt
 from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jwt.exceptions import InvalidTokenError
 from pydantic import ValidationError
 from sqlalchemy import or_, update
@@ -21,9 +21,9 @@ from app.core.db import engine
 from app.core.storage import AttachmentStorage, LocalAttachmentStorage
 from app.models import BotUser, BotUserProject, TokenPayload, User
 
-reusable_oauth2 = OAuth2PasswordBearer(
-    tokenUrl=f"{settings.API_V1_STR}/login/access-token"
-)
+# The session token is a bearer token; there is no token URL to post a
+# password to, since a session is opened by signing in with a passkey.
+reusable_oauth2 = HTTPBearer()
 
 
 def get_db() -> Generator[Session]:
@@ -32,7 +32,15 @@ def get_db() -> Generator[Session]:
 
 
 SessionDep = Annotated[Session, Depends(get_db)]
-TokenDep = Annotated[str, Depends(reusable_oauth2)]
+
+
+def get_token(
+    credentials: Annotated[HTTPAuthorizationCredentials, Depends(reusable_oauth2)],
+) -> str:
+    return credentials.credentials
+
+
+TokenDep = Annotated[str, Depends(get_token)]
 
 
 # A bot user reaching an endpoint only a human may call. Refused for what the
@@ -136,6 +144,14 @@ def get_current_user(session: SessionDep, token: TokenDep) -> User:
         # stuck replaying a 404 against every authenticated request.
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found"
+        )
+    if token_data.sv != user.session_version:
+        # The account signed out everywhere after this token was issued
+        # (FR-12.13, FR-12.14): the session is over like an expired one.
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+            headers={"WWW-Authenticate": "Bearer"},
         )
     if not user.is_active:
         raise HTTPException(status_code=400, detail="Inactive user")

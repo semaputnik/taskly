@@ -3,22 +3,8 @@ import uuid
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
-from app import crud
 from app.core.config import settings
-from app.models import UserCreate
-from tests.utils.utils import random_email, random_lower_string
-
-
-def _headers_for_new_user(client: TestClient, db: Session) -> dict[str, str]:
-    email = random_email()
-    password = random_lower_string()
-    user_in = UserCreate(email=email, password=password)
-    crud.create_user(session=db, user_create=user_in)
-
-    login_data = {"username": email, "password": password}
-    r = client.post(f"{settings.API_V1_STR}/login/access-token", data=login_data)
-    token = r.json()["access_token"]
-    return {"Authorization": f"Bearer {token}"}
+from tests.utils.user import new_user_headers
 
 
 def _inbox_id(client: TestClient, headers: dict[str, str]) -> str:
@@ -38,7 +24,7 @@ def _create_project(client: TestClient, headers: dict[str, str], name: str) -> s
 def test_create_task_without_project_lands_in_inbox(
     client: TestClient, db: Session
 ) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     inbox_id = _inbox_id(client, headers)
 
     r = client.post(
@@ -56,7 +42,7 @@ def test_create_task_without_project_lands_in_inbox(
 
 
 def test_create_task_in_explicit_project(client: TestClient, db: Session) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     project_id = _create_project(client, headers, "Groceries")
 
     r = client.post(
@@ -69,7 +55,7 @@ def test_create_task_in_explicit_project(client: TestClient, db: Session) -> Non
 
 
 def test_create_task_requires_title(client: TestClient, db: Session) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
 
     r = client.post(
         f"{settings.API_V1_STR}/tasks/",
@@ -82,7 +68,7 @@ def test_create_task_requires_title(client: TestClient, db: Session) -> None:
 def test_due_date_round_trips_without_timezone_shift(
     client: TestClient, db: Session
 ) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
 
     r = client.post(
         f"{settings.API_V1_STR}/tasks/",
@@ -94,7 +80,7 @@ def test_due_date_round_trips_without_timezone_shift(
 
 
 def test_priority_rejects_invalid_value(client: TestClient, db: Session) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
 
     r = client.post(
         f"{settings.API_V1_STR}/tasks/",
@@ -105,7 +91,7 @@ def test_priority_rejects_invalid_value(client: TestClient, db: Session) -> None
 
 
 def test_priority_ordering_treats_unset_as_p4(client: TestClient, db: Session) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
 
     for title, priority in [
         ("no priority task", None),
@@ -132,7 +118,7 @@ def test_priority_ordering_treats_unset_as_p4(client: TestClient, db: Session) -
 
 
 def test_complete_and_return_to_not_completed(client: TestClient, db: Session) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     create_r = client.post(
         f"{settings.API_V1_STR}/tasks/",
         headers=headers,
@@ -158,7 +144,7 @@ def test_complete_and_return_to_not_completed(client: TestClient, db: Session) -
 
 
 def test_move_task_between_projects(client: TestClient, db: Session) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     other_project_id = _create_project(client, headers, "Work")
 
     create_r = client.post(
@@ -178,8 +164,8 @@ def test_move_task_between_projects(client: TestClient, db: Session) -> None:
 
 
 def test_cannot_move_task_to_project_not_owned(client: TestClient, db: Session) -> None:
-    headers_a = _headers_for_new_user(client, db)
-    headers_b = _headers_for_new_user(client, db)
+    headers_a = new_user_headers(client, db)
+    headers_b = new_user_headers(client, db)
     other_project_id = _create_project(client, headers_b, "B's project")
 
     create_r = client.post(
@@ -198,7 +184,7 @@ def test_cannot_move_task_to_project_not_owned(client: TestClient, db: Session) 
 
 
 def test_cannot_unset_task_project(client: TestClient, db: Session) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     create_r = client.post(
         f"{settings.API_V1_STR}/tasks/",
         headers=headers,
@@ -215,7 +201,7 @@ def test_cannot_unset_task_project(client: TestClient, db: Session) -> None:
 
 
 def test_assign_task_to_self_and_unassign(client: TestClient, db: Session) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     r = client.get(f"{settings.API_V1_STR}/users/me", headers=headers)
     user_id = r.json()["id"]
 
@@ -244,8 +230,8 @@ def test_assign_task_to_self_and_unassign(client: TestClient, db: Session) -> No
 
 
 def test_cannot_assign_task_to_another_user(client: TestClient, db: Session) -> None:
-    headers_a = _headers_for_new_user(client, db)
-    headers_b = _headers_for_new_user(client, db)
+    headers_a = new_user_headers(client, db)
+    headers_b = new_user_headers(client, db)
     r = client.get(f"{settings.API_V1_STR}/users/me", headers=headers_b)
     other_user_id = r.json()["id"]
 
@@ -265,8 +251,8 @@ def test_cannot_assign_task_to_another_user(client: TestClient, db: Session) -> 
 
 
 def test_users_cannot_see_other_users_tasks(client: TestClient, db: Session) -> None:
-    headers_a = _headers_for_new_user(client, db)
-    headers_b = _headers_for_new_user(client, db)
+    headers_a = new_user_headers(client, db)
+    headers_b = new_user_headers(client, db)
 
     create_r = client.post(
         f"{settings.API_V1_STR}/tasks/",
@@ -291,7 +277,7 @@ def test_users_cannot_see_other_users_tasks(client: TestClient, db: Session) -> 
 
 
 def test_nonexistent_task_returns_404(client: TestClient, db: Session) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
 
     r = client.get(f"{settings.API_V1_STR}/tasks/{uuid.uuid4()}", headers=headers)
     assert r.status_code == 404
@@ -305,7 +291,7 @@ def test_nonexistent_task_returns_404(client: TestClient, db: Session) -> None:
 
 
 def test_view_and_list_task(client: TestClient, db: Session) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     create_r = client.post(
         f"{settings.API_V1_STR}/tasks/",
         headers=headers,

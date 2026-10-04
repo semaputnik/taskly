@@ -3,13 +3,11 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
-from app import crud
 from app.api.deps import get_attachment_storage
 from app.core.config import settings
 from app.main import app
-from app.models import UserCreate
 from tests.api.routes.test_attachments import InMemoryAttachmentStorage
-from tests.utils.utils import random_email, random_lower_string
+from tests.utils.user import new_user_headers
 
 API = settings.API_V1_STR
 
@@ -20,16 +18,6 @@ def storage():
     app.dependency_overrides[get_attachment_storage] = lambda: fake_storage
     yield fake_storage
     del app.dependency_overrides[get_attachment_storage]
-
-
-def _headers_for_new_user(client: TestClient, db: Session) -> dict[str, str]:
-    email = random_email()
-    password = random_lower_string()
-    crud.create_user(session=db, user_create=UserCreate(email=email, password=password))
-    r = client.post(
-        f"{API}/login/access-token", data={"username": email, "password": password}
-    )
-    return {"Authorization": f"Bearer {r.json()['access_token']}"}
 
 
 def _create_project(client: TestClient, headers: dict[str, str], name: str) -> dict:
@@ -83,7 +71,7 @@ def _visible_titles(client: TestClient, headers: dict[str, str]) -> set[str]:
 
 
 def test_restoring_brings_the_same_task_back(client: TestClient, db: Session) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     project = _create_project(client, headers, "Home")
     task = _create_task(
         client,
@@ -121,7 +109,7 @@ def test_restoring_brings_the_same_task_back(client: TestClient, db: Session) ->
 def test_restoring_a_task_brings_back_the_subtasks_deleted_with_it(
     client: TestClient, db: Session
 ) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     root = _create_task(client, headers, "Move house")
     child = _create_task(client, headers, "Pack", parent_id=root["id"])
     _create_task(client, headers, "Books", parent_id=child["id"])
@@ -140,7 +128,7 @@ def test_a_task_deleted_the_way_the_dialog_does_it_comes_back_whole(
     # The delete dialog promises that a task and its subtasks go into the
     # activity log as one deletion and come back from there together. It asks
     # without the cascade first, and confirms it only once warned.
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     root = _create_task(client, headers, "Plan the trip")
     _create_task(client, headers, "Book the train", parent_id=root["id"])
 
@@ -163,7 +151,7 @@ def test_a_task_deleted_the_way_the_dialog_does_it_comes_back_whole(
 def test_a_subtask_deleted_on_its_own_first_stays_deleted(
     client: TestClient, db: Session
 ) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     root = _create_task(client, headers, "Move house")
     _create_task(client, headers, "Pack", parent_id=root["id"])
     dropped = _create_task(client, headers, "Hire a van", parent_id=root["id"])
@@ -197,7 +185,7 @@ def test_a_subtask_deleted_on_its_own_first_stays_deleted(
 def test_restoring_a_subtask_whose_parent_is_deleted_is_refused(
     client: TestClient, db: Session
 ) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     root = _create_task(client, headers, "Move house")
     child = _create_task(client, headers, "Pack", parent_id=root["id"])
     child_entry = _delete_task(client, headers, child["id"])
@@ -212,7 +200,7 @@ def test_restoring_a_subtask_whose_parent_is_deleted_is_refused(
 def test_restoring_a_task_whose_project_is_deleted_is_refused(
     client: TestClient, db: Session
 ) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     project = _create_project(client, headers, "Someday")
     task = _create_task(client, headers, "Learn the cello", project_id=project["id"])
     entry = _delete_task(client, headers, task["id"])
@@ -227,7 +215,7 @@ def test_restoring_a_task_whose_project_is_deleted_is_refused(
 def test_restoring_a_task_whose_project_is_archived_is_refused(
     client: TestClient, db: Session
 ) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     project = _create_project(client, headers, "Someday")
     task = _create_task(client, headers, "Learn the cello", project_id=project["id"])
     entry = _delete_task(client, headers, task["id"])
@@ -246,7 +234,7 @@ def test_restoring_a_task_whose_project_is_archived_is_refused(
 def test_restoring_would_not_open_a_second_occurrence_of_the_same_series(
     client: TestClient, db: Session
 ) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     first = _create_task(
         client,
         headers,
@@ -284,7 +272,7 @@ def test_restoring_would_not_open_a_second_occurrence_of_the_same_series(
 def test_restoring_a_task_deleted_again_since_is_refused(
     client: TestClient, db: Session
 ) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     task = _create_task(client, headers, "Call the bank")
     first_entry = _delete_task(client, headers, task["id"])
     assert _restore(client, headers, first_entry).status_code == 200
@@ -303,7 +291,7 @@ def test_restoring_a_task_deleted_again_since_is_refused(
 def test_restoring_twice_changes_nothing_the_second_time(
     client: TestClient, db: Session
 ) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     task = _create_task(client, headers, "Call the bank")
     entry = _delete_task(client, headers, task["id"])
     assert _restore(client, headers, entry).status_code == 200
@@ -321,8 +309,8 @@ def test_restoring_twice_changes_nothing_the_second_time(
 def test_another_users_entry_cannot_be_restored(
     client: TestClient, db: Session
 ) -> None:
-    owner = _headers_for_new_user(client, db)
-    stranger = _headers_for_new_user(client, db)
+    owner = new_user_headers(client, db)
+    stranger = new_user_headers(client, db)
     task = _create_task(client, owner, "Private")
     entry = _delete_task(client, owner, task["id"])
 
@@ -332,7 +320,7 @@ def test_another_users_entry_cannot_be_restored(
 
 
 def test_only_a_deletion_entry_can_be_restored(client: TestClient, db: Session) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     task = _create_task(client, headers, "Call the bank")
     created = _latest_entry(client, headers, "task_created", task["id"])
     assert created["restorable"] is False
@@ -344,7 +332,7 @@ def test_only_a_deletion_entry_can_be_restored(client: TestClient, db: Session) 
 def test_a_restore_is_logged_and_the_deletion_entry_is_left_as_it_was(
     client: TestClient, db: Session
 ) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     root = _create_task(client, headers, "Move house")
     _create_task(client, headers, "Pack", parent_id=root["id"])
     entry = _delete_task(client, headers, root["id"])
@@ -392,7 +380,7 @@ def _project_ids(
 def test_restoring_a_project_brings_it_back_with_its_tasks(
     client: TestClient, db: Session
 ) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     r = client.post(
         f"{API}/projects/",
         headers=headers,
@@ -424,7 +412,7 @@ def test_restoring_a_project_brings_it_back_with_its_tasks(
 def test_a_task_deleted_on_its_own_before_its_project_stays_deleted(
     client: TestClient, db: Session
 ) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     project = _create_project(client, headers, "Garden")
     _create_task(client, headers, "Plant beds", project_id=project["id"])
     dropped = _create_task(client, headers, "Build a pond", project_id=project["id"])
@@ -444,7 +432,7 @@ def test_a_task_deleted_on_its_own_before_its_project_stays_deleted(
 def test_a_project_archived_when_deleted_comes_back_archived(
     client: TestClient, db: Session
 ) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     project = _create_project(client, headers, "Someday")
     _create_task(client, headers, "Learn the cello", project_id=project["id"])
     r = client.post(f"{API}/projects/{project['id']}/archive", headers=headers)
@@ -463,7 +451,7 @@ def test_a_project_archived_when_deleted_comes_back_archived(
 def test_a_project_restore_that_would_reopen_a_series_is_refused_whole(
     client: TestClient, db: Session
 ) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     project = _create_project(client, headers, "Home")
     inbox = next(
         p["id"]
@@ -507,7 +495,7 @@ def test_a_project_restore_that_would_reopen_a_series_is_refused_whole(
 def test_restoring_a_project_twice_changes_nothing_the_second_time(
     client: TestClient, db: Session
 ) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     project = _create_project(client, headers, "Garden")
     _create_task(client, headers, "Plant beds", project_id=project["id"])
     entry = _delete_project(client, headers, project["id"])
@@ -526,7 +514,7 @@ def test_restoring_a_project_twice_changes_nothing_the_second_time(
 def test_restoring_a_project_deleted_again_since_is_refused(
     client: TestClient, db: Session
 ) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     project = _create_project(client, headers, "Garden")
     first_entry = _delete_project(client, headers, project["id"])
     assert _restore(client, headers, first_entry).status_code == 200
@@ -542,7 +530,7 @@ def test_restoring_a_project_deleted_again_since_is_refused(
 def test_a_project_restore_is_logged_once_for_the_project(
     client: TestClient, db: Session
 ) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     project = _create_project(client, headers, "Garden")
     root = _create_task(client, headers, "Plant beds", project_id=project["id"])
     _create_task(client, headers, "Buy soil", parent_id=root["id"])

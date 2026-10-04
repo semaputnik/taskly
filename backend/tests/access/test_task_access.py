@@ -28,7 +28,7 @@ from app.models import (
     UserCreate,
 )
 from tests.utils.bot import API, create_task, create_user_headers
-from tests.utils.utils import random_email, random_lower_string
+from tests.utils.utils import random_email
 
 
 @dataclass
@@ -67,11 +67,11 @@ def _task(
 def world(db: Session) -> World:
     owner = crud.create_user(
         session=db,
-        user_create=UserCreate(email=random_email(), password=random_lower_string()),
+        user_create=UserCreate(email=random_email()),
     )
     stranger = crud.create_user(
         session=db,
-        user_create=UserCreate(email=random_email(), password=random_lower_string()),
+        user_create=UserCreate(email=random_email()),
     )
 
     def project(name: str) -> Project:

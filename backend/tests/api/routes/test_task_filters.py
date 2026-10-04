@@ -4,27 +4,13 @@ from datetime import date, timedelta
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
-from app import crud
 from app.core.config import settings
-from app.models import UserCreate
-from tests.utils.utils import random_email, random_lower_string
+from tests.utils.user import new_user_headers
 
 TODAY = date.today()
 YESTERDAY = TODAY - timedelta(days=1)
 TOMORROW = TODAY + timedelta(days=1)
 NEXT_WEEK = TODAY + timedelta(days=7)
-
-
-def _headers_for_new_user(client: TestClient, db: Session) -> dict[str, str]:
-    email = random_email()
-    password = random_lower_string()
-    user_in = UserCreate(email=email, password=password)
-    crud.create_user(session=db, user_create=user_in)
-
-    login_data = {"username": email, "password": password}
-    r = client.post(f"{settings.API_V1_STR}/login/access-token", data=login_data)
-    token = r.json()["access_token"]
-    return {"Authorization": f"Bearer {token}"}
 
 
 def _create_project(client: TestClient, headers: dict[str, str], name: str) -> str:
@@ -60,7 +46,7 @@ def _titles(client: TestClient, headers: dict[str, str], **query: object) -> lis
 def test_filter_by_project_includes_subtasks_of_that_project(
     client: TestClient, db: Session
 ) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     work_id = _create_project(client, headers, "Work")
 
     root = _create_task(client, headers, "At work", project_id=work_id)
@@ -78,8 +64,8 @@ def test_filter_by_project_includes_subtasks_of_that_project(
 def test_filter_by_another_users_project_is_refused(
     client: TestClient, db: Session
 ) -> None:
-    headers_a = _headers_for_new_user(client, db)
-    headers_b = _headers_for_new_user(client, db)
+    headers_a = new_user_headers(client, db)
+    headers_b = new_user_headers(client, db)
     project_id = _create_project(client, headers_b, "B's project")
 
     r = client.get(
@@ -93,7 +79,7 @@ def test_filter_by_another_users_project_is_refused(
 def test_filter_by_assignee_and_by_being_unassigned(
     client: TestClient, db: Session
 ) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     user_id = _me(client, headers)
 
     _create_task(client, headers, "Mine", assignee_id=user_id)
@@ -106,7 +92,7 @@ def test_filter_by_assignee_and_by_being_unassigned(
 def test_asking_for_an_assignee_and_unassigned_at_once_is_refused(
     client: TestClient, db: Session
 ) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     user_id = _me(client, headers)
 
     r = client.get(
@@ -118,7 +104,7 @@ def test_asking_for_an_assignee_and_unassigned_at_once_is_refused(
 
 
 def test_filter_by_tag(client: TestClient, db: Session) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
 
     _create_task(client, headers, "Tagged", tags=["urgent", "home"])
     _create_task(client, headers, "Also tagged", tags=["home"])
@@ -132,8 +118,8 @@ def test_filter_by_tag(client: TestClient, db: Session) -> None:
 def test_a_tag_filter_does_not_reach_another_users_tasks(
     client: TestClient, db: Session
 ) -> None:
-    headers_a = _headers_for_new_user(client, db)
-    headers_b = _headers_for_new_user(client, db)
+    headers_a = new_user_headers(client, db)
+    headers_b = new_user_headers(client, db)
 
     _create_task(client, headers_a, "A's tagged task", tags=["shared-name"])
     _create_task(client, headers_b, "B's tagged task", tags=["shared-name"])
@@ -142,7 +128,7 @@ def test_a_tag_filter_does_not_reach_another_users_tasks(
 
 
 def test_filter_by_priority_treats_unset_as_p4(client: TestClient, db: Session) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
 
     _create_task(client, headers, "Top", priority="P1")
     _create_task(client, headers, "Bottom", priority="P4")
@@ -157,7 +143,7 @@ OPEN = ["todo", "in_progress", "waiting"]
 
 
 def test_filter_by_one_or_more_statuses(client: TestClient, db: Session) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     for title, status in (
         ("Planned", "todo"),
         ("Started", "in_progress"),
@@ -188,7 +174,7 @@ def test_filter_by_one_or_more_statuses(client: TestClient, db: Session) -> None
 
 
 def test_an_unknown_status_is_refused(client: TestClient, db: Session) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     r = client.get(
         f"{settings.API_V1_STR}/tasks/",
         headers=headers,
@@ -198,7 +184,7 @@ def test_an_unknown_status_is_refused(client: TestClient, db: Session) -> None:
 
 
 def test_filter_by_a_due_date_range(client: TestClient, db: Session) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
 
     _create_task(client, headers, "Yesterday", due_date=str(YESTERDAY))
     _create_task(client, headers, "Today", due_date=str(TODAY))
@@ -216,7 +202,7 @@ def test_filter_by_a_due_date_range(client: TestClient, db: Session) -> None:
 
 
 def test_filter_for_overdue_tasks(client: TestClient, db: Session) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
 
     _create_task(client, headers, "Late", due_date=str(YESTERDAY))
     _create_task(client, headers, "Due tomorrow", due_date=str(TOMORROW))
@@ -248,7 +234,7 @@ def test_filter_for_overdue_tasks(client: TestClient, db: Session) -> None:
 
 
 def test_filters_combine_with_and(client: TestClient, db: Session) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     work_id = _create_project(client, headers, "Work")
 
     wanted = _create_task(
@@ -280,7 +266,7 @@ def test_filters_combine_with_and(client: TestClient, db: Session) -> None:
 
 
 def test_sort_by_due_date_both_ways(client: TestClient, db: Session) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
 
     _create_task(client, headers, "Later", due_date=str(NEXT_WEEK))
     _create_task(client, headers, "Sooner", due_date=str(TODAY))
@@ -300,7 +286,7 @@ def test_sort_by_due_date_both_ways(client: TestClient, db: Session) -> None:
 
 
 def test_sort_by_priority_both_ways(client: TestClient, db: Session) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
 
     _create_task(client, headers, "Middle", priority="P2")
     _create_task(client, headers, "Unset")
@@ -320,7 +306,7 @@ def test_sort_by_creation_date_is_newest_first(client: TestClient, db: Session) 
     newest first: asking for it without naming a direction means what a
     person would expect it to mean.
     """
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     for title in ("Oldest", "Middle", "Newest"):
         _create_task(client, headers, title)
 
@@ -343,7 +329,7 @@ def test_the_other_orders_keep_the_direction_they_always_had(
     Due date and priority still lead with soonest and P1 when no direction
     is named, so URLs written before the created order keep their meaning.
     """
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     _create_task(client, headers, "Later", due_date=str(TODAY + timedelta(days=2)))
     _create_task(client, headers, "Sooner", due_date=str(TODAY))
     _create_task(client, headers, "Low", priority="P3")
@@ -361,7 +347,7 @@ def test_the_created_order_pages_without_repeating_or_skipping(
     without one, two pages of the same list can show the same task twice and
     never show another.
     """
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     for n in range(6):
         _create_task(client, headers, f"T{n}")
 
@@ -381,7 +367,7 @@ def test_the_created_order_pages_without_repeating_or_skipping(
 def test_sorting_and_filtering_work_together_with_pagination(
     client: TestClient, db: Session
 ) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
 
     for day, title in enumerate(["First", "Second", "Third"]):
         _create_task(
@@ -407,7 +393,7 @@ def test_sorting_and_filtering_work_together_with_pagination(
 def test_deleted_tasks_never_show_up_in_a_filtered_list(
     client: TestClient, db: Session
 ) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     doomed = _create_task(client, headers, "Doomed", tags=["urgent"], priority="P1")
     _create_task(client, headers, "Survivor", tags=["urgent"], priority="P1")
 
@@ -419,7 +405,7 @@ def test_deleted_tasks_never_show_up_in_a_filtered_list(
 
 
 def test_nonsense_paging_is_refused(client: TestClient, db: Session) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
 
     for params in ({"limit": -1}, {"skip": -1}, {"limit": 0}):
         r = client.get(f"{settings.API_V1_STR}/tasks/", headers=headers, params=params)
@@ -427,7 +413,7 @@ def test_nonsense_paging_is_refused(client: TestClient, db: Session) -> None:
 
 
 def test_an_unknown_sort_field_is_refused(client: TestClient, db: Session) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
 
     r = client.get(
         f"{settings.API_V1_STR}/tasks/", headers=headers, params={"sort": "title"}
@@ -438,8 +424,8 @@ def test_an_unknown_sort_field_is_refused(client: TestClient, db: Session) -> No
 def test_filters_do_not_reach_another_users_tasks(
     client: TestClient, db: Session
 ) -> None:
-    headers_a = _headers_for_new_user(client, db)
-    headers_b = _headers_for_new_user(client, db)
+    headers_a = new_user_headers(client, db)
+    headers_b = new_user_headers(client, db)
     _create_task(client, headers_a, "A's task", priority="P1")
 
     assert _titles(client, headers_b, priority="P1") == []
@@ -447,7 +433,7 @@ def test_filters_do_not_reach_another_users_tasks(
 
 
 def test_an_unknown_project_filter_is_refused(client: TestClient, db: Session) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
 
     r = client.get(
         f"{settings.API_V1_STR}/tasks/",
@@ -460,7 +446,7 @@ def test_an_unknown_project_filter_is_refused(client: TestClient, db: Session) -
 def test_filter_by_parent_lists_only_its_direct_subtasks(
     client: TestClient, db: Session
 ) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     root = _create_task(client, headers, "Root")
     child = _create_task(client, headers, "Child", parent_id=root["id"])
     _create_task(client, headers, "Grandchild", parent_id=child["id"])
@@ -473,8 +459,8 @@ def test_filter_by_parent_lists_only_its_direct_subtasks(
 def test_filter_by_another_users_task_as_parent_is_refused(
     client: TestClient, db: Session
 ) -> None:
-    headers_a = _headers_for_new_user(client, db)
-    headers_b = _headers_for_new_user(client, db)
+    headers_a = new_user_headers(client, db)
+    headers_b = new_user_headers(client, db)
     parent = _create_task(client, headers_b, "B's task")
     _create_task(client, headers_b, "B's subtask", parent_id=parent["id"])
 
