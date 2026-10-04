@@ -1,7 +1,7 @@
 # Taskly — Feature Requirements
 
 **Status:** Draft
-**Last updated:** 2026-09-15
+**Last updated:** 2026-10-04
 
 This document lists the features Taskly must provide. It records confirmed
 requirements only. Anything not yet decided is listed under
@@ -28,6 +28,8 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
 | **Owner** | The user who created a bot user. |
 | **Scope** | The set of permissions granted to a bot user: which projects it can see and what it can do. |
 | **Token** | The credential a bot user uses to authenticate to the REST API. A bot user has one token. |
+| **Passkey** | The only credential a human user signs in with. A user holds one or more. There are no passwords. |
+| **Recovery code** | A one-time code the superuser issues to a user who has lost every passkey, spent by creating a new one. |
 | **Task** | The main entity: a unit of work with a status — To do, In progress, Waiting or Done. A task that is not Done is *open*. |
 | **Subtask** | A task that is a child of another task. A subtask is a full task. |
 | **Project** | A container that groups tasks. Every task belongs to a project. Projects are flat: there is no nesting. |
@@ -374,11 +376,17 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
 
 - **FR-09.1** The system has exactly one superuser.
 - **FR-09.2** The superuser can view the list of registered users.
-- **FR-09.3** The superuser has no other administrative functions for now.
+- **FR-09.3** The superuser's one other administrative function is issuing
+  recovery codes to users who have lost every passkey
+  (see [F-12](#f-12-sign-in)). There are no others for now.
 - **FR-09.4** A person can register their own account; account creation does
-  not require an invitation or the superuser's action.
+  not require an invitation or the superuser's action. Registering is creating
+  the account's first passkey (FR-12.2).
 - **FR-09.5** The superuser also uses Taskly as a regular user, with their own
   tasks and projects.
+- **FR-09.6** On an installation that has no superuser yet, the person who
+  registers the e-mail address the installation names as its first superuser
+  becomes it. Once a superuser exists, that address is an ordinary one.
 
 ### F-10. Activity log (event feed)
 
@@ -438,6 +446,66 @@ to it:
 - Which events can trigger a webhook?
 - Are delivery retries and payload signing needed?
 
+### F-12. Sign-in
+
+#### Passkeys
+
+- **FR-12.1** A human user signs in with a passkey (WebAuthn) and nothing
+  else. There are no passwords, no password reset, and no e-mail is sent for
+  signing in or recovering an account.
+- **FR-12.2** Registering asks for an e-mail address and creates the account's
+  first passkey in the same step. The e-mail is required and unique to one
+  account, and it is not verified.
+- **FR-12.3** Signing in asks for nothing: the browser offers the passkeys it
+  holds for this installation, and offers them again in the e-mail field's
+  autofill. Taskly never tells anyone who is not signed in which passkeys, or
+  how many, an account has.
+- **FR-12.4** A passkey is bound to the installation's hostname, taken from
+  the installation's public address and nothing else. Changing that hostname
+  makes every passkey unusable; the deployment guide says so.
+- **FR-12.5** A passkey requires user verification — a biometric or a PIN on
+  the device — both when it is created and every time it is used.
+- **FR-12.6** A user holds one or more passkeys. Settings lists them, each
+  with a name, when it was created and when it was last used. The name is
+  given automatically from the browser and device that made it.
+- **FR-12.7** The user can add a passkey and remove one. Either takes a fresh
+  confirmation with one of the account's passkeys at that moment; the session
+  alone is not enough.
+- **FR-12.8** The last passkey of an account cannot be removed.
+- **FR-12.9** Removing a passkey does not end the sessions it opened; the
+  interface says so where a passkey is removed (see FR-12.13).
+- **FR-12.10** Each half of a passkey ceremony is tied to the other by a
+  challenge that is accepted once and expires after five minutes.
+- **FR-12.11** A sign-in opens the same kind of session as before, with the
+  same lifetime. Bot users and their tokens are unaffected.
+- **FR-12.12** In a browser without passkey support there is no way in. The
+  sign-in screen says so plainly; there is no guest mode and no fallback.
+
+#### Sign out everywhere
+
+- **FR-12.13** The user can end every session of their account at once from
+  Settings. Each session is refused from its next request on. No confirmation
+  with a passkey is asked for this.
+- **FR-12.14** Spending a recovery code signs the account out everywhere.
+
+#### Recovery
+
+- **FR-12.15** A user who has lost every passkey asks the superuser for a
+  recovery code; there is no self-service recovery.
+- **FR-12.16** The superuser issues a recovery code for a user from the list
+  of users. Issuing one takes a fresh confirmation with the superuser's own
+  passkey. A user has at most one live code; a new one replaces it. A code is
+  shown once, kept only as a digest, and expires after 24 hours.
+- **FR-12.17** The user enters their e-mail address and the code on the
+  sign-in screen and creates a new passkey, which spends the code and signs
+  them in. The passkeys the account already had stay; the user lands on the
+  list of passkeys, with a prompt to remove any they do not recognise.
+- **FR-12.18** A code is burned after five wrong tries. A wrong code, a spent
+  one and an expired one are refused in the same words.
+- **FR-12.19** The superuser cannot issue a code for their own account. Their
+  code is printed by a command run on the server and spent the same way as
+  any other.
+
 ## 5. Future ideas
 
 Not requirements yet. Recorded so they are not lost.
@@ -453,7 +521,14 @@ Not requirements yet. Recorded so they are not lost.
 ## 6. Out of scope
 
 - Collaboration between human users (shared projects, assigning tasks to other people, etc.).
-- Superuser functions other than viewing the list of users.
+- Superuser functions other than viewing the list of users and issuing
+  recovery codes.
+- Password sign-in, in any form, alongside or instead of passkeys.
+- Verifying e-mail addresses, and sending any e-mail for signing in or
+  recovering an account.
+- A pairing code or QR flow of Taskly's own for adding a device; the
+  browser's built-in cross-device passkey sign-in covers it.
+- Sign-in events in the activity log.
 - Restricting bot users by tags. Bot access is limited by projects only.
 - Bot users creating, updating or deleting projects.
 - Giving a bot user access to all projects at once.

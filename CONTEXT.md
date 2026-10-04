@@ -161,3 +161,27 @@ that never existed. When it was last used is recorded approximately. Not interch
 human session is not a bot token, and a bot token opens no endpoint that only a
 human may call.
 _Avoid_: "password", "session" for a bot user's credential.
+
+**Passkey**:
+The one kind of credential a human user signs in with. It is bound to this
+installation's hostname, made and kept by the user's device or password
+manager, and Taskly holds nothing of it but its public key. A user holds one
+or more, manages them in Settings, and can never remove the last one. Adding
+or removing one takes a fresh passkey confirmation; a session on its own is
+not enough.
+_Avoid_: "password" (there are none), and "token" — a token belongs to a
+**bot user**.
+
+**Recovery code**:
+What the superuser hands a user who has lost every passkey. One per user at
+a time, good for a day, spent by creating a new passkey, and burned after five
+wrong tries. It never opens a session by itself and never removes the passkeys
+the user already has. The superuser's own code comes from the server's command
+line, never from the interface.
+_Avoid_: "reset", "temporary password".
+
+**Sign out everywhere**:
+Ending every session a user holds at once, on every device. Done by the user
+from Settings, and done for them when a recovery code is spent. Removing a
+passkey does not end sessions; this does.
+_Avoid_: treating a passkey removal as a sign-out.
