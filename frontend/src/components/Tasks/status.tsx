@@ -57,11 +57,11 @@ const STATUS_SHAPES: Record<TaskStatus, ReactNode> = {
   done: (
     <>
       <circle cx="9" cy="9" r="7" fill="currentColor" stroke="none" />
-      {/* Cut out of the fill in the page's own colour, so the check reads
+      {/* Cut out of the fill in the colour of the sheet rows sit on, so it reads
           on the green in either theme. */}
       <path
         d="M5.8 9.3l2.2 2.2 4.3-4.6"
-        stroke="var(--background)"
+        stroke="var(--card)"
         strokeWidth="1.7"
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -71,9 +71,12 @@ const STATUS_SHAPES: Record<TaskStatus, ReactNode> = {
 }
 
 /**
- * The colour each tone gives a mark. The priority hues clear 4.5:1 on both
- * grounds in both themes (see `--priority-*` in `index.css`); done is the one
- * green, since closing is a state the product colours. No tone is ink.
+ * The colour each tone gives a mark; a mark with no tone is ink. The priority
+ * hues clear 4.5:1 on both grounds in both themes (see `--priority-*` in
+ * `index.css`). Done is the Changelog direction's one green, taken from the
+ * palette until the redesign's tokens give it a name of its own: green-700 is
+ * 4.5:1 on the light ground and 4.9:1 on --card, green-500 7.3:1 and 6.1:1
+ * on the dark ones.
  */
 const MARK_TEXT: Record<MarkTone, string> = {
   ...PRIORITY_TEXT,
@@ -168,7 +171,7 @@ export function StatusMenu({ task }: { task: TaskPublic }) {
             variant="ghost"
             size="sm"
             disabled={status.isPending}
-            aria-label={`Status: ${label}. Change status of ${task.title}`}
+            aria-label={`Status: ${markName(task.status, task.priority)}. Change status of ${task.title}`}
             className="-ml-2 size-11 gap-1.5 sm:h-8 sm:w-auto sm:px-2 sm:pointer-coarse:h-11"
           >
             <StatusMark status={task.status} priority={task.priority} />

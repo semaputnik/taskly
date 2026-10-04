@@ -228,9 +228,9 @@ priority hues are the only saturated things a screen can contain.
   — the one category the system gives a colour of its own: red, amber and
   blue, in the order of how much they press. P4 and no priority have no hue and
   stay ink, as every priority did before; the ordinary case is not coloured.
-  They appear as the colour of an open task's status mark, as the text and a 40% border of the priority badge, and as the flag
-  beside a priority wherever one is chosen or filtered on. Each is both a text
-  colour and a ring, so each clears 4.5:1 on every ground it is laid on; the
+  They appear as the colour of an open task's status mark, as the text and a
+  40% border of the priority badge, and as the flag beside a priority wherever
+  one is chosen or filtered on. Each is both a text colour and a mark, so each clears 4.5:1 on every ground it is laid on; the
   pairs are in `index.css`. P2 is amber rather than yellow in light, because
   yellow cannot carry text on white, and yellow in dark, where it can.
   **P1 is not Alert Red.** They are separate tokens because urgent and late are
@@ -487,7 +487,9 @@ ring for Review, a monochrome eye for Waiting, and a filled check for Done
 (`StatusMark` in `status.tsx`). Status is the shape and priority is the colour:
 an open task's mark takes its priority's hue (P1 red, P2 amber, P3 blue,
 otherwise Ink), Done is always the one green, and a mark standing for a status
-alone, as in a menu, is Ink. A mark always travels with its label, or with an
+alone, as in a menu, is Ink. That green is the Changelog direction's (see
+`.impeccable/surfaces/`), arriving ahead of its tokens: it is an exception to
+The One Signal Rule until the redesign's palette replaces this section. A mark always travels with its label, or with an
 accessible name naming the status and priority where the label does not fit —
 the list's status column drops to the mark alone on a narrow screen and keeps a
 44px target. In the compact row the mark is itself the completion control, a

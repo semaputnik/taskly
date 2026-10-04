@@ -25,8 +25,9 @@ const DUE_TONE: Record<DueTone, string> = {
 
 /**
  * A task in two short lines: its status mark, which is also the control that
- * closes it and carries the priority as its colour, and the title; then what there is to know at a glance — how far through its
- * subtasks it is, when it is due, and its tags. A line with nothing to say is
+ * closes it and carries the priority as its colour, and the title; then what
+ * there is to know at a glance — how far through its subtasks it is, when it
+ * is due, and its tags. A line with nothing to say is
  * not drawn, so an undated, untagged task is one line tall.
  *
  * It is the dashboard's row and the task list's compact view. It opens the
