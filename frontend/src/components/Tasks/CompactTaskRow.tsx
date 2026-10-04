@@ -24,13 +24,13 @@ const DUE_TONE: Record<DueTone, string> = {
 }
 
 /**
- * A task in two short lines: the checkbox, carrying the priority in its ring,
- * and the title; then what there is to know at a glance — how far through its
+ * A task in two short lines: its status mark, which is also the control that
+ * closes it and carries the priority as its colour, and the title; then what there is to know at a glance — how far through its
  * subtasks it is, when it is due, and its tags. A line with nothing to say is
  * not drawn, so an undated, untagged task is one line tall.
  *
  * It is the dashboard's row and the task list's compact view. It opens the
- * task from its title, never the whole row: the row also holds the checkbox,
+ * task from its title, never the whole row: the row also holds the mark,
  * and a checkbox inside a link is a trap.
  */
 export function CompactTaskRow({
@@ -43,7 +43,7 @@ export function CompactTaskRow({
   projectName?: string
   /**
    * Completing the task takes this row off the list it is in, so the
-   * checkbox confirms the move and offers the way back (ADR-0006).
+   * mark confirms the move and offers the way back (ADR-0006).
    */
   receipt?: boolean
 }) {
@@ -57,12 +57,13 @@ export function CompactTaskRow({
 
   return (
     <div className="hover:bg-muted/50 flex gap-3 border-b px-4 py-2.5 transition-colors last:border-b-0">
-      {/* Nudged onto the title's line box so the two share a centre. */}
+      {/* Nudged onto the title's line box so the two share a centre: the
+          mark itself sits a pixel down, inside its larger target. */}
       <CompleteTask
         task={task}
-        showPriority
+        asMark
         receipt={receipt}
-        className="mt-px size-[1.125rem]"
+        className="-mt-[3px]"
       />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">

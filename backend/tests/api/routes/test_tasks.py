@@ -50,7 +50,7 @@ def test_create_task_without_project_lands_in_inbox(
     task = r.json()
     assert task["title"] == "Buy milk"
     assert task["project_id"] == inbox_id
-    assert task["status"] == "todo"
+    assert task["status"] == "backlog"
     assert task["priority"] is None
     assert task["due_date"] is None
 

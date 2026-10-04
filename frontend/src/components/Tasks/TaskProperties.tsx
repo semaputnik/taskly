@@ -49,7 +49,7 @@ import {
   MIN_INTERVAL_DAYS,
   NO_RECURRENCE,
 } from "./recurrence"
-import { STATUS_LABELS, STATUSES, StatusGlyph } from "./status"
+import { STATUS_LABELS, STATUSES, StatusMark } from "./status"
 import { TagPicker } from "./TagPicker"
 import { useTaskStatus, useTaskUpdate } from "./useTaskWrites"
 import { PRIORITIES } from "./writes"
@@ -316,7 +316,7 @@ export function TaskProperties({ task }: { task: TaskPublic }) {
         currentBot={task.assignee_bot_user}
         before={
           // The row's icon is fixed like every other row's; the value carries
-          // the status's own glyph.
+          // the status's own mark.
           <PropertyRow icon={ListTodo} label="Status" htmlFor={`${ids}-status`}>
             <Select
               value={task.status}
@@ -332,7 +332,7 @@ export function TaskProperties({ task }: { task: TaskPublic }) {
               <SelectContent>
                 {STATUSES.map((value) => (
                   <SelectItem key={value} value={value}>
-                    <StatusGlyph status={value} />
+                    <StatusMark status={value} />
                     {STATUS_LABELS[value]}
                   </SelectItem>
                 ))}

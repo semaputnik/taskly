@@ -4,7 +4,7 @@ import { Link as RouterLink } from "@tanstack/react-router"
 import type { BotUserPublic, TaskPublic } from "@/client"
 import { ActivityDescription } from "@/components/Activity/ActivityDescription"
 import { useRecordPanels } from "@/components/Records/panels"
-import { OPEN_STATUSES, StatusGlyph } from "@/components/Tasks/status"
+import { OPEN_STATUSES, StatusMark } from "@/components/Tasks/status"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import useAuth from "@/hooks/useAuth"
@@ -141,7 +141,11 @@ function BotTasks({ bot }: { bot: BotUserPublic }) {
               onClick={() => openTask(task.id)}
               className="hover:bg-accent flex w-full items-center gap-3 rounded-md border px-3 py-2 text-left text-sm transition-colors"
             >
-              <StatusGlyph status={task.status} labelled />
+              <StatusMark
+                status={task.status}
+                priority={task.priority}
+                labelled
+              />
               <span className="min-w-0 flex-1 truncate">{task.title}</span>
               {task.due_date && (
                 <span className="text-muted-foreground shrink-0 text-xs">
