@@ -29,7 +29,7 @@ export function Logo({ size = "sm", className, asLink = true }: LogoProps) {
   }
 
   return (
-    <Link to="/" className={className}>
+    <Link to="/" className={cn("inline-flex min-h-6 items-center", className)}>
       {word}
     </Link>
   )

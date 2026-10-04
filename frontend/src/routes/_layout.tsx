@@ -13,6 +13,7 @@ import {
   SheetContent,
   SheetDescription,
   SheetTitle,
+  SheetTrigger,
 } from "@/components/ui/sheet"
 import { isLoggedIn } from "@/hooks/useAuth"
 import { cn } from "@/lib/utils"
@@ -42,18 +43,15 @@ function TopBar() {
     <header className="bg-page border-rule sticky top-0 z-10 flex h-14 items-center gap-3 border-b px-4 md:hidden">
       <Logo className={cn(navItemFocus, "rounded-sm")} />
       <Sheet open={open} onOpenChange={setOpen}>
-        <button
-          type="button"
+        <SheetTrigger
           aria-label="Menu"
-          aria-expanded={open}
-          onClick={() => setOpen(true)}
           className={cn(
             navItemFocus,
             "hover:bg-hover -mr-2 ml-auto grid size-11 place-items-center rounded-md",
           )}
         >
           <Menu aria-hidden className="size-[18px]" strokeWidth={1.6} />
-        </button>
+        </SheetTrigger>
         <SheetContent
           side="left"
           className="bg-page w-[264px] gap-0 px-7 py-7 shadow-none"
@@ -92,7 +90,7 @@ function Layout() {
         {/* `min-w-0`: a grid item never shrinks below its content by default,
             so one long table row would widen the whole page instead of
             scrolling inside its own container. On a phone the foot is kept
-            clear of the Add Task button, so the last row can always be
+            clear of the Add a task button, so the last row can always be
             scrolled out from under it. */}
         <main
           id="main"

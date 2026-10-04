@@ -14,6 +14,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import useAuth from "@/hooks/useAuth"
+import { cn } from "@/lib/utils"
 import { navItemFocus } from "./styles"
 
 const THEMES: { value: Theme; label: string; testId?: string }[] = [
@@ -46,7 +47,10 @@ export function User({
       <DropdownMenu>
         <DropdownMenuTrigger
           data-testid="user-menu"
-          className={`${navItemFocus} text-ink-2 hover:bg-hover hover:text-ink data-[state=open]:bg-hover data-[state=open]:text-ink flex h-[34px] min-w-0 flex-1 items-center gap-2 rounded-md px-2 text-left text-[13px]`}
+          className={cn(
+            navItemFocus,
+            "text-ink-2 hover:bg-hover hover:text-ink data-[state=open]:bg-hover data-[state=open]:text-ink flex h-[34px] min-w-0 flex-1 items-center gap-2 rounded-md px-2 text-left text-[13px]",
+          )}
         >
           <span
             aria-hidden
@@ -97,7 +101,10 @@ export function User({
         to="/settings"
         aria-label="Settings"
         onClick={onNavigate}
-        className={`${navItemFocus} text-ink-3 hover:bg-hover hover:text-ink data-[status=active]:text-ink grid size-[30px] flex-none place-items-center rounded-md`}
+        className={cn(
+          navItemFocus,
+          "text-ink-3 hover:bg-hover hover:text-ink data-[status=active]:text-ink grid size-[30px] flex-none place-items-center rounded-md",
+        )}
       >
         <Settings aria-hidden className="size-4" strokeWidth={1.6} />
       </RouterLink>

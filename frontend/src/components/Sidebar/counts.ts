@@ -33,9 +33,10 @@ export function navCount(
 
 /**
  * The counts the navigation shows: open tasks (what the task list holds when
- * nothing narrows it), live projects and bot users. Each is read through the
- * same query keys the screens use, so any change that makes a screen stale
- * refreshes its count too.
+ * nothing narrows it), live projects and bot users. Projects and bots share
+ * the screens' own query keys; the task count asks for one row under the
+ * tasks root. Either way a change that makes a screen stale refreshes its
+ * count too.
  */
 export function useNavCounts(): Partial<Record<string, NavCount | null>> {
   const tasks = useQuery(
