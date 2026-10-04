@@ -227,23 +227,18 @@ test("User can switch between theme modes", async ({ page }) => {
 test("Selected mode is preserved across sessions", async ({ page }) => {
   await page.goto("/settings")
 
-  await page.getByTestId("user-menu").click()
-  if (
-    await page.evaluate(() =>
-      document.documentElement.classList.contains("dark"),
-    )
-  ) {
-    await page.getByTestId("light-mode").click()
+  // Appearance is in the account menu, which closes on each choice: wait
+  // for it to go before opening it again.
+  const choose = async (mode: "light-mode" | "dark-mode") => {
     await page.getByTestId("user-menu").click()
+    await page.getByTestId(mode).click()
+    await expect(page.getByTestId(mode)).toBeHidden()
   }
 
-  const isLightMode = await page.evaluate(() =>
-    document.documentElement.classList.contains("light"),
-  )
-  expect(isLightMode).toBe(true)
+  await choose("light-mode")
+  await expect(page.locator("html")).toHaveClass(/light/)
 
-  await page.getByTestId("user-menu").click()
-  await page.getByTestId("dark-mode").click()
+  await choose("dark-mode")
   let isDarkMode = await page.evaluate(() =>
     document.documentElement.classList.contains("dark"),
   )
