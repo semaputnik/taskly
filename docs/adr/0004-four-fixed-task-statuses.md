@@ -1,5 +1,8 @@
 # A task has four fixed statuses, and Waiting is open
 
+> Amended by ADR-0008: the set is now six — Backlog and Review joined it —
+> and the reasoning below holds unchanged.
+
 A task used to be completed or not (FR-01.4). That collapsed three different
 open situations into one: work not started, work under way, and work whose
 next move belongs to someone else. The dashboard nagged the owner about tasks

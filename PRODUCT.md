@@ -59,7 +59,7 @@ Taskly is self-hosted, and the data stays on the owner's own server. That is the
   - text search;
   - nested projects;
   - giving a bot access to all projects at once.
-- **Deferred:** webhooks (F-11).
+- **Webhooks** hang off bot users: two fixed events per bot (a task becoming ready for it, a comment on a task it is involved in), set only by the owner in the interface, delivered as thin signed pings from an outbox with retries (F-11).
 - **Terminology** follows `CONTEXT.md`. Say "bot user", never "service account" or "API key". Say "activity log", never "audit log". "Archived" and "deleted" are different states.
 - **Interface language:** English. All specs, docs, code comments and issues are written in English.
 

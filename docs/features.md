@@ -30,7 +30,7 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
 | **Token** | The credential a bot user uses to authenticate to the REST API. A bot user has one token. |
 | **Passkey** | The only credential a human user signs in with. A user holds one or more. There are no passwords. |
 | **Recovery code** | A one-time code the superuser issues to a user who has lost every passkey, spent by creating a new one. |
-| **Task** | The main entity: a unit of work with a status — To do, In progress, Waiting or Done. A task that is not Done is *open*. |
+| **Task** | The main entity: a unit of work with a status — Backlog, To do, In progress, Waiting, Review or Done. A task that is not Done is *open*. |
 | **Subtask** | A task that is a child of another task. A subtask is a full task. |
 | **Project** | A container that groups tasks. Every task belongs to a project. Projects are flat: there is no nesting. |
 | **Inbox** | The default project every user has. Tasks go there unless another project is chosen. Cannot be renamed or deleted. |
@@ -66,13 +66,24 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
 - **FR-01.3** Priority takes one of four values: `P1`, `P2`, `P3`, `P4`.
   `P1` is the highest priority, `P4` the lowest. Priority is optional; a task
   with no priority set behaves as `P4`.
-- **FR-01.4** A task has exactly one of four statuses: **To do**, **In
-  progress**, **Waiting** and **Done** (`todo`, `in_progress`, `waiting`,
-  `done` in the REST API). A task is **open** when its status is To do, In
-  progress or Waiting, and **closed** when it is Done. Waiting means the task
-  is open but its next move belongs to someone or something other than the
-  owner. A new task is To do unless it is created with another status. The
-  statuses are fixed; a user cannot define their own (ADR-0004).
+- **FR-01.4** A task has exactly one of six statuses: **Backlog**, **To do**,
+  **In progress**, **Waiting**, **Review** and **Done** (`backlog`, `todo`,
+  `in_progress`, `waiting`, `review`, `done` in the REST API). A task is
+  **open** when its status is anything but Done, and **closed** when it is
+  Done. Backlog is work written down but not yet decided on; To do is that
+  decision. Waiting means the task is open but its next move belongs to
+  someone or something other than the owner. Review means the doer has
+  finished and the next move is the owner's: check the work and close it, or
+  send it back; it is how a bot user hands work over. A new task is Backlog
+  unless it is created with another status, in the interface and the REST API
+  alike. The statuses are fixed; a user cannot define their own (ADR-0004,
+  ADR-0008). Wherever the interface lists them, the order is Backlog, To do,
+  In progress, Review, Waiting, Done.
+- **FR-01.4a** Status and assignee are independent. Moving a task to Review
+  does not assign it to the owner, and a bot user may put a task it still
+  holds into Review. A bot user that wants its finished work on the owner's
+  dashboard assigns the task to the owner as well (FR-06.7); the REST API
+  documentation records this as the convention.
 - **FR-01.5** A user, or a bot user allowed to update the task, can move a task
   to any status. Closing a task is a single action from any open status (the
   checkbox), and undoing it returns the task to To do.
@@ -149,9 +160,11 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
 - **FR-01.14** Moving a recurring task to Done creates its next occurrence as
   a new task, which starts as To do. The new task copies the done one's fields
   (title, description, priority, assignee, tags) and its subtask tree, with
-  every subtask To do. Comments and attachments are not copied — they belong
-  to the occurrence that was done. Moving an occurrence between open statuses
-  never creates an occurrence.
+  every subtask To do. The next occurrence starts in To do, not Backlog:
+  the decision to do the work was made when the series was set up. Comments
+  and attachments are not copied — they belong to the occurrence that was
+  done. Moving an occurrence between open statuses never creates an
+  occurrence.
 - **FR-01.15** The next occurrence's due date is the done occurrence's due
   date plus the recurrence interval — a fixed schedule, independent of when
   the occurrence was actually done.
@@ -207,12 +220,49 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
 - **FR-04.2** There is a limit on attachment file size. There is no limit on
   file type or on the number of attachments per task. (The exact size limit
   is a configuration detail, not fixed here.)
-- **FR-04.3** Attachments are stored internally by Taskly by default. The
-  storage is a swappable backend (see
-  [ADR-0002](./adr/0002-attachment-storage-backend.md)) so that an external
-  store, such as a per-user Paperless-ngx instance (see
-  [Future ideas](#5-future-ideas)), can be added later without changing how
-  attachments work for users.
+- **FR-04.3** Attachments are kept in Taskly by default. The storage is a
+  swappable backend (see [ADR-0002](./adr/0002-attachment-storage-backend.md));
+  the one alternative is a user's own Paperless-ngx instance, below.
+
+#### Paperless connection
+
+- **FR-04.4** A user can connect their own Paperless-ngx instance in Settings
+  by giving its address and an API token, and can test the connection there.
+  The connection is optional and off until set; one per user. The token is
+  kept so that it can be used but never shown again, only replaced. The
+  address follows the same rule as a webhook URL on loopback and private
+  ranges (FR-11.3), under the same installation setting.
+- **FR-04.5** While a user has a Paperless connection, every PDF attached to
+  their tasks — by them or by one of their bot users — is kept in Paperless.
+  A file is a PDF by its content, not by its name or declared type. Every
+  other file, and every file of a user without a connection, is kept in
+  Taskly as before. The size limit (FR-04.2) applies before anything is sent.
+- **FR-04.6** A PDF is accepted at once and is downloadable from that moment.
+  Taskly keeps it until Paperless has consumed it, hands it over in the
+  background, and then releases its own copy. Deliveries to Paperless are
+  retried on the schedule of FR-11.10; after the last attempt the file stays
+  kept in Taskly, the attachment shows why, and the owner can ask for it to
+  be sent again.
+- **FR-04.7** A PDF that Paperless already holds is not sent again: the
+  attachment is linked to the existing document. One Paperless document may
+  stand behind several attachments.
+- **FR-04.8** Taskly never deletes a document from Paperless. Removing an
+  attachment kept there drops the link only; deleting or restoring a task,
+  and deleting the account, change nothing in Paperless. Disconnecting
+  Paperless leaves attachments kept there where they are; they are out of
+  reach until the connection is set again, and Settings says how many before
+  the user confirms.
+- **FR-04.9** A document sent to Paperless carries the file's original name
+  as its title, a tag named `Taskly`, created on first use, and a note naming
+  the task and linking to it in Taskly. A document linked under FR-04.7 gets
+  the tag and a note too, one note per task it is attached to.
+- **FR-04.10** Downloading an attachment kept in Paperless returns the
+  original file, not Paperless's archived copy. If Paperless cannot be
+  reached, the download fails with an error that says so.
+- **FR-04.11** Every attachment says where it is kept, in the interface and
+  the REST API; one kept in Paperless links to the document there.
+- **FR-04.12** Connecting Paperless moves nothing: PDFs already kept in Taskly
+  stay there.
 
 ### F-05. Projects
 
@@ -258,7 +308,7 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
     "nobody" to filter for, since every task has one
   - tag
   - priority
-  - status: any one of the three open statuses
+  - status: any one of the five open statuses
   - due date
 - **FR-06.3** Filters can be combined; a task must match all active filters.
 - **FR-06.4** The task list can be sorted by due date, by priority and by
@@ -274,8 +324,15 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
 - **FR-06.6** Priorities are told apart by colour as well as by name: P1 red,
   P2 amber/yellow, P3 blue, and P4 (or no priority) uncoloured. A compact row
   shows its task's priority as the colour of its completion checkbox.
-- **FR-06.7** The dashboard shows the user's In progress tasks in a panel of
-  their own, highest priority first, alongside what is overdue and due today.
+- **FR-06.7** The dashboard has a **My work** panel: the user's tasks whose
+  assignee is the user themselves, in To do, In progress, Review or Waiting,
+  grouped by status in the order In progress, Review, To do, Waiting, highest
+  priority first within a group. Each group shows a few tasks and, past
+  that, a link to the task list narrowed to that status and to the user as
+  assignee. Tasks with no assignee, tasks on a bot user and tasks in Backlog
+  are not in it: the dashboard is for the work in the user's hands, and the
+  Tasks page is where everything else is managed. The panel is drawn even
+  when it is empty, and says then that nothing is on the user.
 - **FR-06.8** The task list shows open tasks only. A Done task is not listed
   and cannot be filtered for; completed work is read in the activity log
   (FR-10.8, ADR-0006). Open work is the list's baseline rather than a filter
@@ -289,6 +346,10 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
   anywhere the task stays on screen is not announced.
 - **FR-06.10** A user whose tasks are all Done is told so, and pointed at the
   activity log — not told that they have no tasks.
+- **FR-06.11** The dashboard's date bands — Overdue, Due today, This week —
+  take every open status except Waiting, Backlog included: a due date counts
+  whatever the task's status. Waiting keeps its own band, "Waiting on others".
+  Unlike My work, the bands are not narrowed to the user as assignee.
 
 ### F-07. REST API
 
@@ -436,15 +497,72 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
 - **FR-10.9** One act over many tasks is one log entry naming what the act
   did, not one entry per task it touched.
 
-### F-11. Webhooks — *Deferred*
+### F-11. Webhooks
 
-Taskly will send events to external integrations through webhooks. This
-feature is postponed to a later iteration. Details to settle when we come back
-to it:
+Taskly calls a bot user back when there is something for it to act on
+(ADR-0009). A webhook belongs to a bot user and is set by its owner.
 
-- Who configures a webhook: the user, or per bot user?
-- Which events can trigger a webhook?
-- Are delivery retries and payload signing needed?
+#### Configuration
+
+- **FR-11.1** A bot user has two webhooks, each a URL: one for tasks that
+  become ready for it (FR-11.4) and one for comments on tasks it is involved
+  in (FR-11.6). Each is optional and empty until the owner sets it; a bot user
+  with neither set receives nothing.
+- **FR-11.2** Webhooks are set, changed and cleared by the owner in the bot
+  user's settings in the web UI, like the rest of its configuration
+  (FR-07.3). A bot user cannot read or change its own webhooks through the
+  REST API.
+- **FR-11.3** A webhook URL may use http or https. Addresses that resolve to
+  loopback or private ranges are refused when the URL is set and again when a
+  delivery is sent, unless the installation is configured to allow them. The
+  refusal names the rule.
+
+#### Events
+
+- **FR-11.4** A task becomes **ready** for a bot user when it comes to be in
+  To do with that bot user as its assignee: created so, assigned while in To
+  do, or moved to To do while assigned. The task webhook is called once per
+  task that becomes ready, whoever made the change — the user, another bot
+  user, or a bulk action over many tasks, which is one event per task.
+- **FR-11.5** A change made by the bot user itself never calls its own
+  webhooks. A task leaving the ready state, a restore from the activity log
+  and an unarchive are not events, even when the task they bring back is in
+  To do and assigned to the bot user.
+- **FR-11.6** A bot user is **involved** in a task when it is the task's
+  assignee or reporter, or has commented on it. The comment webhook is called
+  when anyone other than the bot user itself adds a comment to a task it is
+  involved in. Editing or deleting a comment is not an event.
+- **FR-11.7** Tasks in an archived project and deleted tasks produce no events
+  for any bot user.
+
+#### Delivery
+
+- **FR-11.8** A delivery is an HTTP POST with a JSON body carrying the event
+  type (`task.ready`, `comment.added` or `test`), a delivery id, the time of
+  the event, the bot user's id, the task's id and title, and for a comment its
+  id. Nothing else about the task or comment is sent; the bot user reads the
+  rest through the REST API within its scope.
+- **FR-11.9** Each bot user has one webhook secret, generated by Taskly when
+  its first webhook is set, shown once, and stored only as a digest. Every
+  delivery carries a timestamp header and an HMAC-SHA256 signature of the
+  timestamp and body under that secret. The owner can regenerate the secret;
+  the new one is shown once and applies from the next delivery on.
+- **FR-11.10** An event is recorded together with the change that caused it,
+  and delivered after the change is committed: at once, then after 1, 5, 15,
+  60 and 60 minutes if the receiver did not answer with a 2xx within ten
+  seconds. After the last attempt the delivery is failed and no longer
+  retried. Deliveries are not ordered relative to each other.
+- **FR-11.11** The bot user's settings show, for each webhook, its last
+  delivery: when it was attempted, whether it succeeded, and the response
+  status or the error. A webhook is never disabled automatically, however
+  many deliveries fail.
+- **FR-11.12** The owner can send a test event to a webhook from the bot
+  user's settings. It is sent at once, without retries, and the response
+  status or error is shown in the interface.
+- **FR-11.13** Deliveries continue whether or not the bot user holds a valid
+  token. Deleting a bot user discards its undelivered events and ends its
+  deliveries.
+- **FR-11.14** Deliveries are not recorded in the activity log.
 
 ### F-12. Sign-in
 
@@ -512,11 +630,9 @@ Not requirements yet. Recorded so they are not lost.
 
 - **Restore a deleted bot user.** Bring a deleted bot user back and issue it a
   new token.
-- **Paperless-ngx as an attachment storage backend.** Let a user optionally
-  connect their own Paperless-ngx instance so their task attachments are
-  stored and processed (OCR, classification) there instead of internally,
-  with the Paperless document linked back to its Taskly task. Internal
-  storage (FR-04.3) stays the default for users who don't connect one.
+- **Send existing PDFs to Paperless.** An action for a user who connected
+  Paperless after attaching PDFs, to hand the ones kept in Taskly over at
+  their own request (FR-04.12 moves nothing on its own).
 
 ## 6. Out of scope
 
@@ -536,8 +652,14 @@ Not requirements yet. Recorded so they are not lost.
 - Bot users reading the activity log.
 - Bot users editing or deleting comments.
 - Bot users renaming or deleting tags.
+- Webhooks set or read through the REST API, webhooks on a user rather
+  than a bot user, events other than the two in FR-11.4 and FR-11.6, and
+  disabling a webhook automatically after failed deliveries.
 - Nested projects (projects are flat — see FR-05.5).
 - Text search over tasks.
+- Keeping a copy of a PDF in Taskly beside the one in Paperless, sending
+  anything but PDFs to Paperless, serving Paperless's archived copy, and
+  deleting anything from Paperless.
 
 ## 7. Open questions
 

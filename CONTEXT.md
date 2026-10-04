@@ -21,22 +21,47 @@ contains (subtasks, or a project's tasks).
 _Avoid_: "archived" for this state.
 
 **Status**:
-Where a task stands: **To do**, **In progress**, **Waiting** or **Done** — four
-fixed values, not user-defined. Every rule that cares whether work is finished
-only asks whether the task is **open** or Done.
+Where a task stands: **Backlog**, **To do**, **In progress**, **Waiting**,
+**Review** or **Done** — six fixed values, not user-defined. Every rule that
+cares whether work is finished only asks whether the task is **open** or Done.
 _Avoid_: "state", "stage", "column".
 
 **Open** (task):
-A task whose status is To do, In progress or Waiting — anything but Done.
-Overdue, "has open subtasks" and "the open occurrence" all mean this.
+A task whose status is Backlog, To do, In progress, Waiting or Review —
+anything but Done. Overdue, "has open subtasks" and "the open occurrence" all
+mean this.
 _Avoid_: "not completed", "incomplete", "active".
+
+**Backlog**:
+An open status for a task the user has written down but not yet decided to
+do; To do is that decision. Open like any other: its due date counts, it keeps
+its parent from Done, and a recurring task in it is its series' one open
+occurrence. Every new task starts here unless it is created with another
+status; the next occurrence of a recurring task starts in To do instead.
+_Avoid_: "someday", "icebox", "not started" (To do is also not started).
 
 **Waiting**:
 An open status for a task whose next move belongs to someone or something
 other than the owner: a reply, a delivery, the result of someone else's work.
 It is still open — waiting on something is not the work being finished — but it
-is not work the owner can move right now.
+is not work the owner can move right now. When the next move is the owner's,
+the task is in **Review** instead.
 _Avoid_: "blocked", "on hold", "control".
+
+**Review**:
+An open status for a task whose doer has finished and whose next move is the
+owner's: check the work and close it, or send it back. It is how a bot user
+hands finished work over. Status and assignee are separate: nothing moves a
+task onto the owner because it entered Review.
+_Avoid_: "waiting" (that is the other direction), "QA", "in review" as a flag
+beside the status.
+
+**My work**:
+The dashboard's view of what is on the user: their tasks in To do, In
+progress, Review or Waiting whose assignee is the user themselves, grouped by
+status in the order work moves. Tasks with no assignee or on a bot user are
+not in it, and neither is Backlog; the Tasks page is where those are managed.
+_Avoid_: "inbox" (that is a project), "queue".
 
 **Recurring task**:
 A task whose move to Done spawns its next occurrence as a new task, on a
@@ -185,3 +210,47 @@ Ending every session a user holds at once, on every device. Done by the user
 from Settings, and done for them when a recovery code is spent. Removing a
 passkey does not end sessions; this does.
 _Avoid_: treating a passkey removal as a sign-out.
+
+**Webhook** (of a bot user):
+A URL the owner gives a bot user, which Taskly calls when something the bot
+should act on has happened. A bot user has two, each optional and empty until
+set: one for tasks that become **ready** for it, one for comments on tasks it
+is **involved** in. Only the owner sets them, in the interface; a bot user
+cannot read or change its own.
+_Avoid_: "callback", "subscription", "notification".
+
+**Ready** (task, for a bot user):
+The moment a task comes to be in To do with that bot user as its assignee, by
+anyone's change but the bot's own: created so, assigned while in To do, or
+moved to To do while assigned. Leaving the state is not an event, and neither
+is a restore or an unarchive that makes such a task visible again.
+_Avoid_: "assigned" alone (assignment in another status is not it),
+"triggered".
+
+**Involved** (bot user, in a task):
+A bot user is involved in a task when it is the task's assignee or reporter,
+or has commented on it. A comment by anyone else on such a task reaches the
+bot user's comment webhook.
+_Avoid_: "subscribed", "watching".
+
+**Delivery**:
+One event on its way to one webhook: tried at once, then on a fixed schedule
+for about two hours, then failed. Signed with the bot user's webhook secret.
+The last delivery of each webhook is shown to the owner.
+_Avoid_: "message", "notification".
+
+**Paperless connection**:
+A user's link to their own Paperless-ngx instance: its address and an API
+token Taskly keeps but never shows again. Optional, off until set, one per
+user. From the moment it is set, the user's PDF attachments are **kept in**
+Paperless; unsetting it leaves them where they are, out of reach until it is
+set again.
+_Avoid_: "integration" (that is a bot user's word), "sync".
+
+**Kept in** (attachment):
+Where an attachment's bytes live: in Taskly, the default and the only place
+for anything but a PDF, or in Paperless. A PDF on its way to Paperless is kept
+in Taskly until Paperless has it, and stays there, saying why, if Paperless
+would not take it. Taskly never deletes a document from Paperless: removing
+an attachment kept there only drops the link.
+_Avoid_: "uploaded to", "synced", "backend" (that is the code's word).
