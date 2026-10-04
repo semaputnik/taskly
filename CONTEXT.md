@@ -210,3 +210,31 @@ Ending every session a user holds at once, on every device. Done by the user
 from Settings, and done for them when a recovery code is spent. Removing a
 passkey does not end sessions; this does.
 _Avoid_: treating a passkey removal as a sign-out.
+
+**Webhook** (of a bot user):
+A URL the owner gives a bot user, which Taskly calls when something the bot
+should act on has happened. A bot user has two, each optional and empty until
+set: one for tasks that become **ready** for it, one for comments on tasks it
+is **involved** in. Only the owner sets them, in the interface; a bot user
+cannot read or change its own.
+_Avoid_: "callback", "subscription", "notification".
+
+**Ready** (task, for a bot user):
+The moment a task comes to be in To do with that bot user as its assignee, by
+anyone's change but the bot's own: created so, assigned while in To do, or
+moved to To do while assigned. Leaving the state is not an event, and neither
+is a restore or an unarchive that makes such a task visible again.
+_Avoid_: "assigned" alone (assignment in another status is not it),
+"triggered".
+
+**Involved** (bot user, in a task):
+A bot user is involved in a task when it is the task's assignee or reporter,
+or has commented on it. A comment by anyone else on such a task reaches the
+bot user's comment webhook.
+_Avoid_: "subscribed", "watching".
+
+**Delivery**:
+One event on its way to one webhook: tried at once, then on a fixed schedule
+for about two hours, then failed. Signed with the bot user's webhook secret.
+The last delivery of each webhook is shown to the owner.
+_Avoid_: "message", "notification".
