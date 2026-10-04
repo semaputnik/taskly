@@ -21,22 +21,47 @@ contains (subtasks, or a project's tasks).
 _Avoid_: "archived" for this state.
 
 **Status**:
-Where a task stands: **To do**, **In progress**, **Waiting** or **Done** — four
-fixed values, not user-defined. Every rule that cares whether work is finished
-only asks whether the task is **open** or Done.
+Where a task stands: **Backlog**, **To do**, **In progress**, **Waiting**,
+**Review** or **Done** — six fixed values, not user-defined. Every rule that
+cares whether work is finished only asks whether the task is **open** or Done.
 _Avoid_: "state", "stage", "column".
 
 **Open** (task):
-A task whose status is To do, In progress or Waiting — anything but Done.
-Overdue, "has open subtasks" and "the open occurrence" all mean this.
+A task whose status is Backlog, To do, In progress, Waiting or Review —
+anything but Done. Overdue, "has open subtasks" and "the open occurrence" all
+mean this.
 _Avoid_: "not completed", "incomplete", "active".
+
+**Backlog**:
+An open status for a task the user has written down but not yet decided to
+do; To do is that decision. Open like any other: its due date counts, it keeps
+its parent from Done, and a recurring task in it is its series' one open
+occurrence. Every new task starts here unless it is created with another
+status; the next occurrence of a recurring task starts in To do instead.
+_Avoid_: "someday", "icebox", "not started" (To do is also not started).
 
 **Waiting**:
 An open status for a task whose next move belongs to someone or something
 other than the owner: a reply, a delivery, the result of someone else's work.
 It is still open — waiting on something is not the work being finished — but it
-is not work the owner can move right now.
+is not work the owner can move right now. When the next move is the owner's,
+the task is in **Review** instead.
 _Avoid_: "blocked", "on hold", "control".
+
+**Review**:
+An open status for a task whose doer has finished and whose next move is the
+owner's: check the work and close it, or send it back. It is how a bot user
+hands finished work over. Status and assignee are separate: nothing moves a
+task onto the owner because it entered Review.
+_Avoid_: "waiting" (that is the other direction), "QA", "in review" as a flag
+beside the status.
+
+**My work**:
+The dashboard's view of what is on the user: their tasks in To do, In
+progress, Review or Waiting whose assignee is the user themselves, grouped by
+status in the order work moves. Tasks with no assignee or on a bot user are
+not in it, and neither is Backlog; the Tasks page is where those are managed.
+_Avoid_: "inbox" (that is a project), "queue".
 
 **Recurring task**:
 A task whose move to Done spawns its next occurrence as a new task, on a

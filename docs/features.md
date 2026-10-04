@@ -30,7 +30,7 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
 | **Token** | The credential a bot user uses to authenticate to the REST API. A bot user has one token. |
 | **Passkey** | The only credential a human user signs in with. A user holds one or more. There are no passwords. |
 | **Recovery code** | A one-time code the superuser issues to a user who has lost every passkey, spent by creating a new one. |
-| **Task** | The main entity: a unit of work with a status — To do, In progress, Waiting or Done. A task that is not Done is *open*. |
+| **Task** | The main entity: a unit of work with a status — Backlog, To do, In progress, Waiting, Review or Done. A task that is not Done is *open*. |
 | **Subtask** | A task that is a child of another task. A subtask is a full task. |
 | **Project** | A container that groups tasks. Every task belongs to a project. Projects are flat: there is no nesting. |
 | **Inbox** | The default project every user has. Tasks go there unless another project is chosen. Cannot be renamed or deleted. |
@@ -66,13 +66,24 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
 - **FR-01.3** Priority takes one of four values: `P1`, `P2`, `P3`, `P4`.
   `P1` is the highest priority, `P4` the lowest. Priority is optional; a task
   with no priority set behaves as `P4`.
-- **FR-01.4** A task has exactly one of four statuses: **To do**, **In
-  progress**, **Waiting** and **Done** (`todo`, `in_progress`, `waiting`,
-  `done` in the REST API). A task is **open** when its status is To do, In
-  progress or Waiting, and **closed** when it is Done. Waiting means the task
-  is open but its next move belongs to someone or something other than the
-  owner. A new task is To do unless it is created with another status. The
-  statuses are fixed; a user cannot define their own (ADR-0004).
+- **FR-01.4** A task has exactly one of six statuses: **Backlog**, **To do**,
+  **In progress**, **Waiting**, **Review** and **Done** (`backlog`, `todo`,
+  `in_progress`, `waiting`, `review`, `done` in the REST API). A task is
+  **open** when its status is anything but Done, and **closed** when it is
+  Done. Backlog is work written down but not yet decided on; To do is that
+  decision. Waiting means the task is open but its next move belongs to
+  someone or something other than the owner. Review means the doer has
+  finished and the next move is the owner's: check the work and close it, or
+  send it back; it is how a bot user hands work over. A new task is Backlog
+  unless it is created with another status, in the interface and the REST API
+  alike. The statuses are fixed; a user cannot define their own (ADR-0004,
+  ADR-0008). Wherever the interface lists them, the order is Backlog, To do,
+  In progress, Review, Waiting, Done.
+- **FR-01.4a** Status and assignee are independent. Moving a task to Review
+  does not assign it to the owner, and a bot user may put a task it still
+  holds into Review. A bot user that wants its finished work on the owner's
+  dashboard assigns the task to the owner as well (FR-06.7); the REST API
+  documentation records this as the convention.
 - **FR-01.5** A user, or a bot user allowed to update the task, can move a task
   to any status. Closing a task is a single action from any open status (the
   checkbox), and undoing it returns the task to To do.
@@ -149,9 +160,11 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
 - **FR-01.14** Moving a recurring task to Done creates its next occurrence as
   a new task, which starts as To do. The new task copies the done one's fields
   (title, description, priority, assignee, tags) and its subtask tree, with
-  every subtask To do. Comments and attachments are not copied — they belong
-  to the occurrence that was done. Moving an occurrence between open statuses
-  never creates an occurrence.
+  every subtask To do. The next occurrence starts in To do, not Backlog:
+  the decision to do the work was made when the series was set up. Comments
+  and attachments are not copied — they belong to the occurrence that was
+  done. Moving an occurrence between open statuses never creates an
+  occurrence.
 - **FR-01.15** The next occurrence's due date is the done occurrence's due
   date plus the recurrence interval — a fixed schedule, independent of when
   the occurrence was actually done.
@@ -258,7 +271,7 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
     "nobody" to filter for, since every task has one
   - tag
   - priority
-  - status: any one of the three open statuses
+  - status: any one of the five open statuses
   - due date
 - **FR-06.3** Filters can be combined; a task must match all active filters.
 - **FR-06.4** The task list can be sorted by due date, by priority and by
@@ -274,8 +287,15 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
 - **FR-06.6** Priorities are told apart by colour as well as by name: P1 red,
   P2 amber/yellow, P3 blue, and P4 (or no priority) uncoloured. A compact row
   shows its task's priority as the colour of its completion checkbox.
-- **FR-06.7** The dashboard shows the user's In progress tasks in a panel of
-  their own, highest priority first, alongside what is overdue and due today.
+- **FR-06.7** The dashboard has a **My work** panel: the user's tasks whose
+  assignee is the user themselves, in To do, In progress, Review or Waiting,
+  grouped by status in the order In progress, Review, To do, Waiting, highest
+  priority first within a group. Each group shows a few tasks and, past
+  that, a link to the task list narrowed to that status and to the user as
+  assignee. Tasks with no assignee, tasks on a bot user and tasks in Backlog
+  are not in it: the dashboard is for the work in the user's hands, and the
+  Tasks page is where everything else is managed. The panel is drawn even
+  when it is empty, and says then that nothing is on the user.
 - **FR-06.8** The task list shows open tasks only. A Done task is not listed
   and cannot be filtered for; completed work is read in the activity log
   (FR-10.8, ADR-0006). Open work is the list's baseline rather than a filter
@@ -289,6 +309,10 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
   anywhere the task stays on screen is not announced.
 - **FR-06.10** A user whose tasks are all Done is told so, and pointed at the
   activity log — not told that they have no tasks.
+- **FR-06.11** The dashboard's date bands — Overdue, Due today, This week —
+  take every open status except Waiting, Backlog included: a due date counts
+  whatever the task's status. Waiting keeps its own band, "Waiting on others".
+  Unlike My work, the bands are not narrowed to the user as assignee.
 
 ### F-07. REST API
 
