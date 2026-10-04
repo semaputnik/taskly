@@ -220,12 +220,49 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
 - **FR-04.2** There is a limit on attachment file size. There is no limit on
   file type or on the number of attachments per task. (The exact size limit
   is a configuration detail, not fixed here.)
-- **FR-04.3** Attachments are stored internally by Taskly by default. The
-  storage is a swappable backend (see
-  [ADR-0002](./adr/0002-attachment-storage-backend.md)) so that an external
-  store, such as a per-user Paperless-ngx instance (see
-  [Future ideas](#5-future-ideas)), can be added later without changing how
-  attachments work for users.
+- **FR-04.3** Attachments are kept in Taskly by default. The storage is a
+  swappable backend (see [ADR-0002](./adr/0002-attachment-storage-backend.md));
+  the one alternative is a user's own Paperless-ngx instance, below.
+
+#### Paperless connection
+
+- **FR-04.4** A user can connect their own Paperless-ngx instance in Settings
+  by giving its address and an API token, and can test the connection there.
+  The connection is optional and off until set; one per user. The token is
+  kept so that it can be used but never shown again, only replaced. The
+  address follows the same rule as a webhook URL on loopback and private
+  ranges (FR-11.3), under the same installation setting.
+- **FR-04.5** While a user has a Paperless connection, every PDF attached to
+  their tasks — by them or by one of their bot users — is kept in Paperless.
+  A file is a PDF by its content, not by its name or declared type. Every
+  other file, and every file of a user without a connection, is kept in
+  Taskly as before. The size limit (FR-04.2) applies before anything is sent.
+- **FR-04.6** A PDF is accepted at once and is downloadable from that moment.
+  Taskly keeps it until Paperless has consumed it, hands it over in the
+  background, and then releases its own copy. Deliveries to Paperless are
+  retried on the schedule of FR-11.10; after the last attempt the file stays
+  kept in Taskly, the attachment shows why, and the owner can ask for it to
+  be sent again.
+- **FR-04.7** A PDF that Paperless already holds is not sent again: the
+  attachment is linked to the existing document. One Paperless document may
+  stand behind several attachments.
+- **FR-04.8** Taskly never deletes a document from Paperless. Removing an
+  attachment kept there drops the link only; deleting or restoring a task,
+  and deleting the account, change nothing in Paperless. Disconnecting
+  Paperless leaves attachments kept there where they are; they are out of
+  reach until the connection is set again, and Settings says how many before
+  the user confirms.
+- **FR-04.9** A document sent to Paperless carries the file's original name
+  as its title, a tag named `Taskly`, created on first use, and a note naming
+  the task and linking to it in Taskly. A document linked under FR-04.7 gets
+  the tag and a note too, one note per task it is attached to.
+- **FR-04.10** Downloading an attachment kept in Paperless returns the
+  original file, not Paperless's archived copy. If Paperless cannot be
+  reached, the download fails with an error that says so.
+- **FR-04.11** Every attachment says where it is kept, in the interface and
+  the REST API; one kept in Paperless links to the document there.
+- **FR-04.12** Connecting Paperless moves nothing: PDFs already kept in Taskly
+  stay there.
 
 ### F-05. Projects
 
@@ -593,11 +630,9 @@ Not requirements yet. Recorded so they are not lost.
 
 - **Restore a deleted bot user.** Bring a deleted bot user back and issue it a
   new token.
-- **Paperless-ngx as an attachment storage backend.** Let a user optionally
-  connect their own Paperless-ngx instance so their task attachments are
-  stored and processed (OCR, classification) there instead of internally,
-  with the Paperless document linked back to its Taskly task. Internal
-  storage (FR-04.3) stays the default for users who don't connect one.
+- **Send existing PDFs to Paperless.** An action for a user who connected
+  Paperless after attaching PDFs, to hand the ones kept in Taskly over at
+  their own request (FR-04.12 moves nothing on its own).
 
 ## 6. Out of scope
 
@@ -622,6 +657,9 @@ Not requirements yet. Recorded so they are not lost.
   disabling a webhook automatically after failed deliveries.
 - Nested projects (projects are flat — see FR-05.5).
 - Text search over tasks.
+- Keeping a copy of a PDF in Taskly beside the one in Paperless, sending
+  anything but PDFs to Paperless, serving Paperless's archived copy, and
+  deleting anything from Paperless.
 
 ## 7. Open questions
 

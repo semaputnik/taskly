@@ -1,5 +1,8 @@
 # Attachment storage is a swappable backend, defaulting to internal
 
+> Realised by ADR-0010: the optional per-user backend is Paperless-ngx, for
+> PDFs only.
+
 We considered making Paperless-ngx the storage for task attachments outright,
 but that would force every user to connect an external instance before they
 could attach a file at all, and lock the architecture to one integration

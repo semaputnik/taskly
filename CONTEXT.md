@@ -238,3 +238,19 @@ One event on its way to one webhook: tried at once, then on a fixed schedule
 for about two hours, then failed. Signed with the bot user's webhook secret.
 The last delivery of each webhook is shown to the owner.
 _Avoid_: "message", "notification".
+
+**Paperless connection**:
+A user's link to their own Paperless-ngx instance: its address and an API
+token Taskly keeps but never shows again. Optional, off until set, one per
+user. From the moment it is set, the user's PDF attachments are **kept in**
+Paperless; unsetting it leaves them where they are, out of reach until it is
+set again.
+_Avoid_: "integration" (that is a bot user's word), "sync".
+
+**Kept in** (attachment):
+Where an attachment's bytes live: in Taskly, the default and the only place
+for anything but a PDF, or in Paperless. A PDF on its way to Paperless is kept
+in Taskly until Paperless has it, and stays there, saying why, if Paperless
+would not take it. Taskly never deletes a document from Paperless: removing
+an attachment kept there only drops the link.
+_Avoid_: "uploaded to", "synced", "backend" (that is the code's word).
