@@ -1,7 +1,7 @@
 # Taskly — Feature Requirements
 
 **Status:** Draft
-**Last updated:** 2026-10-04
+**Last updated:** 2026-10-05
 
 This document lists the features Taskly must provide. It records confirmed
 requirements only. Anything not yet decided is listed under
@@ -348,8 +348,10 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
   activity log — not told that they have no tasks.
 - **FR-06.11** The dashboard's date bands — Overdue, Due today, This week —
   take every open status except Waiting, Backlog included: a due date counts
-  whatever the task's status. Waiting keeps its own band, "Waiting on others".
-  Unlike My work, the bands are not narrowed to the user as assignee.
+  whatever the task's status. Unlike My work, the bands are not narrowed to
+  the user as assignee. Waiting tasks have no band of their own: a Waiting
+  task on the user is read in My work, and one on a bot user or unassigned is
+  read on the Tasks page.
 
 ### F-07. REST API
 
