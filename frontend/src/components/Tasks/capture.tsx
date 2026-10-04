@@ -130,7 +130,7 @@ const KEYBOARD_OWNERS =
  * The one key that starts capture from anywhere in the app.
  *
  * Writing a task down is the most frequent and most time-sensitive act in a
- * task tracker, and it was the only one that required a trip to the sidebar.
+ * task tracker, and it was the only one that required a trip to the navigation.
  * The key stands down wherever something else is listening: a field being
  * typed into, or an open dialog, panel or menu.
  */
