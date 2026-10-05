@@ -5,7 +5,7 @@ tables for passkeys, ceremony challenges and recovery codes come in, with a
 session version on each user so every session can be ended at once.
 
 Revision ID: a9d3f7c2e815
-Revises: f4b2a9e17c30
+Revises: a7d3c5e9b104
 Create Date: 2026-10-05 12:00:00.000000
 
 """
@@ -16,7 +16,7 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision = 'a9d3f7c2e815'
-down_revision = 'f4b2a9e17c30'
+down_revision = 'a7d3c5e9b104'
 branch_labels = None
 depends_on = None
 
