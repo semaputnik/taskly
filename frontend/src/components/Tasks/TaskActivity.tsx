@@ -35,6 +35,10 @@ const isMac =
   typeof navigator !== "undefined" &&
   /Mac|iPhone|iPad/.test(navigator.userAgent)
 
+/** ⌘ or Ctrl with Enter: the key that posts or saves a comment. */
+const isPostChord = (event: React.KeyboardEvent) =>
+  (event.metaKey || event.ctrlKey) && event.key === "Enter"
+
 /**
  * The task's own history, oldest first: what happened to it as muted lines
  * that name who did it, and the comments as what was said, by whom, in one
@@ -213,9 +217,7 @@ function CommentLine({
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Escape") setEditing(false)
-              if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
-                if (draft.trim()) save.mutate(draft.trim())
-              }
+              if (isPostChord(e) && draft.trim()) save.mutate(draft.trim())
             }}
             className="border-rule-strong focus-visible:border-ring focus-visible:ring-ring/50 field-sizing-content min-h-11 w-full resize-none rounded-md border bg-transparent px-2 py-1.5 text-[15px] leading-normal outline-none focus-visible:ring-[3px]"
           />
@@ -304,7 +306,7 @@ function Composer({ task }: { task: TaskPublic }) {
         placeholder="Write a comment…"
         {...draft.field}
         onKeyDown={(e) => {
-          if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+          if (isPostChord(e)) {
             e.preventDefault()
             post()
           }

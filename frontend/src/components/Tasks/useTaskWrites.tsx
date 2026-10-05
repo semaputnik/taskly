@@ -21,7 +21,7 @@ import {
 import useAuth from "@/hooks/useAuth"
 import type { BatchRefusal } from "@/lib/apiErrors"
 import { useReportChange } from "@/lib/serverState"
-import { toastError, toastSuccess } from "@/lib/toasts"
+import { toastError, toastProblem, toastSuccess } from "@/lib/toasts"
 import type { CaptureTarget } from "./capture"
 import { draftToCreate, emptyDraft, type TaskDraft } from "./draft"
 import { DueDateScopeDialog } from "./recurrence"
@@ -305,20 +305,35 @@ export function useTaskCapture(
         inFlight.current.delete(trimmed)
       }
     },
+    /**
+     * Whether this title is being written right now. `create` refuses it
+     * without a word, so a caller that hands refused words back must ask first:
+     * the title is not lost, it is already on its way.
+     */
+    isSending: (title: string) => inFlight.current.has(title.trim()),
     /** Read by a screen reader; the sighted reader has the record itself. */
     announcement,
   }
 }
 
 /**
- * Taking back a task a line just made. It has no subtasks yet, so there is no
- * cascade to confirm; the deletion is a soft one and can be restored from the
- * activity log like any other. Resolves to whether the task is gone.
+ * Taking back a task a line just made. The deletion is a soft one and can be
+ * restored from the activity log like any other. The notice outlives the
+ * moment, so the task may have gained subtasks since: taking it back would then
+ * take the reader's later work with it, so it is left, and the notice says why.
+ * Resolves to whether the task is gone.
  */
 export function useUndoCapture() {
   const { run } = useWrites()
-  return async (task: TaskPublic) =>
-    (await run((report) => deleteTask(report, task, false))).saved
+  return async (task: TaskPublic) => {
+    const outcome = await run((report) => deleteTask(report, task, false))
+    if (!outcome.saved && outcome.reason === "has subtasks") {
+      toastProblem(
+        `“${task.title}” has subtasks now, so it was not removed. Delete it from its panel to take them with it.`,
+      )
+    }
+    return outcome.saved
+  }
 }
 
 /**

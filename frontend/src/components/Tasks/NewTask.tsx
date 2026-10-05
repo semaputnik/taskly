@@ -3,7 +3,7 @@ import { useBlocker } from "@tanstack/react-router"
 import { useEffect, useRef, useState } from "react"
 
 import type { TaskPublic } from "@/client"
-import { useCaptureFocus, useCaptureTitle } from "@/components/Records/panels"
+import { useCaptureFocus } from "@/components/Records/panels"
 import {
   DescriptionSection,
   ghost,
@@ -25,7 +25,7 @@ import { projectsQuery } from "@/lib/serverState"
 import { cn } from "@/lib/utils"
 import type { CaptureTarget } from "./capture"
 import { carryOver, emptyDraft, isTouched, type TaskFields } from "./draft"
-import { TaskPropertyRows } from "./TaskProperties"
+import { descriptionClass, TaskPropertyRows } from "./TaskProperties"
 import { useTaskCapture } from "./useTaskWrites"
 
 // The commit chord, named the way the reader's keyboard names it.
@@ -61,13 +61,7 @@ export function NewTask({
 }) {
   const capture = useTaskCapture(target, onCreated)
   const [defaults, setDefaults] = useState(() => emptyDraft(target))
-  // A title typed before the panel opened is the reader's own words, so the
-  // draft holds it from the first frame and closing it asks first.
-  const typedTitle = useCaptureTitle()
-  const [draft, setDraft] = useState(() => ({
-    ...defaults,
-    title: typedTitle ?? "",
-  }))
+  const [draft, setDraft] = useState(defaults)
   const touched = isTouched(draft, defaults)
   const titleRef = useCaptureFocus<HTMLTextAreaElement>()
   // Set while a commit is taking the reader onto the new record, which is a
@@ -233,7 +227,9 @@ export function NewTask({
               description: event.target.value,
             }))
           }
-          className={ghost}
+          // The same field the task's own description is, so nothing moves
+          // when the task is created.
+          className={cn(ghost, descriptionClass)}
         />
       </DescriptionSection>
 
@@ -244,7 +240,7 @@ export function NewTask({
           gutter,
         )}
       >
-        <span className="text-muted-foreground text-xs">
+        <span className="text-ink-3 text-xs">
           <kbd className="font-sans">{CHORD}</kbd> creates and starts another
         </span>
         <Button

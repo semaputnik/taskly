@@ -1087,6 +1087,13 @@ class ActivityEntityType(StrEnum):
     TAG = "tag"
 
 
+# What a comment or attachment entry names its task by. Spelled out as SQL so
+# the index below and the filter that reads it are exactly one expression: a
+# bound path would leave the planner unable to match the two. (The migration
+# that created the index spells it out again, as a migration must.)
+ACTIVITY_TASK_REF = "(details -> 'task' ->> 'id')"
+
+
 class ActivityEntry(SQLModel, table=True):
     """
     One change in a user's account, and who made it (FR-10.1, FR-10.2).
@@ -1124,7 +1131,7 @@ class ActivityEntry(SQLModel, table=True):
         Index(
             "ix_activityentry_owner_id_task",
             "owner_id",
-            text("(details -> 'task' ->> 'id')"),
+            text(ACTIVITY_TASK_REF),
         ),
         # A change is made by exactly one actor: a user, or a bot user.
         CheckConstraint(

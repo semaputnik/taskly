@@ -85,7 +85,12 @@ export function DayField({
             className,
           )}
         >
-          <span className={cn(!value && "text-muted-foreground")}>
+          <span
+            className={cn(
+              "whitespace-nowrap",
+              !value && "text-muted-foreground",
+            )}
+          >
             {value ? formatDay(value) : "Not set"}
           </span>
           <CalendarDays className="text-muted-foreground size-4 shrink-0" />

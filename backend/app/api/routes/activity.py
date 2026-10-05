@@ -12,6 +12,7 @@ from app.api.access import archived_refusal
 from app.api.deps import CurrentUser, SessionDep
 from app.deletions import DeletionKind, Restorability, RestoreRefusal
 from app.models import (
+    ACTIVITY_TASK_REF,
     ActivityAction,
     ActivityEntityType,
     ActivityEntriesPublic,
@@ -106,12 +107,6 @@ def _of_kind(kind: ActivityKind) -> Any:
     return actions
 
 
-# What a comment or attachment entry names its task by. Spelled out as SQL so
-# it is exactly the expression `ix_activityentry_owner_id_task` indexes: a
-# bound path would leave the planner unable to match the two.
-TASK_REF = "(details -> 'task' ->> 'id')"
-
-
 def _on_task(task_id: uuid.UUID) -> Any:
     """
     What an entry has to satisfy to belong to the history of one task: it is
@@ -121,7 +116,7 @@ def _on_task(task_id: uuid.UUID) -> Any:
     """
     return or_(
         col(ActivityEntry.entity_id) == task_id,
-        literal_column(TASK_REF) == str(task_id),
+        literal_column(ACTIVITY_TASK_REF) == str(task_id),
         and_(
             col(ActivityEntry.action) == ActivityAction.TASKS_BULK_CHANGED,
             col(ActivityEntry.details).contains({"task_ids": [str(task_id)]}),

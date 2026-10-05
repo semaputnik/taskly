@@ -1,10 +1,5 @@
 import { type UseQueryOptions, useQuery } from "@tanstack/react-query"
-import {
-  type HistoryState,
-  useLocation,
-  useNavigate,
-  useSearch,
-} from "@tanstack/react-router"
+import { useNavigate, useSearch } from "@tanstack/react-router"
 import { useCallback, useEffect, useRef } from "react"
 import { z } from "zod"
 
@@ -34,17 +29,6 @@ interface Records {
   project: ProjectPublic
   tag: TagPublic
   bot: BotUserPublic
-}
-
-declare module "@tanstack/history" {
-  interface HistoryState {
-    /**
-     * The title a capture opens with, typed before its panel was open. Held
-     * in the history entry rather than the address: it is the reader's words,
-     * not where they are, and Back and Forward still bring it along.
-     */
-    captureTitle?: string
-  }
 }
 
 /** The record types that have a panel of their own. */
@@ -174,15 +158,12 @@ export function useRecordPanels() {
   }
 
   const go = useCallback(
-    (next: PanelSearch, state?: HistoryState, replace = false) =>
+    (next: PanelSearch, replace = false) =>
       navigate({
         to: ".",
         replace,
         search: (previous: Record<string, unknown>) =>
           panelLink(previous, next),
-        // Left out unless there is some, so every other panel opens exactly
-        // as it did before capture carried a title.
-        ...(state ? { state } : {}),
       }),
     [navigate],
   )
@@ -204,22 +185,12 @@ export function useRecordPanels() {
      * of the record it leaves in the history: walking ten tasks is one
      * visit to the column, and Back leaves it rather than walking back.
      */
-    walkTo: useCallback(
-      (id: string) => go(opening("task", id), undefined, true),
-      [go],
-    ),
+    walkTo: useCallback((id: string) => go(opening("task", id), true), [go]),
     openProject: useCallback((id: string) => open("project", id), [open]),
     openTag: useCallback((id: string) => open("tag", id), [open]),
     openBot: useCallback((id: string) => open("bot", id), [open]),
-    /**
-     * Open a panel on a record that does not exist yet, with its title
-     * already written if the reader typed one first.
-     */
-    capture: useCallback(
-      (kind: CaptureKind, title?: string) =>
-        go({ capture: kind }, title ? { captureTitle: title } : undefined),
-      [go],
-    ),
+    /** Open a panel on a record that does not exist yet. */
+    capture: useCallback((kind: CaptureKind) => go({ capture: kind }), [go]),
   }
 }
 
@@ -229,11 +200,6 @@ export function useIsOpen(kind: RecordKind, id: string): boolean {
     strict: false,
     select: (search: PanelSearch) => search[KEYS[kind]] === id,
   })
-}
-
-/** The title a capture was opened with, typed before its panel was open. */
-export function useCaptureTitle(): string | undefined {
-  return useLocation({ select: (location) => location.state.captureTitle })
 }
 
 /** How far a panel has got with reading its record. */

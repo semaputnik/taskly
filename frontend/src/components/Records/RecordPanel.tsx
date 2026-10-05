@@ -135,13 +135,10 @@ export function RecordPanel({
         <>
           {children}
           {destructive && (
-            <div
-              className={cn(
-                "mt-auto flex flex-wrap gap-2 border-t py-4",
-                gutter,
-              )}
-            >
-              {destructive}
+            <div className={cn("mt-auto", gutter)}>
+              <div className="flex flex-wrap gap-2 border-t py-4">
+                {destructive}
+              </div>
             </div>
           )}
         </>
@@ -517,13 +514,12 @@ export function PropertyRow({
 /** The property list of a record: a hairline above, a lighter one below. */
 export function PropertyList({ children }: { children: React.ReactNode }) {
   return (
-    <div
-      className={cn(
-        "border-rule-strong flex flex-col gap-0.5 border-t pt-2.5 pb-3.5",
-        gutter,
-      )}
-    >
-      {children}
+    // The rule sits on an inner box, so it runs between the gutters like every
+    // other rule in the column.
+    <div className={gutter}>
+      <div className="border-rule-strong flex flex-col gap-0.5 border-t pt-2.5 pb-3.5">
+        {children}
+      </div>
     </div>
   )
 }
@@ -533,19 +529,8 @@ export function PropertyList({ children }: { children: React.ReactNode }) {
  * disabled control: a control that cannot be used still asks to be tried.
  */
 export function ReadOnlyValue({ children }: { children: React.ReactNode }) {
-  return (
-    <span className={cn("text-muted-foreground text-sm", valueInset)}>
-      {children}
-    </span>
-  )
+  return <span className="text-ink-3 text-sm">{children}</span>
 }
-
-/**
- * Where a value's text starts in a property row: on the label column's edge,
- * where a control's text also starts (its padding is pulled back by the same
- * amount), so a read-only value or a link lines up with the controls above it.
- */
-export const valueInset = ""
 
 /** A section heading: 13px, 600, over a hairline. */
 export function SectionHeading({
