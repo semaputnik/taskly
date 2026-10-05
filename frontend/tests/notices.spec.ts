@@ -137,3 +137,49 @@ test("A notice raised from inside a panel is at the top of the screen too", asyn
   await notice.getByRole("button", { name: "Undo" }).click()
   await expect(panel.getByText("Sign it by Friday")).toBeVisible()
 })
+
+test("Undo of a line's task leaves it, and says why, once it has subtasks", async ({
+  page,
+}) => {
+  await newUser(page)
+  const api = await userApi(page)
+  const notice = await raiseNotice(page, "Plan the trip")
+  const [task] = (await (await api.get("/tasks/")).json()).data
+  await api.create("/tasks/", { title: "Book flights", parent_id: task.id })
+
+  await notice.getByRole("button", { name: "Undo" }).click()
+  await expect(
+    page
+      .locator("[data-sonner-toast]")
+      .filter({ hasText: "has subtasks now, so it was not removed" }),
+  ).toBeVisible()
+  const { count } = await (await api.get("/tasks/")).json()
+  expect(count).toBe(2)
+})
+
+test("The same title sent twice while the first is on its way is not handed back to the line", async ({
+  page,
+}) => {
+  await newUser(page)
+  const api = await userApi(page)
+  await page.goto("/")
+  // Hold the first request so the second Enter finds it still in flight.
+  await page.route("**/api/v1/tasks/", async (route) => {
+    if (route.request().method() === "POST") {
+      await new Promise((resolve) => setTimeout(resolve, 600))
+    }
+    await route.continue()
+  })
+  const line = page.getByRole("textbox", { name: "Add a task" })
+  await line.fill("Water the plants")
+  await line.press("Enter")
+  await line.fill("Water the plants")
+  await line.press("Enter")
+
+  await expect(line).toHaveValue("")
+  await expect
+    .poll(async () => (await (await api.get("/tasks/")).json()).count)
+    .toBe(1)
+  await page.waitForTimeout(800)
+  await expect(line).toHaveValue("")
+})

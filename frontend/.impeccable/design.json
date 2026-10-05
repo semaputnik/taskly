@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-05T02:16:40Z",
+  "generatedAt": "2026-10-05T18:57:32Z",
   "title": "Design System: Taskly",
   "extensions": {
     "colorMeta": {
@@ -454,7 +454,7 @@
       },
       "section-heading": {
         "displayName": "Band Heading",
-        "purpose": "Overdue, Due today, In my hands, Changes; over a Rule Strong hairline."
+        "purpose": "Band headings and a record's section headings; over a Rule Strong hairline."
       },
       "meta": {
         "displayName": "Meta",
@@ -462,11 +462,19 @@
       },
       "mono": {
         "displayName": "Figures",
-        "purpose": "Counts and log times only."
+        "purpose": "Counts, log and activity times, and the position in the record column's bar."
       },
       "key-cap": {
         "displayName": "Key Cap",
-        "purpose": "The outlined C shortcut cap."
+        "purpose": "The outlined C shortcut cap and the comment chord."
+      },
+      "record-title": {
+        "displayName": "Record Title",
+        "purpose": "A task's title at the head of its panel; 22px/600, wrapping."
+      },
+      "record-line": {
+        "displayName": "Record Line",
+        "purpose": "Activity event one-liners and the text of a notice, at 13.5px."
       }
     },
     "shadows": [
@@ -478,19 +486,29 @@
       {
         "name": "modal",
         "value": "0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)",
-        "purpose": "Dialogs and record sheets, with the scrim."
+        "purpose": "Dialogs, with the scrim. The record column carries no shadow."
       },
       {
         "name": "thumb-button",
         "value": "0 6px 16px rgb(0 0 0 / 0.18)",
         "purpose": "The phone Add button floating over scrolling content."
+      },
+      {
+        "name": "notice-light",
+        "value": "0 10px 24px -8px rgb(0 0 0 / 0.25), 0 2px 6px rgb(0 0 0 / 0.08)",
+        "purpose": "A notice at the top of the screen, light theme. The fourth and last shadow in the vocabulary."
+      },
+      {
+        "name": "notice-dark",
+        "value": "0 10px 24px -8px rgb(0 0 0 / 0.7), 0 2px 6px rgb(0 0 0 / 0.4)",
+        "purpose": "The same notice in the dark theme, denser because a dark ground has less to lose."
       }
     ],
     "motion": [
       {
         "name": "color-transition",
         "value": "150ms cubic-bezier(0.4, 0, 0.2, 1)",
-        "purpose": "Hover fills, the capture line's hairline turning ink on focus, the task line's hover tint."
+        "purpose": "Hover fills, the capture line's hairline turning ink on focus, the task line's hover tint, the row tint."
       }
     ],
     "breakpoints": [
@@ -503,6 +521,11 @@
         "name": "md",
         "value": "768px",
         "purpose": "The shell switches from the top bar and phone Add button to the 200px navigation column."
+      },
+      {
+        "name": "record-column",
+        "value": "1200px",
+        "purpose": "The record column becomes a sticky 560px third shell track beside the page; below it, it is fixed over the whole screen."
       }
     ]
   },
@@ -527,7 +550,7 @@
       "name": "Capture Line",
       "kind": "input",
       "refersTo": "capture-line",
-      "description": "Frameless field at the top of the day page: a plus, the field, the C key cap, and a hairline that turns ink on focus.",
+      "description": "Frameless field at the top of the day page: a plus, the field, the C key cap, and a hairline that turns ink on focus. Enter creates the task at once and raises a notice.",
       "html": "<label class=\"ds-cap\"><svg viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linecap=\"round\"><path d=\"M12 5v14M5 12h14\"/></svg><input placeholder=\"Add a task…\" aria-label=\"Add a task\"><kbd class=\"ds-kcap\">C</kbd></label>",
       "css": ":host{--page:#ffffff;--hover:#f3f4f6;--ink:#0b0e11;--ink-2:#3d444d;--ink-3:#656d76;--rule:#e6e8eb;--rule-strong:#c9cdd2;--late:#cf222e;--done:#1a7f37;--p2:#8a5c00;--p3:#0969da;font-family:-apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, \"Helvetica Neue\", \"Noto Sans\", Arial, sans-serif;font-size:15px;line-height:1.45;color:var(--ink);} .ds-kcap{color:var(--ink-3);border:1px solid var(--rule-strong);border-radius:4px;padding:0 5px;font:11px/16px ui-monospace, \"SF Mono\", Menlo, Consolas, monospace;} .ds-cap{display:flex;align-items:center;gap:10px;height:40px;width:420px;color:var(--ink-3);border-bottom:1px solid var(--rule-strong);transition:border-color .15s cubic-bezier(.4,0,.2,1);} .ds-cap:focus-within{border-bottom-color:var(--ink);} .ds-cap input{flex:1;min-width:0;height:100%;border:0;background:transparent;outline:none;font-family:inherit;font-size:15px;color:var(--ink);} .ds-cap input::placeholder{color:var(--ink-3);}"
     },
@@ -543,7 +566,7 @@
       "name": "Task Line",
       "kind": "custom",
       "refersTo": "task-line",
-      "description": "A band of task lines: mark, title, and the 13px meta line with the project at the far right; hairline-divided, hover tint fading right.",
+      "description": "A band of task lines: mark, title, and the 13px meta line with the project at the far right; hairline-divided, hover tint fading right (also the open line's tint).",
       "html": "<div class=\"ds-band\"><h2 class=\"ds-bh ds-late\">Overdue <span class=\"ds-n\">2</span></h2><div class=\"ds-line\"><svg viewBox=\"0 0 18 18\" width=\"18\" height=\"18\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" style=\"color:var(--late);flex:none\"><circle cx=\"9\" cy=\"9\" r=\"7\"/></svg><div class=\"ds-body\"><a class=\"ds-title\" href=\"#\">Renew the domain</a><div class=\"ds-meta\"><span class=\"ds-due\">Yesterday</span><span>infra</span><span class=\"ds-proj\"><span class=\"ds-sq\"></span>Home</span></div></div></div><div class=\"ds-line\"><svg viewBox=\"0 0 18 18\" width=\"18\" height=\"18\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" style=\"color:var(--ink);flex:none\"><circle cx=\"9\" cy=\"9\" r=\"7\"/></svg><div class=\"ds-body\"><a class=\"ds-title\" href=\"#\">Draft the release notes</a><div class=\"ds-meta\"><span>2/5</span><span>Mon</span><span class=\"ds-proj\"><span class=\"ds-sq\"></span>Taskly</span></div></div></div></div>",
       "css": ":host{--page:#ffffff;--hover:#f3f4f6;--ink:#0b0e11;--ink-2:#3d444d;--ink-3:#656d76;--rule:#e6e8eb;--rule-strong:#c9cdd2;--late:#cf222e;--done:#1a7f37;--p2:#8a5c00;--p3:#0969da;font-family:-apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, \"Helvetica Neue\", \"Noto Sans\", Arial, sans-serif;font-size:15px;line-height:1.45;color:var(--ink);} .ds-band{width:520px;} .ds-bh{display:flex;align-items:baseline;gap:8px;margin:0;padding-bottom:8px;border-bottom:1px solid var(--rule-strong);font-size:13px;font-weight:600;} .ds-late{color:var(--late);} .ds-n{color:var(--ink-3);font:400 12px ui-monospace, \"SF Mono\", Menlo, Consolas, monospace;} .ds-line{display:flex;gap:12px;padding:10px 0;border-bottom:1px solid var(--rule);} .ds-line:last-child{border-bottom:0;} .ds-line:hover{background:linear-gradient(to right,var(--hover),transparent 85%);} .ds-body{flex:1;min-width:0;} .ds-title{color:var(--ink);font-weight:500;line-height:1.375;text-decoration:none;text-underline-offset:4px;border-radius:4px;} .ds-title:hover{text-decoration:underline;} .ds-title:focus-visible{outline:none;box-shadow:0 0 0 3px color-mix(in oklab,var(--ink) 50%,transparent);} .ds-meta{display:flex;gap:12px;margin-top:4px;font-size:13px;line-height:1.25;color:var(--ink-3);font-variant-numeric:tabular-nums;} .ds-due{color:var(--late);font-weight:500;} .ds-proj{margin-left:auto;display:flex;align-items:center;gap:6px;} .ds-sq{width:8px;height:8px;border-radius:2px;background:currentColor;opacity:.55;}"
     },
@@ -578,28 +601,69 @@
       "description": "The primary action under the thumb on a phone: a 52px round ink button on its own shadow.",
       "html": "<button class=\"ds-fab\" aria-label=\"Add a task\"><svg viewBox=\"0 0 24 24\" width=\"22\" height=\"22\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\"><path d=\"M12 5v14M5 12h14\"/></svg></button>",
       "css": ":host{--page:#ffffff;--hover:#f3f4f6;--ink:#0b0e11;--ink-2:#3d444d;--ink-3:#656d76;--rule:#e6e8eb;--rule-strong:#c9cdd2;--late:#cf222e;--done:#1a7f37;--p2:#8a5c00;--p3:#0969da;font-family:-apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, \"Helvetica Neue\", \"Noto Sans\", Arial, sans-serif;font-size:15px;line-height:1.45;color:var(--ink);} .ds-fab{display:grid;place-items:center;width:52px;height:52px;border:0;border-radius:9999px;background:var(--ink);color:var(--page);box-shadow:0 6px 16px rgb(0 0 0 / 0.18);cursor:pointer;transition:background-color .15s;} .ds-fab:hover{background:color-mix(in oklab,var(--ink) 90%,transparent);} .ds-fab:focus-visible{outline:none;box-shadow:0 6px 16px rgb(0 0 0 / 0.18),0 0 0 3px color-mix(in oklab,var(--ink) 50%,transparent);}"
+    },
+    {
+      "name": "Record Column Bar and Title",
+      "kind": "custom",
+      "refersTo": "record-bar",
+      "description": "The head of the record column: a 52px bar with context at the left and count, previous, next and close at the right, then the 22px status mark beside the 22px/600 title.",
+      "html": "<div class=\"ds-col\"><div class=\"ds-bar\"><div class=\"ds-ctx\"><span class=\"ds-proj\">Taskly</span><span aria-hidden=\"true\">&middot;</span><span class=\"ds-trunc\">opened by you, 24.09.2026</span></div><span class=\"ds-ctrls\"><span class=\"ds-pos\">3 of 12</span><button class=\"ds-bb\" aria-label=\"Previous task\"><svg viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\" ><path d=\"M18 15l-6-6-6 6\"/></svg></button><button class=\"ds-bb\" aria-label=\"Next task\"><svg viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\" ><path d=\"M6 9l6 6 6-6\"/></svg></button><button class=\"ds-bb\" aria-label=\"Close\"><svg viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\" ><path d=\"M18 6L6 18M6 6l12 12\"/></svg></button></span></div><div class=\"ds-tr\"><span class=\"ds-mk\"><svg viewBox=\"0 0 18 18\" width=\"22\" height=\"22\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" style=\"color:var(--late);flex:none\"><circle cx=\"9\" cy=\"9\" r=\"7\"/></svg></span><h2 class=\"ds-ti\">Draft the release notes</h2></div></div>",
+      "css": ":host{--page:#ffffff;--hover:#f3f4f6;--ink:#0b0e11;--ink-2:#3d444d;--ink-3:#656d76;--rule:#e6e8eb;--rule-strong:#c9cdd2;--late:#cf222e;--done:#1a7f37;--p2:#8a5c00;--p3:#0969da;font-family:-apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, \"Helvetica Neue\", \"Noto Sans\", Arial, sans-serif;font-size:15px;line-height:1.45;color:var(--ink);} .ds-col{width:560px;background:var(--page);border-left:1px solid var(--rule-strong);} .ds-bar{display:flex;align-items:center;gap:12px;height:52px;padding:0 29px 0 36px;} .ds-ctx{flex:1;min-width:0;display:flex;align-items:center;gap:6px;font-size:13px;color:var(--ink-3);} .ds-proj{color:var(--ink-2);font-weight:500;flex:none;} .ds-trunc{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;} .ds-ctrls{display:flex;align-items:center;gap:4px;flex:none;} .ds-pos{margin-right:4px;font:400 12px ui-monospace, \"SF Mono\", Menlo, Consolas, monospace;font-variant-numeric:tabular-nums;color:var(--ink-3);} .ds-bb{display:grid;place-items:center;width:28px;height:28px;border:0;border-radius:6px;background:none;color:var(--ink-3);cursor:pointer;transition:background-color .15s cubic-bezier(.4,0,.2,1),color .15s cubic-bezier(.4,0,.2,1);} .ds-bb:hover{background:var(--hover);color:var(--ink);} .ds-bb:focus-visible{outline:none;box-shadow:0 0 0 3px color-mix(in oklab,var(--ink) 50%,transparent);} .ds-bb svg{width:16px;height:16px;} .ds-tr{display:grid;grid-template-columns:22px minmax(0,1fr);gap:12px;align-items:start;padding:8px 36px 18px;} .ds-mk{display:flex;margin-top:7px;} .ds-ti{margin:0 0 0 -8px;padding:4px 8px;font-size:22px;line-height:1.25;font-weight:600;letter-spacing:-0.015em;}"
+    },
+    {
+      "name": "Property List",
+      "kind": "custom",
+      "refersTo": "property-value",
+      "description": "The record read and editable: a 96px Ink 3 label column, flat 30px text-button values that tint on hover and show their chevron then, and the Priority row's flag and label in its hue.",
+      "html": "<div class=\"ds-pl\"><div class=\"ds-pr\"><span class=\"ds-pb\">Project</span><div class=\"ds-pv\"><button class=\"ds-val\">Taskly<svg class=\"ds-chev\" viewBox=\"0 0 24 24\" width=\"12\" height=\"12\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M6 9l6 6 6-6\"/></svg></button></div></div><div class=\"ds-pr\"><span class=\"ds-pb\">Due</span><div class=\"ds-pv\"><button class=\"ds-val\">Mon, 12 Oct</button></div></div><div class=\"ds-pr\"><span class=\"ds-pb\">Priority</span><div class=\"ds-pv\"><button class=\"ds-val ds-p1\"><span class=\"ds-flag\"><svg viewBox=\"0 0 24 24\" width=\"14\" height=\"14\" fill=\"currentColor\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M4 22V4M4 4h13l-2 4 2 4H4\"/></svg>P1</span><svg class=\"ds-chev\" viewBox=\"0 0 24 24\" width=\"12\" height=\"12\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M6 9l6 6 6-6\"/></svg></button></div></div><div class=\"ds-pr\"><span class=\"ds-pb\">Assignee</span><div class=\"ds-pv\"><button class=\"ds-val ds-unset\">No assignee</button></div></div><div class=\"ds-pr\"><span class=\"ds-pb\">Created</span><div class=\"ds-pv\"><span class=\"ds-ro\">24.09.2026, 09:12 by you</span></div></div></div>",
+      "css": ":host{--page:#ffffff;--hover:#f3f4f6;--ink:#0b0e11;--ink-2:#3d444d;--ink-3:#656d76;--rule:#e6e8eb;--rule-strong:#c9cdd2;--late:#cf222e;--done:#1a7f37;--p2:#8a5c00;--p3:#0969da;font-family:-apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, \"Helvetica Neue\", \"Noto Sans\", Arial, sans-serif;font-size:15px;line-height:1.45;color:var(--ink);} .ds-pl{width:488px;display:flex;flex-direction:column;gap:2px;border-top:1px solid var(--rule-strong);padding:10px 0 14px;} .ds-pr{display:grid;grid-template-columns:96px minmax(0,1fr);column-gap:16px;align-items:start;} .ds-pb{display:flex;align-items:center;height:30px;font-size:13px;color:var(--ink-3);} .ds-pv{display:flex;align-items:center;min-height:30px;min-width:0;gap:8px;} .ds-val{display:inline-flex;align-items:center;gap:6px;width:fit-content;max-width:100%;height:30px;margin-left:-8px;padding:0 8px;border:1px solid transparent;border-radius:6px;background:transparent;color:var(--ink);font:inherit;font-size:15px;cursor:pointer;transition:background-color .15s cubic-bezier(.4,0,.2,1);} .ds-val:hover{background:var(--hover);} .ds-val:focus-visible{outline:none;border-color:var(--ink);} .ds-chev{opacity:0;} .ds-val:hover .ds-chev,.ds-val:focus-visible .ds-chev{opacity:1;} .ds-unset{color:var(--ink-3);} .ds-flag{display:flex;align-items:center;gap:6px;font-weight:500;} .ds-p1{color:var(--late);} .ds-ro{font-size:14px;color:var(--ink-3);}"
+    },
+    {
+      "name": "Record Section and Activity",
+      "kind": "custom",
+      "refersTo": "activity-event",
+      "description": "A section heading (13px/600, mono count, action at the right) over a hairline, then the oldest-first chronology: day separator, mono time column, muted event one-liners that start with the actor, a comment, and the frameless composer.",
+      "html": "<section class=\"ds-sec\"><h3 class=\"ds-sh\">Activity<span class=\"ds-n\">3</span></h3><ol class=\"ds-ol\"><li class=\"ds-day\">Yesterday</li><li class=\"ds-m\"><time>16:40</time><div class=\"ds-ev\"><span class=\"ds-who\">release-bot</span> moved this to Review</div></li><li class=\"ds-m ds-c\"><time>16:52</time><div><div class=\"ds-au\"><a href=\"#\" class=\"ds-bot\">release-bot</a><small>bot user</small></div><p class=\"ds-body\">Notes drafted; the changelog needs a second read.</p></div></li><li class=\"ds-m ds-c\"><time>17:05</time><div><div class=\"ds-au ds-you\">You</div><p class=\"ds-body\">Reading it now.</p><div class=\"ds-act\"><button class=\"ds-ta\">Edit</button><button class=\"ds-ta\">Delete</button></div></div></li></ol><div class=\"ds-comp\"><textarea aria-label=\"New comment\" placeholder=\"Write a comment…\"></textarea><div class=\"ds-cl\"><span><kbd class=\"ds-kc\">⌘ Enter</kbd> to post</span><button class=\"ds-post\">Comment</button></div></div></section>",
+      "css": ":host{--page:#ffffff;--hover:#f3f4f6;--ink:#0b0e11;--ink-2:#3d444d;--ink-3:#656d76;--rule:#e6e8eb;--rule-strong:#c9cdd2;--late:#cf222e;--done:#1a7f37;--p2:#8a5c00;--p3:#0969da;font-family:-apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, \"Helvetica Neue\", \"Noto Sans\", Arial, sans-serif;font-size:15px;line-height:1.45;color:var(--ink);} .ds-sec{width:488px;} .ds-sh{display:flex;align-items:baseline;gap:8px;margin:0;padding-bottom:8px;border-bottom:1px solid var(--rule-strong);font-size:13px;font-weight:600;} .ds-n{color:var(--ink-3);font:400 12px ui-monospace, \"SF Mono\", Menlo, Consolas, monospace;font-variant-numeric:tabular-nums;} .ds-ol{list-style:none;margin:0;padding:0;} .ds-day{padding-top:10px;font-size:12.5px;color:var(--ink-3);} .ds-m{display:grid;grid-template-columns:4.25rem 1fr;column-gap:12px;align-items:baseline;padding:9px 0;border-bottom:1px solid var(--rule);} .ds-m time{font:400 12px ui-monospace, \"SF Mono\", Menlo, Consolas, monospace;font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--ink-3);} .ds-ev{font-size:13.5px;color:var(--ink-3);} .ds-who{color:var(--ink-2);font-weight:500;} .ds-au{display:flex;align-items:baseline;gap:8px;font-weight:500;} .ds-au small{font-size:12px;font-weight:400;color:var(--ink-3);} .ds-bot{color:var(--ink);text-underline-offset:4px;} .ds-bot:hover{text-decoration:underline;} .ds-you{color:var(--ink-3);} .ds-body{margin:3px 0 0;color:var(--ink-2);line-height:1.5;} .ds-act{display:flex;gap:12px;margin-top:4px;font-size:12.5px;opacity:0;transition:opacity .15s;} .ds-c:hover .ds-act,.ds-c:focus-within .ds-act{opacity:1;} .ds-ta{border:0;background:none;padding:0;font:inherit;color:var(--ink-3);cursor:pointer;border-radius:2px;text-underline-offset:4px;} .ds-ta:hover{color:var(--ink);text-decoration:underline;} .ds-ta:focus-visible{outline:none;box-shadow:0 0 0 3px color-mix(in oklab,var(--ink) 50%,transparent);} .ds-comp{margin-top:14px;padding-top:10px;border-top:1px solid var(--rule-strong);} .ds-comp:focus-within{border-top-color:var(--ink);} .ds-comp textarea{display:block;width:100%;min-height:44px;resize:none;border:0;outline:none;background:transparent;padding:6px 0;font:inherit;color:var(--ink);box-sizing:border-box;} .ds-comp textarea::placeholder{color:var(--ink-3);} .ds-cl{display:flex;align-items:center;gap:14px;font-size:13px;color:var(--ink-3);} .ds-kc{border:1px solid var(--rule-strong);border-radius:2px;padding:0 5px;font:11px ui-monospace, \"SF Mono\", Menlo, Consolas, monospace;} .ds-post{margin-left:auto;border:0;background:none;padding:0;font:inherit;font-weight:500;color:var(--ink);cursor:pointer;} .ds-post:hover{text-decoration:underline;} .ds-post:focus-visible{outline:none;box-shadow:0 0 0 3px color-mix(in oklab,var(--ink) 50%,transparent);}"
+    },
+    {
+      "name": "Notice",
+      "kind": "custom",
+      "refersTo": "notice",
+      "description": "A line of the log that has left the page: page ground, Rule Strong hairline, 8px corner, the Notice shadow, severity as the icon's colour only, text actions Open and Undo, and a quiet 24px close inside it. Top-centre, 420px at most.",
+      "html": "<div class=\"ds-nt\" role=\"status\"><svg class=\"ds-ic\" viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"12\" r=\"10\"/><path d=\"M9 12l2 2 4-4\"/></svg><span class=\"ds-tx\">&ldquo;Renew the domain&rdquo; created in Inbox</span><button class=\"ds-na\">Open</button><button class=\"ds-na\">Undo</button><button class=\"ds-x\" aria-label=\"Close notice\"><svg viewBox=\"0 0 24 24\" width=\"14\" height=\"14\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\" ><path d=\"M18 6L6 18M6 6l12 12\"/></svg></button></div>",
+      "css": ":host{--page:#ffffff;--hover:#f3f4f6;--ink:#0b0e11;--ink-2:#3d444d;--ink-3:#656d76;--rule:#e6e8eb;--rule-strong:#c9cdd2;--late:#cf222e;--done:#1a7f37;--p2:#8a5c00;--p3:#0969da;font-family:-apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, \"Helvetica Neue\", \"Noto Sans\", Arial, sans-serif;font-size:15px;line-height:1.45;color:var(--ink);} .ds-nt{position:relative;display:flex;align-items:center;gap:12px;width:420px;box-sizing:border-box;padding:8px 40px 8px 14px;background:var(--page);color:var(--ink);border:1px solid var(--rule-strong);border-radius:8px;font-size:13.5px;box-shadow:0 10px 24px -8px rgb(0 0 0 / 0.25),0 2px 6px rgb(0 0 0 / 0.08);} .ds-ic{flex:none;color:var(--done);} .ds-tx{flex:1;min-width:0;} .ds-na{border:0;background:transparent;padding:4px;font:inherit;font-size:13.5px;font-weight:500;color:var(--ink);cursor:pointer;border-radius:4px;text-underline-offset:4px;} .ds-na:hover{text-decoration:underline;} .ds-na:focus-visible{outline:none;box-shadow:0 0 0 3px color-mix(in oklab,var(--ink) 50%,transparent);} .ds-x{position:absolute;top:50%;right:6px;transform:translateY(-50%);display:grid;place-items:center;width:24px;height:24px;border:0;border-radius:6px;background:transparent;color:var(--ink-3);cursor:pointer;} .ds-x:hover{background:var(--hover);color:var(--ink);} .ds-x:focus-visible{outline:none;box-shadow:0 0 0 3px color-mix(in oklab,var(--ink) 50%,transparent);}"
+    },
+    {
+      "name": "Open Line Tint",
+      "kind": "custom",
+      "refersTo": "task-line-hover",
+      "description": "row-tint: the Hover ground fading out over the last 15% of the row, on a hovered line and on the line open in the record column.",
+      "html": "<div class=\"ds-rt\"><div class=\"ds-r\"><span class=\"ds-t\">Renew the domain</span></div><div class=\"ds-r ds-open\"><span class=\"ds-t\">Draft the release notes</span></div><div class=\"ds-r\"><span class=\"ds-t\">Pay rent</span></div></div>",
+      "css": ":host{--page:#ffffff;--hover:#f3f4f6;--ink:#0b0e11;--ink-2:#3d444d;--ink-3:#656d76;--rule:#e6e8eb;--rule-strong:#c9cdd2;--late:#cf222e;--done:#1a7f37;--p2:#8a5c00;--p3:#0969da;font-family:-apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, \"Helvetica Neue\", \"Noto Sans\", Arial, sans-serif;font-size:15px;line-height:1.45;color:var(--ink);} .ds-rt{width:520px;} .ds-r{padding:10px 0;border-bottom:1px solid var(--rule);transition:background-color .15s cubic-bezier(.4,0,.2,1);} .ds-r:last-child{border-bottom:0;} .ds-r:hover,.ds-open{background-image:linear-gradient(to right,var(--hover),transparent 85%);} .ds-t{font-weight:500;line-height:1.375;}"
     }
   ],
   "narrative": {
     "northStar": "The Changelog",
-    "overview": "Taskly is read the way a project's history is read: one continuous, well-set log on a white page. There are no boxes, no panels and no bezels around the work. Hairline rules and whitespace carry structure; weight and indent carry hierarchy; and every line that records a change names who wrote it, because a person and their bot users act on the same tasks. The register is calm and dense in the way a good release note is dense: everything on the page is a fact, set at a size it can be read at.\n\nThe world is near-monochrome by conviction. Ink and two greys do the reading; two strengths of hairline do the dividing. Colour is held back for state that asks the reader to act (a red for what is late or most urgent, a green for what is done or can be closed) and for the two lower priority hues, which only ever colour a status mark. Nothing coloured marks where the reader is: location is said by weight. Controls are text first: a frameless capture line with a hairline beneath it, text links as actions, a small outlined key cap for the shortcut.\n\nThe brand is the wordmark \"Taskly\", set in the interface's own face. The craft bar is Linear. The category's card grids, chip-filled sidebars and coloured location accents were looked at and rejected: Mission Console and Card Box were turned down after mocks for carrying too many frames and too much chrome.\n\n**Transition note.** Redesign slice 1 shipped the shell (navigation, top bar, capture entry, phone Add button), the day page, the task line and the status marks. The task list, the record panels and capture panel, Bots, Activity, settings and the auth screens are not yet redesigned: they still use the stock component kit, and read as the same world only because its semantic colour names (background, foreground, primary, muted, accent, border, input, ring, destructive) are mapped onto this palette. Their framed inputs, outline buttons with a faint shadow, pill badges and table chrome are inherited, not designed, and are not precedent for new surfaces.",
+    "overview": "Taskly is read the way a project's history is read: one continuous, well-set log on a white page. There are no boxes, no panels and no bezels around the work. Hairline rules and whitespace carry structure; weight and indent carry hierarchy; and every line that records a change names who wrote it, because a person and their bot users act on the same tasks. The register is calm and dense in the way a good release note is dense: everything on the page is a fact, set at a size it can be read at.\n\nThe world is near-monochrome by conviction. Ink and two greys do the reading; two strengths of hairline do the dividing. Colour is held back for state that asks the reader to act (a red for what is late or most urgent, a green for what is done or can be closed) and for the two lower priority hues, which only ever colour a status mark and the Priority row of a task's property list. Nothing coloured marks where the reader is: location is said by weight. Controls are text first: a frameless capture line with a hairline beneath it, text links as actions, a small outlined key cap for the shortcut.\n\nThe brand is the wordmark \"Taskly\", set in the interface's own face. The craft bar is Linear. The category's card grids, chip-filled sidebars and coloured location accents were looked at and rejected: Mission Console and Card Box were turned down after mocks for carrying too many frames and too much chrome.\n\n**Transition note.** Redesign slice 1 shipped the shell (navigation, top bar, capture entry, phone Add button), the day page, the task line and the status marks. Slice 2 shipped the record column the shell holds for every record, the task panel and its capture draft, the capture line's create-at-once behaviour, and the notices at the top. The project, tag and bot panels sit inside the new column but keep their own content (their header, breadcrumb and single-purpose dialogs are the old kit). The task list, Bots, Activity, settings and the auth screens are not yet redesigned: they still use the stock component kit, and read as the same world only because its semantic colour names (background, foreground, primary, muted, accent, border, input, ring, destructive) are mapped onto this palette. Their framed inputs, outline buttons with a faint shadow, pill badges and table chrome are inherited, not designed, and are not precedent for new surfaces.",
     "keyCharacteristics": [
       "One page, one ground: sections are groups under a hairline heading, never framed containers.",
       "Ink plus two greys for all reading; colour only for state that asks for action.",
       "The current screen is marked by weight (600), never by a fill or a colour.",
       "Every log line leads with its actor; bot users' lines are news (ink), the reader's own are reminders (muted).",
       "The platform UI sans at 15px; monospace only for times, counts, ids and key caps.",
-      "Six stroked status marks, told apart by shape; priority is the mark's colour."
+      "Six stroked status marks, told apart by shape; priority is the mark's colour, and the Priority row's.",
+      "A record opens in a column beside the page, not over it: no scrim, no focus trap, the page stays live."
     ],
     "rules": [
       {
         "name": "The Action-Only Colour Rule",
-        "body": "Colour exists only for state that asks for action: red for overdue and P1, green for done and close, amber and blue only for P2 and P3 status marks. No accent marks location, selection, hover or brand; `theme.test.ts` asserts that no accent hue returns. If a new element wants colour, it must name the action the colour asks for.",
+        "body": "Colour exists only for state that asks for action: red for overdue and P1, green for done and close, amber and blue only for P2 and P3 status marks and Priority rows; the one place green and red mark severity is the icon of a notice, and only the icon. No accent marks location, selection, hover or brand; `theme.test.ts` asserts that no accent hue returns. If a new element wants colour, it must name the action the colour asks for.",
         "section": "colors"
       },
       {
         "name": "The Priority Hue Rule",
-        "body": "Priority is carried only as the colour of an open task's status mark. P4 and no priority have no hue and stay ink. A closed task's mark is Done Green whatever its priority was.",
+        "body": "Priority hue lives on two things only: an open task's status mark, and the flag and label of the Priority row in a task's property list (the choices in that row's menu carry their flag in the same hue, so the colour is learnt where it is set). P1 is Overdue Red, P2 Priority Amber, P3 Priority Blue: the same values and the same contrast as on the mark, red 5.4 / 4.9, amber 5.8 / 5.3 and blue 5.2 / 4.7 on the light page / hover, and in dark red 6.0 / 5.0, amber 8.7 / 7.3 and blue 7.8 / 6.6. In the row the label is set at 500 beside a filled 14px flag. P4 is the flag and label in ink; no priority is the words \"No priority\" in Ink 3 with no flag. A closed task's mark is Done Green whatever its priority was. Nowhere else: not a pill, not a line, not a column.",
         "section": "colors"
       },
       {
@@ -619,7 +683,7 @@
       },
       {
         "name": "The No-Frame Rule",
-        "body": "A section is a heading over a hairline and the lines under it. It is never a bordered or filled container, and nothing on the day page sits in a card.",
+        "body": "A section is a heading over a hairline and the lines under it. It is never a bordered or filled container, and nothing on the day page or in a record's column sits in a card.",
         "section": "layout"
       },
       {
@@ -629,7 +693,7 @@
       },
       {
         "name": "The Scrim Rule",
-        "body": "Anything modal brings the scrim with it, and the page ground must fall at least 0.06 in OKLab lightness under it: 50% black does this in light (0.40), and dark needs 80% (0.076).",
+        "body": "Anything modal brings the scrim with it (the record column and a notice are not modal and bring none), and the page ground must fall at least 0.06 in OKLab lightness under it: 50% black does this in light (0.40), and dark needs 80% (0.076).",
         "section": "elevation"
       },
       {
@@ -639,7 +703,7 @@
       },
       {
         "name": "The Stay-Put Rule",
-        "body": "Opening a record never moves the reader to another screen. The panel's address belongs to the shell, so every screen opens a task over itself, and capture starts from any of them.",
+        "body": "Opening a record never moves the reader to another screen. The panel's address belongs to the shell, so every screen opens a task beside itself, and capture starts from any of them.",
         "section": "components"
       }
     ],
@@ -648,18 +712,23 @@
       "**Do** mark the current place by weight (ink, 600), and only by weight.",
       "**Do** lead every activity line with its actor, and set bot users' lines in ink and the reader's own in Ink 3.",
       "**Do** make actions text first: a text link, an inline \"Close it\", a frameless capture line with its `C` key cap.",
-      "**Do** use the six status marks at 18px for status, with priority as their colour (The Six-Mark Rule).",
+      "**Do** use the six status marks at 18px for status (22px as the title row's closing control), with priority as their colour (The Six-Mark Rule).",
+      "**Do** keep a record's controls flat at rest, tint them Hover on reach, grow them to 44px under a coarse pointer, and start every edge of the column on the one gutter (36px, 16px on a phone).",
+      "**Do** open records in the column beside the page with no scrim and no focus trap, and raise every notice at the top with text actions and severity as the icon's colour.",
+      "**Do** show the line that is open with the `row-tint` ground, in lists and tables alike.",
       "**Do** use monospace only for times, counts, ids and key caps, with tabular figures.",
       "**Do** check every new text/ground pair in both themes in `src/theme.test.ts` before shipping.",
       "**Do** say an empty state in one sentence instead of drawing an empty container."
     ],
     "donts": [
-      "**Don't** colour location, selection, brand or decoration; colour is for overdue, P1, done, close, and the P2/P3 marks only.",
+      "**Don't** colour location, selection, brand or decoration; colour is for overdue, P1, done, close, the P2/P3 marks, the Priority row, and the icon of a success or error notice only.",
       "**Don't** put a section, band or list on a card, a filled panel or a bordered box.",
       "**Don't** draw a rule between the navigation and the work.",
       "**Don't** set tags or a project as pills in a task line.",
       "**Don't** use uppercase, letter-spaced labels or eyebrows above headings.",
-      "**Don't** give a shadow to anything that sits on the page.",
+      "**Don't** give a shadow to anything that sits on the page, the record column included.",
+      "**Don't** show priority in colour as a pill, a line or a column: its hue is the status mark's and the Priority row's.",
+      "**Don't** fill a notice with severity colour, or hang its close control off the corner.",
       "**Don't** let colour alone carry a link; inside a sentence it is underlined at rest.",
       "**Don't** take the inherited kit's framed inputs, outline buttons or pill badges on not-yet-redesigned screens as precedent for new surfaces."
     ]

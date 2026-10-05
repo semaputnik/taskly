@@ -11,14 +11,12 @@ import {
   RecordHeader,
   RecordPanel,
   titleFieldClass,
-  valueInset,
 } from "@/components/Records/RecordPanel"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { formatDateTime, formatDayOf } from "@/lib/dates"
 import { scopeProjectsQuery, useReportChange } from "@/lib/serverState"
 import { toastError } from "@/lib/toasts"
-import { cn } from "@/lib/utils"
 import { BotConsole } from "./BotConsole"
 import DeleteBotUser from "./DeleteBotUser"
 import { ago, until } from "./health"
@@ -133,7 +131,7 @@ function BotRecord({ bot }: { bot: BotUserPublic }) {
 
       <PropertyList>
         <PropertyRow label="Token">
-          <div className={cn("flex flex-wrap items-center gap-2", valueInset)}>
+          <div className="flex flex-wrap items-center gap-2">
             <span>{STATUS_TEXT[status]}</span>
             {/* Issuing keeps its dialog: the token is shown once and cannot be
                 read back, so it is a deliberate step, not a click (FR-08.13). */}
@@ -179,7 +177,7 @@ function BotRecord({ bot }: { bot: BotUserPublic }) {
         </PropertyRow>
 
         <PropertyRow label="Projects">
-          <div className={cn("flex flex-col gap-2 py-1", valueInset)}>
+          <div className="flex flex-col gap-2 py-1">
             {(projects ?? []).map((project) => {
               const id = `scope-${bot.id}-${project.id}`
               return (
@@ -212,7 +210,7 @@ function BotRecord({ bot }: { bot: BotUserPublic }) {
         </PropertyRow>
 
         <PropertyRow label="Permissions">
-          <div className={cn("flex flex-col gap-3 py-1", valueInset)}>
+          <div className="flex flex-col gap-3 py-1">
             {PERMISSION_GROUPS.map((group) => (
               <fieldset key={group.title} className="flex flex-col gap-2">
                 <legend className="text-muted-foreground text-xs">

@@ -33,8 +33,12 @@ const textAction =
  */
 const classNames = {
   toast:
-    "gap-3! rounded-lg! px-3.5! py-2! text-[13.5px]! shadow-[0_10px_24px_-8px_rgb(0_0_0/0.25),0_2px_6px_rgb(0_0_0/0.08)]! dark:shadow-[0_10px_24px_-8px_rgb(0_0_0/0.7),0_2px_6px_rgb(0_0_0/0.4)]!",
+    "gap-3! rounded-lg! py-2! pr-10! pl-3.5! text-[13.5px]! shadow-[0_10px_24px_-8px_rgb(0_0_0/0.25),0_2px_6px_rgb(0_0_0/0.08)]! dark:shadow-[0_10px_24px_-8px_rgb(0_0_0/0.7),0_2px_6px_rgb(0_0_0/0.4)]!",
   content: "flex-1",
+  // Inside the notice, at its right, as a quiet control: sonner's own chip
+  // hangs off the corner and is too small to reach.
+  closeButton:
+    "top-1/2! right-1.5! left-auto! size-6! -translate-y-1/2 transform-none! rounded-md! border-0! bg-transparent! text-ink-3! hover:bg-hover! hover:text-ink! pointer-coarse:size-11! pointer-coarse:right-0!",
   success: "[&_[data-icon]]:text-done",
   error: "[&_[data-icon]]:text-late",
   actionButton: textAction,

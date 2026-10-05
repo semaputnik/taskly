@@ -17,14 +17,12 @@ import {
   RecordHeader,
   RecordPanel,
   titleFieldClass,
-  valueInset,
 } from "@/components/Records/RecordPanel"
 import { taskCountLabel } from "@/components/Tags/counts"
 import { LoadingButton } from "@/components/ui/loading-button"
 import { formatDayOf } from "@/lib/dates"
 import { useReportChange } from "@/lib/serverState"
 import { toastError, toastSuccess } from "@/lib/toasts"
-import { cn } from "@/lib/utils"
 import DeleteProject from "./DeleteProject"
 
 /**
@@ -109,7 +107,7 @@ function ProjectRecord({ project }: { project: ProjectPublic }) {
             <RouterLink
               to="/tasks"
               search={{ project_id: project.id }}
-              className={cn(valueInset, "underline-offset-4 hover:underline")}
+              className="underline-offset-4 hover:underline"
             >
               {taskCountLabel(project.task_count ?? 0)}
             </RouterLink>
@@ -188,7 +186,7 @@ function ArchiveToggle({ project }: { project: ProjectPublic }) {
   })
 
   return (
-    <div className={cn("flex flex-wrap items-center gap-2", valueInset)}>
+    <div className="flex flex-wrap items-center gap-2">
       <span>
         {project.is_archived
           ? "Archived — read-only until it comes back"

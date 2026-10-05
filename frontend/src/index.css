@@ -204,6 +204,15 @@
   }
 }
 
+/*
+ * The tint of a line that is under the pointer or open in the record column:
+ * the hover ground, fading out over the last of the row. One utility, so a
+ * list line and a table row cannot drift apart.
+ */
+@utility row-tint {
+  background-image: linear-gradient(to right, var(--hover), transparent 85%);
+}
+
 @layer components {
   /*
    * Scroll shadows: the shadow on an edge shows only while there is content

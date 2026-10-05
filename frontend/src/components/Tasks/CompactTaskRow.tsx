@@ -86,8 +86,8 @@ export function CompactTaskRow({
   return (
     <div
       className={cn(
-        "hover:from-hover border-rule flex gap-3 border-b py-2.5 transition-colors last:border-b-0 hover:bg-linear-to-r hover:to-transparent hover:to-85%",
-        open && "from-hover bg-linear-to-r to-transparent to-85%",
+        "border-rule hover:row-tint flex gap-3 border-b py-2.5 transition-colors last:border-b-0",
+        open && "row-tint",
         flush ? "px-0" : "px-4",
       )}
     >

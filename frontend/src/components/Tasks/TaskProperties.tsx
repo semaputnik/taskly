@@ -212,10 +212,7 @@ export function TaskPropertyRows({
             >
               <SelectTrigger
                 id={`${ids}-repeat`}
-                className={cn(
-                  quiet,
-                  !fields.recurrence && "text-muted-foreground",
-                )}
+                className={cn(quiet, !fields.recurrence && "text-ink-3")}
               >
                 <SelectValue />
               </SelectTrigger>

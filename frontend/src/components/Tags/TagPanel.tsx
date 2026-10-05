@@ -12,7 +12,6 @@ import {
   RecordHeader,
   RecordPanel,
   titleFieldClass,
-  valueInset,
 } from "@/components/Records/RecordPanel"
 import { Button } from "@/components/ui/button"
 import { Refusal, refusalCode } from "@/lib/apiErrors"
@@ -173,13 +172,11 @@ function TagRecord({
 
       <PropertyList>
         <PropertyRow label="Tasks">
-          <TaskCount tag={tag} className={valueInset} />
+          <TaskCount tag={tag} />
         </PropertyRow>
         {tag.created_by_bot_user && (
           <PropertyRow label="Created by">
-            <span className={valueInset}>
-              <BotCreator tag={tag} />
-            </span>
+            <BotCreator tag={tag} />
           </PropertyRow>
         )}
       </PropertyList>
