@@ -44,6 +44,9 @@ import type { RecordLoad } from "./panels"
 export const ghost =
   "record-control border-transparent bg-transparent shadow-none hover:bg-accent focus-visible:border-ring dark:bg-transparent dark:hover:bg-accent/50"
 
+/** Where notices are shown, outside any panel. */
+const NOTICES = "[data-sonner-toaster]"
+
 export function RecordPanel({
   open,
   onClose,
@@ -74,6 +77,17 @@ export function RecordPanel({
       <SheetContent
         side="right"
         className="w-full gap-0 overflow-y-auto p-0 outline-none sm:max-w-xl"
+        // A notice is not the page behind the panel. The notice a capture
+        // leaves arrives while the panel is still sliding out, and its Open
+        // opens the new task in this very panel: the click starts outside a
+        // panel that is on its way out, and the dismissal it started is only
+        // delivered once the click ends, by when Open has made the panel
+        // open again — so the panel was closed straight after it opened.
+        onInteractOutside={(event) => {
+          if ((event.target as Element | null)?.closest(NOTICES)) {
+            event.preventDefault()
+          }
+        }}
         // Opening a record puts focus on the panel itself, not on its first
         // control: that would be the name field, which a reader who only came
         // to look must not find already in their hands. Tab starts from here,
