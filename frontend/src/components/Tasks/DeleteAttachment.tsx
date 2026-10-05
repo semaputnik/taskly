@@ -1,5 +1,4 @@
 import { useMutation } from "@tanstack/react-query"
-import { Trash2 } from "lucide-react"
 import { useState } from "react"
 
 import { type AttachmentPublic, AttachmentsService } from "@/client"
@@ -53,18 +52,17 @@ export function DeleteAttachment({
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <Button
-        variant="ghost"
-        size="icon"
-        aria-label={`Delete ${attachment.filename}`}
+      <button
+        type="button"
+        aria-label={`Remove ${attachment.filename}`}
         className={cn(
-          "text-muted-foreground hover:text-destructive",
+          "text-ink-3 hover:text-destructive focus-visible:ring-ring/50 rounded-sm underline-offset-4 outline-none hover:underline focus-visible:ring-[3px]",
           className,
         )}
         onClick={() => setIsOpen(true)}
       >
-        <Trash2 />
-      </Button>
+        Remove
+      </button>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="break-all">

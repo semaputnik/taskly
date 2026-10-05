@@ -1,5 +1,4 @@
 import { useMutation, useQuery } from "@tanstack/react-query"
-import { Download, Upload } from "lucide-react"
 import { useRef } from "react"
 
 import {
@@ -7,11 +6,10 @@ import {
   AttachmentsService,
   type TaskPublic,
 } from "@/client"
-import { Button } from "@/components/ui/button"
-import { LoadingButton } from "@/components/ui/loading-button"
-import { Separator } from "@/components/ui/separator"
+import { RecordSection } from "@/components/Records/RecordPanel"
 import { attachmentsQuery, useReportChange } from "@/lib/serverState"
 import { toastError } from "@/lib/toasts"
+import { cn } from "@/lib/utils"
 import { DeleteAttachment } from "./DeleteAttachment"
 
 interface TaskAttachmentsProps {
@@ -25,15 +23,15 @@ function formatSize(bytes: number): string {
 }
 
 /**
- * A task's file attachments: upload, download, and delete. Byte storage sits
- * behind a swappable backend on the server (ADR-0002); this dialog only ever
+ * A task's files, as a section of the task: attach, download, and remove. Byte storage sits
+ * behind a swappable backend on the server (ADR-0002); this section only ever
  * sees the metadata and the raw bytes it downloads (FR-04.1).
  */
 export const TaskAttachments = ({ task }: TaskAttachmentsProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const reportChange = useReportChange()
 
-  const { data: attachments, isLoading } = useQuery(attachmentsQuery(task.id))
+  const { data: attachments } = useQuery(attachmentsQuery(task.id))
 
   const invalidate = () =>
     reportChange({ type: "attachments changed", taskId: task.id })
@@ -71,53 +69,64 @@ export const TaskAttachments = ({ task }: TaskAttachmentsProps) => {
     }
   }
 
-  return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-2">
-        {isLoading ? (
-          <p className="text-muted-foreground text-sm italic">Loading…</p>
-        ) : attachments?.data.length ? (
-          attachments.data.map((attachment) => (
-            <div
-              key={attachment.id}
-              className="flex items-center justify-between gap-2 rounded-md border p-2 text-sm"
-            >
-              <div className="flex min-w-0 flex-col">
-                <span className="truncate font-medium">
-                  {attachment.filename}
-                </span>
-                <span className="text-muted-foreground text-xs">
-                  {formatSize(attachment.size)}
-                </span>
-              </div>
-              {/* Download sits beside the file it fetches; delete is set
-                  apart past a rule, so reaching for one never lands on the
-                  other, and both are thumb-sized where there is no mouse. */}
-              <div className="flex shrink-0 items-center gap-3">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  aria-label={`Download ${attachment.filename}`}
-                  className="pointer-coarse:size-11"
-                  onClick={() => download(attachment)}
-                >
-                  <Download />
-                </Button>
-                <Separator orientation="vertical" className="h-6!" />
-                <DeleteAttachment
-                  attachment={attachment}
-                  className="pointer-coarse:size-11"
-                />
-              </div>
-            </div>
-          ))
-        ) : (
-          <p className="text-muted-foreground text-sm italic">
-            No attachments yet.
-          </p>
-        )}
-      </div>
+  const files = attachments?.data ?? []
+  // Touch is no place for a small text target: both actions grow to a
+  // thumb and keep clear of one another.
+  const action =
+    "text-ink-3 hover:text-ink focus-visible:ring-ring/50 rounded-sm underline-offset-4 outline-none hover:underline focus-visible:ring-[3px] pointer-coarse:min-h-11 pointer-coarse:min-w-11"
 
+  return (
+    <RecordSection
+      title="Files"
+      count={files.length > 0 ? files.length : undefined}
+      action={
+        <button
+          type="button"
+          disabled={uploadMutation.isPending}
+          onClick={() => fileInputRef.current?.click()}
+          className={cn(action, "text-[13px] disabled:opacity-50")}
+        >
+          {uploadMutation.isPending ? "Attaching…" : "Attach a file"}
+        </button>
+      }
+    >
+      <ul>
+        {files.map((attachment) => (
+          <li
+            key={attachment.id}
+            className="border-rule grid min-h-9 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b py-1.5"
+          >
+            <div className="flex min-w-0 flex-col sm:flex-row sm:items-baseline sm:gap-2">
+              <span className="truncate text-sm font-medium">
+                {attachment.filename}
+              </span>
+              {/* Where the bytes are kept is part of what the file is
+                  (FR-04.11). Every file is kept in Taskly until another
+                  store is connected (FR-04.3). */}
+              <span className="text-ink-3 shrink-0 text-[12.5px]">
+                {formatSize(attachment.size)} · kept in Taskly
+              </span>
+            </div>
+            {/* Remove is a word, not a bin, and asks first: the bytes are
+                gone the moment the server acts. On touch the two sit a thumb
+                apart. */}
+            <div className="flex shrink-0 items-center gap-3 text-[13px] pointer-coarse:gap-6">
+              <button
+                type="button"
+                aria-label={`Download ${attachment.filename}`}
+                className={action}
+                onClick={() => download(attachment)}
+              >
+                Download
+              </button>
+              <DeleteAttachment
+                attachment={attachment}
+                className="pointer-coarse:min-h-11 pointer-coarse:min-w-11"
+              />
+            </div>
+          </li>
+        ))}
+      </ul>
       <input
         ref={fileInputRef}
         type="file"
@@ -128,15 +137,7 @@ export const TaskAttachments = ({ task }: TaskAttachmentsProps) => {
           if (file) uploadMutation.mutate(file)
         }}
       />
-      <LoadingButton
-        variant="outline"
-        loading={uploadMutation.isPending}
-        onClick={() => fileInputRef.current?.click()}
-      >
-        <Upload />
-        Upload a file
-      </LoadingButton>
-    </div>
+    </RecordSection>
   )
 }
 

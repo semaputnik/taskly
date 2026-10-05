@@ -3,7 +3,7 @@ import { newUser, userApi } from "./utils/account"
 
 test.use({ storageState: { cookies: [], origins: [] } })
 
-/** A task holding one attachment, open on its Files tab. */
+/** A task holding one attachment, open on its Files section. */
 async function openFiles(page: Page) {
   await newUser(page)
   const api = await userApi(page)
@@ -25,7 +25,6 @@ async function openFiles(page: Page) {
 
   await page.goto(`/tasks?view=table&task=${task.id}`)
   const panel = page.getByRole("complementary", { name: "File the taxes" })
-  await panel.getByRole("tab", { name: "Files" }).click()
   await expect(panel.getByText("receipts-2025.pdf")).toBeVisible()
   return { api, task, panel }
 }
@@ -35,17 +34,7 @@ test("Deleting an attachment asks first, and names the file", async ({
 }) => {
   const { api, task, panel } = await openFiles(page)
 
-  // Download and delete are set well apart at desktop width too.
-  const download = await panel
-    .getByRole("button", { name: "Download receipts-2025.pdf" })
-    .boundingBox()
-  const trash = await panel
-    .getByRole("button", { name: "Delete receipts-2025.pdf" })
-    .boundingBox()
-  if (!download || !trash) throw new Error("controls not on screen")
-  expect(trash.x - (download.x + download.width)).toBeGreaterThanOrEqual(24)
-
-  await panel.getByRole("button", { name: "Delete receipts-2025.pdf" }).click()
+  await panel.getByRole("button", { name: "Remove receipts-2025.pdf" }).click()
   const confirm = page.getByRole("dialog", {
     name: "Delete receipts-2025.pdf?",
   })
@@ -59,13 +48,51 @@ test("Deleting an attachment asks first, and names the file", async ({
   expect(kept.count).toBe(1)
 
   // Confirming removes it, and the list says so without a reload.
-  await panel.getByRole("button", { name: "Delete receipts-2025.pdf" }).click()
+  await panel.getByRole("button", { name: "Remove receipts-2025.pdf" }).click()
   await confirm.getByRole("button", { name: "Delete file" }).click()
   await expect(confirm).toBeHidden()
   await expect(panel.getByText("receipts-2025.pdf")).toHaveCount(0)
-  await expect(panel.getByText("No attachments yet.")).toBeVisible()
+  // An empty section is its heading and its action, and nothing else.
+  const files = panel.getByRole("region", { name: "Files" })
+  await expect(files.getByRole("listitem")).toHaveCount(0)
+  await expect(
+    files.getByRole("button", { name: "Attach a file" }),
+  ).toBeVisible()
   const gone = await (await api.get(`/tasks/${task.id}/attachments/`)).json()
   expect(gone.count).toBe(0)
+})
+
+test("A file says what it is, where it is kept, and downloads", async ({
+  page,
+}) => {
+  const { panel } = await openFiles(page)
+  const files = panel.getByRole("region", { name: "Files" })
+
+  // No tabs: the files are a section of the task, with their count.
+  await expect(panel.getByRole("tab")).toHaveCount(0)
+  await expect(files.getByRole("heading", { name: /Files\s*1/ })).toBeVisible()
+  await expect(files).toContainText("8 B · kept in Taskly")
+
+  const downloading = page.waitForEvent("download")
+  await files
+    .getByRole("button", { name: "Download receipts-2025.pdf" })
+    .click()
+  expect((await downloading).suggestedFilename()).toBe("receipts-2025.pdf")
+})
+
+test("A file is attached from the section's heading", async ({ page }) => {
+  const { api, task, panel } = await openFiles(page)
+  const files = panel.getByRole("region", { name: "Files" })
+
+  await files.locator('input[type="file"]').setInputFiles({
+    name: "notes.txt",
+    mimeType: "text/plain",
+    buffer: Buffer.from("remember the receipts"),
+  })
+  await expect(files.getByText("notes.txt")).toBeVisible()
+  await expect(files.getByRole("listitem")).toHaveCount(2)
+  const kept = await (await api.get(`/tasks/${task.id}/attachments/`)).json()
+  expect(kept.count).toBe(2)
 })
 
 test("A failed deletion leaves the attachment and says what failed", async ({
@@ -82,7 +109,7 @@ test("A failed deletion leaves the attachment and says what failed", async ({
       : route.fallback(),
   )
 
-  await panel.getByRole("button", { name: "Delete receipts-2025.pdf" }).click()
+  await panel.getByRole("button", { name: "Remove receipts-2025.pdf" }).click()
   const confirm = page.getByRole("dialog", {
     name: "Delete receipts-2025.pdf?",
   })
@@ -110,7 +137,7 @@ test.describe("on a touch screen", () => {
       .getByRole("button", { name: "Download receipts-2025.pdf" })
       .boundingBox()
     const remove = await panel
-      .getByRole("button", { name: "Delete receipts-2025.pdf" })
+      .getByRole("button", { name: "Remove receipts-2025.pdf" })
       .boundingBox()
     if (!download || !remove) throw new Error("controls not on screen")
 
