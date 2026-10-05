@@ -3,13 +3,14 @@ import { Link as RouterLink } from "@tanstack/react-router"
 
 import type { ActivityEntryPublic } from "@/client"
 import { ActivityDescription } from "@/components/Activity/ActivityDescription"
+import { ActorLabel } from "@/components/Activity/ActorLabel"
 import { useRestoreDeletion } from "@/components/Activity/RestoreDeletion"
-import { recordLink } from "@/components/Records/panels"
 import { Skeleton } from "@/components/ui/skeleton"
 import useAuth from "@/hooks/useAuth"
 import { formatDateTime } from "@/lib/dates"
 import { activityQuery } from "@/lib/serverState"
 import { cn } from "@/lib/utils"
+import { textLink } from "./DayPage"
 import { byDay, clock, windowLabel } from "./log"
 
 /** How many lines the day page shows before handing off to the full log. */
@@ -19,15 +20,24 @@ const LOG_LINES = 8
 export const changesQuery = (since: string | null) =>
   activityQuery({ since: since ?? undefined, limit: LOG_LINES })
 
-const textLink =
-  "focus-visible:ring-ring/50 rounded-sm underline-offset-[3px] outline-none hover:underline focus-visible:ring-[3px]"
-
 // The time in a narrow column, the actor, then the sentence. On a phone the
 // sentence drops beneath the time and the actor rather than squeezing them.
-const line =
+const lineGrid =
   "border-rule grid grid-cols-[8ch_minmax(0,1fr)] items-baseline gap-x-3 gap-y-0.5 border-b py-2 md:grid-cols-[8ch_128px_minmax(0,1fr)]"
 
-function Heading({ count, window }: { count: number | null; window: string }) {
+// A link inside a sentence has to look like one before it is hovered.
+const inlineLink = cn(
+  textLink,
+  "text-ink decoration-rule-strong underline hover:decoration-current",
+)
+
+function Heading({
+  count,
+  windowText,
+}: {
+  count: number | null
+  windowText: string
+}) {
   return (
     <h2 className="border-rule-strong flex items-baseline gap-2 border-b pb-2 text-[13px] font-semibold">
       Changes
@@ -36,7 +46,7 @@ function Heading({ count, window }: { count: number | null; window: string }) {
           {count}
         </span>
       )}
-      <span className="text-ink-3 ml-auto font-normal">{window}</span>
+      <span className="text-ink-3 ml-auto font-normal">{windowText}</span>
     </h2>
   )
 }
@@ -45,9 +55,9 @@ function Heading({ count, window }: { count: number | null; window: string }) {
 export function ChangesPending() {
   return (
     <section className="mb-9">
-      <Heading count={null} window="" />
+      <Heading count={null} windowText="" />
       {Array.from({ length: 3 }).map((_, index) => (
-        <div key={index} className={line}>
+        <div key={index} className={lineGrid}>
           <Skeleton className="h-3 w-10" />
           <Skeleton className="h-4 w-24" />
           <Skeleton className="col-start-2 h-4 w-56 max-w-full md:col-start-3" />
@@ -68,37 +78,35 @@ export function Changes({ since }: { since: string | null }) {
   const { user } = useAuth()
   const { data } = useSuspenseQuery(changesQuery(since))
   const now = new Date()
-  const window = windowLabel(since ? new Date(since) : null, now)
+  const windowText = windowLabel(since ? new Date(since) : null, now)
 
   return (
     <section className="mb-9">
-      <Heading count={data.count} window={window} />
+      <Heading count={data.count} windowText={windowText} />
       {data.data.length === 0 ? (
-        <Empty window={since ? window : null} />
+        <Empty windowText={since ? windowText : null} />
       ) : (
-        <>
-          {byDay(data.data, now).map((day) => (
-            <div key={day.entries[0].id}>
-              {day.label && (
-                <h3 className="text-ink-3 pt-4 pb-1 text-[13px] font-medium">
-                  {day.label}
-                </h3>
-              )}
-              <ol>
-                {day.entries.map((entry) => (
-                  <Line key={entry.id} entry={entry} currentUserId={user?.id} />
-                ))}
-              </ol>
-            </div>
-          ))}
-          <RouterLink
-            to="/activity"
-            className={cn(textLink, "text-ink-3 inline-block pt-2 text-[13px]")}
-          >
-            Full log <span aria-hidden>→</span>
-          </RouterLink>
-        </>
+        byDay(data.data, now).map((day) => (
+          <div key={day.entries[0].id}>
+            {day.label && (
+              <h3 className="text-ink-3 pt-4 pb-1 text-[13px] font-medium">
+                {day.label}
+              </h3>
+            )}
+            <ol>
+              {day.entries.map((entry) => (
+                <Line key={entry.id} entry={entry} currentUserId={user?.id} />
+              ))}
+            </ol>
+          </div>
+        ))
       )}
+      <RouterLink
+        to="/activity"
+        className={cn(textLink, "text-ink-3 inline-block pt-2 text-[13px]")}
+      >
+        Full log <span aria-hidden>→</span>
+      </RouterLink>
     </section>
   )
 }
@@ -111,17 +119,16 @@ function Line({
   currentUserId?: string
 }) {
   const byBot = Boolean(entry.actor_bot_user_id)
-  const at = entry.created_at ? new Date(entry.created_at) : null
 
   return (
-    <li className={line}>
-      {at ? (
+    <li className={lineGrid}>
+      {entry.created_at ? (
         <time
-          dateTime={entry.created_at ?? undefined}
-          title={formatDateTime(entry.created_at as string)}
+          dateTime={entry.created_at}
+          title={formatDateTime(entry.created_at)}
           className="text-ink-3 font-mono text-xs tabular-nums"
         >
-          {clock(at)}
+          {clock(new Date(entry.created_at))}
         </time>
       ) : (
         <span />
@@ -132,18 +139,12 @@ function Line({
           byBot ? "text-ink font-medium" : "text-ink-3",
         )}
       >
-        {entry.actor_bot_user_id ? (
-          <RouterLink
-            {...recordLink("bot", entry.actor_bot_user_id)}
-            className={textLink}
-          >
-            {entry.actor_bot_user_name ?? "A bot user"}
-          </RouterLink>
-        ) : entry.actor_id === currentUserId ? (
-          "You"
-        ) : (
-          "Someone else"
-        )}
+        <ActorLabel
+          entry={entry}
+          currentUserId={currentUserId}
+          showBadge={false}
+          showIcon={false}
+        />
       </span>
       {/* The sentence follows its actor, so its verb is not capitalised:
           "release-bot deleted …". The words themselves are the full log's. */}
@@ -160,7 +161,10 @@ function Line({
   )
 }
 
-/** Restore, inline after the deletion it undoes: nothing is lost by it. */
+/**
+ * Restore, inline after the deletion it undoes: it loses nothing, so it asks
+ * nothing first, and the toast says what came back.
+ */
 function Restore({ entry }: { entry: ActivityEntryPublic }) {
   const { name, mutation } = useRestoreDeletion(entry)
   return (
@@ -169,12 +173,9 @@ function Restore({ entry }: { entry: ActivityEntryPublic }) {
       onClick={() => mutation.mutate()}
       disabled={mutation.isPending}
       aria-label={`Restore ${name}`}
-      className={cn(
-        textLink,
-        "text-ink decoration-rule-strong ml-2.5 text-[13px] underline hover:decoration-current disabled:opacity-60",
-      )}
+      className={cn(inlineLink, "ml-2.5 text-[13px] disabled:opacity-60")}
     >
-      {mutation.isPending ? "Restoring…" : "Restore"}
+      Restore
     </button>
   )
 }
@@ -183,18 +184,14 @@ function Restore({ entry }: { entry: ActivityEntryPublic }) {
  * Nothing in the window: said in a sentence, pointing at the bot users whose
  * changes land here.
  */
-function Empty({ window }: { window: string | null }) {
+function Empty({ windowText }: { windowText: string | null }) {
   return (
     <p className="text-ink-2 pt-3">
-      {window ? `Nothing has changed ${window}.` : "Nothing has happened yet."}{" "}
+      {windowText
+        ? `Nothing has changed ${windowText}.`
+        : "Nothing has happened yet."}{" "}
       The changes your{" "}
-      <RouterLink
-        to="/bots"
-        className={cn(
-          textLink,
-          "text-ink decoration-rule-strong underline hover:decoration-current",
-        )}
-      >
+      <RouterLink to="/bots" className={inlineLink}>
         bot users
       </RouterLink>{" "}
       make through the API land here, newest first.

@@ -232,7 +232,7 @@ test("Changes reads the reader's and the bot users' entries newest first, with R
   const log = changesLog(page)
   // A first visit has no last one: the window is everything so far.
   await expect(log.getByRole("heading", { level: 2 })).toHaveText(
-    /^Changes\s*5\s*so far$/,
+    /^Changes\s*6\s*so far$/,
   )
   const lines = log.getByRole("listitem")
   // The actor first, then what they did, newest first.
@@ -241,6 +241,7 @@ test("Changes reads the reader's and the bot users' entries newest first, with R
     /Triage agent\s*deleted Old staging banner\s*Restore$/i,
     /Triage agent\s*created Migrate the marketing pages/i,
     /Triage agent\s*created Old staging banner/i,
+    /You\s*created the project Support queue/i,
     /You\s*created Renew the domain/i,
   ])
   await expect(log.getByRole("button", { name: /^Restore/ })).toHaveCount(2)
@@ -255,6 +256,18 @@ test("Changes reads the reader's and the bot users' entries newest first, with R
         ? getComputedStyle(node.lastElementChild).color
         : null,
     )
+  expect(await sentenceColour(lines.nth(0))).not.toBe(
+    await sentenceColour(lines.nth(1)),
+  )
+  // In the dark theme too. A reload is the same visit, so the log holds.
+  await page.evaluate(() => localStorage.setItem("vite-ui-theme", "dark"))
+  await page.reload()
+  await expect(lines).toHaveCount(6)
+  expect(
+    await page.evaluate(
+      () => getComputedStyle(document.documentElement).colorScheme,
+    ),
+  ).toBe("dark")
   expect(await sentenceColour(lines.nth(0))).not.toBe(
     await sentenceColour(lines.nth(1)),
   )
@@ -279,6 +292,7 @@ test("An empty Changes log says so and points at bot users", async ({
   await page.goto("/")
   const log = changesLog(page)
   await expect(log).toContainText("Nothing has happened yet.")
+  await expect(log.getByRole("link", { name: "Full log" })).toBeVisible()
   await log.getByRole("link", { name: "bot users", exact: true }).click()
   await expect(page).toHaveURL(/\/bots/)
 })
