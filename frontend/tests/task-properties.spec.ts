@@ -1,5 +1,6 @@
 import { expect, type Page, test } from "@playwright/test"
 import { newUser, userApi } from "./utils/account"
+import { openDraft } from "./utils/capture"
 import { textOn, token } from "./utils/colour"
 
 test.use({ storageState: { cookies: [], origins: [] } })
@@ -224,11 +225,7 @@ test("The draft is the same rows under the same title and heading", async ({
   await page.setViewportSize({ width: 1440, height: 900 })
   await newUser(page)
   await page.goto("/")
-  // The shell has to be listening before a key means anything to it.
-  await expect(
-    page.getByRole("button", { name: "Add a task" }).first(),
-  ).toBeVisible()
-  await page.keyboard.press("c")
+  await openDraft(page)
   const panel = page.getByRole("complementary", { name: "New task" })
   await expect(panel).toBeVisible()
 

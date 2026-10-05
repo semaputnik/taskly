@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test"
-import { openCaptured } from "./utils/capture"
+import { openCaptured, openDraft } from "./utils/capture"
 import { randomEmail } from "./utils/random"
+import { taskLine } from "./utils/tasks"
 import { logInUser } from "./utils/user"
 
 test.use({ storageState: { cookies: [], origins: [] } })
@@ -11,8 +12,8 @@ test("A user's own changes appear on the Activity page, newest first", async ({
   const email = randomEmail()
   await logInUser(page, email)
 
-  await page.goto("/tasks?view=table")
-  await page.getByRole("button", { name: "Add a task" }).first().click()
+  await page.goto("/tasks")
+  await openDraft(page)
   const title = page.getByRole("textbox", { name: "Task title" })
   await title.fill("Renew the passport")
   await title.press("Enter")
@@ -22,15 +23,12 @@ test("A user's own changes appear on the Activity page, newest first", async ({
   ).toBeVisible()
   await page.keyboard.press("Escape")
 
-  await page
-    .getByRole("row", { name: /Renew the passport/ })
+  await taskLine(page, "Renew the passport")
     .getByRole("checkbox", { name: "Mark as done" })
     .click()
   // The list holds open work, so the task leaves it once it is done
   // (ADR-0006). Where it went is the point of the rest of this test.
-  await expect(
-    page.getByRole("row", { name: /Renew the passport/ }),
-  ).toHaveCount(0)
+  await expect(taskLine(page, "Renew the passport")).toHaveCount(0)
 
   await page.goto("/activity")
   const rows = page.getByRole("row").filter({ hasText: "Renew the passport" })
@@ -54,8 +52,8 @@ test("A deleted task can be restored from the Activity page", async ({
   const email = randomEmail()
   await logInUser(page, email)
 
-  await page.goto("/tasks?view=table")
-  await page.getByRole("button", { name: "Add a task" }).first().click()
+  await page.goto("/tasks")
+  await openDraft(page)
   const title = page.getByRole("textbox", { name: "Task title" })
   await title.fill("Cancel the gym")
   await title.press("Enter")
@@ -67,8 +65,8 @@ test("A deleted task can be restored from the Activity page", async ({
   // Gone before the row behind it is clicked, not still fading out over it.
   await expect(page.locator("[data-record-column]")).toHaveCount(0)
 
-  const taskRow = page.getByRole("row", { name: /Cancel the gym/ })
-  await taskRow.getByText("Cancel the gym").click()
+  const taskRow = taskLine(page, "Cancel the gym")
+  await taskRow.getByRole("link", { name: "Cancel the gym" }).click()
   await page.getByRole("button", { name: "Delete task" }).click()
   await page
     .getByRole("dialog")
@@ -95,8 +93,8 @@ test("A deleted task can be restored from the Activity page", async ({
   // Its rows are back, so the deletion offers nothing more to restore.
   await expect(deletion.getByRole("button", { name: "Restore" })).toHaveCount(0)
 
-  await page.goto("/tasks?view=table")
-  await expect(page.getByRole("row", { name: /Cancel the gym/ })).toBeVisible()
+  await page.goto("/tasks")
+  await expect(taskLine(page, "Cancel the gym")).toBeVisible()
 })
 
 test("A bot user's changes appear on the Activity page under its name", async ({

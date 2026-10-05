@@ -70,23 +70,19 @@ test("Add a task is one tap from any screen, in the thumb's corner", async ({
   await expect(page.getByText("“Buy milk” created")).toBeVisible()
 })
 
-test("The list's bar lines up in two rows: filters, then order and view", async ({
+test("The task list never scrolls sideways, and its filters wrap onto more rows", async ({
   page,
 }) => {
   await newUser(page)
   await page.goto("/tasks")
 
-  const filters = await page
-    .getByRole("button", { name: "Filters" })
-    .boundingBox()
-  const sort = await page
-    .getByRole("combobox", { name: "Sort by" })
-    .boundingBox()
-  const view = await page.getByRole("group", { name: "View" }).boundingBox()
-  if (!filters || !sort || !view) throw new Error("The bar is missing")
-
-  // The order starts the second row under Filters, and the view ends it.
-  expect(sort.y).toBeGreaterThan(filters.y + filters.height - 1)
-  expect(Math.abs(sort.x - filters.x)).toBeLessThan(2)
-  expect(Math.abs(view.y - sort.y)).toBeLessThan(4)
+  for (const name of ["Any project", "Anyone", "Any time", /^Order:/]) {
+    await expect(page.getByRole("button", { name })).toBeVisible()
+  }
+  const overflow = await page.evaluate(
+    () =>
+      document.documentElement.scrollWidth -
+      document.documentElement.clientWidth,
+  )
+  expect(overflow).toBeLessThanOrEqual(0)
 })

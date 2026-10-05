@@ -82,7 +82,7 @@ test("Deleting an account names its button and what goes with it", async ({
   await expect(description).toContainText("cannot be undone")
 })
 
-test("A date reads the same in the table and in the panel's date field", async ({
+test("A date in the panel's date field is written the product's way", async ({
   page,
 }) => {
   await newUser(page)
@@ -93,22 +93,19 @@ test("A date reads the same in the table and in the panel's date field", async (
   })
   await api.create(`/tasks/${task.id}/comments/`, { body: "Signed" })
 
-  // The panel shows the day the same way the table does, whatever language
-  // the browser's own date picker speaks.
-  await page.goto(`/tasks?view=table&task=${task.id}`)
+  // The panel shows the day the way the product writes one, whatever
+  // language the browser's own date picker speaks.
+  await page.goto(`/tasks?task=${task.id}`)
   const field = page
     .getByRole("complementary", { name: "Renew the lease" })
     .getByRole("button", { name: /^Due date:/ })
   const shown = ((await field.textContent()) ?? "").trim()
   expect(shown).toMatch(/2026/)
-  await page.keyboard.press("Escape")
-  const row = page.getByRole("row", { name: /Renew the lease/ })
-  await expect(row).toContainText(shown)
-  await expect(row).not.toContainText("2026-09-01")
+  expect(shown).not.toContain("2026-09-01")
 
   // Moments in the panel are written to the minute and no further: the
   // Created row with its day, the history's time column with the time alone.
-  await page.goto(`/tasks?view=table&task=${task.id}`)
+  await page.goto(`/tasks?task=${task.id}`)
   const panel = page.getByRole("complementary", { name: "Renew the lease" })
   const created = await panel.locator("time").first().textContent()
   const commented = await panel
@@ -152,7 +149,7 @@ test("Heading levels descend without skipping on every screen", async ({
   for (const path of SIGNED_IN) await check(path)
   // A panel's title is the h2 under whatever opened it.
   const task = (await (await api.get("/tasks/")).json()).data[0]
-  await page.goto(`/tasks?view=table&task=${task.id}`)
+  await page.goto(`/tasks?task=${task.id}`)
   const panel = page.locator("[data-record-column]")
   await expect(panel).toBeVisible()
   const inPanel = await panel.evaluate((node) =>

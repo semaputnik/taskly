@@ -29,7 +29,7 @@ export function TaskSubtasks({
   onOpen: (id: string) => void
 }) {
   const { data } = useQuery(
-    tasksQuery({ parent_id: task.id, limit: SUBTASK_LIMIT }),
+    tasksQuery({ parent_id: task.id, sort: "priority", limit: SUBTASK_LIMIT }),
   )
   const children = data?.data ?? []
   const total = data?.count ?? 0

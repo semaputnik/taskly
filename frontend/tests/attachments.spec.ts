@@ -23,7 +23,7 @@ async function openFiles(page: Page) {
   )
   expect(uploaded.ok()).toBe(true)
 
-  await page.goto(`/tasks?view=table&task=${task.id}`)
+  await page.goto(`/tasks?task=${task.id}`)
   const panel = page.getByRole("complementary", { name: "File the taxes" })
   await expect(
     panel.getByRole("region", { name: "Files" }).getByText("receipts-2025.pdf"),

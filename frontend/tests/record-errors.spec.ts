@@ -1,6 +1,7 @@
 import { expect, type Page, test } from "@playwright/test"
 import { newUser, userApi } from "./utils/account"
 import { randomEmail } from "./utils/random"
+import { taskLine } from "./utils/tasks"
 import { logInUser } from "./utils/user"
 
 test.use({ storageState: { cookies: [], origins: [] } })
@@ -35,7 +36,7 @@ test("A link to a record that is not there says so, for every panel", async ({
   await expectCannotOpen(page, "/bots", `bot=${UNKNOWN}`)
   // Something that is not an id at all is not a record to open: the screen
   // behind it simply shows, with nothing left waiting.
-  await page.goto("/tasks?view=table&task=not-a-task")
+  await page.goto("/tasks?task=not-a-task")
   await expect(page.getByRole("heading", { name: "Tasks" })).toBeVisible()
   await expect(page.locator("[data-record-column]")).toHaveCount(0)
 })
@@ -93,7 +94,7 @@ test("A failure that may pass offers to try again", async ({ page }) => {
       ? route.fallback()
       : route.fulfill({ status: 503, body: "unavailable" }),
   )
-  await page.goto(`/tasks?view=table&task=${task.id}`)
+  await page.goto(`/tasks?task=${task.id}`)
   const panel = page.locator("[data-record-column]")
   // Said after the first failed attempt, while retries carry on behind it.
   await expect(panel).toContainText("could not be loaded", { timeout: 3_000 })
@@ -122,11 +123,9 @@ test("A task the list filters out still opens from its link", async ({
     (p: { is_inbox: boolean }) => p.is_inbox,
   )
 
-  await page.goto(`/tasks?view=table&project_id=${inbox.id}&task=${task.id}`)
+  await page.goto(`/tasks?project_id=${inbox.id}&task=${task.id}`)
   await expect(
     page.getByRole("complementary", { name: "Prune the roses" }),
   ).toBeVisible()
-  await expect(page.getByRole("row", { name: /Prune the roses/ })).toHaveCount(
-    0,
-  )
+  await expect(taskLine(page, "Prune the roses")).toHaveCount(0)
 })

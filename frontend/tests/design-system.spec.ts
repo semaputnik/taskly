@@ -24,12 +24,27 @@ for (const theme of ["light", "dark"] as const) {
     })
 
     test("The primary action is readable on its fill", async ({ page }) => {
-      // A new account's empty list offers it as a filled button.
-      await page.goto("/tasks?view=table")
+      // The Projects page's own button is the filled one.
+      await page.goto("/projects")
       const add = page
         .getByRole("main")
-        .getByRole("button", { name: "Add a task" })
+        .getByRole("button", { name: "Add Project" })
       expect(await textOnFill(add)).toBeGreaterThanOrEqual(AA)
+    })
+
+    test("The task list's quiet text is readable", async ({ page }) => {
+      await page.goto("/tasks")
+      const ground = await pageGround(page)
+      // The filters and the order are text, quiet until set.
+      for (const name of ["Any project", "Newest first"]) {
+        const control = page.getByRole("button", { name }).first()
+        await expect(control).toBeVisible()
+        expect(await textOn(control, ground)).toBeGreaterThanOrEqual(AA)
+      }
+      // The muted half of the counts sentence.
+      const counts = page.getByText("Nothing is open.")
+      await expect(counts).toBeVisible()
+      expect(await textOn(counts, ground)).toBeGreaterThanOrEqual(AA)
     })
 
     test("Page subtitles and text links are readable", async ({ page }) => {
@@ -73,7 +88,7 @@ for (const theme of ["light", "dark"] as const) {
     })
 
     test("Native controls follow the theme", async ({ page }) => {
-      await page.goto("/tasks?view=table")
+      await page.goto("/tasks")
       const scheme = await page.evaluate(
         () => getComputedStyle(document.documentElement).colorScheme,
       )

@@ -572,6 +572,9 @@ def _task_filters(*, owner_id: uuid.UUID, query: TaskQuery) -> list[Any]:
             )
         )
 
+    if query.assigned_to_bots:
+        conditions.append(col(Task.assignee_bot_user_id).is_not(None))
+
     if query.reporter_id is not None:
         # The owner or a bot user: the id names one or the other, as it does
         # for the assignee.
@@ -628,23 +631,21 @@ _NATURAL_ORDER = {
 
 def _task_ordering(query: TaskQuery) -> list[Any]:
     """
-    How the list is ordered. Without a sort it stays as it was: the most
-    pressing work first, oldest first within a priority.
+    How the list is ordered. Without a sort it is the created order, newest
+    filed first (FR-06.4); the most pressing work is asked for by name.
     """
-    if query.sort is None:
-        return [_PRIORITY_RANK, Task.created_at, Task.id]
-
-    descending = (query.order or _NATURAL_ORDER[query.sort]) is SortOrder.DESC
+    sort = query.sort or TaskSort.CREATED_AT
+    descending = (query.order or _NATURAL_ORDER[sort]) is SortOrder.DESC
     created_at = col(Task.created_at)
     # Annotated because the branches build expressions over columns of
     # different types, which mypy will not unify on its own.
     ordering: Any
-    if query.sort is TaskSort.DUE_DATE:
+    if sort is TaskSort.DUE_DATE:
         due_date = col(Task.due_date)
         # A task with no due date is not early or late, so it goes last either
         # way rather than leading one of the two orders.
         ordering = nullslast(due_date.desc() if descending else due_date.asc())
-    elif query.sort is TaskSort.CREATED_AT:
+    elif sort is TaskSort.CREATED_AT:
         ordering = created_at.desc() if descending else created_at.asc()
     else:
         ordering = _PRIORITY_RANK.desc() if descending else _PRIORITY_RANK.asc()

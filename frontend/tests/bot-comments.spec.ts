@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test"
 import { randomEmail } from "./utils/random"
+import { taskLine } from "./utils/tasks"
 import { logInUser } from "./utils/user"
 
 test.use({ storageState: { cookies: [], origins: [] } })
@@ -51,10 +52,9 @@ test("A bot user's comment names the bot and offers no edit or delete", async ({
   })
   expect(commented.ok()).toBe(true)
 
-  await page.goto(`/tasks?view=table&project_id=${project.id}`)
-  await page
-    .getByRole("row", { name: /Ship 1\.2/ })
-    .getByText("Ship 1.2")
+  await page.goto(`/tasks?project_id=${project.id}`)
+  await taskLine(page, "Ship 1.2")
+    .getByRole("link", { name: "Ship 1.2" })
     .click()
 
   // Comments are in the panel's Activity section.

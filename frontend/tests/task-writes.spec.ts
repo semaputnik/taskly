@@ -25,7 +25,7 @@ test("A refused title keeps what was typed, and leaving again retries", async ({
       : route.fallback()
   })
 
-  await page.goto(`/tasks?view=table&task=${task.id}`)
+  await page.goto(`/tasks?task=${task.id}`)
   const title = page.getByRole("textbox", { name: "Task title" })
   await title.fill("Book the vet for Friday")
   await title.press("Enter")
@@ -46,35 +46,4 @@ test("A refused title keeps what was typed, and leaving again retries", async ({
   await expect(page.getByRole("textbox", { name: "Task title" })).toHaveValue(
     "Book the vet for Friday",
   )
-})
-
-test("A batch due date says a recurring task is in the way before sending", async ({
-  page,
-}) => {
-  await newUser(page)
-  const api = await userApi(page)
-  await api.create("/tasks/", { title: "Water the plants" })
-  await api.create("/tasks/", {
-    title: "Take out the bins",
-    due_date: "2030-01-07",
-    recurrence: { frequency: "weekly" },
-  })
-
-  const batches: string[] = []
-  page.on("request", (request) => {
-    if (request.url().includes("/tasks/bulk")) batches.push(request.url())
-  })
-
-  await page.goto("/tasks?view=table")
-  await page.getByRole("checkbox", { name: "Select Water the plants" }).check()
-  await page.getByRole("checkbox", { name: "Select Take out the bins" }).check()
-  await page.getByLabel("Set due date").fill("2030-02-01")
-
-  await expect(page.getByText("Nothing was changed: 1 task")).toBeVisible()
-  await expect(
-    page.getByText(
-      "“Take out the bins” repeats. Move its due date from the task itself",
-    ),
-  ).toBeVisible()
-  expect(batches).toEqual([])
 })

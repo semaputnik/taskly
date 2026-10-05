@@ -9,7 +9,7 @@ async function openTask(page: Page, tags: string[] = []) {
   await api.create("/tags/", { name: "errands" })
   await api.create("/tags/", { name: "deploy" })
   const task = await api.create("/tasks/", { title: "Buy stamps", tags })
-  await page.goto(`/tasks?view=table&task=${task.id}`)
+  await page.goto(`/tasks?task=${task.id}`)
   const panel = page.getByRole("complementary", { name: "Buy stamps" })
   const vocabulary = async () =>
     (await (await api.get("/tags/")).json()).data
@@ -166,39 +166,6 @@ test("The capture shortcut stands down while the popover is open", async ({
   await search.press("c")
   await expect(search).toHaveValue("c")
   await expect(page).not.toHaveURL(/capture=/)
-})
-
-test("Bulk Add tag adds each chosen tag to every selected task", async ({
-  page,
-}) => {
-  await newUser(page)
-  const api = await userApi(page)
-  await api.create("/tags/", { name: "errands" })
-  const first = await api.create("/tasks/", { title: "One", tags: ["deploy"] })
-  const second = await api.create("/tasks/", { title: "Two" })
-  await page.goto("/tasks?view=table")
-
-  await page
-    .getByRole("checkbox", { name: "Select every task on this page" })
-    .check()
-  await page.getByRole("button", { name: "Add tag" }).click()
-  // The tasks' own tags are not marked: they differ from task to task.
-  await expect(option(page, "deploy")).toBeVisible()
-  await option(page, "errands").click()
-  await expect(option(page, "errands (on it)")).toBeVisible()
-  await page
-    .getByRole("combobox", { name: "Search or create a tag" })
-    .fill("urgent")
-  await option(page, 'Create tag "urgent"').click()
-
-  const tagsOf = async (id: string) =>
-    ((await (await api.get(`/tasks/${id}`)).json()).tags as string[])
-      .slice()
-      .sort()
-  await expect
-    .poll(() => tagsOf(first.id))
-    .toEqual(["deploy", "errands", "urgent"])
-  await expect.poll(() => tagsOf(second.id)).toEqual(["errands", "urgent"])
 })
 
 test.describe("on a phone", () => {
