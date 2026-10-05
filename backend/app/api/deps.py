@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Annotated
 
 import jwt
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, Header, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jwt.exceptions import InvalidTokenError
 from pydantic import ValidationError
@@ -41,6 +41,8 @@ def get_token(
 
 
 TokenDep = Annotated[str, Depends(get_token)]
+# The browser a request comes from; a new passkey is named after it (FR-12.6).
+UserAgent = Annotated[str | None, Header()]
 
 
 # A bot user reaching an endpoint only a human may call. Refused for what the

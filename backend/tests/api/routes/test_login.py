@@ -91,7 +91,7 @@ def test_registering_a_taken_email_is_refused(client: TestClient, db: Session) -
     r = client.post(f"{API}/login/registration/options", json={"email": user.email})
 
     assert r.status_code == 400
-    assert r.json()["detail"] == "An account with this e-mail already exists."
+    assert r.json()["detail"] == "An account with this email already exists."
 
 
 def test_an_email_taken_while_registering_is_refused_at_the_end(
@@ -107,7 +107,7 @@ def test_an_email_taken_while_registering_is_refused_at_the_end(
     )
 
     assert r.status_code == 400
-    assert r.json()["detail"] == "An account with this e-mail already exists."
+    assert r.json()["detail"] == "An account with this email already exists."
 
 
 def test_a_passkey_made_without_user_verification_is_refused(

@@ -78,7 +78,7 @@ test("Signing in as someone else in the same tab shows none of the first account
 
   await addVirtualAuthenticator(page)
   await page.getByRole("link", { name: "Create account" }).click()
-  // The sign-in screen has an e-mail field too: fill the one on sign-up.
+  // The sign-in screen has an email field too: fill the one on sign-up.
   await expect(
     page.getByRole("heading", { name: "Create an account" }),
   ).toBeVisible()

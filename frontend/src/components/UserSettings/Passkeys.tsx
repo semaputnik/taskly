@@ -1,19 +1,19 @@
 import { useMutation, useQuery } from "@tanstack/react-query"
 import { KeyRound, ShieldAlert } from "lucide-react"
 
-import type { PasskeyPublic } from "@/client"
-import { UsersService } from "@/client"
+import { type PasskeyPublic, UsersService } from "@/client"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { LoadingButton } from "@/components/ui/loading-button"
+import { Skeleton } from "@/components/ui/skeleton"
 import useAuth from "@/hooks/useAuth"
 import { formatDateTime } from "@/lib/dates"
-import { addPasskey, removePasskey, wasDismissed } from "@/lib/passkeys"
+import {
+  addPasskey,
+  removePasskey,
+  reportUnlessDismissed,
+} from "@/lib/passkeys"
 import { passkeysQuery, useReportChange } from "@/lib/serverState"
 import { toastError, toastSuccess } from "@/lib/toasts"
-
-const reportUnlessDismissed = (error: unknown) => {
-  if (!wasDismissed(error)) toastError(error)
-}
 
 /**
  * The account's passkeys, and signing out everywhere (FR-12.6–FR-12.9,
@@ -39,7 +39,7 @@ const Passkeys = ({ recovered = false }: { recovered?: boolean }) => (
 
 function PasskeyList() {
   const reportChange = useReportChange()
-  const { data } = useQuery(passkeysQuery())
+  const { data, isPending } = useQuery(passkeysQuery())
   const passkeys = data?.data ?? []
 
   const add = useMutation({
@@ -54,9 +54,11 @@ function PasskeyList() {
       <h2 className="text-lg font-semibold">Passkeys</h2>
       <p className="text-muted-foreground mt-1 text-sm">
         You sign in with any of these. Adding or removing one asks you to
-        confirm with a passkey you already have.
+        confirm with a passkey you already have. Removing one does not sign out
+        the devices it signed in; sign out everywhere for that.
       </p>
       <ul className="mt-4 divide-y" data-testid="passkey-list">
+        {isPending && <PendingPasskey />}
         {passkeys.map((passkey) => (
           <PasskeyRow
             key={passkey.id}
@@ -102,9 +104,11 @@ function PasskeyRow({
         <p className="truncate font-medium">{passkey.name}</p>
         <p className="text-muted-foreground text-sm">
           Created {formatDateTime(passkey.created_at)} ·{" "}
-          {passkey.last_used_at
-            ? `last used ${formatDateTime(passkey.last_used_at)}`
-            : "never used"}
+          {passkey.last_used_at ? (
+            `last used ${formatDateTime(passkey.last_used_at)}`
+          ) : (
+            <span className="italic">never used</span>
+          )}
         </p>
       </div>
       <LoadingButton
@@ -123,6 +127,18 @@ function PasskeyRow({
       >
         Remove
       </LoadingButton>
+    </li>
+  )
+}
+
+function PendingPasskey() {
+  return (
+    <li className="flex items-center justify-between gap-4 py-3">
+      <div className="flex flex-col gap-2">
+        <Skeleton className="h-4 w-40" />
+        <Skeleton className="h-3 w-64" />
+      </div>
+      <Skeleton className="h-8 w-16" />
     </li>
   )
 }

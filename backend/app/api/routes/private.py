@@ -1,8 +1,7 @@
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 from pydantic import BaseModel
-from sqlmodel import SQLModel
 
 from app import crud, passkeys
 from app.api.deps import SessionDep
@@ -18,7 +17,7 @@ class PrivateUserCreate(BaseModel):
     is_superuser: bool = False
 
 
-class PrivateSession(SQLModel):
+class PrivateSession(BaseModel):
     user: UserPublic
     access_token: str
 
@@ -60,5 +59,5 @@ def issue_recovery_code(body: PrivateRecoveryCode, session: SessionDep) -> Any:
     """
     user = crud.get_user_by_email(session=session, email=body.email)
     if user is None:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise passkeys.UserNotFound()
     return passkeys.issue_recovery_code(session, user=user)

@@ -16,8 +16,7 @@ import { Input } from "@/components/ui/input"
 import { LoadingButton } from "@/components/ui/loading-button"
 import { useCopyToClipboard } from "@/hooks/useCopyToClipboard"
 import { formatDateTime } from "@/lib/dates"
-import { issueRecoveryCode, wasDismissed } from "@/lib/passkeys"
-import { toastError } from "@/lib/toasts"
+import { issueRecoveryCode, reportUnlessDismissed } from "@/lib/passkeys"
 
 /**
  * Issue a recovery code for a user who has lost every passkey (FR-12.16).
@@ -29,9 +28,7 @@ export function IssueRecoveryCode({ user }: { user: UserPublic }) {
   const issue = useMutation({
     mutationFn: () => issueRecoveryCode(user.id),
     onSuccess: setIssued,
-    onError: (error) => {
-      if (!wasDismissed(error)) toastError(error)
-    },
+    onError: reportUnlessDismissed,
   })
 
   return (
@@ -45,10 +42,7 @@ export function IssueRecoveryCode({ user }: { user: UserPublic }) {
         <LifeBuoy />
         Issue recovery code
       </LoadingButton>
-      <Dialog
-        open={issued !== null}
-        onOpenChange={(open) => !open && setIssued(null)}
-      >
+      <Dialog open={issued !== null}>
         {issued && (
           <RecoveryCodeShown
             email={user.email}
@@ -72,14 +66,22 @@ function RecoveryCodeShown({
 }) {
   const [copiedText, copy] = useCopyToClipboard()
   const copied = copiedText === issued.code
+  // Shown once and gone on closing, so it closes only on "Done": not on
+  // Escape, a click outside, or a corner control (DESIGN.md, Dialogs).
+  const refuseDismissal = (event: Event) => event.preventDefault()
 
   return (
-    <DialogContent className="sm:max-w-md">
+    <DialogContent
+      className="sm:max-w-md"
+      showCloseButton={false}
+      onEscapeKeyDown={refuseDismissal}
+      onInteractOutside={refuseDismissal}
+    >
       <DialogHeader>
         <DialogTitle>Recovery code for {email}</DialogTitle>
         <DialogDescription>
-          Give it to them yourself. They enter it with their e-mail under “Have
-          a recovery code?” and make a new passkey. It works once, until{" "}
+          Give it to them yourself. They enter it with their email under “Have a
+          recovery code?” and make a new passkey. It works once, until{" "}
           {formatDateTime(issued.expires_at)}, and replaces any code issued
           before. It won't be shown again.
         </DialogDescription>

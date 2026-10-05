@@ -205,7 +205,7 @@ A user who lost every passkey asks the superuser, who issues a recovery code fro
 docker compose -f compose.release.yml exec backend python -m app.superuser_recovery_code
 ```
 
-(For the stack built from source, use `-f compose.yml -f compose.deploy.yml` instead.) The code is good for 24 hours and is entered with the e-mail under “Have a recovery code?” on the sign-in screen.
+(For the stack built from source, use `-f compose.yml -f compose.deploy.yml` instead.) The code is good for 24 hours and is entered with the email under “Have a recovery code?” on the sign-in screen.
 
 ### Upgrading from Password Sign-in
 

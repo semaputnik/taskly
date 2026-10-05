@@ -154,7 +154,7 @@ class WebAuthnChallenge(SQLModel, table=True):
     user_id: uuid.UUID | None = Field(
         default=None, foreign_key="user.id", nullable=True, ondelete="CASCADE"
     )
-    # Registering only: the e-mail asked for and the id the account will be
+    # Registering only: the email asked for and the id the account will be
     # given, which the new passkey is made under.
     email: str | None = Field(default=None, max_length=255)
     user_handle: uuid.UUID | None = None

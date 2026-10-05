@@ -23,7 +23,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 from urllib.parse import urlsplit
 
-from sqlmodel import Session, col, delete, func, select
+from sqlmodel import Session, col, delete, select
 from webauthn import (
     base64url_to_bytes,
     generate_authentication_options,
@@ -57,6 +57,7 @@ from app.models import (
     UserCreate,
     WebAuthnChallenge,
 )
+from app.passkey_names import passkey_name
 
 # How long either half of a ceremony waits for the other (FR-12.10). Also the
 # timeout the browser is given, so it stops asking when the server stops
@@ -77,7 +78,7 @@ class PasskeyError(Exception):
 
 class EmailTaken(PasskeyError):
     def __init__(self) -> None:
-        super().__init__("An account with this e-mail already exists.")
+        super().__init__("An account with this email already exists.")
 
 
 class SignInRefused(PasskeyError):
@@ -102,9 +103,9 @@ class CeremonyFailed(PasskeyError):
 
 class RecoveryRefused(PasskeyError):
     # A wrong code, a spent one and an expired one read the same (FR-12.18),
-    # and so does an e-mail with no account behind it.
+    # and so does an email with no account behind it.
     def __init__(self) -> None:
-        super().__init__("This e-mail and recovery code do not match a live code.")
+        super().__init__("This email and recovery code do not match a live code.")
 
 
 class LastPasskey(PasskeyError):
@@ -117,6 +118,11 @@ class LastPasskey(PasskeyError):
 class PasskeyNotFound(PasskeyError):
     def __init__(self) -> None:
         super().__init__("Passkey not found.")
+
+
+class UserNotFound(PasskeyError):
+    def __init__(self) -> None:
+        super().__init__("User not found")
 
 
 class OwnRecoveryCode(PasskeyError):
@@ -177,8 +183,8 @@ def finish_registration(
     verified = _verify_registration(credential, row.challenge)
     if crud.get_user_by_email(session=session, email=row.email):
         raise EmailTaken()
-    is_superuser = row.email == settings.FIRST_SUPERUSER and not _superuser_exists(
-        session
+    is_superuser = (
+        row.email == settings.FIRST_SUPERUSER and find_superuser(session) is None
     )
     user = crud.create_user(
         session=session,
@@ -193,11 +199,11 @@ def finish_registration(
     return user
 
 
-def _superuser_exists(session: Session) -> bool:
-    count = session.exec(
-        select(func.count()).select_from(User).where(User.is_superuser == True)  # noqa: E712
-    ).one()
-    return count > 0
+def find_superuser(session: Session) -> User | None:
+    """The installation's superuser, if one has registered yet (FR-09.6)."""
+    return session.exec(
+        select(User).where(User.is_superuser == True)  # noqa: E712
+    ).first()
 
 
 # --- Signing in -------------------------------------------------------------
@@ -263,13 +269,7 @@ def confirm(session: Session, *, user: User, credential: dict[str, Any]) -> None
 
 
 def list_passkeys(session: Session, *, user: User) -> list[Passkey]:
-    return list(
-        session.exec(
-            select(Passkey)
-            .where(Passkey.user_id == user.id)
-            .order_by(col(Passkey.created_at))
-        ).all()
-    )
+    return _passkeys_of(session, user.id)
 
 
 def start_new_passkey(
@@ -321,9 +321,13 @@ def remove_passkey(
     passkey = session.get(Passkey, passkey_id)
     if passkey is None or passkey.user_id != user.id:
         raise PasskeyNotFound()
-    if len(_passkeys_of(session, user.id)) <= 1:
-        raise LastPasskey()
     confirm(session, user=user, credential=confirmation)
+    # Hold the account while counting, so two removals at once cannot each
+    # see a passkey left and take the last one between them.
+    _lock_user(session, user.id)
+    if len(_passkeys_of(session, user.id)) <= 1:
+        session.rollback()
+        raise LastPasskey()
     session.delete(passkey)
     session.commit()
 
@@ -333,9 +337,13 @@ def sign_out_everywhere(session: Session, *, user: User) -> None:
     End every session of the account at once (FR-12.13). Each is refused from
     its next request on, because its token carries the version this replaces.
     """
+    _end_every_session(session, user)
+    session.commit()
+
+
+def _end_every_session(session: Session, user: User) -> None:
     user.session_version += 1
     session.add(user)
-    session.commit()
 
 
 # --- Recovery ---------------------------------------------------------------
@@ -369,17 +377,16 @@ def issue_recovery_code_for(
     superuser: User,
     user_id: uuid.UUID,
     confirmation: dict[str, Any],
-) -> RecoveryCodeIssued | None:
+) -> RecoveryCodeIssued:
     """
     The superuser issuing a code for someone else, confirmed with their own
-    passkey (FR-12.16). Their own account is refused (FR-12.19). None if there
-    is no such user.
+    passkey (FR-12.16). Their own account is refused (FR-12.19).
     """
     if user_id == superuser.id:
         raise OwnRecoveryCode()
     user = session.get(User, user_id)
     if user is None:
-        return None
+        raise UserNotFound()
     confirm(session, user=superuser, credential=confirmation)
     return issue_recovery_code(session, user=user)
 
@@ -395,10 +402,13 @@ def start_recovery(session: Session, *, email: str, code: str) -> dict[str, Any]
     A wrong code counts as a miss, and the fifth miss burns it (FR-12.18).
     """
     user = crud.get_user_by_email(session=session, email=email)
-    if user is None:
+    if user is None or not user.is_active:
         raise RecoveryRefused()
-    recovery = session.get(RecoveryCode, user.id)
+    # Locked until the miss is counted, so tries made at once are each
+    # counted and the fifth still burns the code.
+    recovery = _locked_recovery_code(session, user.id)
     if recovery is None:
+        session.rollback()
         raise RecoveryRefused()
     if recovery.expires_at <= datetime.now(UTC):
         session.delete(recovery)
@@ -432,14 +442,19 @@ def finish_recovery(
     if row is None or row.user_id is None:
         raise RecoveryRefused()
     user = session.get(User, row.user_id)
-    recovery = session.get(RecoveryCode, row.user_id)
-    if user is None or recovery is None or recovery.expires_at <= datetime.now(UTC):
+    recovery = _locked_recovery_code(session, row.user_id)
+    if (
+        user is None
+        or not user.is_active
+        or recovery is None
+        or recovery.expires_at <= datetime.now(UTC)
+    ):
+        session.rollback()
         raise RecoveryRefused()
     verified = _verify_registration(credential, row.challenge)
     session.add(_new_passkey(user.id, credential, verified, user_agent, used=True))
     session.delete(recovery)
-    user.session_version += 1
-    session.add(user)
+    _end_every_session(session, user)
     session.commit()
     session.refresh(user)
     return user
@@ -500,13 +515,20 @@ def _take(
     challenge = _challenge_in(credential)
     if challenge is None:
         return None
-    row = session.exec(
-        select(WebAuthnChallenge).where(WebAuthnChallenge.challenge == challenge)
-    ).first()
+    # One statement that both finds and removes the row, so of two requests
+    # answering with the same challenge at once only one gets it back.
+    row: WebAuthnChallenge | None = session.exec(
+        delete(WebAuthnChallenge)
+        .where(col(WebAuthnChallenge.challenge) == challenge)
+        .returning(WebAuthnChallenge)
+    ).scalar_one_or_none()
+    if row is not None:
+        # Gone from the table, so kept apart from the session: the commit
+        # would otherwise expire it, and there is no row to reload it from.
+        session.expunge(row)
+    session.commit()
     if row is None:
         return None
-    session.delete(row)
-    session.commit()
     if row.kind != kind or row.expires_at <= datetime.now(UTC):
         return None
     return row
@@ -635,8 +657,24 @@ def _passkey_for(session: Session, credential: dict[str, Any]) -> Passkey | None
     ).first()
 
 
+def _lock_user(session: Session, user_id: uuid.UUID) -> None:
+    session.exec(select(User.id).where(User.id == user_id).with_for_update()).one()
+
+
+def _locked_recovery_code(session: Session, user_id: uuid.UUID) -> RecoveryCode | None:
+    return session.exec(
+        select(RecoveryCode).where(RecoveryCode.user_id == user_id).with_for_update()
+    ).first()
+
+
 def _passkeys_of(session: Session, user_id: uuid.UUID) -> list[Passkey]:
-    return list(session.exec(select(Passkey).where(Passkey.user_id == user_id)).all())
+    return list(
+        session.exec(
+            select(Passkey)
+            .where(Passkey.user_id == user_id)
+            .order_by(col(Passkey.created_at))
+        ).all()
+    )
 
 
 def _new_passkey(
@@ -657,41 +695,3 @@ def _new_passkey(
         name=passkey_name(user_agent),
         last_used_at=datetime.now(UTC) if used else None,
     )
-
-
-# --- Naming -----------------------------------------------------------------
-
-# Checked in order: several browsers carry another's token too (Edge and Opera
-# say "Chrome", Chrome says "Safari").
-_BROWSERS = (
-    ("Edg/", "Edge"),
-    ("OPR/", "Opera"),
-    ("Firefox/", "Firefox"),
-    ("FxiOS/", "Firefox"),
-    ("CriOS/", "Chrome"),
-    ("Chrome/", "Chrome"),
-    ("Safari/", "Safari"),
-)
-_SYSTEMS = (
-    ("iPhone", "iPhone"),
-    ("iPad", "iPad"),
-    ("Android", "Android"),
-    ("CrOS", "ChromeOS"),
-    ("Mac OS X", "macOS"),
-    ("Macintosh", "macOS"),
-    ("Windows", "Windows"),
-    ("Linux", "Linux"),
-)
-
-
-def passkey_name(user_agent: str | None) -> str:
-    """
-    A name for a new passkey, from the browser and device that made it
-    (FR-12.6), such as "Chrome on macOS".
-    """
-    agent = user_agent or ""
-    browser = next((name for token, name in _BROWSERS if token in agent), None)
-    system = next((name for token, name in _SYSTEMS if token in agent), None)
-    if browser and system:
-        return f"{browser} on {system}"
-    return browser or system or "Passkey"

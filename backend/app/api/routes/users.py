@@ -1,7 +1,7 @@
 import uuid
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import col, func, select
 
 from app import crud, passkeys
@@ -9,6 +9,7 @@ from app.api.deps import (
     AttachmentStorageDep,
     CurrentUser,
     SessionDep,
+    UserAgent,
     get_current_active_superuser,
 )
 from app.models import (
@@ -136,12 +137,9 @@ def new_passkey_options(
     Start adding a passkey, once the caller has confirmed with one they hold
     (FR-12.7).
     """
-    try:
-        return passkeys.start_new_passkey(
-            session, user=current_user, confirmation=body.confirmation
-        )
-    except passkeys.PasskeyError as error:
-        raise HTTPException(status_code=400, detail=str(error))
+    return passkeys.start_new_passkey(
+        session, user=current_user, confirmation=body.confirmation
+    )
 
 
 @router.post("/me/passkeys", response_model=PasskeyPublic)
@@ -149,18 +147,15 @@ def add_passkey(
     session: SessionDep,
     current_user: CurrentUser,
     body: PasskeyCredential,
-    user_agent: Annotated[str | None, Header()] = None,
+    user_agent: UserAgent = None,
 ) -> Any:
     """Finish adding a passkey."""
-    try:
-        return passkeys.finish_new_passkey(
-            session,
-            user=current_user,
-            credential=body.credential,
-            user_agent=user_agent,
-        )
-    except passkeys.PasskeyError as error:
-        raise HTTPException(status_code=400, detail=str(error))
+    return passkeys.finish_new_passkey(
+        session,
+        user=current_user,
+        credential=body.credential,
+        user_agent=user_agent,
+    )
 
 
 @router.delete("/me/passkeys/{passkey_id}", response_model=Message)
@@ -175,17 +170,12 @@ def remove_passkey(
     (FR-12.7). The last one stays (FR-12.8), and the sessions it opened are
     not ended (FR-12.9).
     """
-    try:
-        passkeys.remove_passkey(
-            session,
-            user=current_user,
-            passkey_id=passkey_id,
-            confirmation=body.confirmation,
-        )
-    except passkeys.PasskeyNotFound as error:
-        raise HTTPException(status_code=404, detail=str(error))
-    except passkeys.PasskeyError as error:
-        raise HTTPException(status_code=400, detail=str(error))
+    passkeys.remove_passkey(
+        session,
+        user=current_user,
+        passkey_id=passkey_id,
+        confirmation=body.confirmation,
+    )
     return Message(message="Passkey removed")
 
 
@@ -211,15 +201,9 @@ def issue_recovery_code(
     with the superuser's own passkey (FR-12.16). The code is shown once. The
     superuser's own account is refused (FR-12.19).
     """
-    try:
-        issued = passkeys.issue_recovery_code_for(
-            session,
-            superuser=current_user,
-            user_id=user_id,
-            confirmation=body.confirmation,
-        )
-    except passkeys.PasskeyError as error:
-        raise HTTPException(status_code=400, detail=str(error))
-    if issued is None:
-        raise HTTPException(status_code=404, detail="User not found")
-    return issued
+    return passkeys.issue_recovery_code_for(
+        session,
+        superuser=current_user,
+        user_id=user_id,
+        confirmation=body.confirmation,
+    )

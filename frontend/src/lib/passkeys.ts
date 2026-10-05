@@ -11,6 +11,7 @@ import {
 } from "@simplewebauthn/browser"
 
 import { LoginService, UsersService } from "@/client"
+import { toastError } from "@/lib/toasts"
 
 /**
  * Passkey ceremonies, end to end: ask the API for options, hand them to the
@@ -26,7 +27,7 @@ export function passkeysSupported(): boolean {
   return browserSupportsWebAuthn()
 }
 
-/** Whether the browser offers passkeys in the e-mail field's autofill (FR-12.3). */
+/** Whether the browser offers passkeys in the email field's autofill (FR-12.3). */
 export function autofillSupported(): Promise<boolean> {
   return browserSupportsWebAuthnAutofill()
 }
@@ -48,6 +49,11 @@ export function wasDismissed(error: unknown): boolean {
     error.name === "AbortError" ||
     code === "ERROR_CEREMONY_ABORTED"
   )
+}
+
+/** Report a failed ceremony, unless the person just dismissed the prompt. */
+export function reportUnlessDismissed(error: unknown) {
+  if (!wasDismissed(error)) toastError(error)
 }
 
 const creationOptions = (data: unknown) =>
@@ -74,7 +80,7 @@ export async function registerAccount(email: string): Promise<string> {
 
 /**
  * Sign in with whatever passkey the browser offers (FR-12.3). With
- * `autofill`, the browser offers them in the e-mail field's suggestions and
+ * `autofill`, the browser offers them in the email field's suggestions and
  * the promise waits until one is picked.
  */
 export async function signInWithPasskey({

@@ -58,7 +58,7 @@ function PasskeySignIn() {
   const { signInMutation } = useAuth()
   const { mutate } = signInMutation
 
-  // Offer the browser's passkeys in the e-mail field's suggestions as well,
+  // Offer the browser's passkeys in the email field's suggestions as well,
   // waiting in the background until one is picked (FR-12.3).
   useEffect(() => {
     let cancelled = false

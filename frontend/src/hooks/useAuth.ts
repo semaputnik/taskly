@@ -4,19 +4,13 @@ import { useNavigate } from "@tanstack/react-router"
 import {
   recoverAccount,
   registerAccount,
+  reportUnlessDismissed,
   signInWithPasskey,
-  wasDismissed,
 } from "@/lib/passkeys"
 import { clearServerState, currentUserQuery } from "@/lib/serverState"
-import { toastError } from "@/lib/toasts"
 
 const isLoggedIn = () => {
   return localStorage.getItem("access_token") !== null
-}
-
-/** A ceremony the person dismissed is not an error to report. */
-const reportUnlessDismissed = (error: unknown) => {
-  if (!wasDismissed(error)) toastError(error)
 }
 
 const useAuth = () => {

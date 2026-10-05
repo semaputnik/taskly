@@ -16,7 +16,7 @@ test("The sign-in screen asks for nothing but a passkey", async ({ page }) => {
   await expect(
     page.getByRole("button", { name: "Sign in with passkey" }),
   ).toBeVisible()
-  // The e-mail field is there for the browser's passkey suggestions only.
+  // The email field is there for the browser's passkey suggestions only.
   await expect(page.getByTestId("email-input")).toHaveAttribute(
     "autocomplete",
     "username webauthn",

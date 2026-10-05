@@ -8,7 +8,7 @@ test.use({ storageState: { cookies: [], origins: [] } })
 async function recover(page: Page, email: string, code: string) {
   await page.goto("/login")
   await page.getByRole("link", { name: "Have a recovery code?" }).click()
-  // The sign-in screen has an e-mail field too: fill the one on recovery.
+  // The sign-in screen has an email field too: fill the one on recovery.
   await expect(
     page.getByRole("heading", { name: "Recover your account" }),
   ).toBeVisible()
@@ -45,7 +45,7 @@ test("A wrong code is refused", async ({ page }) => {
   await recover(page, email, "AAAA-AAAA-AAAA-AAAA")
 
   await expect(
-    page.getByText("This e-mail and recovery code do not match a live code."),
+    page.getByText("This email and recovery code do not match a live code."),
   ).toBeVisible()
   await expect(page).toHaveURL(/\/recover/)
 })

@@ -1,5 +1,6 @@
 import hashlib
 import secrets
+import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -23,7 +24,7 @@ def create_access_token(
     return encoded_jwt
 
 
-def session_token(user_id: Any, session_version: int) -> str:
+def session_token(user_id: uuid.UUID, session_version: int) -> str:
     """A session token with the lifetime every sign-in gets (FR-12.11)."""
     return create_access_token(
         user_id,

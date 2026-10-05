@@ -9,7 +9,7 @@ import { randomEmail } from "./utils/random"
 
 test.use({ storageState: { cookies: [], origins: [] } })
 
-test("Registering asks for an e-mail and nothing else", async ({ page }) => {
+test("Registering asks for an email and nothing else", async ({ page }) => {
   await page.goto("/signup")
 
   await expect(page.getByTestId("email-input")).toBeEditable()
@@ -34,7 +34,7 @@ test("Registering makes a passkey and signs in", async ({ page }) => {
   ).toHaveCount(1)
 })
 
-test("Registering a taken e-mail is refused", async ({ page }) => {
+test("Registering a taken email is refused", async ({ page }) => {
   await addVirtualAuthenticator(page)
   const email = randomEmail()
   await createUser({ email })
@@ -44,12 +44,12 @@ test("Registering a taken e-mail is refused", async ({ page }) => {
   await page.getByRole("button", { name: "Create account" }).click()
 
   await expect(
-    page.getByText("An account with this e-mail already exists."),
+    page.getByText("An account with this email already exists."),
   ).toBeVisible()
   await expect(page).toHaveURL(/\/signup/)
 })
 
-test("Registering with an invalid e-mail", async ({ page }) => {
+test("Registering with an invalid email", async ({ page }) => {
   await page.goto("/signup")
   await page.getByTestId("email-input").fill("invalid-email")
   await page.getByRole("button", { name: "Create account" }).click()

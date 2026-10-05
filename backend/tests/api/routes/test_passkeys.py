@@ -442,7 +442,7 @@ def locked_out(
     return user, lost, code
 
 
-RECOVERY_REFUSED = "This e-mail and recovery code do not match a live code."
+RECOVERY_REFUSED = "This email and recovery code do not match a live code."
 
 
 def _recover(
@@ -634,3 +634,39 @@ def test_the_command_says_when_there_is_no_superuser(
     assert superuser_recovery_code.main() == 1
 
     assert settings.FIRST_SUPERUSER in capsys.readouterr().err
+
+
+def test_an_inactive_account_cannot_spend_a_code(
+    client: TestClient, db: Session, locked_out: tuple[User, Authenticator, str]
+) -> None:
+    user, _, code = locked_out
+    user.is_active = False
+    db.add(user)
+    db.commit()
+
+    r = _recover(client, user.email, code, Authenticator())
+
+    assert r.status_code == 400
+    assert r.json()["detail"] == RECOVERY_REFUSED
+
+
+def test_an_account_made_inactive_during_the_ceremony_is_refused(
+    client: TestClient, db: Session, locked_out: tuple[User, Authenticator, str]
+) -> None:
+    user, _, code = locked_out
+    options = client.post(
+        f"{API}/login/recovery/options", json={"email": user.email, "code": code}
+    ).json()
+    user.is_active = False
+    db.add(user)
+    db.commit()
+
+    r = client.post(
+        f"{API}/login/recovery",
+        json={"credential": Authenticator().create_json(options)},
+    )
+
+    assert r.status_code == 400
+    db.expire_all()
+    # Refused before anything was spent.
+    assert db.get(RecoveryCode, user.id) is not None
