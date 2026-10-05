@@ -502,9 +502,9 @@ export function PropertyRow({
           <span id={labelId} className={text}>
             {label}
           </span>
-          <div role="group" aria-labelledby={labelId} className={value}>
+          <fieldset aria-labelledby={labelId} className={`${value} m-0 border-0 p-0`}>
             {children}
-          </div>
+          </fieldset>
         </>
       )}
     </div>
