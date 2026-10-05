@@ -56,7 +56,7 @@ Taskly is self-hosted, and the data stays on the owner's own server. That is the
 - **Bot users** are deliberately weak. They have no login, no password and no email. Their scope is an explicit list of projects plus permissions (task create/read/update/delete, comments, tag creation). They never reach archived projects, never read the activity log, and cannot edit or delete comments. Their comments are append-only.
 - **Out of scope:**
   - collaboration between humans;
-  - text search;
+  - full-text search over descriptions and comments (the capture line matches open task titles only);
   - nested projects;
   - giving a bot access to all projects at once.
 - **Webhooks** hang off bot users: two fixed events per bot (a task becoming ready for it, a comment on a task it is involved in), set only by the owner in the interface, delivered as thin signed pings from an outbox with retries (F-11).
