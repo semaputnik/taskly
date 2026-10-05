@@ -2,11 +2,11 @@ from sqlmodel import Session, select
 
 from app import crud
 from app.models import Project, ProjectCreate, ProjectUpdate, UserCreate
-from tests.utils.utils import random_email, random_lower_string
+from tests.utils.utils import random_email
 
 
 def test_create_user_creates_inbox_project(db: Session) -> None:
-    user_in = UserCreate(email=random_email(), password=random_lower_string())
+    user_in = UserCreate(email=random_email())
     user = crud.create_user(session=db, user_create=user_in)
 
     statement = select(Project).where(Project.owner_id == user.id)
@@ -18,7 +18,7 @@ def test_create_user_creates_inbox_project(db: Session) -> None:
 
 
 def test_create_project(db: Session) -> None:
-    user_in = UserCreate(email=random_email(), password=random_lower_string())
+    user_in = UserCreate(email=random_email())
     user = crud.create_user(session=db, user_create=user_in)
 
     project_in = ProjectCreate(name="Groceries", description="Weekly shopping list")
@@ -33,7 +33,7 @@ def test_create_project(db: Session) -> None:
 
 
 def test_update_project(db: Session) -> None:
-    user_in = UserCreate(email=random_email(), password=random_lower_string())
+    user_in = UserCreate(email=random_email())
     user = crud.create_user(session=db, user_create=user_in)
     project = crud.create_project(
         session=db, project_create=ProjectCreate(name="Old name"), owner_id=user.id

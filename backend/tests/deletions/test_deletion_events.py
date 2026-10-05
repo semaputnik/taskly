@@ -27,14 +27,14 @@ from app.models import (
     User,
     UserCreate,
 )
-from tests.utils.utils import random_email, random_lower_string
+from tests.utils.utils import random_email
 
 
 @pytest.fixture
 def owner(db: Session) -> User:
     return crud.create_user(
         session=db,
-        user_create=UserCreate(email=random_email(), password=random_lower_string()),
+        user_create=UserCreate(email=random_email()),
     )
 
 

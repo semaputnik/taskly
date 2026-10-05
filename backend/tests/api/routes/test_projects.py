@@ -3,26 +3,12 @@ import uuid
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
-from app import crud
 from app.core.config import settings
-from app.models import UserCreate
-from tests.utils.utils import random_email, random_lower_string
-
-
-def _headers_for_new_user(client: TestClient, db: Session) -> dict[str, str]:
-    email = random_email()
-    password = random_lower_string()
-    user_in = UserCreate(email=email, password=password)
-    crud.create_user(session=db, user_create=user_in)
-
-    login_data = {"username": email, "password": password}
-    r = client.post(f"{settings.API_V1_STR}/login/access-token", data=login_data)
-    token = r.json()["access_token"]
-    return {"Authorization": f"Bearer {token}"}
+from tests.utils.user import new_user_headers
 
 
 def test_new_account_gets_inbox_project(client: TestClient, db: Session) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
 
     r = client.get(f"{settings.API_V1_STR}/projects/", headers=headers)
     assert r.status_code == 200
@@ -33,7 +19,7 @@ def test_new_account_gets_inbox_project(client: TestClient, db: Session) -> None
 
 
 def test_create_project(client: TestClient, db: Session) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
 
     r = client.post(
         f"{settings.API_V1_STR}/projects/",
@@ -50,7 +36,7 @@ def test_create_project(client: TestClient, db: Session) -> None:
 def test_list_projects_includes_inbox_and_created(
     client: TestClient, db: Session
 ) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
 
     client.post(
         f"{settings.API_V1_STR}/projects/",
@@ -67,7 +53,7 @@ def test_list_projects_includes_inbox_and_created(
 
 
 def test_rename_project(client: TestClient, db: Session) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
 
     create_r = client.post(
         f"{settings.API_V1_STR}/projects/",
@@ -88,8 +74,8 @@ def test_rename_project(client: TestClient, db: Session) -> None:
 
 
 def test_users_cannot_see_other_users_projects(client: TestClient, db: Session) -> None:
-    headers_a = _headers_for_new_user(client, db)
-    headers_b = _headers_for_new_user(client, db)
+    headers_a = new_user_headers(client, db)
+    headers_b = new_user_headers(client, db)
 
     create_r = client.post(
         f"{settings.API_V1_STR}/projects/",
@@ -117,7 +103,7 @@ def test_users_cannot_see_other_users_projects(client: TestClient, db: Session) 
 
 
 def test_nonexistent_project_returns_404(client: TestClient, db: Session) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
 
     r = client.patch(
         f"{settings.API_V1_STR}/projects/{uuid.uuid4()}",
@@ -128,7 +114,7 @@ def test_nonexistent_project_returns_404(client: TestClient, db: Session) -> Non
 
 
 def test_renaming_inbox_is_refused(client: TestClient, db: Session) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
 
     r = client.get(f"{settings.API_V1_STR}/projects/", headers=headers)
     inbox_id = next(p["id"] for p in r.json()["data"] if p["is_inbox"])
@@ -143,7 +129,7 @@ def test_renaming_inbox_is_refused(client: TestClient, db: Session) -> None:
 
 
 def test_changing_inbox_description_is_allowed(client: TestClient, db: Session) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
 
     r = client.get(f"{settings.API_V1_STR}/projects/", headers=headers)
     inbox_id = next(p["id"] for p in r.json()["data"] if p["is_inbox"])
@@ -158,7 +144,7 @@ def test_changing_inbox_description_is_allowed(client: TestClient, db: Session) 
 
 
 def test_deleting_inbox_is_refused(client: TestClient, db: Session) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
 
     r = client.get(f"{settings.API_V1_STR}/projects/", headers=headers)
     inbox_id = next(p["id"] for p in r.json()["data"] if p["is_inbox"])
@@ -169,7 +155,7 @@ def test_deleting_inbox_is_refused(client: TestClient, db: Session) -> None:
 
 
 def test_delete_non_inbox_project(client: TestClient, db: Session) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
 
     create_r = client.post(
         f"{settings.API_V1_STR}/projects/",

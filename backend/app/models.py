@@ -11,6 +11,7 @@ from sqlalchemy import (
     DateTime,
     Identity,
     Index,
+    LargeBinary,
     UniqueConstraint,
     text,
 )
@@ -31,15 +32,10 @@ class UserBase(SQLModel):
     full_name: str | None = Field(default=None, max_length=255)
 
 
-# Properties to receive via API on creation
+# Properties to create a user with. There is no password: an account's only
+# credentials are its passkeys (FR-12.1), made in the same step (FR-12.2).
 class UserCreate(UserBase):
-    password: str = Field(min_length=8, max_length=128)
-
-
-class UserRegister(SQLModel):
-    email: EmailStr = Field(max_length=255)
-    password: str = Field(min_length=8, max_length=128)
-    full_name: str | None = Field(default=None, max_length=255)
+    pass
 
 
 # Properties to receive via API on update, all are optional
@@ -48,7 +44,6 @@ class UserUpdate(SQLModel):
     is_active: bool | None = None
     is_superuser: bool | None = None
     full_name: str | None = Field(default=None, max_length=255)
-    password: str | None = Field(default=None, min_length=8, max_length=128)
 
 
 class UserUpdateMe(SQLModel):
@@ -56,15 +51,12 @@ class UserUpdateMe(SQLModel):
     email: EmailStr | None = Field(default=None, max_length=255)
 
 
-class UpdatePassword(SQLModel):
-    current_password: str = Field(min_length=8, max_length=128)
-    new_password: str = Field(min_length=8, max_length=128)
-
-
 # Database model, database table inferred from class name
 class User(UserBase, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    hashed_password: str
+    # Carried in every session token this user is issued and compared on every
+    # request: raising it ends every session at once (FR-12.13, FR-12.14).
+    session_version: int = 0
     created_at: datetime | None = Field(
         default_factory=get_datetime_utc,
         sa_type=DateTime(timezone=True),  # type: ignore
@@ -80,6 +72,141 @@ class UserPublic(UserBase):
 class UsersPublic(SQLModel):
     data: list[UserPublic]
     count: int
+
+
+class Passkey(SQLModel, table=True):
+    """
+    A WebAuthn credential a user signs in with (FR-12.1). Taskly holds only
+    its public half; the private key stays on the user's device or in their
+    password manager.
+    """
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    user_id: uuid.UUID = Field(
+        foreign_key="user.id", nullable=False, ondelete="CASCADE", index=True
+    )
+    credential_id: bytes = Field(sa_type=LargeBinary, unique=True, index=True)
+    public_key: bytes = Field(sa_type=LargeBinary)
+    sign_count: int = 0
+    # What the browser reported it can reach the authenticator over, handed
+    # back when the same passkey is asked for, so the browser offers it the
+    # right way.
+    transports: list[str] = Field(default_factory=list, sa_type=JSONB)
+    # Given from the browser and device that made it, never typed (FR-12.6).
+    name: str = Field(max_length=255)
+    created_at: datetime = Field(
+        default_factory=get_datetime_utc,
+        sa_type=DateTime(timezone=True),  # type: ignore
+    )
+    last_used_at: datetime | None = Field(
+        default=None,
+        sa_type=DateTime(timezone=True),  # type: ignore
+    )
+
+
+class PasskeyPublic(SQLModel):
+    id: uuid.UUID
+    name: str
+    created_at: datetime
+    last_used_at: datetime | None
+
+
+class PasskeysPublic(SQLModel):
+    data: list[PasskeyPublic]
+    count: int
+
+
+class ChallengeKind(StrEnum):
+    """What the ceremony a challenge belongs to is for."""
+
+    # Creating an account with its first passkey (FR-12.2).
+    REGISTRATION = "registration"
+    # Signing in (FR-12.3).
+    SIGN_IN = "sign_in"
+    # A fresh confirmation with one of the user's passkeys (FR-12.7, FR-12.16).
+    CONFIRMATION = "confirmation"
+    # Adding a passkey to an account that is already signed in (FR-12.7).
+    NEW_PASSKEY = "new_passkey"
+    # Creating a passkey with a recovery code (FR-12.17).
+    RECOVERY = "recovery"
+
+
+class WebAuthnChallenge(SQLModel, table=True):
+    """
+    The server's half of one passkey ceremony: issued with the options the
+    browser is handed, taken once when the browser answers, and refused
+    after five minutes (FR-12.10).
+    """
+
+    __tablename__ = "webauthn_challenge"
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    kind: ChallengeKind = Field(
+        sa_type=SAEnum(  # type: ignore
+            ChallengeKind,
+            name="challengekind",
+            values_callable=lambda kinds: [kind.value for kind in kinds],
+        )
+    )
+    challenge: bytes = Field(sa_type=LargeBinary, unique=True, index=True)
+    # Whose ceremony it is. Empty for signing in, where nobody is known yet,
+    # and for registering, where the account does not exist yet.
+    user_id: uuid.UUID | None = Field(
+        default=None, foreign_key="user.id", nullable=True, ondelete="CASCADE"
+    )
+    # Registering only: the email asked for and the id the account will be
+    # given, which the new passkey is made under.
+    email: str | None = Field(default=None, max_length=255)
+    user_handle: uuid.UUID | None = None
+    expires_at: datetime = Field(sa_type=DateTime(timezone=True))  # type: ignore
+
+
+class RecoveryCode(SQLModel, table=True):
+    """
+    The one live recovery code a user may hold (FR-12.16). Kept as a digest
+    only; the code itself is shown once, when it is issued.
+    """
+
+    __tablename__ = "recovery_code"
+
+    user_id: uuid.UUID = Field(
+        foreign_key="user.id", primary_key=True, ondelete="CASCADE"
+    )
+    digest: str = Field(max_length=64)
+    expires_at: datetime = Field(sa_type=DateTime(timezone=True))  # type: ignore
+    failed_attempts: int = 0
+
+
+class RecoveryCodeIssued(SQLModel):
+    code: str
+    expires_at: datetime
+
+
+class RegistrationStart(SQLModel):
+    email: EmailStr = Field(max_length=255)
+
+
+class RecoveryStart(SQLModel):
+    email: EmailStr = Field(max_length=255)
+    code: str = Field(max_length=64)
+
+
+class PasskeyCredential(SQLModel):
+    """
+    The browser's answer to a passkey ceremony, as WebAuthn's
+    `PublicKeyCredential.toJSON()` gives it.
+    """
+
+    credential: dict[str, Any]
+
+
+class Confirmation(SQLModel):
+    """
+    A fresh assertion with one of the caller's own passkeys, answering a
+    confirmation challenge (FR-12.7, FR-12.16).
+    """
+
+    confirmation: dict[str, Any]
 
 
 class Deletion(SQLModel, table=True):
@@ -1106,7 +1233,7 @@ class BotUser(SQLModel, table=True):
     An identity for an integration, owned by one user and far weaker than
     them (FR-08.1–FR-08.4).
 
-    Not a kind of `User`: login, registration, password reset and the
+    Not a kind of `User`: sign-in, registration, recovery and the
     superuser's account list all work on users, so none of them can reach a
     bot user by forgetting to check for one. It has no password and no email;
     the only way in is its token.
@@ -1236,8 +1363,6 @@ class Token(SQLModel):
 # Contents of JWT token
 class TokenPayload(SQLModel):
     sub: str | None = None
-
-
-class NewPassword(SQLModel):
-    token: str
-    new_password: str = Field(min_length=8, max_length=128)
+    # The user's session version when the token was issued. A token from
+    # before the account last signed out everywhere carries a lower one.
+    sv: int | None = None

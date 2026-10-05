@@ -23,7 +23,7 @@ cp .env.example .env        # then replace every changethis with a real value
 docker compose up -d db mailpit
 cd backend
 uv sync
-uv run bash scripts/prestart.sh   # migrations + superuser creation
+uv run bash scripts/prestart.sh   # migrations
 uv run fastapi dev                # http://localhost:8000
 ```
 
@@ -34,7 +34,13 @@ bun install
 bun run dev                       # http://localhost:5173, with hot reload
 ```
 
-The superuser login and password are `FIRST_SUPERUSER` and `FIRST_SUPERUSER_PASSWORD` in `.env`.
+Taskly signs in with passkeys only, so use a browser that supports them. To
+become the superuser, open <http://localhost:5173/signup> and register the
+address `FIRST_SUPERUSER` names in `.env`: whoever registers it while there is
+no superuser becomes one. A database from before passkeys keeps its accounts
+without a way in; get the superuser's recovery code with
+`uv run python -m app.superuser_recovery_code` from `backend/` and spend it
+under “Have a recovery code?”.
 
 ## URLs
 

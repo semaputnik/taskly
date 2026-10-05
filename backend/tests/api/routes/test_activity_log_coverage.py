@@ -50,15 +50,22 @@ NOT_LOGGED = {
         "A suggestion withheld, not a change to tags or tasks; the merge the "
         "suggestion leads to is logged"
     ),
-    f"POST {API}/login/access-token": ACCOUNT,
+    f"POST {API}/login/registration/options": ACCOUNT,
+    f"POST {API}/login/registration": ACCOUNT,
+    f"POST {API}/login/passkey/options": ACCOUNT,
+    f"POST {API}/login/passkey": ACCOUNT,
+    f"POST {API}/login/recovery/options": ACCOUNT,
+    f"POST {API}/login/recovery": ACCOUNT,
     f"POST {API}/login/test-token": ACCOUNT,
-    f"POST {API}/password-recovery/{{email}}": ACCOUNT,
-    f"POST {API}/password-recovery-html-content/{{email}}": ACCOUNT,
-    f"POST {API}/reset-password/": ACCOUNT,
-    f"POST {API}/users/signup": ACCOUNT,
     f"PATCH {API}/users/me": ACCOUNT,
-    f"PATCH {API}/users/me/password": ACCOUNT,
     f"DELETE {API}/users/me": ACCOUNT,
+    f"POST {API}/users/me/confirmation/options": ACCOUNT,
+    f"POST {API}/users/me/passkeys/options": ACCOUNT,
+    f"POST {API}/users/me/passkeys": ACCOUNT,
+    f"DELETE {API}/users/me/passkeys/{{passkey_id}}": ACCOUNT,
+    f"POST {API}/users/me/sign-out-everywhere": ACCOUNT,
+    # Sign-in events are out of the log (features.md, Out of scope).
+    f"POST {API}/users/{{user_id}}/recovery-code": ACCOUNT,
     f"POST {API}/bot-users/": (
         "Bot user management is not among the changes FR-10.3 covers; what a bot "
         "user does is logged, as its own actor"
@@ -79,6 +86,7 @@ NOT_LOGGED = {
     ),
     f"POST {API}/utils/test-email/": "Sends an email; changes nothing",
     f"POST {API}/private/users/": "Local development helper for test accounts",
+    f"POST {API}/private/recovery-code": "Local development helper for test accounts",
 }
 
 

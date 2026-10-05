@@ -13,11 +13,11 @@ from app.models import (
     TaskUpdate,
     UserCreate,
 )
-from tests.utils.utils import random_email, random_lower_string
+from tests.utils.utils import random_email
 
 
 def test_get_inbox_project(db: Session) -> None:
-    user_in = UserCreate(email=random_email(), password=random_lower_string())
+    user_in = UserCreate(email=random_email())
     user = crud.create_user(session=db, user_create=user_in)
 
     inbox = crud.get_inbox_project(session=db, owner_id=user.id)
@@ -27,7 +27,7 @@ def test_get_inbox_project(db: Session) -> None:
 
 
 def test_create_task(db: Session) -> None:
-    user_in = UserCreate(email=random_email(), password=random_lower_string())
+    user_in = UserCreate(email=random_email())
     user = crud.create_user(session=db, user_create=user_in)
     inbox = crud.get_inbox_project(session=db, owner_id=user.id)
 
@@ -56,7 +56,7 @@ def test_create_task(db: Session) -> None:
 
 
 def test_create_task_with_no_priority_stays_unset(db: Session) -> None:
-    user_in = UserCreate(email=random_email(), password=random_lower_string())
+    user_in = UserCreate(email=random_email())
     user = crud.create_user(session=db, user_create=user_in)
     inbox = crud.get_inbox_project(session=db, owner_id=user.id)
 
@@ -72,7 +72,7 @@ def test_create_task_with_no_priority_stays_unset(db: Session) -> None:
 
 
 def test_update_task_fields(db: Session) -> None:
-    user_in = UserCreate(email=random_email(), password=random_lower_string())
+    user_in = UserCreate(email=random_email())
     user = crud.create_user(session=db, user_create=user_in)
     inbox = crud.get_inbox_project(session=db, owner_id=user.id)
     task = crud.create_task(
@@ -102,7 +102,7 @@ def test_update_task_fields(db: Session) -> None:
 
 
 def test_complete_and_return_to_not_completed(db: Session) -> None:
-    user_in = UserCreate(email=random_email(), password=random_lower_string())
+    user_in = UserCreate(email=random_email())
     user = crud.create_user(session=db, user_create=user_in)
     inbox = crud.get_inbox_project(session=db, owner_id=user.id)
     task = crud.create_task(
@@ -125,7 +125,7 @@ def test_complete_and_return_to_not_completed(db: Session) -> None:
 
 
 def test_move_task_to_another_project(db: Session) -> None:
-    user_in = UserCreate(email=random_email(), password=random_lower_string())
+    user_in = UserCreate(email=random_email())
     user = crud.create_user(session=db, user_create=user_in)
     inbox = crud.get_inbox_project(session=db, owner_id=user.id)
     other_project = crud.create_project(
@@ -152,7 +152,7 @@ def _tree(db: Session, depth: int) -> tuple[uuid.UUID, list[Task]]:
     """A chain of `depth` tasks, the first a root in a new project."""
     user = crud.create_user(
         session=db,
-        user_create=UserCreate(email=random_email(), password=random_lower_string()),
+        user_create=UserCreate(email=random_email()),
     )
     project = crud.create_project(
         session=db, project_create=ProjectCreate(name="Deep"), owner_id=user.id
@@ -212,7 +212,7 @@ def test_task_project_ids_do_not_reach_another_users_tasks(db: Session) -> None:
     _, chain = _tree(db, depth=2)
     stranger = crud.create_user(
         session=db,
-        user_create=UserCreate(email=random_email(), password=random_lower_string()),
+        user_create=UserCreate(email=random_email()),
     )
 
     assert (

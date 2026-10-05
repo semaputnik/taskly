@@ -5,22 +5,17 @@ from sqlmodel import Session
 from app import crud
 from app.core.config import settings
 from app.main import app
-from app.models import User, UserCreate
-from tests.utils.utils import random_email, random_lower_string
+from app.models import User
+from tests.utils.passkey import Authenticator
+from tests.utils.user import create_random_user, give_passkey, sign_in
+from tests.utils.utils import random_email
 
 API = settings.API_V1_STR
 
 
 def _new_user(client: TestClient, db: Session) -> tuple[User, dict[str, str]]:
-    email = random_email()
-    password = random_lower_string()
-    user = crud.create_user(
-        session=db, user_create=UserCreate(email=email, password=password)
-    )
-    r = client.post(
-        f"{API}/login/access-token", data={"username": email, "password": password}
-    )
-    return user, {"Authorization": f"Bearer {r.json()['access_token']}"}
+    user = create_random_user(db)
+    return user, sign_in(client, give_passkey(db, user))
 
 
 # --- The one thing a superuser can do -----------------------------------------
@@ -92,7 +87,7 @@ def test_creating_an_account_as_the_superuser_is_refused(
     r = client.post(
         f"{API}/users/",
         headers=superuser_token_headers,
-        json={"email": email, "password": random_lower_string()},
+        json={"email": email},
     )
     assert r.status_code == 405
     assert crud.get_user_by_email(session=db, email=email) is None
@@ -120,12 +115,15 @@ def test_registering_cannot_make_you_a_superuser(
     client: TestClient, db: Session
 ) -> None:
     email = random_email()
+    options = client.post(
+        f"{API}/login/registration/options",
+        json={"email": email, "is_superuser": True},
+    ).json()
     r = client.post(
-        f"{API}/users/signup",
-        json={"email": email, "password": random_lower_string(), "is_superuser": True},
+        f"{API}/login/registration",
+        json={"credential": Authenticator().create_json(options), "is_superuser": True},
     )
-    assert r.status_code == 200
-    assert r.json()["is_superuser"] is False
+    assert r.status_code == 200, r.text
 
     user = crud.get_user_by_email(session=db, email=email)
     assert user is not None and user.is_superuser is False
@@ -135,17 +133,15 @@ def test_registering_cannot_make_you_a_superuser(
 
 
 def test_anyone_can_register_and_gets_an_inbox(client: TestClient) -> None:
-    email = random_email()
-    password = random_lower_string()
-
     # No token at all: nobody has to invite or approve the new account.
-    r = client.post(f"{API}/users/signup", json={"email": email, "password": password})
-    assert r.status_code == 200, r.text
-
+    options = client.post(
+        f"{API}/login/registration/options", json={"email": random_email()}
+    ).json()
     r = client.post(
-        f"{API}/login/access-token", data={"username": email, "password": password}
+        f"{API}/login/registration",
+        json={"credential": Authenticator().create_json(options)},
     )
-    assert r.status_code == 200
+    assert r.status_code == 200, r.text
     headers = {"Authorization": f"Bearer {r.json()['access_token']}"}
 
     r = client.get(f"{API}/projects/", headers=headers)

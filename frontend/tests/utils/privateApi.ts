@@ -13,20 +13,31 @@ client.setConfig({
   httpAgent: new Agent({ keepAlive: false }),
 })
 
-export const createUser = async ({
+/**
+ * A user and a session for them, without a passkey ceremony: the way a test
+ * sets a scene when signing in is not what it is about. An existing user is
+ * signed in as they are.
+ */
+export const createSession = async ({
   email,
-  password,
+  isSuperuser = false,
 }: {
   email: string
-  password: string
+  isSuperuser?: boolean
 }) => {
   const response = await PrivateService.createUser({
-    body: {
-      email,
-      password,
-      is_verified: true,
-      full_name: "Test User",
-    },
+    body: { email, full_name: "Test User", is_superuser: isSuperuser },
   })
   return response.data
+}
+
+export const createUser = async (user: {
+  email: string
+  isSuperuser?: boolean
+}) => (await createSession(user)).user
+
+/** A recovery code for the user, as the server's recovery command prints one. */
+export const recoveryCodeFor = async (email: string) => {
+  const response = await PrivateService.issueRecoveryCode({ body: { email } })
+  return response.data.code
 }

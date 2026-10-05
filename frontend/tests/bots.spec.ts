@@ -1,6 +1,5 @@
 import { expect, test } from "@playwright/test"
-import { createUser } from "./utils/privateApi.ts"
-import { randomEmail, randomPassword } from "./utils/random"
+import { randomEmail } from "./utils/random"
 import { storeTokenAndClose } from "./utils/tokenDialog"
 import { logInUser } from "./utils/user"
 
@@ -11,9 +10,7 @@ test("A bot user is created on the Bots page and its token is shown once", async
   request,
 }) => {
   const email = randomEmail()
-  const password = randomPassword()
-  await createUser({ email, password })
-  await logInUser(page, email, password)
+  await logInUser(page, email)
 
   await page.goto("/projects")
   await page.getByRole("button", { name: "Add Project" }).click()
@@ -75,9 +72,7 @@ test("A token is revoked and a new one issued with an expiry", async ({
   request,
 }) => {
   const email = randomEmail()
-  const password = randomPassword()
-  await createUser({ email, password })
-  await logInUser(page, email, password)
+  await logInUser(page, email)
   const api = `${process.env.VITE_API_URL}/api/v1`
 
   await page.goto("/bots")
@@ -142,9 +137,7 @@ test("A bot's scope is narrowed and the bot is deleted from the Bots page", asyn
   request,
 }) => {
   const email = randomEmail()
-  const password = randomPassword()
-  await createUser({ email, password })
-  await logInUser(page, email, password)
+  await logInUser(page, email)
   const api = `${process.env.VITE_API_URL}/api/v1`
 
   await page.goto("/projects")

@@ -156,36 +156,6 @@ export type Body_attachments_upload_attachment = {
 };
 
 /**
- * Body_login-login_access_token
- */
-export type Body_login_login_access_token = {
-    /**
-     * Grant Type
-     */
-    grant_type?: string | null;
-    /**
-     * Username
-     */
-    username: string;
-    /**
-     * Password
-     */
-    password: string;
-    /**
-     * Scope
-     */
-    scope?: string;
-    /**
-     * Client Id
-     */
-    client_id?: string | null;
-    /**
-     * Client Secret
-     */
-    client_secret?: string | null;
-};
-
-/**
  * BotPermissions
  *
  * What a bot user may do inside the projects of its scope (FR-08.9,
@@ -453,6 +423,21 @@ export type CommentsPublic = {
 };
 
 /**
+ * Confirmation
+ *
+ * A fresh assertion with one of the caller's own passkeys, answering a
+ * confirmation challenge (FR-12.7, FR-12.16).
+ */
+export type Confirmation = {
+    /**
+     * Confirmation
+     */
+    confirmation: {
+        [key: string]: unknown;
+    };
+};
+
+/**
  * DueDateScope
  *
  * What moving the due date of an open recurring occurrence means for the rest
@@ -484,17 +469,75 @@ export type Message = {
 };
 
 /**
- * NewPassword
+ * PasskeyCredential
+ *
+ * The browser's answer to a passkey ceremony, as WebAuthn's
+ * `PublicKeyCredential.toJSON()` gives it.
  */
-export type NewPassword = {
+export type PasskeyCredential = {
     /**
-     * Token
+     * Credential
      */
-    token: string;
+    credential: {
+        [key: string]: unknown;
+    };
+};
+
+/**
+ * PasskeyPublic
+ */
+export type PasskeyPublic = {
     /**
-     * New Password
+     * Id
      */
-    new_password: string;
+    id: string;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Last Used At
+     */
+    last_used_at: string | null;
+};
+
+/**
+ * PasskeysPublic
+ */
+export type PasskeysPublic = {
+    /**
+     * Data
+     */
+    data: Array<PasskeyPublic>;
+    /**
+     * Count
+     */
+    count: number;
+};
+
+/**
+ * PrivateRecoveryCode
+ */
+export type PrivateRecoveryCode = {
+    /**
+     * Email
+     */
+    email: string;
+};
+
+/**
+ * PrivateSession
+ */
+export type PrivateSession = {
+    user: UserPublic;
+    /**
+     * Access Token
+     */
+    access_token: string;
 };
 
 /**
@@ -506,17 +549,13 @@ export type PrivateUserCreate = {
      */
     email: string;
     /**
-     * Password
-     */
-    password: string;
-    /**
      * Full Name
      */
-    full_name: string;
+    full_name?: string | null;
     /**
-     * Is Verified
+     * Is Superuser
      */
-    is_verified?: boolean;
+    is_superuser?: boolean;
 };
 
 /**
@@ -596,6 +635,34 @@ export type ProjectsPublic = {
 };
 
 /**
+ * RecoveryCodeIssued
+ */
+export type RecoveryCodeIssued = {
+    /**
+     * Code
+     */
+    code: string;
+    /**
+     * Expires At
+     */
+    expires_at: string;
+};
+
+/**
+ * RecoveryStart
+ */
+export type RecoveryStart = {
+    /**
+     * Email
+     */
+    email: string;
+    /**
+     * Code
+     */
+    code: string;
+};
+
+/**
  * Recurrence
  *
  * How often a recurring task comes back: a fixed interval, never tied to when
@@ -613,6 +680,16 @@ export type Recurrence = {
  * RecurrenceFrequency
  */
 export type RecurrenceFrequency = 'daily' | 'weekly' | 'monthly' | 'every_n_days';
+
+/**
+ * RegistrationStart
+ */
+export type RegistrationStart = {
+    /**
+     * Email
+     */
+    email: string;
+};
 
 /**
  * SortOrder
@@ -999,20 +1076,6 @@ export type Token = {
 };
 
 /**
- * UpdatePassword
- */
-export type UpdatePassword = {
-    /**
-     * Current Password
-     */
-    current_password: string;
-    /**
-     * New Password
-     */
-    new_password: string;
-};
-
-/**
  * UserPublic
  */
 export type UserPublic = {
@@ -1040,24 +1103,6 @@ export type UserPublic = {
      * Created At
      */
     created_at?: string | null;
-};
-
-/**
- * UserRegister
- */
-export type UserRegister = {
-    /**
-     * Email
-     */
-    email: string;
-    /**
-     * Password
-     */
-    password: string;
-    /**
-     * Full Name
-     */
-    full_name?: string | null;
 };
 
 /**
@@ -1116,30 +1161,158 @@ export type ValidationError = {
     };
 };
 
-export type loginLoginAccessTokenData = {
-    body: Body_login_login_access_token;
+export type loginRegistrationOptionsData = {
+    body: RegistrationStart;
     path?: never;
     query?: never;
-    url: '/api/v1/login/access-token';
+    url: '/api/v1/login/registration/options';
 };
 
-export type loginLoginAccessTokenErrors = {
+export type loginRegistrationOptionsErrors = {
     /**
      * Validation Error
      */
     422: HTTPValidationError;
 };
 
-export type loginLoginAccessTokenError = loginLoginAccessTokenErrors[keyof loginLoginAccessTokenErrors];
+export type loginRegistrationOptionsError = loginRegistrationOptionsErrors[keyof loginRegistrationOptionsErrors];
 
-export type loginLoginAccessTokenResponses = {
+export type loginRegistrationOptionsResponses = {
+    /**
+     * Response Login-Registration Options
+     *
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type loginRegisterData = {
+    body: PasskeyCredential;
+    headers?: {
+        /**
+         * User-Agent
+         */
+        'user-agent'?: string | null;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/v1/login/registration';
+};
+
+export type loginRegisterErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type loginRegisterError = loginRegisterErrors[keyof loginRegisterErrors];
+
+export type loginRegisterResponses = {
     /**
      * Successful Response
      */
     200: Token;
 };
 
-export type loginLoginAccessTokenResponse = loginLoginAccessTokenResponses[keyof loginLoginAccessTokenResponses];
+export type loginRegisterResponse = loginRegisterResponses[keyof loginRegisterResponses];
+
+export type loginSignInOptionsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/login/passkey/options';
+};
+
+export type loginSignInOptionsResponses = {
+    /**
+     * Response Login-Sign In Options
+     *
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type loginSignInData = {
+    body: PasskeyCredential;
+    path?: never;
+    query?: never;
+    url: '/api/v1/login/passkey';
+};
+
+export type loginSignInErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type loginSignInError = loginSignInErrors[keyof loginSignInErrors];
+
+export type loginSignInResponses = {
+    /**
+     * Successful Response
+     */
+    200: Token;
+};
+
+export type loginSignInResponse = loginSignInResponses[keyof loginSignInResponses];
+
+export type loginRecoveryOptionsData = {
+    body: RecoveryStart;
+    path?: never;
+    query?: never;
+    url: '/api/v1/login/recovery/options';
+};
+
+export type loginRecoveryOptionsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type loginRecoveryOptionsError = loginRecoveryOptionsErrors[keyof loginRecoveryOptionsErrors];
+
+export type loginRecoveryOptionsResponses = {
+    /**
+     * Response Login-Recovery Options
+     *
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type loginRecoverData = {
+    body: PasskeyCredential;
+    headers?: {
+        /**
+         * User-Agent
+         */
+        'user-agent'?: string | null;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/v1/login/recovery';
+};
+
+export type loginRecoverErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type loginRecoverError = loginRecoverErrors[keyof loginRecoverErrors];
+
+export type loginRecoverResponses = {
+    /**
+     * Successful Response
+     */
+    200: Token;
+};
+
+export type loginRecoverResponse = loginRecoverResponses[keyof loginRecoverResponses];
 
 export type loginTestTokenData = {
     body?: never;
@@ -1156,91 +1329,6 @@ export type loginTestTokenResponses = {
 };
 
 export type loginTestTokenResponse = loginTestTokenResponses[keyof loginTestTokenResponses];
-
-export type loginRecoverPasswordData = {
-    body?: never;
-    path: {
-        /**
-         * Email
-         */
-        email: string;
-    };
-    query?: never;
-    url: '/api/v1/password-recovery/{email}';
-};
-
-export type loginRecoverPasswordErrors = {
-    /**
-     * Validation Error
-     */
-    422: HTTPValidationError;
-};
-
-export type loginRecoverPasswordError = loginRecoverPasswordErrors[keyof loginRecoverPasswordErrors];
-
-export type loginRecoverPasswordResponses = {
-    /**
-     * Successful Response
-     */
-    200: Message;
-};
-
-export type loginRecoverPasswordResponse = loginRecoverPasswordResponses[keyof loginRecoverPasswordResponses];
-
-export type loginResetPasswordData = {
-    body: NewPassword;
-    path?: never;
-    query?: never;
-    url: '/api/v1/reset-password/';
-};
-
-export type loginResetPasswordErrors = {
-    /**
-     * Validation Error
-     */
-    422: HTTPValidationError;
-};
-
-export type loginResetPasswordError = loginResetPasswordErrors[keyof loginResetPasswordErrors];
-
-export type loginResetPasswordResponses = {
-    /**
-     * Successful Response
-     */
-    200: Message;
-};
-
-export type loginResetPasswordResponse = loginResetPasswordResponses[keyof loginResetPasswordResponses];
-
-export type loginRecoverPasswordHtmlContentData = {
-    body?: never;
-    path: {
-        /**
-         * Email
-         */
-        email: string;
-    };
-    query?: never;
-    url: '/api/v1/password-recovery-html-content/{email}';
-};
-
-export type loginRecoverPasswordHtmlContentErrors = {
-    /**
-     * Validation Error
-     */
-    422: HTTPValidationError;
-};
-
-export type loginRecoverPasswordHtmlContentError = loginRecoverPasswordHtmlContentErrors[keyof loginRecoverPasswordHtmlContentErrors];
-
-export type loginRecoverPasswordHtmlContentResponses = {
-    /**
-     * Successful Response
-     */
-    200: string;
-};
-
-export type loginRecoverPasswordHtmlContentResponse = loginRecoverPasswordHtmlContentResponses[keyof loginRecoverPasswordHtmlContentResponses];
 
 export type usersReadUsersData = {
     body?: never;
@@ -1333,55 +1421,169 @@ export type usersUpdateUserMeResponses = {
 
 export type usersUpdateUserMeResponse = usersUpdateUserMeResponses[keyof usersUpdateUserMeResponses];
 
-export type usersUpdatePasswordMeData = {
-    body: UpdatePassword;
+export type usersConfirmationOptionsData = {
+    body?: never;
     path?: never;
     query?: never;
-    url: '/api/v1/users/me/password';
+    url: '/api/v1/users/me/confirmation/options';
 };
 
-export type usersUpdatePasswordMeErrors = {
+export type usersConfirmationOptionsResponses = {
+    /**
+     * Response Users-Confirmation Options
+     *
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type usersReadPasskeysData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/users/me/passkeys';
+};
+
+export type usersReadPasskeysResponses = {
+    /**
+     * Successful Response
+     */
+    200: PasskeysPublic;
+};
+
+export type usersReadPasskeysResponse = usersReadPasskeysResponses[keyof usersReadPasskeysResponses];
+
+export type usersAddPasskeyData = {
+    body: PasskeyCredential;
+    headers?: {
+        /**
+         * User-Agent
+         */
+        'user-agent'?: string | null;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/v1/users/me/passkeys';
+};
+
+export type usersAddPasskeyErrors = {
     /**
      * Validation Error
      */
     422: HTTPValidationError;
 };
 
-export type usersUpdatePasswordMeError = usersUpdatePasswordMeErrors[keyof usersUpdatePasswordMeErrors];
+export type usersAddPasskeyError = usersAddPasskeyErrors[keyof usersAddPasskeyErrors];
 
-export type usersUpdatePasswordMeResponses = {
+export type usersAddPasskeyResponses = {
+    /**
+     * Successful Response
+     */
+    200: PasskeyPublic;
+};
+
+export type usersAddPasskeyResponse = usersAddPasskeyResponses[keyof usersAddPasskeyResponses];
+
+export type usersNewPasskeyOptionsData = {
+    body: Confirmation;
+    path?: never;
+    query?: never;
+    url: '/api/v1/users/me/passkeys/options';
+};
+
+export type usersNewPasskeyOptionsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type usersNewPasskeyOptionsError = usersNewPasskeyOptionsErrors[keyof usersNewPasskeyOptionsErrors];
+
+export type usersNewPasskeyOptionsResponses = {
+    /**
+     * Response Users-New Passkey Options
+     *
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type usersRemovePasskeyData = {
+    body: Confirmation;
+    path: {
+        /**
+         * Passkey Id
+         */
+        passkey_id: string;
+    };
+    query?: never;
+    url: '/api/v1/users/me/passkeys/{passkey_id}';
+};
+
+export type usersRemovePasskeyErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type usersRemovePasskeyError = usersRemovePasskeyErrors[keyof usersRemovePasskeyErrors];
+
+export type usersRemovePasskeyResponses = {
     /**
      * Successful Response
      */
     200: Message;
 };
 
-export type usersUpdatePasswordMeResponse = usersUpdatePasswordMeResponses[keyof usersUpdatePasswordMeResponses];
+export type usersRemovePasskeyResponse = usersRemovePasskeyResponses[keyof usersRemovePasskeyResponses];
 
-export type usersRegisterUserData = {
-    body: UserRegister;
+export type usersSignOutEverywhereData = {
+    body?: never;
     path?: never;
     query?: never;
-    url: '/api/v1/users/signup';
+    url: '/api/v1/users/me/sign-out-everywhere';
 };
 
-export type usersRegisterUserErrors = {
+export type usersSignOutEverywhereResponses = {
+    /**
+     * Successful Response
+     */
+    200: Message;
+};
+
+export type usersSignOutEverywhereResponse = usersSignOutEverywhereResponses[keyof usersSignOutEverywhereResponses];
+
+export type usersIssueRecoveryCodeData = {
+    body: Confirmation;
+    path: {
+        /**
+         * User Id
+         */
+        user_id: string;
+    };
+    query?: never;
+    url: '/api/v1/users/{user_id}/recovery-code';
+};
+
+export type usersIssueRecoveryCodeErrors = {
     /**
      * Validation Error
      */
     422: HTTPValidationError;
 };
 
-export type usersRegisterUserError = usersRegisterUserErrors[keyof usersRegisterUserErrors];
+export type usersIssueRecoveryCodeError = usersIssueRecoveryCodeErrors[keyof usersIssueRecoveryCodeErrors];
 
-export type usersRegisterUserResponses = {
+export type usersIssueRecoveryCodeResponses = {
     /**
      * Successful Response
      */
-    200: UserPublic;
+    200: RecoveryCodeIssued;
 };
 
-export type usersRegisterUserResponse = usersRegisterUserResponses[keyof usersRegisterUserResponses];
+export type usersIssueRecoveryCodeResponse = usersIssueRecoveryCodeResponses[keyof usersIssueRecoveryCodeResponses];
 
 export type projectsReadProjectsData = {
     body?: never;
@@ -2717,7 +2919,32 @@ export type privateCreateUserResponses = {
     /**
      * Successful Response
      */
-    200: UserPublic;
+    200: PrivateSession;
 };
 
 export type privateCreateUserResponse = privateCreateUserResponses[keyof privateCreateUserResponses];
+
+export type privateIssueRecoveryCodeData = {
+    body: PrivateRecoveryCode;
+    path?: never;
+    query?: never;
+    url: '/api/v1/private/recovery-code';
+};
+
+export type privateIssueRecoveryCodeErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type privateIssueRecoveryCodeError = privateIssueRecoveryCodeErrors[keyof privateIssueRecoveryCodeErrors];
+
+export type privateIssueRecoveryCodeResponses = {
+    /**
+     * Successful Response
+     */
+    200: RecoveryCodeIssued;
+};
+
+export type privateIssueRecoveryCodeResponse = privateIssueRecoveryCodeResponses[keyof privateIssueRecoveryCodeResponses];
