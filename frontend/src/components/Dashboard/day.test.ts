@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import { dayHeading, lede, type VisitStore, visitSince } from "./day"
+import { dayHeading, lede, markSeen, type VisitStore, visitSince } from "./day"
 
 describe("the date at the top of the day page", () => {
   test("is the day of the month, two digits, and the rest beside it", () => {
@@ -108,6 +108,16 @@ describe("the last visit", () => {
     visitSince(store, LATER)
     const tuesday = { ...stores(), local: store.local }
     expect(visitSince(tuesday, TUESDAY)).toBe(LATER.toISOString())
+  })
+
+  test("leaving moves the next session's start, not this one's", () => {
+    const store = stores()
+    const EVENING = new Date("2026-10-05T19:00:00Z")
+    visitSince(store, MONDAY)
+    markSeen(store, EVENING)
+    expect(visitSince(store, EVENING)).toBeNull()
+    const tuesday = { ...stores(), local: store.local }
+    expect(visitSince(tuesday, TUESDAY)).toBe(EVENING.toISOString())
   })
 
   test("storage that refuses is a first visit, not a failure", () => {

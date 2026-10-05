@@ -25,7 +25,7 @@ import { inAWeek, today, tomorrow } from "./when"
 // counts whatever the task's status, and a waiting task's next move is
 // someone else's (FR-06.11). Nor are they narrowed to the reader as
 // assignee: a late task on a bot user is late all the same.
-export const BAND_STATUSES: OpenStatus[] = OPEN_STATUSES.filter(
+const BAND_STATUSES: OpenStatus[] = OPEN_STATUSES.filter(
   (status) => status !== "waiting",
 )
 
@@ -44,9 +44,9 @@ const BANDS = {
 
 /**
  * The page's requests, shared by the sentence and the bands through the
- * cache. The week asks for a count alone; the agents' changes too.
+ * cache. The week asks for a count alone; the bot users' changes too.
  */
-export const dayQueries = (since: string | null) =>
+const dayQueries = (since: string | null) =>
   [
     tasksQuery({ ...BANDS.overdue(), limit: PREVIEW_ROWS }),
     tasksQuery({ ...BANDS.today(), limit: PREVIEW_ROWS }),
@@ -112,7 +112,7 @@ export function DayPending() {
 
 /**
  * One muted sentence of real counts — what needs the reader, and how many
- * changes their agents made since the last visit — then the date bands.
+ * changes their bot users made since the last visit — then the date bands.
  * When nothing is overdue or due, the page says so in a sentence rather than
  * drawing an empty box.
  */
@@ -147,7 +147,7 @@ export function Day({ since }: { since: string | null }) {
             <Band label="Overdue" count={overdue.count} tone="late">
               <Lines tasks={overdue.data} projectNames={projectNames} />
               {overdue.count > PREVIEW_ROWS && (
-                <MoreLink
+                <BandMoreLink
                   count={overdue.count - PREVIEW_ROWS}
                   search={BANDS.overdue()}
                 />
@@ -158,7 +158,7 @@ export function Day({ since }: { since: string | null }) {
             <Band label="Due today" count={due.count}>
               <Lines tasks={due.data} projectNames={projectNames} />
               {due.count > PREVIEW_ROWS && (
-                <MoreLink
+                <BandMoreLink
                   count={due.count - PREVIEW_ROWS}
                   search={BANDS.today()}
                 />
@@ -231,7 +231,7 @@ const textLink =
   "focus-visible:ring-ring/50 rounded-sm underline-offset-[3px] outline-none hover:underline focus-visible:ring-[3px]"
 
 /** The link that ends a band too long to show, into the task list. */
-function MoreLink({
+function BandMoreLink({
   count,
   search,
 }: {

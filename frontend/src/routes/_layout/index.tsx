@@ -1,10 +1,10 @@
 import { usePrefetchQuery } from "@tanstack/react-query"
 import { createFileRoute } from "@tanstack/react-router"
-import { Suspense, useState } from "react"
+import { Suspense, useEffect, useState } from "react"
 
 import { CaptureLine } from "@/components/Dashboard/CaptureLine"
 import { Day, DayHeading, DayPending } from "@/components/Dashboard/DayPage"
-import { visitSince } from "@/components/Dashboard/day"
+import { markSeen, visitSince } from "@/components/Dashboard/day"
 import {
   InProgress,
   InProgressPending,
@@ -27,7 +27,7 @@ export const Route = createFileRoute("/_layout/")({
   }),
 })
 
-/** When this visit counts the agents' changes from, fixed for the session. */
+/** When this visit counts the bot users' changes from, fixed for the session. */
 function useVisitSince(): string | null {
   const [since] = useState(() => {
     // Merely reaching for storage throws where site data is blocked.
@@ -40,6 +40,28 @@ function useVisitSince(): string | null {
       return null
     }
   })
+
+  // The page is read until the reader leaves it — another screen, another
+  // tab, or the browser closing — so that is when the look is remembered.
+  useEffect(() => {
+    const seen = () => {
+      try {
+        markSeen({ local: localStorage, session: sessionStorage }, new Date())
+      } catch {
+        // As above: blocked storage only costs the next visit its count.
+      }
+    }
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") seen()
+    }
+    document.addEventListener("visibilitychange", onVisibility)
+    window.addEventListener("pagehide", seen)
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility)
+      window.removeEventListener("pagehide", seen)
+      seen()
+    }
+  }, [])
   return since
 }
 

@@ -37,10 +37,30 @@ test("The bands take every open status but Waiting, and the sentence counts them
     { title: "Book the dentist", due_date: day(5), status: "backlog" },
     { title: "Someday", due_date: day(20) },
   ])
+  // A late task on a bot user, filed by the bot user itself: the bands are
+  // not narrowed to the reader as assignee, and the filing is its change.
+  const api = await userApi(page)
+  const project = await api.create("/projects/", { name: "Support queue" })
+  const bot = await api.create("/bot-users/", {
+    name: "Triage agent",
+    scope: { project_ids: [project.id], permissions: { create_tasks: true } },
+  })
+  const { token } = await api.create(`/bot-users/${bot.id}/token`)
+  const filed = await page.request.post(`${api.url}/tasks/`, {
+    headers: { Authorization: `Bearer ${token}` },
+    data: {
+      title: "Answer the refund",
+      project_id: project.id,
+      due_date: day(-1),
+      assignee_id: bot.id,
+    },
+  })
+  expect(filed.ok()).toBe(true)
   await page.goto("/")
 
   const overdue = band(page, /^Overdue/)
-  await expect(overdue.getByRole("heading")).toHaveText(/^Overdue\s*2$/)
+  await expect(overdue.getByRole("heading")).toHaveText(/^Overdue\s*3$/)
+  await expect(overdue).toContainText("Answer the refund")
   await expect(overdue).toContainText("Pay the rent")
   // Backlog is open like any other status: its due date counts.
   await expect(overdue).toContainText("File the taxes")
@@ -55,10 +75,10 @@ test("The bands take every open status but Waiting, and the sentence counts them
   // Waiting has no band of its own on the day page.
   await expect(page.getByRole("heading", { name: /Waiting/ })).toHaveCount(0)
 
-  await expect(page.getByText("4 need you.")).toBeVisible()
-  // A new account, on its first visit, with no agents yet.
+  await expect(page.getByText("5 need you.")).toBeVisible()
+  // A first visit counts every change the bot users have made.
   await expect(
-    page.getByText("Your agents have made no changes yet."),
+    page.getByText("Your agents have made 1 change so far."),
   ).toBeVisible()
 
   const week = page.getByRole("link", { name: /2 more due later this week/ })

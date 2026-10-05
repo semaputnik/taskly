@@ -1,6 +1,6 @@
 /**
  * The words at the top of the day page: the date, and the one sentence of
- * what needs the reader and what their agents did since they last looked.
+ * what needs the reader and what their bot users did since they last looked.
  *
  * Plain functions, so the wording for zero, one and many, and the rule for
  * when a visit starts, can be read and tested apart from the page.
@@ -23,7 +23,7 @@ export function dayHeading(
 }
 
 /**
- * What the agents' changes are counted from: the reader's last visit, or,
+ * What the bot users' changes are counted from: the reader's last visit, or,
  * on a first visit, everything they have done.
  */
 export type ChangesWindow = "visit" | "ever"
@@ -32,7 +32,7 @@ const changesNoun = (count: number) => (count === 1 ? "change" : "changes")
 
 /**
  * The sentence, in its two halves: what needs the reader today — what is
- * overdue or due today — set in ink, then the agents' changes, muted.
+ * overdue or due today — set in ink, then the bot users' changes, muted.
  */
 export function lede({
   needYou,
@@ -79,9 +79,9 @@ const SINCE = "taskly.day.since"
  * When the reader's last visit was, as an ISO timestamp, or null on a first
  * visit.
  *
- * A visit is a browser session: its first look at the day page fixes what it
- * counts from, so reading the page again, or reloading it, does not reset the
- * count to nothing. Every look is remembered, and the next session counts
+ * A visit is one browser tab's session: its first look at the day page fixes
+ * what it counts from, so reading the page again, or reloading it, does not
+ * reset the count to nothing. Every look is remembered, and the next session counts
  * from the latest of them. Kept in the browser, so it is per device; storage
  * that refuses makes every visit a first one rather than breaking the page.
  */
@@ -96,5 +96,18 @@ export function visitSince(store: VisitStore, now: Date): string | null {
     return since || null
   } catch {
     return null
+  }
+}
+
+/**
+ * Remember that the reader is looking at the day page now, without moving
+ * what this session counts from. Called as the reader leaves the page, so a
+ * tab left open all day still counts the next session from its last look.
+ */
+export function markSeen(store: VisitStore, now: Date): void {
+  try {
+    store.local.setItem(LAST_SEEN, now.toISOString())
+  } catch {
+    // Storage that refuses only costs the next visit its count.
   }
 }

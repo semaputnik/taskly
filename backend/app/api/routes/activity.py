@@ -148,7 +148,7 @@ def read_activity_log(
 
     `by_bots` keeps the changes any of the user's bot users made, and `since`
     the entries written after a moment. Together they are what the dashboard
-    counts when it says how many changes the user's agents made since their
+    counts when it says how many changes the user's bot users made since their
     last visit (FR-06.12). A moment without an offset is read as UTC.
 
     Always the requesting user's own entries and nothing wider: there is no
