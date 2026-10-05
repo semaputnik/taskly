@@ -73,14 +73,12 @@ const STATUS_SHAPES: Record<TaskStatus, ReactNode> = {
 /**
  * The colour each tone gives a mark; a mark with no tone is ink. The priority
  * hues clear 4.5:1 on both grounds in both themes (see `--priority-*` in
- * `index.css`). Done is the Changelog direction's one green, taken from the
- * palette until the redesign's tokens give it a name of its own: green-700 is
- * 4.5:1 on the light ground and 4.9:1 on --card, green-500 7.3:1 and 6.1:1
- * on the dark ones.
+ * `index.css`). Done is the palette's one green, `--done`, checked there
+ * against every ground in both themes.
  */
 const MARK_TEXT: Record<MarkTone, string> = {
   ...PRIORITY_TEXT,
-  done: "text-green-700 dark:text-green-500",
+  done: "text-done",
 }
 
 /**
