@@ -2,15 +2,15 @@ import type { TaskPublic } from "@/client"
 import { describeRecurrence } from "./recurrence"
 
 /**
- * The words a compact task row puts on a task: its due day said the way a
- * person says it, and how far through its subtasks it is. Kept apart from the
- * row so the wording can be tested without a renderer.
+ * The words a task line puts on a task: its meta line, what it says and in
+ * what order, with the due day said the way a person says it. Kept apart
+ * from the row so the composition can be tested without a renderer.
  */
 
 /**
  * How a due day reads against today: missed, today, within the coming week,
  * or further out. Only a missed day takes the alert colour; today is ink,
- * and the rest are muted.
+ * and both are set a weight up; the rest are muted.
  */
 export type DueTone = "late" | "today" | "soon" | "later"
 
@@ -76,22 +76,29 @@ export function subtaskProgress(
 }
 
 /**
- * One thing the meta line says about a task. The row draws each with its own
- * glyph; the due day also carries its tone.
+ * One fact the meta line states about a task, drawn with its own glyph; the
+ * due day also carries its tone.
  */
-export type MetaItem =
+export type MetaFact =
   | { kind: "subtasks"; text: string }
   | { kind: "due"; text: string; tone: DueTone }
   | { kind: "recurrence"; text: string }
   | { kind: "tag"; text: string }
-  | { kind: "project"; text: string }
+
+/**
+ * The line beneath a task's title: its facts, then the project it sits in,
+ * which the row sets apart at the far right.
+ */
+export interface MetaLine {
+  facts: MetaFact[]
+  project: string | null
+}
 
 /**
  * What the line beneath a task's title says, in the order it says it: how far
- * through its subtasks it is, when it is due, how it repeats, its tags, and
- * last its project, which the row sets at the far right. Whatever the task
- * does not have is left out, so a task with nothing to say has an empty meta
- * line and its row stays one line tall.
+ * through its subtasks it is, when it is due, how it repeats and its tags;
+ * then its project. Whatever the task does not have is left out, so a task
+ * with nothing to say has an empty meta line and its row stays one line tall.
  */
 export function metaLine(
   task: Partial<
@@ -106,23 +113,22 @@ export function metaLine(
     >
   >,
   { today, projectName }: { today: string; projectName?: string },
-): MetaItem[] {
-  const items: MetaItem[] = []
+): MetaLine {
+  const facts: MetaFact[] = []
   const progress = subtaskProgress(task)
-  if (progress) items.push({ kind: "subtasks", text: progress })
+  if (progress) facts.push({ kind: "subtasks", text: progress })
   if (task.due_date) {
     const due = describeDue(task.due_date, today, {
       done: task.status === "done",
     })
-    items.push({ kind: "due", ...due })
+    facts.push({ kind: "due", ...due })
   }
   if (task.recurrence) {
-    items.push({
+    facts.push({
       kind: "recurrence",
       text: describeRecurrence(task.recurrence),
     })
   }
-  for (const tag of task.tags ?? []) items.push({ kind: "tag", text: tag })
-  if (projectName) items.push({ kind: "project", text: projectName })
-  return items
+  for (const tag of task.tags ?? []) facts.push({ kind: "tag", text: tag })
+  return { facts, project: projectName || null }
 }

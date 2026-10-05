@@ -14,9 +14,12 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { isoDay } from "@/lib/dates"
 import { cn } from "@/lib/utils"
 import { CompleteTask } from "./CompleteTask"
-import { type DueTone, type MetaItem, metaLine } from "./compact"
+import { type DueTone, type MetaFact, metaLine } from "./compact"
 
-/** Only a missed day is coloured; today is ink, and the rest stay quiet. */
+/**
+ * Only a missed day is coloured; today is ink. Both are set a weight up, as
+ * the two days that ask for action; the rest stay quiet.
+ */
 const DUE_TONE: Record<DueTone, string> = {
   late: "text-late font-medium",
   today: "text-ink font-medium",
@@ -24,15 +27,15 @@ const DUE_TONE: Record<DueTone, string> = {
   later: "",
 }
 
-/** Each meta item's glyph, and what it is said as to a screen reader. */
-const META: Record<
-  Exclude<MetaItem["kind"], "project">,
-  { glyph: LucideIcon; said: string }
+/** Each fact's glyph, and the label a screen reader hears before it. */
+const FACT: Record<
+  MetaFact["kind"],
+  { glyph: LucideIcon; spokenLabel: string }
 > = {
-  subtasks: { glyph: ListTree, said: "Subtasks done:" },
-  due: { glyph: CalendarDays, said: "Due:" },
-  recurrence: { glyph: Repeat, said: "Repeats:" },
-  tag: { glyph: Tag, said: "Tag:" },
+  subtasks: { glyph: ListTree, spokenLabel: "Subtasks done:" },
+  due: { glyph: CalendarDays, spokenLabel: "Due:" },
+  recurrence: { glyph: Repeat, spokenLabel: "Repeats:" },
+  tag: { glyph: Tag, spokenLabel: "Tag:" },
 }
 
 /**
@@ -62,9 +65,10 @@ export function CompactTaskRow({
   receipt?: boolean
 }) {
   const done = task.status === "done"
-  const items = metaLine(task, { today: isoDay(new Date()), projectName })
-  const project = items.find((item) => item.kind === "project")
-  const facts = items.filter((item) => item.kind !== "project")
+  const { facts, project } = metaLine(task, {
+    today: isoDay(new Date()),
+    projectName,
+  })
 
   return (
     <div className="hover:from-hover flex gap-3 border-b border-rule px-4 py-2.5 transition-colors last:border-b-0 hover:bg-linear-to-r hover:to-transparent hover:to-85%">
@@ -96,12 +100,12 @@ export function CompactTaskRow({
           </RouterLink>
         </div>
 
-        {items.length > 0 && (
+        {(facts.length > 0 || project) && (
           <div className="text-ink-3 mt-1 flex items-start gap-3 text-[0.8125rem] leading-tight tabular-nums">
             {facts.length > 0 && (
               <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
-                {facts.map((item, index) => (
-                  <MetaFact key={`${item.kind}-${index}`} item={item} />
+                {facts.map((fact, index) => (
+                  <Fact key={`${fact.kind}-${index}`} fact={fact} />
                 ))}
               </div>
             )}
@@ -116,7 +120,7 @@ export function CompactTaskRow({
                   aria-hidden
                 />
                 <span className="sr-only">Project:</span>
-                <span className="truncate">{project.text}</span>
+                <span className="truncate">{project}</span>
               </span>
             )}
           </div>
@@ -126,18 +130,18 @@ export function CompactTaskRow({
   )
 }
 
-function MetaFact({ item }: { item: Exclude<MetaItem, { kind: "project" }> }) {
-  const { glyph: Glyph, said } = META[item.kind]
+function Fact({ fact }: { fact: MetaFact }) {
+  const { glyph: Glyph, spokenLabel } = FACT[fact.kind]
   return (
     <span
       className={cn(
         "flex min-w-0 items-center gap-1",
-        item.kind === "due" && DUE_TONE[item.tone],
+        fact.kind === "due" && DUE_TONE[fact.tone],
       )}
     >
-      <Glyph className="size-[13px] shrink-0" aria-hidden />
-      <span className="sr-only">{said}</span>
-      <span className="truncate">{item.text}</span>
+      <Glyph className="size-[0.8125rem] shrink-0" aria-hidden />
+      <span className="sr-only">{spokenLabel}</span>
+      <span className="truncate">{fact.text}</span>
     </span>
   )
 }
