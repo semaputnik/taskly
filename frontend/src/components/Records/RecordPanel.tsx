@@ -156,7 +156,7 @@ function Column({
   children: React.ReactNode
 }) {
   const column = useRef<HTMLElement>(null)
-  useColumnFocus(column)
+  useColumnFocus(column, name)
   useColumnKeys(column, { onClose, walk, onWalk })
 
   return (
@@ -254,7 +254,10 @@ let closing: ReturnType<typeof setTimeout> | undefined
  * open. Closing returns focus to the line that opened it — unless the reader
  * has since put it somewhere of their own on the page.
  */
-function useColumnFocus(column: React.RefObject<HTMLElement | null>) {
+function useColumnFocus(
+  column: React.RefObject<HTMLElement | null>,
+  name: string,
+) {
   useEffect(() => {
     const element = column.current
     if (!element) return
@@ -283,6 +286,17 @@ function useColumnFocus(column: React.RefObject<HTMLElement | null>) {
       }, 0)
     }
   }, [column])
+
+  // The line that is open is where focus belongs on closing: after a walk, or
+  // when a click left focus on nothing, it is not the first opener. The
+  // router marks the open task's link, so that is where to look.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `name` is how a walk is noticed
+  useEffect(() => {
+    const line = document.querySelector<HTMLElement>(
+      'main a[aria-current="page"]',
+    )
+    if (line) opener = line
+  }, [name])
 }
 
 /** A keyboard that is typing, picking or navigating a widget keeps its keys. */
@@ -313,7 +327,7 @@ const OPEN_LAYER = [
   '[role="listbox"]',
 ].join(",")
 
-/** Where notices are shown, outside any panel. */
+/** Where notices are shown. */
 const NOTICES_SELECTOR = "[data-sonner-toaster]"
 
 const EDITABLE =

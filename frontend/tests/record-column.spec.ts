@@ -130,6 +130,20 @@ test("Next and previous walk the list the task was opened from", async ({
   await expect(column(page)).toHaveCount(0)
 })
 
+test("After a walk, closing gives focus to the line now open", async ({
+  page,
+}) => {
+  const { order, link } = await dayPage(page)
+  await link(order[0]).click()
+  await expect(column(page, order[0])).toBeVisible()
+  await page.keyboard.press("ArrowDown")
+  await expect(column(page, order[1])).toBeVisible()
+
+  await page.keyboard.press("Escape")
+  await expect(column(page)).toHaveCount(0)
+  await expect(link(order[1])).toBeFocused()
+})
+
 test("The arrows leave a field, a select and a menu their keys", async ({
   page,
 }) => {
