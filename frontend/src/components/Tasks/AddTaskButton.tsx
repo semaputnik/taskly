@@ -9,11 +9,13 @@ import { Button } from "@/components/ui/button"
  * Below `md` the navigation folds into a menu sheet, and the page's capture
  * line sits at the top of a screen that scrolls: writing a task down from
  * anywhere would take a trip to the top. This keeps it one tap from every
- * screen, in the corner a thumb rests in. It goes when the capture line is
- * pinned to the bottom of the phone (FR-06.15). It is the primary action, so it is ink; it floats over the page,
- * so like a popover it lifts by a shadow, here a deeper one. An open record's column
- * takes the whole phone screen and covers it: capture is already on screen,
- * or a record is being read.
+ * screen, in the corner a thumb rests in. It is the primary action, so it is
+ * ink; it floats over the page, so like a popover it lifts by a shadow, here
+ * a deeper one. An open record's column takes the whole phone screen and
+ * covers it: capture is already on screen, or a record is being read.
+ *
+ * It stays until the capture line is pinned to the bottom of the phone, which
+ * replaces it (FR-06.15).
  */
 export function AddTaskButton() {
   const { capture } = useRecordPanels()
