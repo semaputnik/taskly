@@ -5,9 +5,10 @@ import { RecordSection } from "@/components/Records/RecordPanel"
 import { isoDay } from "@/lib/dates"
 import { tasksQuery, useReportChange } from "@/lib/serverState"
 import { cn } from "@/lib/utils"
+import { Assignee } from "./CompactTaskRow"
 import { CompleteTask } from "./CompleteTask"
 import { CaptureField } from "./capture"
-import { describeDue } from "./compact"
+import { describeDue, metaLine } from "./compact"
 import { useTaskCapture } from "./useTaskWrites"
 
 /** More than a panel should list; past it, the section says how many there are. */
@@ -63,7 +64,7 @@ export function TaskSubtasks({
 
 /**
  * One child: the status mark that closes it, its title that opens it, and one
- * quiet fact at the right — the day it is due, else the bot user it is with.
+ * quiet facts at the right — the day it is due, then whose it is (FR-06.13).
  */
 function SubtaskLine({
   task,
@@ -78,7 +79,9 @@ function SubtaskLine({
   const due = task.due_date
     ? describeDue(task.due_date, today, { done: closed })
     : null
-  const fact = due?.text ?? task.assignee_bot_user?.name
+  const assignee = metaLine(task, { today }).facts.find(
+    (fact) => fact.kind === "assignee",
+  )
 
   return (
     <li className="border-rule grid min-h-9 grid-cols-[18px_minmax(0,1fr)_auto] items-center gap-3 border-b py-px">
@@ -95,14 +98,14 @@ function SubtaskLine({
       >
         {task.title}
       </button>
-      {fact && (
-        <span
-          className={cn(
-            "text-ink-3 text-[12.5px]",
-            due?.tone === "late" && "text-late",
+      {(due || assignee) && (
+        <span className="text-ink-3 flex min-w-0 items-center gap-3 text-[12.5px]">
+          {due && (
+            <span className={cn(due.tone === "late" && "text-late")}>
+              {due.text}
+            </span>
           )}
-        >
-          {fact}
+          {assignee && <Assignee fact={assignee} />}
         </span>
       )}
     </li>

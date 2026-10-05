@@ -186,4 +186,120 @@ describe("the meta line", () => {
     expect(metaLine({}, { today: TODAY })).toEqual(empty)
     expect(metaLine(bare, { today: TODAY, projectName: "" })).toEqual(empty)
   })
+
+  describe("the assignee (FR-06.13)", () => {
+    const release = { id: "b1", name: "release-bot", deleted: false }
+    const assignee = (line: ReturnType<typeof metaLine>) =>
+      line.facts.find((fact) => fact.kind === "assignee")
+
+    test('says "you" for a task assigned to the owner', () => {
+      const line = metaLine(
+        { ...bare, assignee_id: "u1", assignee_bot_user: null },
+        { today: TODAY },
+      )
+      expect(assignee(line)).toEqual({
+        kind: "assignee",
+        text: "you",
+        handover: false,
+      })
+    })
+
+    test("says the bot user's name for a task assigned to one", () => {
+      // The payload carries a bot user's id as the assignee id too.
+      const line = metaLine(
+        { ...bare, assignee_id: "b1", assignee_bot_user: release },
+        { today: TODAY },
+      )
+      expect(assignee(line)).toEqual({
+        kind: "assignee",
+        text: "release-bot",
+        handover: false,
+      })
+    })
+
+    test("still names a deleted bot user", () => {
+      const line = metaLine(
+        {
+          ...bare,
+          assignee_id: "b1",
+          assignee_bot_user: { ...release, deleted: true },
+        },
+        { today: TODAY },
+      )
+      expect(assignee(line)?.text).toBe("release-bot")
+    })
+
+    test('says the bot user, an arrow and "you" for a task handed over in Review', () => {
+      const line = metaLine(
+        {
+          ...bare,
+          status: "review",
+          assignee_id: "u1",
+          assignee_bot_user: null,
+          handover: { bot_user: release, at: "2026-09-17T10:00:00Z" },
+        },
+        { today: TODAY },
+      )
+      expect(assignee(line)).toEqual({
+        kind: "assignee",
+        text: "release-bot → you",
+        handover: true,
+      })
+    })
+
+    test("names the bot user it was handed over by even once deleted", () => {
+      const line = metaLine(
+        {
+          ...bare,
+          status: "review",
+          assignee_id: "u1",
+          assignee_bot_user: null,
+          handover: {
+            bot_user: { ...release, deleted: true },
+            at: "2026-09-17T10:00:00Z",
+          },
+        },
+        { today: TODAY },
+      )
+      expect(assignee(line)?.text).toBe("release-bot → you")
+    })
+
+    test('is plain "you" in Review when nobody handed it over', () => {
+      const line = metaLine(
+        {
+          ...bare,
+          status: "review",
+          assignee_id: "u1",
+          assignee_bot_user: null,
+          handover: null,
+        },
+        { today: TODAY },
+      )
+      expect(assignee(line)).toMatchObject({ text: "you", handover: false })
+    })
+
+    test("names nobody when the task is unassigned", () => {
+      const line = metaLine(
+        { ...bare, assignee_id: null, assignee_bot_user: null },
+        { today: TODAY },
+      )
+      expect(assignee(line)).toBeUndefined()
+      expect(metaLine(bare, { today: TODAY }).facts).toEqual([])
+    })
+
+    test("comes after the due day and tags, before the project", () => {
+      const line = metaLine(
+        {
+          ...bare,
+          due_date: "2026-09-18",
+          tags: ["web"],
+          assignee_id: "u1",
+          assignee_bot_user: null,
+        },
+        { today: TODAY, projectName: "Website relaunch" },
+      )
+      expect(kinds(line)).toEqual(["due", "tag", "assignee"])
+      expect(line.project).toBe("Website relaunch")
+    })
+  })
 })

@@ -29,7 +29,7 @@ const DUE_TONE: Record<DueTone, string> = {
 
 /** Each fact's glyph, and the label a screen reader hears before it. */
 const FACT: Record<
-  MetaFact["kind"],
+  Exclude<MetaFact["kind"], "assignee">,
   { glyph: LucideIcon; spokenLabel: string }
 > = {
   subtasks: { glyph: ListTree, spokenLabel: "Subtasks done:" },
@@ -42,7 +42,8 @@ const FACT: Record<
  * The task line: its status mark, which is also the control that closes it
  * and carries the priority as its colour; the title in medium weight; and
  * beneath it a quiet meta line — subtask progress, due day, recurrence and
- * tags, each a small glyph and its value, with the project at the far right
+ * tags, each a small glyph and its value, then who the task is with, in
+ * words, with the project at the far right
  * as a neutral square and its name. A line with nothing to say in its meta
  * is one line tall.
  *
@@ -174,6 +175,7 @@ export function CompactTaskRow({
 }
 
 function Fact({ fact }: { fact: MetaFact }) {
+  if (fact.kind === "assignee") return <Assignee fact={fact} />
   const { glyph: Glyph, spokenLabel } = FACT[fact.kind]
   return (
     <span
@@ -185,6 +187,32 @@ function Fact({ fact }: { fact: MetaFact }) {
       <Glyph className="size-[0.8125rem] shrink-0" aria-hidden />
       <span className="sr-only">{spokenLabel}</span>
       <span className="truncate">{fact.text}</span>
+    </span>
+  )
+}
+
+/**
+ * Whose task it is, in words alone: a name needs no glyph beside it. Quiet
+ * like the rest of the line, except the hand-over, which is set in Ink 2 as
+ * the one fact that asks something of the reader (FR-06.13). On a phone its
+ * name is capped, so a long one gives way before the project does.
+ */
+export function Assignee({
+  fact,
+}: {
+  fact: Extract<MetaFact, { kind: "assignee" }>
+}) {
+  return (
+    <span
+      className={cn(
+        "max-w-32 min-w-0 truncate sm:max-w-64",
+        fact.handover && "text-ink-2",
+      )}
+    >
+      <span className="sr-only">
+        {fact.handover ? "Handed over by:" : "Assigned to:"}
+      </span>
+      {fact.text}
     </span>
   )
 }
