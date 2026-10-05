@@ -62,7 +62,10 @@ export function PriorityValue({
       )}
     >
       {/* `text-current` keeps the select trigger's grey off the flag. */}
-      <Flag className="size-3.5 shrink-0 fill-current text-current" aria-hidden />
+      <Flag
+        className="size-3.5 shrink-0 fill-current text-current"
+        aria-hidden
+      />
       {priority}
     </span>
   )

@@ -486,24 +486,27 @@ export function PropertyRow({
   const labelId = useId()
   const text =
     "text-ink-3 flex h-[30px] items-center text-[13px] pointer-coarse:h-11"
+  const value =
+    "flex min-h-[30px] min-w-0 items-center gap-2 pointer-coarse:min-h-11"
   return (
     <div className="grid grid-cols-[88px_minmax(0,1fr)] items-start gap-x-4 md:grid-cols-[96px_minmax(0,1fr)]">
       {htmlFor ? (
-        <label htmlFor={htmlFor} className={text}>
-          {label}
-        </label>
+        <>
+          <label htmlFor={htmlFor} className={text}>
+            {label}
+          </label>
+          <div className={value}>{children}</div>
+        </>
       ) : (
-        <span id={labelId} className={text}>
-          {label}
-        </span>
+        <>
+          <span id={labelId} className={text}>
+            {label}
+          </span>
+          <div role="group" aria-labelledby={labelId} className={value}>
+            {children}
+          </div>
+        </>
       )}
-      <div
-        role={htmlFor ? undefined : "group"}
-        aria-labelledby={htmlFor ? undefined : labelId}
-        className="flex min-h-[30px] min-w-0 items-center gap-2 pointer-coarse:min-h-11"
-      >
-        {children}
-      </div>
     </div>
   )
 }

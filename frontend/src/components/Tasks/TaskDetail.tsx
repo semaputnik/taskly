@@ -141,11 +141,7 @@ export function TaskDetail() {
               title it closes. */}
           <TitleRow
             mark={
-              <CompleteTask
-                asMark
-                task={task}
-                markClassName="size-[22px]"
-              />
+              <CompleteTask asMark task={task} markClassName="size-[22px]" />
             }
           >
             <TaskTitle task={task} />

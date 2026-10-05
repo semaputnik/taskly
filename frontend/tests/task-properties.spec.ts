@@ -130,11 +130,7 @@ for (const theme of ["light", "dark"] as const) {
     page,
   }) => {
     await page.setViewportSize({ width: 1440, height: 900 })
-    const { api, task, panel } = await openTask(
-      page,
-      { priority: "P1" },
-      theme,
-    )
+    const { api, task, panel } = await openTask(page, { priority: "P1" }, theme)
     const priority = panel.getByRole("combobox", { name: "Priority" })
     const ground = await token(page, "--page")
     const hover = await token(page, "--hover")
@@ -154,9 +150,10 @@ for (const theme of ["light", "dark"] as const) {
         )
         continue
       }
-      expect(await textOn(word, ground), `${level} on the page`).toBeGreaterThan(
-        AA,
-      )
+      expect(
+        await textOn(word, ground),
+        `${level} on the page`,
+      ).toBeGreaterThan(AA)
       expect(await textOn(word, hover), `${level} on hover`).toBeGreaterThan(AA)
     }
 
@@ -164,9 +161,9 @@ for (const theme of ["light", "dark"] as const) {
     await api.patch(`/tasks/${task.id}`, { priority: null })
     await page.reload()
     await expect(priority).toHaveText("No priority")
-    expect(await textOn(priority.getByText("No priority"), ground)).toBeGreaterThan(
-      AA,
-    )
+    expect(
+      await textOn(priority.getByText("No priority"), ground),
+    ).toBeGreaterThan(AA)
   })
 }
 
@@ -195,7 +192,10 @@ test("The description is edited where it is read, and is invited when empty", as
   await description.fill("Pricing copy is a separate task.")
   await panel.getByRole("textbox", { name: "Task title" }).click()
   await expect
-    .poll(async () => (await (await api.get(`/tasks/${task.id}`)).json()).description)
+    .poll(
+      async () =>
+        (await (await api.get(`/tasks/${task.id}`)).json()).description,
+    )
     .toBe("Pricing copy is a separate task.")
 })
 
@@ -239,12 +239,18 @@ test("The draft is the same rows under the same title and heading", async ({
   }
   await expect(panel.getByRole("button", { name: /^Due date/ })).toBeVisible()
   await expect(panel.getByRole("group", { name: "Tags" })).toBeVisible()
-  await expect(panel.getByRole("heading", { name: "Description" })).toBeVisible()
+  await expect(
+    panel.getByRole("heading", { name: "Description" }),
+  ).toBeVisible()
   // Its one commit stays pinned at the foot of the column.
   const create = panel.getByRole("button", { name: "Create task" })
   const column = await panel.boundingBox()
   const button = await create.boundingBox()
-  expect(column && button && button.y + button.height > column.y + column.height - 80).toBe(true)
+  expect(
+    column &&
+      button &&
+      button.y + button.height > column.y + column.height - 80,
+  ).toBe(true)
 })
 
 test.describe("On a phone", () => {
@@ -259,7 +265,9 @@ test.describe("On a phone", () => {
   }) => {
     const { panel } = await openTask(page, { priority: "P1" })
 
-    const label = await panel.getByText("Project", { exact: true }).boundingBox()
+    const label = await panel
+      .getByText("Project", { exact: true })
+      .boundingBox()
     expect(label?.x).toBe(16)
     for (const name of ["Project", "Priority", "Assignee", "Repeat"]) {
       const box = await panel.getByRole("combobox", { name }).boundingBox()
