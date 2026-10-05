@@ -13,12 +13,13 @@ from fastapi.testclient import TestClient
 from sqlmodel import Session
 
 from app.core.config import settings
-from tests.utils.bot import (
+from tests.utils.accounts import (
     ALL_PERMISSIONS,
     create_bot_user,
     create_project,
     create_task,
     create_user_headers,
+    my_id,
     token_headers,
 )
 
@@ -36,13 +37,6 @@ def _task(client: TestClient, headers: Headers, task_id: str) -> Any:
     r = client.get(f"{API}/tasks/{task_id}", headers=headers)
     assert r.status_code == 200, r.text
     return r.json()
-
-
-def _me(client: TestClient, headers: Headers) -> str:
-    r = client.get(f"{API}/users/me", headers=headers)
-    assert r.status_code == 200, r.text
-    user_id: str = r.json()["id"]
-    return user_id
 
 
 def _bot(
@@ -65,7 +59,7 @@ def test_a_task_the_user_files_names_the_user(
 
     task = _task(client, owner, task_id)
 
-    assert task["reporter_id"] == _me(client, owner)
+    assert task["reporter_id"] == my_id(client, owner)
     assert task["reporter_bot_user"] is None
 
 
@@ -95,7 +89,7 @@ def test_a_subtask_names_whoever_filed_it(client: TestClient, owner: Headers) ->
 
     child = create_task(client, bot, parent_id=root, title="Bot's subtask")
 
-    assert _task(client, owner, root)["reporter_id"] == _me(client, owner)
+    assert _task(client, owner, root)["reporter_id"] == my_id(client, owner)
     assert _task(client, owner, child)["reporter_id"] == bot_user["id"]
 
 
@@ -138,7 +132,7 @@ def test_creating_a_task_cannot_choose_its_reporter(
         },
     )
     assert r.status_code == 200, r.text
-    assert r.json()["reporter_id"] == _me(client, owner)
+    assert r.json()["reporter_id"] == my_id(client, owner)
 
 
 def test_updating_a_task_cannot_change_its_reporter(
@@ -155,7 +149,7 @@ def test_updating_a_task_cannot_change_its_reporter(
     )
     assert r.status_code == 200, r.text
     assert r.json()["title"] == "Renamed"
-    assert r.json()["reporter_id"] == _me(client, owner)
+    assert r.json()["reporter_id"] == my_id(client, owner)
 
 
 def test_a_bot_user_cannot_file_a_task_as_its_owner(
@@ -170,7 +164,7 @@ def test_a_bot_user_cannot_file_a_task_as_its_owner(
         json={
             "title": "Passing itself off",
             "project_id": project_id,
-            "reporter_id": _me(client, owner),
+            "reporter_id": my_id(client, owner),
         },
     )
     assert r.status_code == 200, r.text
@@ -248,7 +242,7 @@ def test_a_task_in_a_list_names_its_reporter(
     assert r.status_code == 200, r.text
     by_title = {t["title"]: t for t in r.json()["data"]}
 
-    assert by_title["Mine"]["reporter_id"] == _me(client, owner)
+    assert by_title["Mine"]["reporter_id"] == my_id(client, owner)
     assert by_title["Theirs"]["reporter_id"] == bot_user["id"]
     assert by_title["Theirs"]["reporter_bot_user"]["name"] == "Filing agent"
 
@@ -271,7 +265,7 @@ def test_filter_by_reporter_keeps_only_what_that_actor_filed(
         assert r.status_code == 200, r.text
         return [t["title"] for t in r.json()["data"]]
 
-    assert titles(_me(client, owner)) == ["Mine"]
+    assert titles(my_id(client, owner)) == ["Mine"]
     assert titles(bot_user["id"]) == ["Theirs"]
 
 
@@ -286,7 +280,7 @@ def test_the_reporter_filter_narrows_alongside_the_others(
     create_task(client, owner, project_id=project_id, title="Mine here")
     create_task(client, owner, project_id=elsewhere, title="Mine elsewhere")
 
-    me = _me(client, owner)
+    me = my_id(client, owner)
     r = client.get(
         f"{API}/tasks/",
         headers=owner,
@@ -325,7 +319,7 @@ def test_a_reporter_filter_reaches_nothing_outside_the_callers_own_tasks(
     create_task(client, stranger, project_id=stranger_project, title="Not yours")
 
     r = client.get(
-        f"{API}/tasks/", headers=owner, params={"reporter_id": _me(client, stranger)}
+        f"{API}/tasks/", headers=owner, params={"reporter_id": my_id(client, stranger)}
     )
     assert r.status_code == 200, r.text
     assert r.json()["count"] == 0

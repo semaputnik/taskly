@@ -2,19 +2,8 @@ from fastapi.testclient import TestClient
 from sqlmodel import Session
 
 from app.core.config import settings
+from tests.utils.accounts import create_task_record
 from tests.utils.user import new_user_headers
-
-
-def _create_task(
-    client: TestClient, headers: dict[str, str], title: str, **fields: object
-) -> dict:
-    r = client.post(
-        f"{settings.API_V1_STR}/tasks/",
-        headers=headers,
-        json={"title": title, **fields},
-    )
-    assert r.status_code == 200, r.text
-    return r.json()
 
 
 def _add_comment(client: TestClient, headers: dict[str, str], task_id: str, body: str):
@@ -33,7 +22,7 @@ def _list_comments(client: TestClient, headers: dict[str, str], task_id: str):
 
 def test_a_comment_can_be_added_to_a_task(client: TestClient, db: Session) -> None:
     headers = new_user_headers(client, db)
-    task = _create_task(client, headers, "Buy milk")
+    task = create_task_record(client, headers, "Buy milk")
 
     r = _add_comment(client, headers, task["id"], "On it")
     assert r.status_code == 200, r.text
@@ -49,8 +38,8 @@ def test_a_comment_can_be_added_to_a_task(client: TestClient, db: Session) -> No
 
 def test_a_comment_can_be_added_to_a_subtask(client: TestClient, db: Session) -> None:
     headers = new_user_headers(client, db)
-    root = _create_task(client, headers, "Root")
-    subtask = _create_task(client, headers, "Subtask", parent_id=root["id"])
+    root = create_task_record(client, headers, "Root")
+    subtask = create_task_record(client, headers, "Subtask", parent_id=root["id"])
 
     r = _add_comment(client, headers, subtask["id"], "Progress note")
     assert r.status_code == 200, r.text
@@ -58,7 +47,7 @@ def test_a_comment_can_be_added_to_a_subtask(client: TestClient, db: Session) ->
 
 def test_comments_are_listed_oldest_first(client: TestClient, db: Session) -> None:
     headers = new_user_headers(client, db)
-    task = _create_task(client, headers, "Task")
+    task = create_task_record(client, headers, "Task")
 
     _add_comment(client, headers, task["id"], "First")
     _add_comment(client, headers, task["id"], "Second")
@@ -70,7 +59,7 @@ def test_comments_are_listed_oldest_first(client: TestClient, db: Session) -> No
 
 def test_a_user_can_edit_their_own_comment(client: TestClient, db: Session) -> None:
     headers = new_user_headers(client, db)
-    task = _create_task(client, headers, "Task")
+    task = create_task_record(client, headers, "Task")
     comment = _add_comment(client, headers, task["id"], "Original").json()
 
     r = client.patch(
@@ -87,7 +76,7 @@ def test_a_user_can_edit_their_own_comment(client: TestClient, db: Session) -> N
 
 def test_a_user_can_delete_their_own_comment(client: TestClient, db: Session) -> None:
     headers = new_user_headers(client, db)
-    task = _create_task(client, headers, "Task")
+    task = create_task_record(client, headers, "Task")
     comment = _add_comment(client, headers, task["id"], "Gone soon").json()
 
     r = client.delete(
@@ -105,7 +94,7 @@ def test_a_user_cannot_read_comments_on_another_users_task(
 ) -> None:
     headers_a = new_user_headers(client, db)
     headers_b = new_user_headers(client, db)
-    task = _create_task(client, headers_a, "A's task")
+    task = create_task_record(client, headers_a, "A's task")
     _add_comment(client, headers_a, task["id"], "Private note")
 
     r = _list_comments(client, headers_b, task["id"])
@@ -117,7 +106,7 @@ def test_a_user_cannot_add_a_comment_to_another_users_task(
 ) -> None:
     headers_a = new_user_headers(client, db)
     headers_b = new_user_headers(client, db)
-    task = _create_task(client, headers_a, "A's task")
+    task = create_task_record(client, headers_a, "A's task")
 
     r = _add_comment(client, headers_b, task["id"], "Sneaky")
     assert r.status_code == 404
@@ -128,7 +117,7 @@ def test_a_user_cannot_edit_another_users_comment(
 ) -> None:
     headers_a = new_user_headers(client, db)
     headers_b = new_user_headers(client, db)
-    task = _create_task(client, headers_a, "A's task")
+    task = create_task_record(client, headers_a, "A's task")
     comment = _add_comment(client, headers_a, task["id"], "Original").json()
 
     r = client.patch(
@@ -144,7 +133,7 @@ def test_a_user_cannot_delete_another_users_comment(
 ) -> None:
     headers_a = new_user_headers(client, db)
     headers_b = new_user_headers(client, db)
-    task = _create_task(client, headers_a, "A's task")
+    task = create_task_record(client, headers_a, "A's task")
     comment = _add_comment(client, headers_a, task["id"], "Original").json()
 
     r = client.delete(
@@ -158,7 +147,7 @@ def test_a_user_cannot_delete_another_users_comment(
 
 def test_a_blank_comment_is_rejected(client: TestClient, db: Session) -> None:
     headers = new_user_headers(client, db)
-    task = _create_task(client, headers, "Task")
+    task = create_task_record(client, headers, "Task")
 
     r = _add_comment(client, headers, task["id"], "   ")
     assert r.status_code == 422
@@ -166,7 +155,7 @@ def test_a_blank_comment_is_rejected(client: TestClient, db: Session) -> None:
 
 def test_comment_body_is_trimmed(client: TestClient, db: Session) -> None:
     headers = new_user_headers(client, db)
-    task = _create_task(client, headers, "Task")
+    task = create_task_record(client, headers, "Task")
 
     r = _add_comment(client, headers, task["id"], "  spaced  ")
     assert r.status_code == 200
@@ -186,7 +175,7 @@ def test_a_comment_cannot_carry_an_attachment_field(
     client: TestClient, db: Session
 ) -> None:
     headers = new_user_headers(client, db)
-    task = _create_task(client, headers, "Task")
+    task = create_task_record(client, headers, "Task")
 
     # There is no such field to send: the schema offers no attachment relation
     # on a comment at all (FR-03.3).
@@ -203,7 +192,7 @@ def test_a_comment_on_a_deleted_task_cannot_be_edited_or_deleted(
     client: TestClient, db: Session
 ) -> None:
     headers = new_user_headers(client, db)
-    task = _create_task(client, headers, "Doomed")
+    task = create_task_record(client, headers, "Doomed")
     comment = _add_comment(client, headers, task["id"], "Before deletion").json()
 
     r = client.delete(f"{settings.API_V1_STR}/tasks/{task['id']}", headers=headers)
@@ -224,7 +213,7 @@ def test_a_comment_on_a_deleted_task_cannot_be_edited_or_deleted(
 
 def test_comments_survive_a_deleted_task(client: TestClient, db: Session) -> None:
     headers = new_user_headers(client, db)
-    task = _create_task(client, headers, "Doomed")
+    task = create_task_record(client, headers, "Doomed")
     _add_comment(client, headers, task["id"], "Before deletion")
 
     r = client.delete(f"{settings.API_V1_STR}/tasks/{task['id']}", headers=headers)

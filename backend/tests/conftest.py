@@ -4,10 +4,12 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session, delete
 
+from app.api.deps import get_attachment_storage
 from app.core.config import settings
 from app.core.db import engine
 from app.main import app
 from app.models import User
+from tests.utils.storage import InMemoryAttachmentStorage
 from tests.utils.user import authentication_token_from_email
 
 
@@ -50,3 +52,12 @@ def normal_user_token_headers(client: TestClient, db: Session) -> dict[str, str]
     return authentication_token_from_email(
         client=client, email=settings.EMAIL_TEST_USER, db=db
     )
+
+
+@pytest.fixture(autouse=True)
+def storage() -> Generator[InMemoryAttachmentStorage]:
+    """Attachments go to memory, never to a disk; the test can look inside."""
+    fake_storage = InMemoryAttachmentStorage()
+    app.dependency_overrides[get_attachment_storage] = lambda: fake_storage
+    yield fake_storage
+    del app.dependency_overrides[get_attachment_storage]

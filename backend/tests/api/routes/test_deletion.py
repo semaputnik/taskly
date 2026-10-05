@@ -5,48 +5,19 @@ from sqlmodel import Session
 
 from app.core.config import settings
 from app.models import Deletion, Project, Task
+from tests.utils.accounts import (
+    create_project,
+    create_task_record,
+    delete_task,
+    inbox_project_id,
+)
 from tests.utils.user import new_user_headers
-
-
-def _inbox_id(client: TestClient, headers: dict[str, str]) -> str:
-    r = client.get(f"{settings.API_V1_STR}/projects/", headers=headers)
-    return next(p["id"] for p in r.json()["data"] if p["is_inbox"])
-
-
-def _create_project(client: TestClient, headers: dict[str, str], name: str) -> str:
-    r = client.post(
-        f"{settings.API_V1_STR}/projects/",
-        headers=headers,
-        json={"name": name},
-    )
-    assert r.status_code == 200, r.text
-    return r.json()["id"]
-
-
-def _create_task(
-    client: TestClient, headers: dict[str, str], title: str, **fields: object
-) -> dict:
-    r = client.post(
-        f"{settings.API_V1_STR}/tasks/",
-        headers=headers,
-        json={"title": title, **fields},
-    )
-    assert r.status_code == 200, r.text
-    return r.json()
 
 
 def _listed_titles(client: TestClient, headers: dict[str, str]) -> set[str]:
     r = client.get(f"{settings.API_V1_STR}/tasks/", headers=headers)
     assert r.status_code == 200, r.text
     return {t["title"] for t in r.json()["data"]}
-
-
-def _delete_task(
-    client: TestClient, headers: dict[str, str], task_id: str, **params: object
-):
-    return client.delete(
-        f"{settings.API_V1_STR}/tasks/{task_id}", headers=headers, params=params
-    )
 
 
 def _stored_task(db: Session, task_id: str) -> Task:
@@ -68,9 +39,9 @@ def test_deleting_a_task_hides_it_but_keeps_the_row(
     client: TestClient, db: Session
 ) -> None:
     headers = new_user_headers(client, db)
-    task = _create_task(client, headers, "Throwaway")
+    task = create_task_record(client, headers, "Throwaway")
 
-    r = _delete_task(client, headers, task["id"])
+    r = delete_task(client, headers, task["id"])
     assert r.status_code == 200
 
     assert _listed_titles(client, headers) == set()
@@ -86,10 +57,10 @@ def test_deleting_a_task_with_subtasks_is_refused(
     client: TestClient, db: Session
 ) -> None:
     headers = new_user_headers(client, db)
-    root = _create_task(client, headers, "Root")
-    child = _create_task(client, headers, "Child", parent_id=root["id"])
+    root = create_task_record(client, headers, "Root")
+    child = create_task_record(client, headers, "Child", parent_id=root["id"])
 
-    r = _delete_task(client, headers, root["id"])
+    r = delete_task(client, headers, root["id"])
     assert r.status_code == 409
     assert r.json()["detail"]["code"] == "task_has_subtasks"
 
@@ -102,12 +73,14 @@ def test_deleting_a_task_with_subtasks_cascades_when_confirmed(
     client: TestClient, db: Session
 ) -> None:
     headers = new_user_headers(client, db)
-    root = _create_task(client, headers, "Root")
-    child = _create_task(client, headers, "Child", parent_id=root["id"])
-    grandchild = _create_task(client, headers, "Grandchild", parent_id=child["id"])
-    bystander = _create_task(client, headers, "Bystander")
+    root = create_task_record(client, headers, "Root")
+    child = create_task_record(client, headers, "Child", parent_id=root["id"])
+    grandchild = create_task_record(
+        client, headers, "Grandchild", parent_id=child["id"]
+    )
+    bystander = create_task_record(client, headers, "Bystander")
 
-    r = _delete_task(client, headers, root["id"], delete_subtasks=True)
+    r = delete_task(client, headers, root["id"], delete_subtasks=True)
     assert r.status_code == 200
 
     assert _listed_titles(client, headers) == {"Bystander"}
@@ -120,11 +93,13 @@ def test_a_whole_cascade_shares_one_deletion_event(
     client: TestClient, db: Session
 ) -> None:
     headers = new_user_headers(client, db)
-    root = _create_task(client, headers, "Root")
-    child = _create_task(client, headers, "Child", parent_id=root["id"])
-    grandchild = _create_task(client, headers, "Grandchild", parent_id=child["id"])
+    root = create_task_record(client, headers, "Root")
+    child = create_task_record(client, headers, "Child", parent_id=root["id"])
+    grandchild = create_task_record(
+        client, headers, "Grandchild", parent_id=child["id"]
+    )
 
-    _delete_task(client, headers, root["id"], delete_subtasks=True)
+    delete_task(client, headers, root["id"], delete_subtasks=True)
 
     deletion_ids = {
         _stored_task(db, task["id"]).deletion_id for task in (root, child, grandchild)
@@ -142,14 +117,14 @@ def test_a_subtask_deleted_on_its_own_stays_distinguishable(
     client: TestClient, db: Session
 ) -> None:
     headers = new_user_headers(client, db)
-    root = _create_task(client, headers, "Root")
-    early = _create_task(client, headers, "Deleted early", parent_id=root["id"])
-    sibling = _create_task(client, headers, "Sibling", parent_id=root["id"])
+    root = create_task_record(client, headers, "Root")
+    early = create_task_record(client, headers, "Deleted early", parent_id=root["id"])
+    sibling = create_task_record(client, headers, "Sibling", parent_id=root["id"])
 
-    _delete_task(client, headers, early["id"])
+    delete_task(client, headers, early["id"])
     early_deletion_id = _stored_task(db, early["id"]).deletion_id
 
-    _delete_task(client, headers, root["id"], delete_subtasks=True)
+    delete_task(client, headers, root["id"], delete_subtasks=True)
 
     root_deletion_id = _stored_task(db, root["id"]).deletion_id
     assert _stored_task(db, sibling["id"]).deletion_id == root_deletion_id
@@ -162,22 +137,22 @@ def test_a_task_whose_subtasks_are_all_deleted_needs_no_confirmation(
     client: TestClient, db: Session
 ) -> None:
     headers = new_user_headers(client, db)
-    root = _create_task(client, headers, "Root")
-    child = _create_task(client, headers, "Child", parent_id=root["id"])
+    root = create_task_record(client, headers, "Root")
+    child = create_task_record(client, headers, "Child", parent_id=root["id"])
 
-    _delete_task(client, headers, child["id"])
+    delete_task(client, headers, child["id"])
 
-    r = _delete_task(client, headers, root["id"])
+    r = delete_task(client, headers, root["id"])
     assert r.status_code == 200
 
 
 def test_deleting_a_project_deletes_its_tasks(client: TestClient, db: Session) -> None:
     headers = new_user_headers(client, db)
-    project_id = _create_project(client, headers, "Work")
+    project_id = create_project(client, headers, "Work")
 
-    root = _create_task(client, headers, "Root", project_id=project_id)
-    child = _create_task(client, headers, "Child", parent_id=root["id"])
-    elsewhere = _create_task(client, headers, "In the Inbox")
+    root = create_task_record(client, headers, "Root", project_id=project_id)
+    child = create_task_record(client, headers, "Child", parent_id=root["id"])
+    elsewhere = create_task_record(client, headers, "In the Inbox")
 
     r = client.delete(f"{settings.API_V1_STR}/projects/{project_id}", headers=headers)
     assert r.status_code == 200
@@ -202,11 +177,11 @@ def test_deleting_a_project_leaves_a_task_deleted_earlier_alone(
     client: TestClient, db: Session
 ) -> None:
     headers = new_user_headers(client, db)
-    project_id = _create_project(client, headers, "Work")
-    early = _create_task(client, headers, "Deleted early", project_id=project_id)
-    other = _create_task(client, headers, "Still there", project_id=project_id)
+    project_id = create_project(client, headers, "Work")
+    early = create_task_record(client, headers, "Deleted early", project_id=project_id)
+    other = create_task_record(client, headers, "Still there", project_id=project_id)
 
-    _delete_task(client, headers, early["id"])
+    delete_task(client, headers, early["id"])
     early_deletion_id = _stored_task(db, early["id"]).deletion_id
 
     client.delete(f"{settings.API_V1_STR}/projects/{project_id}", headers=headers)
@@ -219,10 +194,10 @@ def test_a_deleted_subtask_does_not_block_completing_its_parent(
     client: TestClient, db: Session
 ) -> None:
     headers = new_user_headers(client, db)
-    root = _create_task(client, headers, "Root")
-    child = _create_task(client, headers, "Child", parent_id=root["id"])
+    root = create_task_record(client, headers, "Root")
+    child = create_task_record(client, headers, "Child", parent_id=root["id"])
 
-    _delete_task(client, headers, child["id"])
+    delete_task(client, headers, child["id"])
 
     r = client.patch(
         f"{settings.API_V1_STR}/tasks/{root['id']}",
@@ -237,8 +212,8 @@ def test_a_deleted_task_cannot_be_used_as_a_parent(
     client: TestClient, db: Session
 ) -> None:
     headers = new_user_headers(client, db)
-    task = _create_task(client, headers, "Gone")
-    _delete_task(client, headers, task["id"])
+    task = create_task_record(client, headers, "Gone")
+    delete_task(client, headers, task["id"])
 
     r = client.post(
         f"{settings.API_V1_STR}/tasks/",
@@ -252,7 +227,7 @@ def test_a_deleted_project_cannot_take_new_tasks(
     client: TestClient, db: Session
 ) -> None:
     headers = new_user_headers(client, db)
-    project_id = _create_project(client, headers, "Work")
+    project_id = create_project(client, headers, "Work")
     client.delete(f"{settings.API_V1_STR}/projects/{project_id}", headers=headers)
 
     r = client.post(
@@ -262,7 +237,7 @@ def test_a_deleted_project_cannot_take_new_tasks(
     )
     assert r.status_code == 404
 
-    task = _create_task(client, headers, "Somewhere else")
+    task = create_task_record(client, headers, "Somewhere else")
     r = client.patch(
         f"{settings.API_V1_STR}/tasks/{task['id']}",
         headers=headers,
@@ -273,18 +248,18 @@ def test_a_deleted_project_cannot_take_new_tasks(
 
 def test_deleting_a_task_twice_returns_404(client: TestClient, db: Session) -> None:
     headers = new_user_headers(client, db)
-    task = _create_task(client, headers, "Throwaway")
+    task = create_task_record(client, headers, "Throwaway")
 
-    assert _delete_task(client, headers, task["id"]).status_code == 200
-    assert _delete_task(client, headers, task["id"]).status_code == 404
+    assert delete_task(client, headers, task["id"]).status_code == 200
+    assert delete_task(client, headers, task["id"]).status_code == 404
 
 
 def test_users_cannot_delete_each_others_tasks(client: TestClient, db: Session) -> None:
     headers_a = new_user_headers(client, db)
     headers_b = new_user_headers(client, db)
-    task = _create_task(client, headers_a, "A's task")
+    task = create_task_record(client, headers_a, "A's task")
 
-    assert _delete_task(client, headers_b, task["id"]).status_code == 404
+    assert delete_task(client, headers_b, task["id"]).status_code == 404
     assert _stored_task(db, task["id"]).deletion_id is None
 
 
@@ -293,13 +268,13 @@ def test_deleting_a_nonexistent_task_returns_404(
 ) -> None:
     headers = new_user_headers(client, db)
 
-    r = _delete_task(client, headers, str(uuid.uuid4()))
+    r = delete_task(client, headers, str(uuid.uuid4()))
     assert r.status_code == 404
 
 
 def test_deleting_the_inbox_is_still_refused(client: TestClient, db: Session) -> None:
     headers = new_user_headers(client, db)
-    inbox_id = _inbox_id(client, headers)
+    inbox_id = inbox_project_id(client, headers)
 
     r = client.delete(f"{settings.API_V1_STR}/projects/{inbox_id}", headers=headers)
     assert r.status_code == 400

@@ -4,33 +4,8 @@ from fastapi.testclient import TestClient
 from sqlmodel import Session
 
 from app.core.config import settings
+from tests.utils.accounts import create_project, create_task_record, inbox_project_id
 from tests.utils.user import new_user_headers
-
-
-def _inbox_id(client: TestClient, headers: dict[str, str]) -> str:
-    r = client.get(f"{settings.API_V1_STR}/projects/", headers=headers)
-    return next(p["id"] for p in r.json()["data"] if p["is_inbox"])
-
-
-def _create_project(client: TestClient, headers: dict[str, str], name: str) -> str:
-    r = client.post(
-        f"{settings.API_V1_STR}/projects/",
-        headers=headers,
-        json={"name": name},
-    )
-    return r.json()["id"]
-
-
-def _create_task(
-    client: TestClient, headers: dict[str, str], title: str, **fields: object
-) -> dict:
-    r = client.post(
-        f"{settings.API_V1_STR}/tasks/",
-        headers=headers,
-        json={"title": title, **fields},
-    )
-    assert r.status_code == 200, r.text
-    return r.json()
 
 
 def _read_task(client: TestClient, headers: dict[str, str], task_id: str) -> dict:
@@ -52,10 +27,12 @@ def _complete(
 def test_task_can_be_nested_to_arbitrary_depth(client: TestClient, db: Session) -> None:
     headers = new_user_headers(client, db)
 
-    root = _create_task(client, headers, "Root")
-    child = _create_task(client, headers, "Child", parent_id=root["id"])
-    grandchild = _create_task(client, headers, "Grandchild", parent_id=child["id"])
-    great_grandchild = _create_task(
+    root = create_task_record(client, headers, "Root")
+    child = create_task_record(client, headers, "Child", parent_id=root["id"])
+    grandchild = create_task_record(
+        client, headers, "Grandchild", parent_id=child["id"]
+    )
+    great_grandchild = create_task_record(
         client, headers, "Great grandchild", parent_id=grandchild["id"]
     )
 
@@ -67,9 +44,9 @@ def test_task_can_be_nested_to_arbitrary_depth(client: TestClient, db: Session) 
 
 def test_subtask_is_a_full_task(client: TestClient, db: Session) -> None:
     headers = new_user_headers(client, db)
-    root = _create_task(client, headers, "Root")
+    root = create_task_record(client, headers, "Root")
 
-    subtask = _create_task(
+    subtask = create_task_record(
         client,
         headers,
         "Subtask",
@@ -97,11 +74,13 @@ def test_subtask_resolves_to_the_project_of_its_root_ancestor(
     client: TestClient, db: Session
 ) -> None:
     headers = new_user_headers(client, db)
-    project_id = _create_project(client, headers, "Work")
+    project_id = create_project(client, headers, "Work")
 
-    root = _create_task(client, headers, "Root", project_id=project_id)
-    child = _create_task(client, headers, "Child", parent_id=root["id"])
-    grandchild = _create_task(client, headers, "Grandchild", parent_id=child["id"])
+    root = create_task_record(client, headers, "Root", project_id=project_id)
+    child = create_task_record(client, headers, "Child", parent_id=root["id"])
+    grandchild = create_task_record(
+        client, headers, "Grandchild", parent_id=child["id"]
+    )
 
     assert child["project_id"] == project_id
     assert grandchild["project_id"] == project_id
@@ -120,8 +99,8 @@ def test_subtask_cannot_be_given_its_own_project(
     client: TestClient, db: Session
 ) -> None:
     headers = new_user_headers(client, db)
-    other_project_id = _create_project(client, headers, "Elsewhere")
-    root = _create_task(client, headers, "Root")
+    other_project_id = create_project(client, headers, "Elsewhere")
+    root = create_task_record(client, headers, "Root")
 
     r = client.post(
         f"{settings.API_V1_STR}/tasks/",
@@ -139,9 +118,9 @@ def test_subtask_cannot_be_moved_to_another_project(
     client: TestClient, db: Session
 ) -> None:
     headers = new_user_headers(client, db)
-    other_project_id = _create_project(client, headers, "Elsewhere")
-    root = _create_task(client, headers, "Root")
-    child = _create_task(client, headers, "Child", parent_id=root["id"])
+    other_project_id = create_project(client, headers, "Elsewhere")
+    root = create_task_record(client, headers, "Root")
+    child = create_task_record(client, headers, "Child", parent_id=root["id"])
 
     r = client.patch(
         f"{settings.API_V1_STR}/tasks/{child['id']}",
@@ -149,7 +128,7 @@ def test_subtask_cannot_be_moved_to_another_project(
         json={"project_id": other_project_id},
     )
     assert r.status_code == 400
-    assert _read_task(client, headers, child["id"])["project_id"] == _inbox_id(
+    assert _read_task(client, headers, child["id"])["project_id"] == inbox_project_id(
         client, headers
     )
 
@@ -158,12 +137,14 @@ def test_moving_a_root_task_moves_its_whole_subtree(
     client: TestClient, db: Session
 ) -> None:
     headers = new_user_headers(client, db)
-    inbox_id = _inbox_id(client, headers)
-    work_id = _create_project(client, headers, "Work")
+    inbox_id = inbox_project_id(client, headers)
+    work_id = create_project(client, headers, "Work")
 
-    root = _create_task(client, headers, "Root")
-    child = _create_task(client, headers, "Child", parent_id=root["id"])
-    grandchild = _create_task(client, headers, "Grandchild", parent_id=child["id"])
+    root = create_task_record(client, headers, "Root")
+    child = create_task_record(client, headers, "Child", parent_id=root["id"])
+    grandchild = create_task_record(
+        client, headers, "Grandchild", parent_id=child["id"]
+    )
     assert grandchild["project_id"] == inbox_id
 
     r = client.patch(
@@ -183,7 +164,7 @@ def test_subtask_of_another_users_task_is_rejected(
 ) -> None:
     headers_a = new_user_headers(client, db)
     headers_b = new_user_headers(client, db)
-    root = _create_task(client, headers_a, "A's task")
+    root = create_task_record(client, headers_a, "A's task")
 
     r = client.post(
         f"{settings.API_V1_STR}/tasks/",
@@ -208,8 +189,8 @@ def test_completing_a_task_with_uncompleted_subtasks_is_refused(
     client: TestClient, db: Session
 ) -> None:
     headers = new_user_headers(client, db)
-    root = _create_task(client, headers, "Root")
-    _create_task(client, headers, "Child", parent_id=root["id"])
+    root = create_task_record(client, headers, "Root")
+    create_task_record(client, headers, "Child", parent_id=root["id"])
 
     r = _complete(client, headers, root["id"])
     assert r.status_code == 409
@@ -219,9 +200,11 @@ def test_completing_a_task_with_uncompleted_subtasks_is_refused(
 
 def test_refusal_looks_at_the_whole_subtree(client: TestClient, db: Session) -> None:
     headers = new_user_headers(client, db)
-    root = _create_task(client, headers, "Root")
-    child = _create_task(client, headers, "Child", parent_id=root["id"])
-    grandchild = _create_task(client, headers, "Grandchild", parent_id=child["id"])
+    root = create_task_record(client, headers, "Root")
+    child = create_task_record(client, headers, "Child", parent_id=root["id"])
+    grandchild = create_task_record(
+        client, headers, "Grandchild", parent_id=child["id"]
+    )
 
     r = _complete(client, headers, child["id"], subtasks="leave_uncompleted")
     assert r.status_code == 200
@@ -236,9 +219,9 @@ def test_refusal_is_distinct_from_other_client_errors(
     client: TestClient, db: Session
 ) -> None:
     headers = new_user_headers(client, db)
-    other_project_id = _create_project(client, headers, "Elsewhere")
-    root = _create_task(client, headers, "Root")
-    child = _create_task(client, headers, "Child", parent_id=root["id"])
+    other_project_id = create_project(client, headers, "Elsewhere")
+    root = create_task_record(client, headers, "Root")
+    child = create_task_record(client, headers, "Child", parent_id=root["id"])
 
     refusal = _complete(client, headers, root["id"])
     move = client.patch(
@@ -254,9 +237,11 @@ def test_completing_with_subtasks_left_uncompleted(
     client: TestClient, db: Session
 ) -> None:
     headers = new_user_headers(client, db)
-    root = _create_task(client, headers, "Root")
-    child = _create_task(client, headers, "Child", parent_id=root["id"])
-    grandchild = _create_task(client, headers, "Grandchild", parent_id=child["id"])
+    root = create_task_record(client, headers, "Root")
+    child = create_task_record(client, headers, "Child", parent_id=root["id"])
+    grandchild = create_task_record(
+        client, headers, "Grandchild", parent_id=child["id"]
+    )
 
     r = _complete(client, headers, root["id"], subtasks="leave_uncompleted")
     assert r.status_code == 200
@@ -270,9 +255,11 @@ def test_completing_with_subtasks_completed_too(
     client: TestClient, db: Session
 ) -> None:
     headers = new_user_headers(client, db)
-    root = _create_task(client, headers, "Root")
-    child = _create_task(client, headers, "Child", parent_id=root["id"])
-    grandchild = _create_task(client, headers, "Grandchild", parent_id=child["id"])
+    root = create_task_record(client, headers, "Root")
+    child = create_task_record(client, headers, "Child", parent_id=root["id"])
+    grandchild = create_task_record(
+        client, headers, "Grandchild", parent_id=child["id"]
+    )
 
     r = _complete(client, headers, root["id"], subtasks="complete")
     assert r.status_code == 200
@@ -286,9 +273,9 @@ def test_completing_every_subtask_leaves_the_parent_uncompleted(
     client: TestClient, db: Session
 ) -> None:
     headers = new_user_headers(client, db)
-    root = _create_task(client, headers, "Root")
-    first = _create_task(client, headers, "First", parent_id=root["id"])
-    second = _create_task(client, headers, "Second", parent_id=root["id"])
+    root = create_task_record(client, headers, "Root")
+    first = create_task_record(client, headers, "First", parent_id=root["id"])
+    second = create_task_record(client, headers, "Second", parent_id=root["id"])
 
     for task in (first, second):
         r = _complete(client, headers, task["id"])
@@ -301,8 +288,8 @@ def test_completing_a_parent_whose_subtasks_are_done_needs_no_directive(
     client: TestClient, db: Session
 ) -> None:
     headers = new_user_headers(client, db)
-    root = _create_task(client, headers, "Root")
-    child = _create_task(client, headers, "Child", parent_id=root["id"])
+    root = create_task_record(client, headers, "Root")
+    child = create_task_record(client, headers, "Child", parent_id=root["id"])
     _complete(client, headers, child["id"])
 
     r = _complete(client, headers, root["id"])
@@ -314,8 +301,8 @@ def test_returning_a_task_to_not_completed_is_never_refused(
     client: TestClient, db: Session
 ) -> None:
     headers = new_user_headers(client, db)
-    root = _create_task(client, headers, "Root")
-    _create_task(client, headers, "Child", parent_id=root["id"])
+    root = create_task_record(client, headers, "Root")
+    create_task_record(client, headers, "Child", parent_id=root["id"])
     _complete(client, headers, root["id"], subtasks="leave_uncompleted")
 
     r = client.patch(
@@ -331,8 +318,8 @@ def test_editing_a_parent_without_completing_it_is_never_refused(
     client: TestClient, db: Session
 ) -> None:
     headers = new_user_headers(client, db)
-    root = _create_task(client, headers, "Root")
-    _create_task(client, headers, "Child", parent_id=root["id"])
+    root = create_task_record(client, headers, "Root")
+    create_task_record(client, headers, "Child", parent_id=root["id"])
 
     r = client.patch(
         f"{settings.API_V1_STR}/tasks/{root['id']}",
@@ -347,8 +334,8 @@ def test_subtask_directive_without_completion_is_rejected(
     client: TestClient, db: Session
 ) -> None:
     headers = new_user_headers(client, db)
-    root = _create_task(client, headers, "Root")
-    _create_task(client, headers, "Child", parent_id=root["id"])
+    root = create_task_record(client, headers, "Root")
+    create_task_record(client, headers, "Child", parent_id=root["id"])
 
     r = client.patch(
         f"{settings.API_V1_STR}/tasks/{root['id']}",

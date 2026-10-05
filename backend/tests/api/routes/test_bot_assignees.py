@@ -7,23 +7,19 @@ from sqlmodel import Session
 
 from app.core.config import settings
 from app.models import BotUser
-from tests.utils.bot import (
+from tests.utils.accounts import (
     ALL_PERMISSIONS,
     create_bot_user,
     create_project,
     create_task,
     create_user_headers,
+    my_id,
     token_headers,
 )
 
 API = settings.API_V1_STR
 
 Headers = dict[str, str]
-
-
-def _me(client: TestClient, headers: Headers) -> str:
-    user_id: str = client.get(f"{API}/users/me", headers=headers).json()["id"]
-    return user_id
 
 
 def _bot(client: TestClient, headers: Headers, name: str = "Triage bot") -> str:
@@ -84,7 +80,7 @@ def test_a_task_assigned_to_the_owner_names_no_bot_user(
     client: TestClient, db: Session, how: str
 ) -> None:
     owner = create_user_headers(client, db)
-    me = _me(client, owner)
+    me = my_id(client, owner)
 
     status, task = _assign(client, owner, how, me)
     assert status == 200, task
@@ -96,7 +92,7 @@ def test_reassigning_moves_between_the_owner_and_a_bot_user(
     client: TestClient, db: Session
 ) -> None:
     owner = create_user_headers(client, db)
-    me = _me(client, owner)
+    me = my_id(client, owner)
     bot_id = _bot(client, owner)
     task_id = create_task(client, owner)
 
@@ -119,7 +115,7 @@ def test_assigning_outside_the_owner_and_their_live_bot_users_is_refused(
     owner = create_user_headers(client, db)
     other = create_user_headers(client, db)
     if whom == "another user":
-        assignee_id = _me(client, other)
+        assignee_id = my_id(client, other)
     elif whom == "another user's bot user":
         assignee_id = _bot(client, other)
     elif whom == "nobody known":
@@ -158,7 +154,7 @@ def test_a_bot_can_assign_a_task_in_its_scope_to_itself(
 
 def test_the_assignee_filter_covers_bot_users(client: TestClient, db: Session) -> None:
     owner = create_user_headers(client, db)
-    me = _me(client, owner)
+    me = my_id(client, owner)
     first_bot = _bot(client, owner, "First")
     second_bot = _bot(client, owner, "Second")
     tasks = {}
@@ -299,7 +295,7 @@ def test_assignment_entries_name_the_owner_as_a_user(
     client: TestClient, db: Session
 ) -> None:
     owner = create_user_headers(client, db)
-    me = _me(client, owner)
+    me = my_id(client, owner)
     task_id = create_task(client, owner)
 
     client.patch(f"{API}/tasks/{task_id}", headers=owner, json={"assignee_id": me})

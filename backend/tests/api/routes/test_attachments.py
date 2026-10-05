@@ -2,53 +2,10 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
-from app.api.deps import get_attachment_storage
 from app.core.config import settings
-from app.core.storage import AttachmentStorage
-from app.main import app
+from tests.utils.accounts import create_task_record
+from tests.utils.storage import InMemoryAttachmentStorage
 from tests.utils.user import new_user_headers
-
-
-class InMemoryAttachmentStorage(AttachmentStorage):
-    """
-    A storage double that never touches a real filesystem, so the test suite
-    can assert on exactly what a delete released without disk I/O.
-    """
-
-    def __init__(self) -> None:
-        self.files: dict[str, bytes] = {}
-
-    def put(self, key: str, data: bytes) -> None:
-        self.files[key] = data
-
-    def get(self, key: str) -> bytes:
-        try:
-            return self.files[key]
-        except KeyError:
-            raise FileNotFoundError(key) from None
-
-    def delete(self, key: str) -> None:
-        self.files.pop(key, None)
-
-
-@pytest.fixture(autouse=True)
-def storage():
-    fake_storage = InMemoryAttachmentStorage()
-    app.dependency_overrides[get_attachment_storage] = lambda: fake_storage
-    yield fake_storage
-    del app.dependency_overrides[get_attachment_storage]
-
-
-def _create_task(
-    client: TestClient, headers: dict[str, str], title: str, **fields: object
-) -> dict:
-    r = client.post(
-        f"{settings.API_V1_STR}/tasks/",
-        headers=headers,
-        json={"title": title, **fields},
-    )
-    assert r.status_code == 200, r.text
-    return r.json()
 
 
 def _upload(
@@ -76,7 +33,7 @@ def test_a_file_can_be_uploaded_to_a_task(
     client: TestClient, db: Session, storage: InMemoryAttachmentStorage
 ) -> None:
     headers = new_user_headers(client, db)
-    task = _create_task(client, headers, "Buy milk")
+    task = create_task_record(client, headers, "Buy milk")
 
     r = _upload(client, headers, task["id"])
     assert r.status_code == 200, r.text
@@ -94,8 +51,8 @@ def test_a_file_can_be_uploaded_to_a_task(
 
 def test_a_file_can_be_uploaded_to_a_subtask(client: TestClient, db: Session) -> None:
     headers = new_user_headers(client, db)
-    root = _create_task(client, headers, "Root")
-    subtask = _create_task(client, headers, "Subtask", parent_id=root["id"])
+    root = create_task_record(client, headers, "Root")
+    subtask = create_task_record(client, headers, "Subtask", parent_id=root["id"])
 
     r = _upload(client, headers, subtask["id"])
     assert r.status_code == 200, r.text
@@ -105,7 +62,7 @@ def test_a_task_can_carry_multiple_attachments_of_any_type(
     client: TestClient, db: Session
 ) -> None:
     headers = new_user_headers(client, db)
-    task = _create_task(client, headers, "Task")
+    task = create_task_record(client, headers, "Task")
 
     _upload(client, headers, task["id"], filename="a.txt", content_type="text/plain")
     _upload(
@@ -125,7 +82,7 @@ def test_downloading_returns_the_exact_bytes_uploaded(
     client: TestClient, db: Session
 ) -> None:
     headers = new_user_headers(client, db)
-    task = _create_task(client, headers, "Task")
+    task = create_task_record(client, headers, "Task")
     content = b"\x00\x01exact bytes\xffdone"
 
     uploaded = _upload(client, headers, task["id"], content=content).json()
@@ -145,7 +102,7 @@ def test_downloading_a_non_latin1_filename_does_not_crash(
     client: TestClient, db: Session
 ) -> None:
     headers = new_user_headers(client, db)
-    task = _create_task(client, headers, "Task")
+    task = create_task_record(client, headers, "Task")
     uploaded = _upload(client, headers, task["id"], filename="файл.txt").json()
     assert uploaded["filename"] == "файл.txt"
 
@@ -163,7 +120,7 @@ def test_a_filename_with_a_backslash_does_not_break_the_header(
     client: TestClient, db: Session
 ) -> None:
     headers = new_user_headers(client, db)
-    task = _create_task(client, headers, "Task")
+    task = create_task_record(client, headers, "Task")
     uploaded = _upload(client, headers, task["id"], filename="evil\\").json()
 
     r = client.get(
@@ -183,7 +140,7 @@ def test_a_filename_with_a_slash_is_percent_encoded(
     client: TestClient, db: Session
 ) -> None:
     headers = new_user_headers(client, db)
-    task = _create_task(client, headers, "Task")
+    task = create_task_record(client, headers, "Task")
     uploaded = _upload(client, headers, task["id"], filename="reports/q3.txt").json()
 
     r = client.get(
@@ -199,7 +156,7 @@ def test_downloading_a_non_ascii_content_type_does_not_crash(
     client: TestClient, db: Session
 ) -> None:
     headers = new_user_headers(client, db)
-    task = _create_task(client, headers, "Task")
+    task = create_task_record(client, headers, "Task")
     uploaded = _upload(
         client, headers, task["id"], content_type="text/plain; charset=кодировка"
     ).json()
@@ -221,7 +178,7 @@ def test_an_overlong_filename_and_content_type_are_truncated_not_rejected(
     client: TestClient, db: Session
 ) -> None:
     headers = new_user_headers(client, db)
-    task = _create_task(client, headers, "Task")
+    task = create_task_record(client, headers, "Task")
 
     r = _upload(
         client,
@@ -239,7 +196,7 @@ def test_downloading_an_attachment_whose_bytes_are_missing_is_a_404(
     client: TestClient, db: Session, storage: InMemoryAttachmentStorage
 ) -> None:
     headers = new_user_headers(client, db)
-    task = _create_task(client, headers, "Task")
+    task = create_task_record(client, headers, "Task")
     uploaded = _upload(client, headers, task["id"]).json()
     # Simulate the row existing with its bytes gone from storage, without
     # going through the delete endpoint (which removes the row too).
@@ -255,7 +212,7 @@ def test_deleting_an_attachment_releases_its_storage_bytes(
     client: TestClient, db: Session, storage: InMemoryAttachmentStorage
 ) -> None:
     headers = new_user_headers(client, db)
-    task = _create_task(client, headers, "Task")
+    task = create_task_record(client, headers, "Task")
     uploaded = _upload(client, headers, task["id"]).json()
     assert uploaded["id"] in storage.files
 
@@ -274,7 +231,7 @@ def test_a_user_cannot_read_attachments_on_another_users_task(
 ) -> None:
     headers_a = new_user_headers(client, db)
     headers_b = new_user_headers(client, db)
-    task = _create_task(client, headers_a, "A's task")
+    task = create_task_record(client, headers_a, "A's task")
     _upload(client, headers_a, task["id"])
 
     r = _list_attachments(client, headers_b, task["id"])
@@ -286,7 +243,7 @@ def test_a_user_cannot_upload_to_another_users_task(
 ) -> None:
     headers_a = new_user_headers(client, db)
     headers_b = new_user_headers(client, db)
-    task = _create_task(client, headers_a, "A's task")
+    task = create_task_record(client, headers_a, "A's task")
 
     r = _upload(client, headers_b, task["id"])
     assert r.status_code == 404
@@ -297,7 +254,7 @@ def test_a_user_cannot_download_another_users_attachment(
 ) -> None:
     headers_a = new_user_headers(client, db)
     headers_b = new_user_headers(client, db)
-    task = _create_task(client, headers_a, "A's task")
+    task = create_task_record(client, headers_a, "A's task")
     uploaded = _upload(client, headers_a, task["id"]).json()
 
     r = client.get(
@@ -311,7 +268,7 @@ def test_a_user_cannot_delete_another_users_attachment(
 ) -> None:
     headers_a = new_user_headers(client, db)
     headers_b = new_user_headers(client, db)
-    task = _create_task(client, headers_a, "A's task")
+    task = create_task_record(client, headers_a, "A's task")
     uploaded = _upload(client, headers_a, task["id"]).json()
 
     r = client.delete(
@@ -328,7 +285,7 @@ def test_uploading_a_file_over_the_size_limit_is_rejected(
 ) -> None:
     monkeypatch.setattr(settings, "ATTACHMENT_MAX_SIZE_BYTES", 10)
     headers = new_user_headers(client, db)
-    task = _create_task(client, headers, "Task")
+    task = create_task_record(client, headers, "Task")
 
     r = _upload(client, headers, task["id"], content=b"this is more than ten bytes")
     assert r.status_code == 413
@@ -351,7 +308,7 @@ def test_attachments_survive_a_deleted_task(
     client: TestClient, db: Session, storage: InMemoryAttachmentStorage
 ) -> None:
     headers = new_user_headers(client, db)
-    task = _create_task(client, headers, "Doomed")
+    task = create_task_record(client, headers, "Doomed")
     uploaded = _upload(client, headers, task["id"]).json()
 
     r = client.delete(f"{settings.API_V1_STR}/tasks/{task['id']}", headers=headers)
@@ -367,7 +324,7 @@ def test_an_attachment_on_a_deleted_task_cannot_be_downloaded_or_deleted(
     client: TestClient, db: Session
 ) -> None:
     headers = new_user_headers(client, db)
-    task = _create_task(client, headers, "Doomed")
+    task = create_task_record(client, headers, "Doomed")
     uploaded = _upload(client, headers, task["id"]).json()
 
     client.delete(f"{settings.API_V1_STR}/tasks/{task['id']}", headers=headers)
@@ -387,7 +344,7 @@ def test_deleting_your_own_account_releases_attachment_storage_bytes(
     client: TestClient, db: Session, storage: InMemoryAttachmentStorage
 ) -> None:
     headers = new_user_headers(client, db)
-    task = _create_task(client, headers, "Task")
+    task = create_task_record(client, headers, "Task")
     uploaded = _upload(client, headers, task["id"]).json()
     assert uploaded["id"] in storage.files
 
