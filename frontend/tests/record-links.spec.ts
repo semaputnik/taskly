@@ -22,14 +22,14 @@ test("A task linked from a bot user's activity replaces the bot's sheet", async 
 
   await page.goto(`/bots?bot=${bot.id}`)
   const feed = page
-    .getByRole("dialog", { name: "Triage agent" })
+    .getByRole("complementary", { name: "Triage agent" })
     .getByRole("list", { name: "Recent activity by Triage agent" })
   await feed.getByRole("link", { name: "Answer the refund request" }).click()
 
   await expect(
-    page.getByRole("dialog", { name: "Answer the refund request" }),
+    page.getByRole("complementary", { name: "Answer the refund request" }),
   ).toBeVisible()
-  await expect(page.getByRole("dialog")).toHaveCount(1)
+  await expect(page.locator("[data-record-column]")).toHaveCount(1)
   expect(new URL(page.url()).searchParams.has("bot")).toBe(false)
 })
 
@@ -47,15 +47,19 @@ test("Activity entries open the record they name", async ({ page }) => {
     .filter({ hasText: "errands" })
     .getByRole("link", { name: "errands" })
     .click()
-  await expect(page.getByRole("dialog", { name: "errands" })).toBeVisible()
+  await expect(
+    page.getByRole("complementary", { name: "errands" }),
+  ).toBeVisible()
   await expect(page).toHaveURL(new RegExp(`/activity\\?.*tag_id=${tag.id}`))
   await page.keyboard.press("Escape")
-  await expect(page.getByRole("dialog")).toHaveCount(0)
+  await expect(page.locator("[data-record-column]")).toHaveCount(0)
 
   await rows
     .filter({ hasText: "Commented on Book the vet" })
     .getByRole("link", { name: "Book the vet" })
     .click()
-  await expect(page.getByRole("dialog", { name: "Book the vet" })).toBeVisible()
+  await expect(
+    page.getByRole("complementary", { name: "Book the vet" }),
+  ).toBeVisible()
   await expect(page).toHaveURL(new RegExp(`/activity\\?.*task=${task.id}`))
 })

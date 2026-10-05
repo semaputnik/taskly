@@ -31,7 +31,7 @@ test("Merging from a tag's panel moves its tasks and removes it", async ({
 
   await page.goto("/tags")
   await page.getByRole("row", { name: "Open Deploy", exact: true }).click()
-  const panel = page.getByRole("dialog", { name: "Deploy", exact: true })
+  const panel = page.getByRole("complementary", { name: "Deploy", exact: true })
   const startMerge = async () => {
     await panel.getByRole("button", { name: "Merge…" }).click()
     const start = page.getByRole("dialog", { name: "Merge with Deploy" })
@@ -64,7 +64,10 @@ test("Merging from a tag's panel moves its tasks and removes it", async ({
   await confirm.getByRole("button", { name: "Merge into deploy" }).click()
 
   // The panel moves onto the tag that now carries the tasks.
-  const survivor = page.getByRole("dialog", { name: "deploy", exact: true })
+  const survivor = page.getByRole("complementary", {
+    name: "deploy",
+    exact: true,
+  })
   await expect(survivor).toBeVisible()
   await expect(survivor).toContainText("3 tasks")
   await expect(survivor).toContainText("+ 1 in archived projects")
@@ -211,7 +214,7 @@ test("A tag a bot user created says which one", async ({ page }) => {
   )
   await page.getByRole("row", { name: "Open needs-triage" }).click()
   await expect(
-    page.getByRole("dialog", { name: "needs-triage" }),
+    page.getByRole("complementary", { name: "needs-triage" }),
   ).toContainText("Created by the bot user Triage agent")
 })
 
@@ -235,7 +238,7 @@ test.describe("on a phone", () => {
     )
 
     await page.goto(`/tags?tag_id=${ship.id}`)
-    const panel = page.getByRole("dialog", { name: "ship", exact: true })
+    const panel = page.getByRole("complementary", { name: "ship", exact: true })
     await panel.getByRole("button", { name: "Merge…" }).click()
     const dialog = page.getByRole("dialog", { name: /^Merge / })
     for (const name of ["Ship", "ships", "shipping"]) {

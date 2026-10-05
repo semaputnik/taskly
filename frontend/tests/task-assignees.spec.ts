@@ -36,7 +36,7 @@ test("A task is assigned to a bot user from the task form and found by it", asyn
   await title.fill("Sort the inbox")
   await title.press("Enter")
   await openCaptured(page)
-  const panel = page.getByRole("dialog", { name: "Sort the inbox" })
+  const panel = page.getByRole("complementary", { name: "Sort the inbox" })
   await panel.getByRole("combobox", { name: "Assignee" }).click()
   await page.getByRole("option", { name: "Triage bot" }).click()
   await expect(panel.getByRole("combobox", { name: "Assignee" })).toContainText(
@@ -49,7 +49,7 @@ test("A task is assigned to a bot user from the task form and found by it", asyn
   await title.press("Enter")
   await openCaptured(page)
   await expect(
-    page.getByRole("dialog", { name: "Call the bank" }),
+    page.getByRole("complementary", { name: "Call the bank" }),
   ).toBeVisible()
   await page.keyboard.press("Escape")
   await expect(page.getByRole("row", { name: /Call the bank/ })).toBeVisible()

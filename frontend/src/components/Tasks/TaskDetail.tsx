@@ -9,6 +9,7 @@ import {
   RecordPanel,
   titleFieldClass,
 } from "@/components/Records/RecordPanel"
+import { useWalk } from "@/components/Records/walk"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   projectsQuery,
@@ -52,6 +53,8 @@ export function TaskDetail() {
   } = useRecordPanel("task")
   const captureTarget = useCaptureTarget()
   const onOpenTask = panels.openTask
+  // The list the task was opened from, when there is one to walk.
+  const walk = useWalk(taskId)
 
   const { data: projects } = useQuery({
     ...projectsQuery(),
@@ -77,6 +80,8 @@ export function TaskDetail() {
   return (
     <RecordPanel
       {...shell}
+      walk={walk}
+      onWalk={panels.walkTo}
       destructive={
         task && !capturing ? (
           <DeleteTask task={task} onSuccess={shell.onClose} />

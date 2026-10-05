@@ -73,7 +73,7 @@ test("Granting a bot user “Create tags” lets it add to the vocabulary", asyn
   // Granted in the bot user's panel, the same request goes through.
   await row.click()
   const createTags = page
-    .getByRole("dialog", { name: "Triage agent", exact: true })
+    .getByRole("complementary", { name: "Triage agent", exact: true })
     .getByRole("checkbox", { name: "Create tags" })
   await createTags.click()
   await expect(createTags).toBeChecked()

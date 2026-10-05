@@ -329,6 +329,7 @@ function Tasks() {
           pending={isPending || waitingForMe}
           pendingRows={Math.min(PAGE_SIZE, Math.max(count, 5)) || 5}
           rowLabel={(task) => `Open ${task.title}`}
+          opens="task"
           onRowClick={(task) => openTask(task.id)}
           selection={{
             ids: selected,

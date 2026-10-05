@@ -36,6 +36,7 @@ function ProjectsTableContent({
       columns={columns}
       data={projects.data}
       rowLabel={(project) => `Open ${project.name}`}
+      opens="project"
       onRowClick={(project) => onOpen(project.id)}
       empty={
         <EmptyState
