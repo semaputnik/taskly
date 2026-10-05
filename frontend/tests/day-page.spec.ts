@@ -387,8 +387,8 @@ test("A section that cannot load says so and leaves the rest of the page", async
     status: "in_progress",
     assignee_id: myId,
   })
-  // The activity log refuses. The sentence under the date and the Changes
-  // log read it; the reader's own work does not.
+  // The activity log refuses. The Changes log and the sentence's second
+  // half read it; the bands and the reader's own work do not.
   let refuse = true
   await page.route(
     (url) => url.pathname === "/api/v1/activity-log/",
@@ -399,17 +399,19 @@ test("A section that cannot load says so and leaves the rest of the page", async
   )
   await page.goto("/")
 
-  const failed = page
-    .getByRole("alert")
-    .filter({ hasText: "Changes could not be loaded." })
-  await expect(failed).toBeVisible()
+  // The sentence under the date loses its half about the bot users; the
+  // bands, which read only tasks, stand.
+  const alerts = page.getByRole("alert")
+  await expect(alerts).toHaveText(["Changes could not be loaded. Try again"])
+  await expect(page.getByText("Nothing needs you today.")).toBeVisible()
+  await expect(page.getByText(/Your bot users/)).toHaveCount(0)
   const myWork = page
     .locator("section")
     .filter({ has: page.getByRole("heading", { name: /^In my hands/ }) })
   await expect(myWork).toContainText("Water the plants")
 
   refuse = false
-  await failed.getByRole("button", { name: "Try again" }).click()
-  await expect(failed).toHaveCount(0)
+  await alerts.getByRole("button", { name: "Try again" }).click()
+  await expect(alerts).toHaveCount(0)
   await expect(page.getByRole("heading", { name: /^Changes/ })).toBeVisible()
 })

@@ -57,7 +57,7 @@ export function lede({
 
   const share = total > changes
   const counted = share
-    ? `${changes === 0 ? "none" : changes} of the ${total} changes`
+    ? `${changes === 0 ? "none" : changes} of the ${total} ${changesNoun(total)}`
     : `${changes === 0 ? "no" : changes} ${changesNoun(changes)}`
 
   if (window === "ever") {

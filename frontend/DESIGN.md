@@ -1,6 +1,6 @@
 ---
 name: Taskly
-description: A personal task tracker set as one continuous, well-set log that its owner and their agents both write.
+description: A personal task tracker set as one continuous, well-set log that its owner and their bot users both write.
 colors:
   page: "#ffffff"
   raised: "#ffffff"
@@ -330,7 +330,7 @@ The line every slice reuses. The 18px status mark (also the close control), then
 The capture line; the day heading (56px day number, 17px weekday and month beside it); one Ink 3 sentence of real counts with its figures in ink at 500; then the Overdue band (heading in Overdue Red) and the Due today band, each showing up to five lines and ending in an "N more →" link; the rest of the week as a single link. When nothing is overdue or due, the page says so in a sentence instead of drawing an empty band.
 
 ### In my hands
-The reader's own work, grouped In progress, Review, To do, Waiting, each group under a 13px/500 Ink 3 label indented to the title column. A task handed over in Review carries a hand-off line under its meta: the agent's name in Ink 2 at 500, when it finished, and "Close it" in green — inline, no dialog.
+The reader's own work, grouped In progress, Review, To do, Waiting, each group under a 13px/500 Ink 3 label indented to the title column. A task handed over in Review carries a hand-off line under its meta: the bot user's name in Ink 2 at 500, when it finished, and "Close it" in green — inline, no dialog.
 
 ### Changes
 Log lines, newest first: time (12px mono Ink 3) / actor / sentence, the verb lower-cased so it follows its actor. A line a bot user wrote is ink, the actor at 500, because it is news; a line the reader wrote is Ink 3, because it is a reminder. "Restore" sits inline after a deletion it undoes, as an underlined ink link, and asks nothing first.

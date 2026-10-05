@@ -4,7 +4,12 @@ import { Suspense, useEffect, useState } from "react"
 
 import { CaptureLine } from "@/components/Dashboard/CaptureLine"
 import { Changes, ChangesPending } from "@/components/Dashboard/Changes"
-import { Day, DayHeading, DayPending } from "@/components/Dashboard/DayPage"
+import {
+  botChangesQuery,
+  Day,
+  DayHeading,
+  DayPending,
+} from "@/components/Dashboard/DayPage"
 import { markSeen, visitSince } from "@/components/Dashboard/day"
 import {
   MyWork,
@@ -74,6 +79,7 @@ function Dashboard() {
   // bands have suspended and resumed: the sections below them are not
   // rendered until they resume.
   usePrefetchQuery(changesQuery(since))
+  usePrefetchQuery(botChangesQuery(since))
   usePrefetchMyWork()
 
   return (
@@ -95,10 +101,10 @@ function Dashboard() {
           </>
         }
       >
-        <Section name="Today's tasks">
+        <Section name="What is due">
           <Day since={since} />
         </Section>
-        <Section name="Your work">
+        <Section name="In my hands">
           <MyWork />
         </Section>
         <Section name="Changes">

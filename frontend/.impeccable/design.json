@@ -551,7 +551,7 @@
       "name": "Review Hand-off",
       "kind": "custom",
       "refersTo": "close-it",
-      "description": "An agent's finished work in the owner's hands: the agent named, and one green Close it inline.",
+      "description": "A bot user's finished work in the owner's hands: the bot user named, and one green Close it inline.",
       "html": "<div class=\"ds-ho\"><span><b>release-bot</b> moved this to Review 12 min ago</span><button class=\"ds-close\">Close it</button></div>",
       "css": ":host{--page:#ffffff;--hover:#f3f4f6;--ink:#0b0e11;--ink-2:#3d444d;--ink-3:#656d76;--rule:#e6e8eb;--rule-strong:#c9cdd2;--late:#cf222e;--done:#1a7f37;--p2:#8a5c00;--p3:#0969da;font-family:-apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, \"Helvetica Neue\", \"Noto Sans\", Arial, sans-serif;font-size:15px;line-height:1.45;color:var(--ink);} .ds-ho{display:flex;flex-wrap:wrap;align-items:center;gap:4px 14px;font-size:13px;line-height:1.25;color:var(--ink-3);} .ds-ho b{color:var(--ink-2);font-weight:500;} .ds-close{border:0;background:none;padding:0;font:inherit;font-weight:500;color:var(--done);cursor:pointer;border-radius:4px;text-underline-offset:3px;} .ds-close:hover{text-decoration:underline;} .ds-close:focus-visible{outline:none;box-shadow:0 0 0 3px color-mix(in oklab,var(--ink) 50%,transparent);}"
     },

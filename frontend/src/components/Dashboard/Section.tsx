@@ -6,8 +6,9 @@ import { textLink } from "./shared"
 
 /**
  * One section of the day page, failing on its own: a request that does not
- * answer costs its section a sentence, not the whole page its bands. Trying
- * again resets the failed queries so they are asked afresh.
+ * answer costs the section that reads it, said in a sentence, and leaves the
+ * others standing. Trying again resets the failed queries so they are asked
+ * afresh, under the page's one loading frame.
  */
 export function Section({
   name,

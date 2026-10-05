@@ -64,6 +64,9 @@ describe("the sentence under the date", () => {
     expect(
       lede({ needYou: 0, changes: 0, total: 2, window: "ever" }).changes,
     ).toBe("Your bot users have made none of the 2 changes so far.")
+    expect(
+      lede({ needYou: 0, changes: 0, total: 1, window: "visit" }).changes,
+    ).toBe("Your bot users made none of the 1 change since your last visit.")
   })
 })
 
