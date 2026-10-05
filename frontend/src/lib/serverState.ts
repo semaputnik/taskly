@@ -149,6 +149,27 @@ export const tasksQuery = (query: ReadTasksQuery = {}) =>
     queryFn: async () => (await TasksService.readTasks({ query })).data,
   })
 
+/**
+ * The tasks whose title contains what the reader typed, newest first. The
+ * answer carries the text it is for, so a screen that has moved on to newer
+ * text can tell an answer to older text from one to its own.
+ */
+export const taskTitleSearchQuery = (
+  text: string,
+  { status, limit }: Pick<NonNullable<ReadTasksQuery>, "status" | "limit">,
+) =>
+  queryOptions({
+    // Under its own segment, like the tag search: no text typed into a
+    // search can make up another key.
+    queryKey: [ROOT.tasks, "title", text, status, limit],
+    queryFn: async () => {
+      const { data } = await TasksService.readTasks({
+        query: { title: text, status, limit },
+      })
+      return { text, tasks: data.data }
+    },
+  })
+
 export const taskQuery = (taskId: string | null | undefined) =>
   queryOptions({
     queryKey: [ROOT.task, taskId],
