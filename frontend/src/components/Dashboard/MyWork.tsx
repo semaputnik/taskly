@@ -146,9 +146,7 @@ function StatusGroup({
           receipt
           flush
         >
-          {task.status === "review" && task.handover && (
-            <Handover task={task} handover={task.handover} />
-          )}
+          {task.handover && <Handover task={task} handover={task.handover} />}
         </CompactTaskRow>
       ))}
       {count > tasks.length && (

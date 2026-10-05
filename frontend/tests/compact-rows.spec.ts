@@ -8,8 +8,11 @@ test.use({ storageState: { cookies: [], origins: [] } })
 const group = (page: Page, name: string) =>
   page
     .locator("section")
+    .filter({
+      has: page.getByRole("heading", { level: 2, name: /In my hands/ }),
+    })
+    .locator("section")
     .filter({ has: page.getByRole("heading", { level: 3, name }) })
-    .last()
 
 /** A root task with two subtasks, one done, due today and tagged. */
 async function seedStarted(page: Page) {

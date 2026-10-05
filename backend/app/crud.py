@@ -1596,19 +1596,24 @@ _STATUS_ACTIONS = (
 )
 
 
-def _status_after(entry: ActivityEntry) -> str | None:
-    """The status `entry` left its task or tasks in, or None if it set none."""
+def _status_move(entry: ActivityEntry) -> tuple[list[str], str | None]:
+    """
+    The tasks `entry` set a status on, as the log writes their ids, and the
+    status it left them in, or None if it set none. A batch names its tasks
+    in its details; every other entry is about its own entity.
+    """
     details = entry.details
     match entry.action:
+        case ActivityAction.TASKS_BULK_CHANGED:
+            changes = details.get("changes", {})
+            return details.get("task_ids", []), changes.get("status")
         case ActivityAction.TASK_CREATED:
             status = details.get("task", {}).get("status")
-        case ActivityAction.TASKS_BULK_CHANGED:
-            status = details.get("changes", {}).get("status")
         case ActivityAction.TASK_COMPLETED:
             status = TaskStatus.DONE
         case _:
             status = details.get("to")
-    return str(status) if status is not None else None
+    return [str(entry.entity_id)], status
 
 
 def get_review_moves(
@@ -1647,24 +1652,21 @@ def get_review_moves(
         )
         .order_by(col(ActivityEntry.position).desc())
     )
-    latest: dict[str, ActivityEntry] = {}
+    # Task ids as the log writes them, as text: a batch's are kept in JSON.
+    latest: dict[str, tuple[ActivityEntry, str]] = {}
     for entry in session.exec(statement).all():
-        if _status_after(entry) is None:
+        named, status = _status_move(entry)
+        if status is None:
             # A batch that changed something other than the status.
             continue
-        named = (
-            entry.details.get("task_ids", [])
-            if entry.action == ActivityAction.TASKS_BULK_CHANGED
-            else [str(entry.entity_id)]
-        )
         for task_id in named:
             if task_id in wanted:
-                latest.setdefault(task_id, entry)
+                latest.setdefault(task_id, (entry, status))
 
     return {
         uuid.UUID(task_id): ReviewMove(entry.actor_bot_user_id, entry.created_at)
-        for task_id, entry in latest.items()
-        if _status_after(entry) == TaskStatus.REVIEW
+        for task_id, (entry, status) in latest.items()
+        if status == TaskStatus.REVIEW
         and entry.actor_bot_user_id is not None
         and entry.created_at is not None
     }
