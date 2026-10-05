@@ -1,12 +1,4 @@
 import { useMutation, useQuery } from "@tanstack/react-query"
-import {
-  Activity,
-  CalendarClock,
-  Clock,
-  FolderKanban,
-  KeyRound,
-  ShieldCheck,
-} from "lucide-react"
 import { useEffect, useState } from "react"
 
 import { type BotScope, BotsService, type BotUserPublic } from "@/client"
@@ -140,7 +132,7 @@ function BotRecord({ bot }: { bot: BotUserPublic }) {
       )}
 
       <PropertyList>
-        <PropertyRow icon={KeyRound} label="Token">
+        <PropertyRow label="Token">
           <div className={cn("flex flex-wrap items-center gap-2", valueInset)}>
             <span>{STATUS_TEXT[status]}</span>
             {/* Issuing keeps its dialog: the token is shown once and cannot be
@@ -153,7 +145,7 @@ function BotRecord({ bot }: { bot: BotUserPublic }) {
           </div>
         </PropertyRow>
 
-        <PropertyRow icon={CalendarClock} label="Expires">
+        <PropertyRow label="Expires">
           <ReadOnlyValue>
             {/* Only a token that still works has an expiry worth counting
                 down to; a revoked one stopped before its date, and an expired
@@ -168,7 +160,7 @@ function BotRecord({ bot }: { bot: BotUserPublic }) {
           </ReadOnlyValue>
         </PropertyRow>
 
-        <PropertyRow icon={Activity} label="Last used">
+        <PropertyRow label="Last used">
           {/* An empty timestamp and a never-used integration are different
               facts, so the second one is said in words. */}
           <ReadOnlyValue>
@@ -186,7 +178,7 @@ function BotRecord({ bot }: { bot: BotUserPublic }) {
           </ReadOnlyValue>
         </PropertyRow>
 
-        <PropertyRow icon={FolderKanban} label="Projects">
+        <PropertyRow label="Projects">
           <div className={cn("flex flex-col gap-2 py-1", valueInset)}>
             {(projects ?? []).map((project) => {
               const id = `scope-${bot.id}-${project.id}`
@@ -219,7 +211,7 @@ function BotRecord({ bot }: { bot: BotUserPublic }) {
           </div>
         </PropertyRow>
 
-        <PropertyRow icon={ShieldCheck} label="Permissions">
+        <PropertyRow label="Permissions">
           <div className={cn("flex flex-col gap-3 py-1", valueInset)}>
             {PERMISSION_GROUPS.map((group) => (
               <fieldset key={group.title} className="flex flex-col gap-2">
@@ -255,7 +247,7 @@ function BotRecord({ bot }: { bot: BotUserPublic }) {
           </div>
         </PropertyRow>
 
-        <PropertyRow icon={Clock} label="Created">
+        <PropertyRow label="Created">
           <ReadOnlyValue>
             {bot.created_at ? formatDayOf(bot.created_at) : "Unknown"}
           </ReadOnlyValue>

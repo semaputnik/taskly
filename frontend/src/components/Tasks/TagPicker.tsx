@@ -1,8 +1,7 @@
 import { useQuery } from "@tanstack/react-query"
-import { Check, Plus, X } from "lucide-react"
+import { Check, Plus, Tag, X } from "lucide-react"
 import { useEffect, useState } from "react"
 
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   Command,
@@ -196,7 +195,8 @@ export function TagPickerContent({
 const popoverClass = "w-72 p-0 max-sm:w-[calc(100vw-2rem)]"
 
 /**
- * A task's tags as a property value: chips, then the Add tag button.
+ * A task's tags as a property value: a tag glyph and the name for each, then
+ * a plus that opens the picker.
  *
  * The value it reports is the whole set, built on what the reader has
  * already chosen in this visit, so a second choice made before the first
@@ -232,31 +232,46 @@ export function TagPicker({
     )
 
   return (
-    <div className="flex flex-wrap items-center gap-1 py-0.5">
+    <div className="flex min-w-0 flex-wrap items-center gap-x-3">
       {current.map((tagName) => (
-        <Badge key={tagName} variant="secondary" className="gap-1">
+        <span
+          key={tagName}
+          className="group/tag flex h-[30px] items-center gap-1.5 text-[15px] pointer-coarse:h-11"
+        >
+          {/* The glyph gives its place to the control that removes the tag
+              when the tag is reached for, so a row of tags takes no room for
+              controls it is not using. Under a thumb there is no reaching:
+              the control is always there, and its target is 44px. */}
+          <span className="relative grid size-5 shrink-0 place-items-center">
+            <Tag
+              className="text-ink-3 size-3.5 group-focus-within/tag:opacity-0 group-hover/tag:opacity-0 pointer-coarse:opacity-0"
+              aria-hidden
+            />
+            <button
+              type="button"
+              aria-label={`Remove tag ${tagName}`}
+              className="text-ink-3 hover:text-ink hover:bg-hover focus-visible:ring-ring/50 absolute inset-0 grid cursor-pointer place-items-center rounded-sm opacity-0 outline-none group-focus-within/tag:opacity-100 group-hover/tag:opacity-100 focus-visible:ring-[3px] pointer-coarse:-inset-3 pointer-coarse:opacity-100"
+              onClick={() => remove(tagName)}
+            >
+              <X className="size-3" />
+            </button>
+          </span>
           {tagName}
-          <button
-            type="button"
-            aria-label={`Remove tag ${tagName}`}
-            className="-my-1 -mr-1 inline-flex size-6 cursor-pointer items-center justify-center rounded-sm opacity-60 hover:opacity-100 pointer-coarse:-my-3 pointer-coarse:size-11"
-            onClick={() => remove(tagName)}
-          >
-            <X className="size-3" />
-          </button>
-        </Badge>
+        </span>
       ))}
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
-          <Button
+          <button
             type="button"
-            variant="ghost"
-            size="sm"
-            className="text-muted-foreground pointer-coarse:h-11"
+            aria-label="Add tag"
+            className={cn(
+              "text-ink-3 hover:bg-hover hover:text-ink focus-visible:ring-ring/50 flex h-[30px] items-center gap-1.5 rounded-md px-2 text-[15px] outline-none focus-visible:ring-[3px] pointer-coarse:h-11",
+              current.length === 0 && "-ml-2",
+            )}
           >
-            <Plus />
-            Add tag
-          </Button>
+            <Plus className="size-3.5" aria-hidden />
+            {current.length === 0 && "Add tag"}
+          </button>
         </PopoverTrigger>
         <PopoverContent align="start" className={popoverClass}>
           {/* Mounted only while open, so a query typed and abandoned is gone

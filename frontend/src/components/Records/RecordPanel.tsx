@@ -1,11 +1,5 @@
-import {
-  ChevronDown,
-  ChevronUp,
-  type LucideIcon,
-  Trash2,
-  X,
-} from "lucide-react"
-import { useEffect, useRef, useState } from "react"
+import { ChevronDown, ChevronUp, Trash2, X } from "lucide-react"
+import { useEffect, useId, useRef, useState } from "react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -47,6 +41,22 @@ import type { Neighbours } from "./walk"
 export const ghost =
   "record-control border-transparent bg-transparent shadow-none hover:bg-accent focus-visible:border-ring dark:bg-transparent dark:hover:bg-accent/50"
 
+/**
+ * The column's side gutters: 36px beside the page, 16px on a phone, so the bar,
+ * the title, the properties and every section start on one edge.
+ */
+export const gutter = "px-4 md:px-9"
+
+/**
+ * A property's value as a text button: 30px tall, flat at rest, tinted on
+ * hover, with its chevron shown only then, and always, a little quieter,
+ * under a thumb, which has no hover. Written for a select's trigger (the
+ * chevron is its last child); the margin pulls the text back onto the label
+ * column's edge, so the tint reaches past the text and the text does not move.
+ */
+export const quiet =
+  "record-control data-[size=default]:h-[30px] data-[size=default]:pointer-coarse:h-11 w-fit max-w-full -ml-2 gap-1.5 border-transparent bg-transparent px-2 py-0 text-[15px] shadow-none hover:bg-hover focus-visible:border-ring dark:bg-transparent dark:hover:bg-hover [&>svg:last-child]:size-3 [&>svg:last-child]:opacity-0 hover:[&>svg:last-child]:opacity-100 focus-visible:[&>svg:last-child]:opacity-100 data-[state=open]:[&>svg:last-child]:opacity-100 pointer-coarse:[&>svg:last-child]:opacity-60"
+
 export function RecordPanel({
   open,
   onClose,
@@ -66,6 +76,8 @@ export function RecordPanel({
   /** The records on either side of this one in the list it was opened from. */
   walk,
   onWalk,
+  /** Where the record sits and who opened it, at the left of the bar. */
+  bar,
   children,
 }: {
   open: boolean
@@ -75,6 +87,7 @@ export function RecordPanel({
   kind?: string
   walk?: Neighbours | null
   onWalk?: (id: string) => void
+  bar?: React.ReactNode
   children?: React.ReactNode
 } & RecordLoad) {
   // Mounted only while open, so opening and closing are the column's mount
@@ -87,6 +100,7 @@ export function RecordPanel({
       onClose={onClose}
       walk={walk}
       onWalk={onWalk}
+      bar={bar}
     >
       {failure ? (
         <div role="alert" className="flex flex-col items-start gap-3 p-6">
@@ -121,7 +135,12 @@ export function RecordPanel({
         <>
           {children}
           {destructive && (
-            <div className="mt-auto flex flex-wrap gap-2 border-t px-6 py-4">
+            <div
+              className={cn(
+                "mt-auto flex flex-wrap gap-2 border-t py-4",
+                gutter,
+              )}
+            >
               {destructive}
             </div>
           )}
@@ -146,6 +165,7 @@ function Column({
   onClose,
   walk,
   onWalk,
+  bar,
   children,
 }: {
   name: string
@@ -153,6 +173,7 @@ function Column({
   onClose: () => void
   walk?: Neighbours | null
   onWalk?: (id: string) => void
+  bar?: React.ReactNode
   children: React.ReactNode
 }) {
   const column = useRef<HTMLElement>(null)
@@ -171,13 +192,18 @@ function Column({
         "min-[1200px]:sticky min-[1200px]:inset-auto min-[1200px]:top-0 min-[1200px]:z-auto min-[1200px]:h-svh min-[1200px]:w-[560px] min-[1200px]:self-start min-[1200px]:border-l",
       )}
     >
-      <div className="bg-page sticky top-0 z-10 flex h-14 shrink-0 items-center gap-1 pr-3 pl-6 min-[1200px]:h-[52px]">
-        {walk && (
-          <span className="text-ink-3 font-mono text-xs tabular-nums">
-            {walk.position} of {walk.count}
-          </span>
-        )}
-        <span className="ml-auto flex items-center gap-1">
+      <div className="bg-page sticky top-0 z-10 flex h-14 shrink-0 items-center gap-3 pr-3 pl-4 md:pr-[29px] md:pl-9 min-[1200px]:h-[52px]">
+        {/* One bar: where the record sits, then the controls that act on the
+            column. The context truncates; the controls never move. */}
+        <div className="text-ink-3 flex min-w-0 flex-1 items-center gap-1.5 text-[13px]">
+          {bar}
+        </div>
+        <span className="flex shrink-0 items-center gap-1">
+          {walk && (
+            <span className="text-ink-3 mr-1 font-mono text-xs tabular-nums">
+              {walk.position} of {walk.count}
+            </span>
+          )}
           {walk && onWalk && (
             <>
               <BarButton
@@ -430,7 +456,7 @@ export function RecordHeader({
   title?: React.ReactNode
 }) {
   return (
-    <header className="flex flex-col gap-3 border-b p-6 pt-2">
+    <header className={cn("flex flex-col gap-3 border-b py-6 pt-2", gutter)}>
       <p className="text-muted-foreground flex min-w-0 items-center gap-1 text-sm">
         {breadcrumb}
       </p>
@@ -440,78 +466,121 @@ export function RecordHeader({
 }
 
 /**
- * One property: an icon and its label in a column, the value beside it.
+ * One property: its label in a 96px column, ink-3, and the value beside it.
  *
- * The label column is proportional until there is room for a fixed one — on a
- * phone, 8rem of label leaves a third of the screen for the value it labels.
- *
- * The label sits beside the value's first line, not the middle of it: a value
- * that wraps — a task's tags — keeps its label where the eye expects it. Both
- * sides are at least one control tall, so a single-line row is centred as it
- * always was.
+ * The label names its value. Where the value is one control, the label is that
+ * control's `<label>`; where it is several (tags) or none (a read-only date),
+ * the value is a group the label names. Both sides are 30px tall, so a
+ * single-line row is centred; a value that wraps keeps its label on the first
+ * line.
  */
 export function PropertyRow({
-  icon: Icon,
   label,
   htmlFor,
   children,
 }: {
-  icon: LucideIcon
   label: string
   htmlFor?: string
   children: React.ReactNode
 }) {
+  const labelId = useId()
+  const text =
+    "text-ink-3 flex h-[30px] items-center text-[13px] pointer-coarse:h-11"
+  const value =
+    "flex min-h-[30px] min-w-0 items-center gap-2 pointer-coarse:min-h-11"
   return (
-    <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,3fr)] items-start gap-2 py-1 md:grid-cols-[8rem_1fr]">
-      <label
-        htmlFor={htmlFor}
-        className="text-muted-foreground flex min-h-9 items-center gap-2 text-sm pointer-coarse:min-h-11"
-      >
-        <Icon className="size-4 shrink-0" aria-hidden />
-        {label}
-      </label>
-      <div className="grid min-h-9 min-w-0 items-center text-sm pointer-coarse:min-h-11">
-        {children}
-      </div>
+    <div className="grid grid-cols-[88px_minmax(0,1fr)] items-start gap-x-4 md:grid-cols-[96px_minmax(0,1fr)]">
+      {htmlFor ? (
+        <>
+          <label htmlFor={htmlFor} className={text}>
+            {label}
+          </label>
+          <div className={value}>{children}</div>
+        </>
+      ) : (
+        <>
+          <span id={labelId} className={text}>
+            {label}
+          </span>
+          <fieldset
+            aria-labelledby={labelId}
+            className={`${value} m-0 border-0 p-0`}
+          >
+            {children}
+          </fieldset>
+        </>
+      )}
     </div>
   )
 }
 
-/** The property list of a record: hairline-separated rows. */
+/** The property list of a record: a hairline above, a lighter one below. */
 export function PropertyList({ children }: { children: React.ReactNode }) {
-  return <div className="divide-y px-6 py-2">{children}</div>
-}
-
-/**
- * A value the record cannot change, said in words rather than shown as a
- * disabled control — a control that cannot be used still asks to be tried.
- */
-export function ReadOnlyValue({ children }: { children: React.ReactNode }) {
   return (
-    <span className={cn("text-muted-foreground", valueInset)}>{children}</span>
+    <div
+      className={cn(
+        "border-rule-strong flex flex-col gap-0.5 border-t pt-2.5 pb-3.5",
+        gutter,
+      )}
+    >
+      {children}
+    </div>
   )
 }
 
 /**
- * Where a value's text starts in a property row: a control's padding plus its
- * border, so a read-only value or a link lines up with the select above it
- * rather than a few pixels short of it.
+ * A value the record cannot change, said in words rather than shown as a
+ * disabled control: a control that cannot be used still asks to be tried.
  */
-export const valueInset = "px-[calc(--spacing(3)+1px)]"
+export function ReadOnlyValue({ children }: { children: React.ReactNode }) {
+  return (
+    <span className={cn("text-muted-foreground text-sm", valueInset)}>
+      {children}
+    </span>
+  )
+}
 
-/** The banded section a record's description sits in, on a record and a draft. */
+/**
+ * Where a value's text starts in a property row: on the label column's edge,
+ * where a control's text also starts (its padding is pulled back by the same
+ * amount), so a read-only value or a link lines up with the controls above it.
+ */
+export const valueInset = ""
+
+/** A section heading: 13px, 600, over a hairline. */
+export function SectionHeading({
+  children,
+  count,
+  action,
+}: {
+  children: React.ReactNode
+  count?: React.ReactNode
+  action?: React.ReactNode
+}) {
+  return (
+    <h3 className="border-rule-strong flex items-baseline gap-2 border-b pb-2 text-[13px] font-semibold">
+      {children}
+      {count !== undefined && (
+        <span className="text-ink-3 font-mono text-xs font-normal tabular-nums">
+          {count}
+        </span>
+      )}
+      {action && <span className="ml-auto font-normal">{action}</span>}
+    </h3>
+  )
+}
+
+/** The section a record's description sits in, on a record and a draft. */
 export function DescriptionSection({
   children,
 }: {
   children: React.ReactNode
 }) {
   return (
-    <div className="border-t px-6 py-5">
-      <h3 className={cn("mb-2 text-sm font-medium", valueInset)}>
-        Description
-      </h3>
-      {children}
-    </div>
+    <section className={cn("pt-[18px] pb-1", gutter)}>
+      <SectionHeading>Description</SectionHeading>
+      <div className="pt-2">{children}</div>
+    </section>
   )
 }
 
@@ -520,6 +589,7 @@ export function EditableText({
   value,
   onCommit,
   multiline,
+  wrap,
   className,
   placeholder,
   id,
@@ -534,6 +604,11 @@ export function EditableText({
    */
   onCommit: (next: string) => undefined | Promise<boolean>
   multiline?: boolean
+  /**
+   * One line of text that wraps when it is long, as a title does: Enter saves
+   * it rather than breaking the line, and a pasted break becomes a space.
+   */
+  wrap?: boolean
   className?: string
   placeholder?: string
   id?: string
@@ -581,6 +656,23 @@ export function EditableText({
     className: cn(ghost, className),
   }
 
+  if (wrap) {
+    return (
+      <Textarea
+        {...shared}
+        rows={1}
+        onChange={(e) => type(e.target.value.replace(/\s*\n\s*/g, " "))}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+            e.preventDefault()
+            e.currentTarget.blur()
+          }
+          if (e.key === "Escape") abandon()
+        }}
+      />
+    )
+  }
+
   return multiline ? (
     <Textarea
       {...shared}
@@ -605,3 +697,36 @@ export function EditableText({
 /** The panel's own heading for a record's title, when it is a control. */
 export const titleFieldClass =
   "h-auto px-2 py-1.5 text-xl leading-snug font-semibold md:text-xl"
+
+/**
+ * A task's title: 22px, 600, wrapping rather than scrolling, flat until it is
+ * reached for. For a textarea one row tall that grows with its text; the
+ * margin puts its text on the gutter's edge.
+ */
+export const taskTitleClass =
+  "min-h-0 resize-none -ml-2 px-2 py-1 text-[22px] leading-[1.25] font-semibold tracking-[-0.015em] md:text-[22px]"
+
+/**
+ * The line a task opens with: its status mark, which is the control that
+ * closes it, and its title beside it. The draft has no mark yet.
+ */
+export function TitleRow({
+  mark,
+  children,
+}: {
+  mark?: React.ReactNode
+  children: React.ReactNode
+}) {
+  return (
+    <div
+      className={cn(
+        "grid items-start gap-3 pt-2 pb-[18px]",
+        mark ? "grid-cols-[22px_minmax(0,1fr)]" : "grid-cols-1",
+        gutter,
+      )}
+    >
+      {mark && <span className="mt-[7px] flex">{mark}</span>}
+      {children}
+    </div>
+  )
+}

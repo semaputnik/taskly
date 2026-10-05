@@ -5,12 +5,14 @@ import type { TaskPublic } from "@/client"
 import { useRecordPanel } from "@/components/Records/panels"
 import {
   EditableText,
-  RecordHeader,
+  gutter,
   RecordPanel,
-  titleFieldClass,
+  TitleRow,
+  taskTitleClass,
 } from "@/components/Records/RecordPanel"
 import { useWalk } from "@/components/Records/walk"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { formatDayOf } from "@/lib/dates"
 import {
   projectsQuery,
   taskQuery,
@@ -18,6 +20,7 @@ import {
   useReportChange,
 } from "@/lib/serverState"
 import { toastSuccess } from "@/lib/toasts"
+import { cn } from "@/lib/utils"
 import { CompleteTask } from "./CompleteTask"
 import { CaptureField, useCaptureTarget } from "./capture"
 import DeleteTask from "./DeleteTask"
@@ -25,7 +28,7 @@ import { NewTask } from "./NewTask"
 import { PriorityBadge } from "./priority"
 import { TaskAttachments } from "./TaskAttachments"
 import { TaskComments } from "./TaskComments"
-import { TaskProperties } from "./TaskProperties"
+import { reporterName, TaskProperties } from "./TaskProperties"
 import { useTaskCapture, useTaskUpdate } from "./useTaskWrites"
 
 /** More than a panel should list; past it, the tab says how many there are. */
@@ -87,6 +90,35 @@ export function TaskDetail() {
           <DeleteTask task={task} onSuccess={shell.onClose} />
         ) : undefined
       }
+      bar={
+        capturing ? (
+          <>
+            <span className="shrink-0">New task</span>
+            <span aria-hidden>·</span>
+            <span className="truncate">Not saved yet</span>
+          </>
+        ) : task ? (
+          <>
+            <span className="text-ink-2 shrink-0 font-medium">
+              {projectName ?? "Inbox"}
+            </span>
+            {parent && (
+              <>
+                <ChevronRight className="size-3.5 shrink-0" aria-hidden />
+                <button
+                  type="button"
+                  onClick={() => onOpenTask(parent.id)}
+                  className="hover:text-foreground focus-visible:ring-ring/50 min-w-0 truncate rounded-sm underline-offset-4 outline-none hover:underline focus-visible:ring-[3px]"
+                >
+                  {parent.title}
+                </button>
+              </>
+            )}
+            <span aria-hidden>·</span>
+            <span className="truncate">{opened(task)}</span>
+          </>
+        ) : undefined
+      }
     >
       {capturing ? (
         <NewTask
@@ -105,39 +137,21 @@ export function TaskDetail() {
         />
       ) : !task ? null : (
         <>
-          <RecordHeader
-            breadcrumb={
-              <>
-                <span className="shrink-0">{projectName ?? "Inbox"}</span>
-                {parent && (
-                  <>
-                    <ChevronRight className="size-3.5 shrink-0" aria-hidden />
-                    <button
-                      type="button"
-                      onClick={() => onOpenTask(parent.id)}
-                      className="hover:text-foreground truncate underline-offset-4 transition-colors hover:underline"
-                    >
-                      {parent.title}
-                    </button>
-                  </>
-                )}
-              </>
+          {/* The status mark is the control that closes the task, beside the
+              title it closes. */}
+          <TitleRow
+            mark={
+              <CompleteTask asMark task={task} markClassName="size-[22px]" />
             }
-            title={
-              <div className="flex items-start gap-3">
-                <span className="mt-2.5">
-                  <CompleteTask task={task} />
-                </span>
-                <TaskTitle task={task} />
-              </div>
-            }
-          />
+          >
+            <TaskTitle task={task} />
+          </TitleRow>
 
           <TaskProperties task={task} />
 
           <Tabs
             defaultValue="comments"
-            className="gap-4 border-t px-6 py-5"
+            className={cn("gap-4 border-t py-5", gutter)}
             // A tab's content is mounted only while it is on screen, so a
             // collection is fetched only once its tab is opened; each task
             // starts on its comments.
@@ -216,18 +230,31 @@ export function TaskDetail() {
   )
 }
 
+/**
+ * The bar's account of how the task came to be: "opened by you, 24.09.2026",
+ * or by the bot user that filed it. A task from before the reporter was kept
+ * says only when. The day is written the product's way, numerically in the
+ * reader's locale, as the Created row beneath writes its day (it adds the time).
+ */
+function opened(task: TaskPublic): string {
+  const by = reporterName(task)
+  const day = task.created_at ? formatDayOf(task.created_at) : null
+  return ["opened", by && `by ${by},`, day].filter(Boolean).join(" ")
+}
+
 /** The task's own name, saved when focus leaves it. */
 function TaskTitle({ task }: { task: TaskPublic }) {
   const update = useTaskUpdate(task)
 
   return (
     <EditableText
+      wrap
       value={task.title}
       ariaLabel="Task title"
       onCommit={(title) =>
         title.trim() ? update.save({ title: title.trim() }) : undefined
       }
-      className={titleFieldClass}
+      className={taskTitleClass}
     />
   )
 }

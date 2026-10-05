@@ -37,6 +37,8 @@ interface AssigneeSelectProps {
   current?: BotUserRef | null
   /** Styling for the trigger, so the control can sit flat in a property list. */
   className?: string
+  /** So a label elsewhere can name the control. */
+  id?: string
 }
 
 /** Who a task can be assigned to: the user or one of their bot users. */
@@ -46,6 +48,7 @@ export function AssigneeSelect({
   currentUserEmail,
   current,
   className,
+  id,
 }: AssigneeSelectProps) {
   const { data: bots } = useBotUsers()
   const botOptions = (bots?.data ?? []).map((bot) => ({
@@ -59,7 +62,11 @@ export function AssigneeSelect({
 
   return (
     <Select onValueChange={onChange} value={value}>
-      <SelectTrigger className={cn("w-full", className)} aria-label="Assignee">
+      <SelectTrigger
+        id={id}
+        className={cn("w-full", className)}
+        aria-label="Assignee"
+      >
         <SelectValue />
       </SelectTrigger>
       <SelectContent>

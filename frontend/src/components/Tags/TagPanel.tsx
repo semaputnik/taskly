@@ -1,5 +1,5 @@
 import { useMutation, useQuery } from "@tanstack/react-query"
-import { Bot, CheckSquare, Merge } from "lucide-react"
+import { Merge } from "lucide-react"
 import { useState } from "react"
 
 import { type TagPublic, TagsService } from "@/client"
@@ -172,11 +172,11 @@ function TagRecord({
       />
 
       <PropertyList>
-        <PropertyRow icon={CheckSquare} label="Tasks">
+        <PropertyRow label="Tasks">
           <TaskCount tag={tag} className={valueInset} />
         </PropertyRow>
         {tag.created_by_bot_user && (
-          <PropertyRow icon={Bot} label="Created by">
+          <PropertyRow label="Created by">
             <span className={valueInset}>
               <BotCreator tag={tag} />
             </span>
