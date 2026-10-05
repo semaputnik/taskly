@@ -7,15 +7,18 @@ import {
   CompactTaskRow,
   CompactTaskRowPending,
 } from "@/components/Tasks/CompactTaskRow"
-import type { OpenStatus } from "@/components/Tasks/statuses"
+import { OPEN_STATUSES, type OpenStatus } from "@/components/Tasks/statuses"
 import { projectsQuery, tasksQuery } from "@/lib/serverState"
 import { Group, MoreLink, PREVIEW_ROWS } from "./sheet"
 import { inAWeek, today, tomorrow } from "./when"
 
-// The work the owner can move themselves. A waiting task is open too, but its
-// next move is someone else's, so it has a band of its own rather than
-// nagging from Overdue and Today.
-const ACTIONABLE: OpenStatus[] = ["todo", "in_progress"]
+// The work the owner can move themselves: every open status but one
+// (FR-06.11). A waiting task is open too, but its next move is someone
+// else's, so it has a band of its own rather than nagging from Overdue and
+// Today.
+const ACTIONABLE: OpenStatus[] = OPEN_STATUSES.filter(
+  (status) => status !== "waiting",
+)
 const WAITING: OpenStatus[] = ["waiting"]
 
 type TasksQuery = Parameters<typeof tasksQuery>[0]

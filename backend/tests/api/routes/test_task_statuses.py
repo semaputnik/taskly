@@ -1,5 +1,5 @@
 """
-The four task statuses (semaputnik/taskly#97): what each move is allowed to
+The six task statuses (semaputnik/taskly#97, #134): what each move is allowed to
 do, what it does to subtasks and series, and what the log says about it.
 """
 
@@ -19,8 +19,8 @@ from tests.utils.bot import (
 )
 
 API = settings.API_V1_STR
-STATUSES = ["todo", "in_progress", "waiting", "done"]
-OPEN = ["todo", "in_progress", "waiting"]
+STATUSES = ["backlog", "todo", "in_progress", "review", "waiting", "done"]
+OPEN = ["backlog", "todo", "in_progress", "review", "waiting"]
 
 Headers = dict[str, str]
 
@@ -63,8 +63,8 @@ def owner(client: TestClient, db: Session) -> Headers:
 # --- Creating -----------------------------------------------------------------
 
 
-def test_a_new_task_is_to_do(client: TestClient, owner: Headers) -> None:
-    assert _create(client, owner)["status"] == "todo"
+def test_a_new_task_is_in_backlog(client: TestClient, owner: Headers) -> None:
+    assert _create(client, owner)["status"] == "backlog"
 
 
 def test_a_task_can_be_created_in_any_status(
@@ -99,7 +99,7 @@ def test_completed_is_no_longer_part_of_the_api(
     # Unknown fields are ignored, so the old flag changes nothing.
     r = _patch(client, owner, task["id"], completed=True)
     assert r.status_code == 200
-    assert r.json()["status"] == "todo"
+    assert r.json()["status"] == "backlog"
 
 
 # --- Moving -------------------------------------------------------------------
@@ -143,7 +143,7 @@ def test_a_bot_user_without_update_permission_cannot_move_a_task(
     )
     task = _create(client, owner, project_id=project_id)
     assert _patch(client, bot, task["id"], status="in_progress").status_code == 403
-    assert _status(client, owner, task["id"]) == "todo"
+    assert _status(client, owner, task["id"]) == "backlog"
 
 
 def test_an_unknown_status_is_refused(client: TestClient, owner: Headers) -> None:
@@ -170,7 +170,7 @@ def test_done_with_an_open_subtask_is_refused(
     r = _patch(client, owner, root, status="done")
     assert r.status_code == 409
     assert error_code(r) == "task_has_uncompleted_subtasks"
-    assert _status(client, owner, root) == "todo"
+    assert _status(client, owner, root) == "backlog"
 
 
 def test_done_leaving_subtasks_keeps_each_status(
@@ -201,7 +201,7 @@ def test_a_done_subtree_does_not_block_done(client: TestClient, owner: Headers) 
     assert _patch(client, owner, root, status="done").status_code == 200
 
 
-@pytest.mark.parametrize("end", ["in_progress", "waiting", "todo"])
+@pytest.mark.parametrize("end", OPEN)
 def test_moving_between_open_statuses_leaves_subtasks_alone(
     client: TestClient, owner: Headers, end: str
 ) -> None:
@@ -210,14 +210,14 @@ def test_moving_between_open_statuses_leaves_subtasks_alone(
 
     r = _patch(client, owner, root, status=end)
     assert r.status_code == 200, r.text
-    assert _status(client, owner, child) == "todo"
+    assert _status(client, owner, child) == "backlog"
 
 
 def test_subtasks_only_goes_with_done(client: TestClient, owner: Headers) -> None:
     root, _ = _tree(client, owner)
     r = _patch(client, owner, root, status="in_progress", subtasks="complete")
     assert r.status_code == 400
-    assert _status(client, owner, root) == "todo"
+    assert _status(client, owner, root) == "backlog"
 
 
 def test_closing_every_subtask_leaves_the_parent_open(
@@ -246,7 +246,9 @@ def _occurrences(client: TestClient, headers: Headers) -> list[dict[str, Any]]:
     return [t for t in _tasks(client, headers) if t["title"] == "Water the plants"]
 
 
-@pytest.mark.parametrize("path", [["in_progress", "waiting", "todo"], ["waiting"]])
+@pytest.mark.parametrize(
+    "path", [["in_progress", "review", "waiting", "todo"], ["review"], ["backlog"]]
+)
 def test_open_moves_create_no_occurrence(
     client: TestClient, owner: Headers, path: list[str]
 ) -> None:
@@ -270,6 +272,26 @@ def test_done_creates_exactly_one_to_do_occurrence(
     successor = next(t for t in occurrences if t["id"] != task["id"])
     assert successor["status"] == "todo"
     assert successor["due_date"] == "2026-03-02"
+
+
+def test_the_next_occurrence_and_its_subtasks_skip_backlog(
+    client: TestClient, owner: Headers
+) -> None:
+    # The decision was made when the series was set up (ADR-0008): a new
+    # recurring task starts in Backlog like any other, its successors in To do.
+    task = _recurring(client, owner)
+    assert task["status"] == "backlog"
+    _create(client, owner, title="Fill the can", parent_id=task["id"])
+    _patch(client, owner, task["id"], status="done", subtasks="leave_uncompleted")
+
+    successor = next(t for t in _occurrences(client, owner) if t["status"] != "done")
+    assert successor["status"] == "todo"
+    [subtask] = [
+        t
+        for t in _tasks(client, owner)
+        if t["title"] == "Fill the can" and t["parent_id"] == successor["id"]
+    ]
+    assert subtask["status"] == "todo"
 
 
 @pytest.mark.parametrize("end", OPEN)
@@ -361,14 +383,14 @@ def test_bulk_open_moves_ignore_open_subtasks(
     assert (
         _bulk(client, owner, task_ids=[root], status="in_progress").status_code == 200
     )
-    assert _status(client, owner, child) == "todo"
+    assert _status(client, owner, child) == "backlog"
 
 
 def test_bulk_subtasks_only_goes_with_done(client: TestClient, owner: Headers) -> None:
     root, _ = _tree(client, owner)
     r = _bulk(client, owner, task_ids=[root], status="waiting", subtasks="complete")
     assert r.status_code == 400
-    assert _status(client, owner, root) == "todo"
+    assert _status(client, owner, root) == "backlog"
 
 
 # --- Activity log -------------------------------------------------------------
@@ -388,7 +410,7 @@ def test_each_kind_of_move_is_logged_once(client: TestClient, owner: Headers) ->
     ]
     assert entries[0]["details"] == {
         "title": "Call the bank",
-        "from": "todo",
+        "from": "backlog",
         "to": "in_progress",
     }
     assert entries[1]["details"]["from"] == "in_progress"

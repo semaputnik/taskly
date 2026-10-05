@@ -36,13 +36,29 @@ function nextUpdate(page: Page) {
 }
 
 test("Every open status is the baseline, and one status reads as itself", () => {
-  expect(OPEN_STATUSES).toEqual(["todo", "in_progress", "waiting"])
+  expect(OPEN_STATUSES).toEqual([
+    "backlog",
+    "todo",
+    "in_progress",
+    "review",
+    "waiting",
+  ])
   // The list holds open work, so naming every open status narrows nothing:
   // it reads as no filter at all, and gets no chip offering to remove it
-  // (ADR-0006). URLs written before that spell the baseline out this way.
+  // (ADR-0006).
   expect(
-    describeStatusFilter(["waiting", "todo", "in_progress"]),
+    describeStatusFilter([
+      "waiting",
+      "review",
+      "todo",
+      "in_progress",
+      "backlog",
+    ]),
   ).toBeUndefined()
+  // The three open statuses there once were are a narrowing now.
+  expect(describeStatusFilter(["todo", "in_progress", "waiting"])).toBe(
+    "To do, In progress, Waiting",
+  )
   expect(describeStatusFilter(["waiting"])).toBe("Waiting")
   expect(describeStatusFilter(["todo", "in_progress"])).toBe(
     "To do, In progress",
@@ -84,6 +100,29 @@ test("Completing sends done, takes the row away, and undoes to To do", async ({
   }
 })
 
+test("A task captured from the interface starts in Backlog", async ({
+  page,
+}) => {
+  await newUser(page)
+  await page.goto("/tasks?view=table")
+  // The shell has to be listening before a key means anything to it.
+  await expect(page.getByRole("button", { name: "Filters" })).toBeVisible()
+
+  await page.keyboard.press("c")
+  const title = page.getByRole("textbox", { name: "Task title" })
+  await expect(title).toBeFocused()
+  const created = page.waitForResponse(
+    (response) =>
+      response.request().method() === "POST" &&
+      /\/tasks\/$/.test(response.url()),
+  )
+  await title.fill("Book the dentist")
+  await title.press("Enter")
+  expect((await (await created).json()).status).toBe("backlog")
+
+  await expect(statusTrigger(page, "Book the dentist")).toContainText("Backlog")
+})
+
 test("A status is changed from the list column and from the panel", async ({
   page,
 }) => {
@@ -92,9 +131,20 @@ test("A status is changed from the list column and from the panel", async ({
   await page.goto("/tasks?view=table")
 
   await expect(page.getByRole("columnheader", { name: "Status" })).toBeVisible()
-  await expect(statusTrigger(page, "Call the bank")).toContainText("To do")
+  await expect(statusTrigger(page, "Call the bank")).toContainText("Backlog")
   await statusTrigger(page, "Call the bank").click()
-  await expect(page.getByRole("menuitemradio", { name: "To do" })).toBeChecked()
+  // Every status, in the order work moves.
+  await expect(page.getByRole("menuitemradio")).toHaveText([
+    "Backlog",
+    "To do",
+    "In progress",
+    "Review",
+    "Waiting",
+    "Done",
+  ])
+  await expect(
+    page.getByRole("menuitemradio", { name: "Backlog" }),
+  ).toBeChecked()
   await page.getByRole("menuitemradio", { name: "Waiting" }).click()
   await expect(statusTrigger(page, "Call the bank")).toContainText("Waiting")
   // Choosing in the menu did not open the task behind it.
@@ -106,12 +156,10 @@ test("A status is changed from the list column and from the panel", async ({
   const select = panel.getByRole("combobox", { name: "Status" })
   await expect(select).toContainText("Waiting")
   await select.click()
-  await page.getByRole("option", { name: "In progress" }).click()
-  await expect(select).toContainText("In progress")
+  await page.getByRole("option", { name: "Review" }).click()
+  await expect(select).toContainText("Review")
   await page.keyboard.press("Escape")
-  await expect(statusTrigger(page, "Call the bank")).toContainText(
-    "In progress",
-  )
+  await expect(statusTrigger(page, "Call the bank")).toContainText("Review")
 })
 
 test("Done asks about open subtasks from the checkbox and from the menu", async ({
@@ -173,7 +221,11 @@ test("The list holds open work, and narrows to a single open status", async ({
   const listed = page.waitForRequest(
     (request) =>
       request.url().includes("/tasks/?") &&
-      request.url().includes("status=todo&status=in_progress&status=waiting"),
+      request
+        .url()
+        .includes(
+          "status=backlog&status=todo&status=in_progress&status=review&status=waiting",
+        ),
   )
   await seed(page, [
     { title: "Planned" },
@@ -194,8 +246,16 @@ test("The list holds open work, and narrows to a single open status", async ({
   await expect(page.getByText(/^Status:/)).toHaveCount(0)
 
   await filter.click()
-  // Done is not a view of this list to ask for.
-  await expect(page.getByRole("option", { name: "Done" })).toHaveCount(0)
+  // The five open statuses, in the order work moves. Done is not a view of
+  // this list to ask for.
+  await expect(page.getByRole("option")).toHaveText([
+    "Any open status",
+    "Backlog",
+    "To do",
+    "In progress",
+    "Review",
+    "Waiting",
+  ])
   await page.getByRole("option", { name: "Waiting" }).click()
   await expect(page.getByText("Status: Waiting")).toBeVisible()
   await expect(row(page, "Parked")).toBeVisible()
@@ -265,7 +325,7 @@ test("The activity log says a task moved to Waiting", async ({ page }) => {
   ).toContainText("Moved Renew the lease to Waiting")
 })
 
-test("On a phone the status column is a glyph with a 44px target", async ({
+test("On a phone the status column is a mark with a 44px target", async ({
   page,
 }) => {
   await newUser(page)

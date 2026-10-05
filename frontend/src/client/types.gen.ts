@@ -923,12 +923,17 @@ export type TaskSort = 'due_date' | 'priority' | 'created_at';
 /**
  * TaskStatus
  *
- * Where a task stands (FR-01.4). Four fixed values rather than user-defined
- * ones (ADR-0004): every rule in the product only needs to know whether a
- * task is open or done, and the three open values tell apart who holds the
- * next move.
+ * Where a task stands (FR-01.4). Six fixed values rather than user-defined
+ * ones (ADR-0004, ADR-0008): every rule in the product only needs to know
+ * whether a task is open or done, and the five open values tell apart
+ * whether the work is decided on and who holds the next move. Declared in
+ * the order the interface lists them.
+ *
+ * A new task starts in `backlog`. A bot user hands finished work over by
+ * moving it to `review` and assigning it to the owner; entering review
+ * does not change the assignee on its own (FR-01.4a).
  */
-export type TaskStatus = 'todo' | 'in_progress' | 'waiting' | 'done';
+export type TaskStatus = 'backlog' | 'todo' | 'in_progress' | 'review' | 'waiting' | 'done';
 
 /**
  * TaskUpdate

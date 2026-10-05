@@ -35,16 +35,6 @@ export const PRIORITY_TEXT: Record<PriorityTone, string> = {
   p3: "text-priority-p3",
 }
 
-/**
- * The ring and tint of the compact checkbox for each hue. The checked state
- * keeps the checkbox's own teal: done is done, whatever the priority was.
- */
-export const PRIORITY_CHECK: Record<PriorityTone, string> = {
-  p1: "border-priority-p1 bg-priority-p1/10 dark:bg-priority-p1/15",
-  p2: "border-priority-p2 bg-priority-p2/10 dark:bg-priority-p2/15",
-  p3: "border-priority-p3 bg-priority-p3/10 dark:bg-priority-p3/15",
-}
-
 const PRIORITY_BADGE: Record<PriorityTone, string> = {
   p1: "text-priority-p1 border-priority-p1/40",
   p2: "text-priority-p2 border-priority-p2/40",

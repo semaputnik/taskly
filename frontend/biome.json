@@ -11,7 +11,8 @@
       "!**/src/components/ui/**/*",
       "!**/public/assets/**/*",
       "!**/playwright-report",
-      "!**/playwright.config.ts"
+      "!**/playwright.config.ts",
+      "!**/.impeccable"
     ]
   },
   "linter": {

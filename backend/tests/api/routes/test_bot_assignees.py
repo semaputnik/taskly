@@ -252,7 +252,7 @@ def test_a_recurring_task_passes_its_bot_assignee_to_the_next_occurrence(
     r = client.get(
         f"{API}/tasks/",
         headers=owner,
-        params={"status": ["todo", "in_progress", "waiting"]},
+        params={"status": ["backlog", "todo", "in_progress", "review", "waiting"]},
     ).json()["data"]
     assert [(t["title"], t["assignee_id"]) for t in r] == [("Weekly report", bot_id)]
 

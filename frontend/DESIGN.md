@@ -228,10 +228,9 @@ priority hues are the only saturated things a screen can contain.
   — the one category the system gives a colour of its own: red, amber and
   blue, in the order of how much they press. P4 and no priority have no hue and
   stay ink, as every priority did before; the ordinary case is not coloured.
-  They appear as the ring and a 10% tint (15% in dark) of the compact row's
-  checkbox, as the text and a 40% border of the priority badge, and as the flag
-  beside a priority wherever one is chosen or filtered on. Each is both a text
-  colour and a ring, so each clears 4.5:1 on every ground it is laid on; the
+  They appear as the colour of an open task's status mark, as the text and a
+  40% border of the priority badge, and as the flag beside a priority wherever
+  one is chosen or filtered on. Each is both a text colour and a mark, so each clears 4.5:1 on every ground it is laid on; the
   pairs are in `index.css`. P2 is amber rather than yellow in light, because
   yellow cannot carry text on white, and yellow in dark, where it can.
   **P1 is not Alert Red.** They are separate tokens because urgent and late are
@@ -283,11 +282,11 @@ never by spending the accent, and never by a second hue: an active account is
 a filled ink dot, an inactive one a hollow muted ring.
 
 **The Priority Hue Rule.** Priority is the one exception, and it is a narrow
-one: three hues for P1–P3, never teal, never a fill larger than the checkbox's
-tint, and never on anything but the priority itself — not the row, not the
+one: three hues for P1–P3, never teal, never a fill beyond a status mark's
+own, and never on anything but the priority itself — not the row, not the
 title, not the band. A priority hue is always doubled by words where words are
-read: the badge says "P1", and the compact checkbox names its priority to
-assistive technology.
+read: the badge says "P1", and a status mark names its priority to assistive
+technology.
 
 **The Chroma Zero Rule.** Every structural token — surface, border, text,
 skeleton, divider — has chroma exactly `0`. There are no warm greys and no cool
@@ -481,15 +480,21 @@ sits beside the thing it is about. A square check selects a row for a batch.
 The two live in the same row and must never be confused, which is why they are
 different shapes rather than two identical boxes in different columns.
 
-**The Four-Glyph Rule.** A task's status is carried by one of four glyphs,
-told apart by shape alone so they read in greyscale at 16px: an empty dashed
-ring for To do, a half-filled ring for In progress, a ring with a clock hand for
-Waiting, and a ring with a check for Done. They are Ink, and Ink Muted for Done;
-never Signal Teal and never a second hue (The One Signal Rule). A glyph always
-travels with its label, or with an accessible name where the label does not
-fit — the list's status column drops to the glyph alone on a narrow screen and
-keeps a 44px target. The glyph is a reading; the round check stays the one
-control that closes a task from a list, and it is checked only for Done.
+**The Six-Mark Rule.** A task's status is carried by one of six marks, told
+apart by shape alone so they read in greyscale at 18px: a dashed ring for
+Backlog, a solid ring for To do, a half-filled ring for In progress, a dot in a
+ring for Review, a monochrome eye for Waiting, and a filled check for Done
+(`StatusMark` in `status.tsx`). Status is the shape and priority is the colour:
+an open task's mark takes its priority's hue (P1 red, P2 amber, P3 blue,
+otherwise Ink), Done is always the one green, and a mark standing for a status
+alone, as in a menu, is Ink. That green is the Changelog direction's (see
+`.impeccable/surfaces/`), arriving ahead of its tokens: it is an exception to
+The One Signal Rule until the redesign's palette replaces this section. A mark always travels with its label, or with an
+accessible name naming the status and priority where the label does not fit —
+the list's status column drops to the mark alone on a narrow screen and keeps a
+44px target. In the compact row the mark is itself the completion control, a
+checkbox named for what ticking it does; in the table the round check stays
+beside the title and the mark is a reading.
 
 **The Pill-Means-Data Rule.** Fully-round is reserved for badges — values
 attached to a record. If it is pressable and pill-shaped, it is miscommunicating.
@@ -693,9 +698,10 @@ rather than a table.
 Two short lines for a task, used by every dashboard band and by the task list,
 which opens in them. The table is the other view (`view=table`, switched from
 the filter bar and kept in the URL); compact rows need no parameter.
-- **Line one:** the round completion checkbox at 18px, its ring and tint in the
-  priority's hue (The Priority Hue Rule), then the title as the link that opens
-  the task — never the whole row, since the row also holds the checkbox — and
+- **Line one:** the task's status mark at 18px, in its priority's hue (The
+  Six-Mark Rule), which is also the checkbox that closes the task and is named
+  for its status and priority; then the title as the link that opens the task —
+  never the whole row, since the row also holds the mark — and
   the project name in Ink Muted `xs`, from `sm` up. A subtask is marked with the
   same corner arrow as the table.
 - **Line two**, `xs` Ink Muted with 14px icons, in this order: subtask progress
