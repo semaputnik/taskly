@@ -1,28 +1,19 @@
 import { expect, type Page } from "@playwright/test"
+import { createSession } from "./privateApi.ts"
 
-export async function signUpNewUser(
-  page: Page,
-  name: string,
-  email: string,
-  password: string,
-) {
-  await page.goto("/signup")
-
-  await page.getByTestId("full-name-input").fill(name)
-  await page.getByTestId("email-input").fill(email)
-  await page.getByTestId("password-input").fill(password)
-  await page.getByTestId("confirm-password-input").fill(password)
-  await page.getByRole("button", { name: "Sign Up" }).click()
+/**
+ * Sign in as `email` without the passkey ceremony, creating the user if there
+ * is none. For tests about anything but signing in; `passkeys.ts` drives the
+ * real ceremony through a virtual authenticator.
+ */
+export async function logInUser(page: Page, email: string) {
+  const { access_token: token } = await createSession({ email })
   await page.goto("/login")
-}
-
-export async function logInUser(page: Page, email: string, password: string) {
-  await page.goto("/login")
-
-  await page.getByTestId("email-input").fill(email)
-  await page.getByTestId("password-input").fill(password)
-  await page.getByRole("button", { name: "Log In" }).click()
-  await page.waitForURL("/")
+  await page.evaluate(
+    (token) => localStorage.setItem("access_token", token),
+    token,
+  )
+  await page.goto("/")
   await expect(
     page.getByText("What needs you now, and what changed without you"),
   ).toBeVisible()

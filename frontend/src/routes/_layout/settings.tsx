@@ -1,19 +1,23 @@
-import { createFileRoute } from "@tanstack/react-router"
+import { createFileRoute, useNavigate } from "@tanstack/react-router"
+import { z } from "zod"
 
-import ChangePassword from "@/components/UserSettings/ChangePassword"
 import DeleteAccount from "@/components/UserSettings/DeleteAccount"
+import Passkeys from "@/components/UserSettings/Passkeys"
 import UserInformation from "@/components/UserSettings/UserInformation"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import useAuth from "@/hooks/useAuth"
 
-const tabsConfig = [
-  { value: "my-profile", title: "My profile", component: UserInformation },
-  { value: "password", title: "Password", component: ChangePassword },
-  { value: "danger-zone", title: "Danger zone", component: DeleteAccount },
-]
+const TABS = ["my-profile", "passkeys", "danger-zone"] as const
+
+const settingsSearch = z.object({
+  tab: z.enum(TABS).optional(),
+  // Set after a recovery code was spent (FR-12.17).
+  recovered: z.boolean().optional(),
+})
 
 export const Route = createFileRoute("/_layout/settings")({
   component: UserSettings,
+  validateSearch: settingsSearch,
   head: () => ({
     meta: [
       {
@@ -25,9 +29,8 @@ export const Route = createFileRoute("/_layout/settings")({
 
 function UserSettings() {
   const { user: currentUser } = useAuth()
-  const finalTabs = currentUser?.is_superuser
-    ? tabsConfig.slice(0, 3)
-    : tabsConfig
+  const { tab = "my-profile", recovered } = Route.useSearch()
+  const navigate = useNavigate({ from: Route.fullPath })
 
   if (!currentUser) {
     return null
@@ -42,19 +45,33 @@ function UserSettings() {
         </p>
       </div>
 
-      <Tabs defaultValue="my-profile" className="gap-4">
+      <Tabs
+        value={tab}
+        onValueChange={(value) =>
+          navigate({
+            search: (prev) => ({
+              ...prev,
+              tab: value as (typeof TABS)[number],
+              recovered: undefined,
+            }),
+          })
+        }
+        className="gap-4"
+      >
         <TabsList>
-          {finalTabs.map((tab) => (
-            <TabsTrigger key={tab.value} value={tab.value}>
-              {tab.title}
-            </TabsTrigger>
-          ))}
+          <TabsTrigger value="my-profile">My profile</TabsTrigger>
+          <TabsTrigger value="passkeys">Passkeys</TabsTrigger>
+          <TabsTrigger value="danger-zone">Danger zone</TabsTrigger>
         </TabsList>
-        {finalTabs.map((tab) => (
-          <TabsContent key={tab.value} value={tab.value}>
-            <tab.component />
-          </TabsContent>
-        ))}
+        <TabsContent value="my-profile">
+          <UserInformation />
+        </TabsContent>
+        <TabsContent value="passkeys">
+          <Passkeys recovered={recovered} />
+        </TabsContent>
+        <TabsContent value="danger-zone">
+          <DeleteAccount />
+        </TabsContent>
       </Tabs>
     </div>
   )

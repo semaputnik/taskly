@@ -5,10 +5,8 @@ from typing import Any
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
-from app import crud
 from app.core.config import settings
-from app.models import UserCreate
-from tests.utils.utils import random_email, random_lower_string
+from tests.utils.user import new_user_headers
 
 API = settings.API_V1_STR
 
@@ -24,13 +22,7 @@ READ_ONLY = {"read_tasks": True}
 
 
 def create_user_headers(client: TestClient, db: Session) -> dict[str, str]:
-    email = random_email()
-    password = random_lower_string()
-    crud.create_user(session=db, user_create=UserCreate(email=email, password=password))
-    r = client.post(
-        f"{API}/login/access-token", data={"username": email, "password": password}
-    )
-    return {"Authorization": f"Bearer {r.json()['access_token']}"}
+    return new_user_headers(client, db)
 
 
 def create_project(client: TestClient, headers: dict[str, str], name: str = "P") -> str:

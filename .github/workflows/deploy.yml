@@ -46,7 +46,6 @@ jobs:
           PROJECT_NAME: ${{ vars.PROJECT_NAME }}
           SECRET_KEY: ${{ secrets.SECRET_KEY }}
           FIRST_SUPERUSER: ${{ vars.FIRST_SUPERUSER }}
-          FIRST_SUPERUSER_PASSWORD: ${{ secrets.FIRST_SUPERUSER_PASSWORD }}
       - name: Deploy to FastAPI Cloud
         run: uv run fastapi deploy
         env:

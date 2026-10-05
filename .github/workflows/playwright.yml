@@ -57,6 +57,10 @@ jobs:
     if: ${{ needs.changes.outputs.changed == 'true' }}
     timeout-minutes: 15
     runs-on: ubuntu-latest
+    env:
+      # The browser reaches the app from inside the backend's network, as
+      # localhost:8000, and passkeys are bound to that hostname (FR-12.4).
+      FRONTEND_HOST: http://localhost:8000
     strategy:
       matrix:
         shardIndex: [1, 2, 3, 4]

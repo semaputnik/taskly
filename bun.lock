@@ -23,6 +23,7 @@
         "@radix-ui/react-slot": "^1.2.4",
         "@radix-ui/react-tabs": "^1.1.21",
         "@radix-ui/react-tooltip": "^1.2.16",
+        "@simplewebauthn/browser": "^14.0.0",
         "@tailwindcss/vite": "^4.3.3",
         "@tanstack/react-query": "^5.102.8",
         "@tanstack/react-query-devtools": "^5.102.8",
@@ -453,6 +454,8 @@
     "@rolldown/pluginutils": ["@rolldown/pluginutils@1.0.1", "", {}, "sha512-2j9bGt5Jh8hj+vPtgzPtl72j0yRxHAyumoo6TNfAjsLB04UtpSvPbPcDcBMxz7n+9CYB0c1GxQFxYRg2jimqGw=="],
 
     "@selderee/plugin-htmlparser2": ["@selderee/plugin-htmlparser2@0.11.0", "", { "dependencies": { "domhandler": "^5.0.3", "selderee": "^0.11.0" } }, "sha512-P33hHGdldxGabLFjPPpaTxVolMrzrcegejx+0GxjrIb9Zv48D8yAIA/QTDR2dFl7Uz7urX8aX6+5bCZslr+gWQ=="],
+
+    "@simplewebauthn/browser": ["@simplewebauthn/browser@14.0.0", "", {}, "sha512-1odWVqeEBTl7lJ9zMKLEsmTlnyrDO5iRcTvfMKKk1WThUnp/i8JJdffdj2icP+tty159s4PgwE3BiMoEW9NFow=="],
 
     "@socket.io/component-emitter": ["@socket.io/component-emitter@3.1.2", "", {}, "sha512-9BCxFwvbGg/RsZK9tjXd8s4UcwR0MWeFQ1XEKIQVVvAGJyINdrqKMcTRyLoK8Rse1GjzLV9cwjWV1olXRWEXVA=="],
 

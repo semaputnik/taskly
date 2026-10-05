@@ -3,29 +3,61 @@ from typing import Any
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-from app import crud
+from app import crud, passkeys
 from app.api.deps import SessionDep
-from app.models import (
-    UserCreate,
-    UserPublic,
-)
+from app.core import security
+from app.models import RecoveryCodeIssued, UserCreate, UserPublic
 
 router = APIRouter(tags=["private"], prefix="/private")
 
 
 class PrivateUserCreate(BaseModel):
     email: str
-    password: str
-    full_name: str
-    is_verified: bool = False
+    full_name: str | None = None
+    is_superuser: bool = False
 
 
-@router.post("/users/", response_model=UserPublic)
+class PrivateSession(BaseModel):
+    user: UserPublic
+    access_token: str
+
+
+@router.post("/users/", response_model=PrivateSession)
 def create_user(user_in: PrivateUserCreate, session: SessionDep) -> Any:
     """
-    Create a new user.
+    A user and a session for them, without a passkey ceremony: for the
+    end-to-end tests, which set a scene this way rather than through the
+    sign-in screen. An existing user is signed in as they are. Only mounted in
+    development.
     """
-    user_create = UserCreate(
-        email=user_in.email, password=user_in.password, full_name=user_in.full_name
+    user = crud.get_user_by_email(session=session, email=user_in.email)
+    if user is None:
+        user = crud.create_user(
+            session=session,
+            user_create=UserCreate(
+                email=user_in.email,
+                full_name=user_in.full_name,
+                is_superuser=user_in.is_superuser,
+            ),
+        )
+    return PrivateSession(
+        user=UserPublic.model_validate(user),
+        access_token=security.session_token(user.id, user.session_version),
     )
-    return crud.create_user(session=session, user_create=user_create)
+
+
+class PrivateRecoveryCode(BaseModel):
+    email: str
+
+
+@router.post("/recovery-code", response_model=RecoveryCodeIssued)
+def issue_recovery_code(body: PrivateRecoveryCode, session: SessionDep) -> Any:
+    """
+    A recovery code for any user, superuser included, the way the server's
+    recovery command gives one (FR-12.19): for the end-to-end tests of
+    recovering an account. Only mounted in development.
+    """
+    user = crud.get_user_by_email(session=session, email=body.email)
+    if user is None:
+        raise passkeys.UserNotFound()
+    return passkeys.issue_recovery_code(session, user=user)

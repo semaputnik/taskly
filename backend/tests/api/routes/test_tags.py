@@ -1,22 +1,10 @@
 from fastapi.testclient import TestClient
 from sqlmodel import Session, func, select
 
-from app import crud
 from app.core.config import settings
-from app.models import Tag, UserCreate
-from tests.utils.utils import random_email, random_lower_string
-
-
-def _headers_for_new_user(client: TestClient, db: Session) -> dict[str, str]:
-    email = random_email()
-    password = random_lower_string()
-    user_in = UserCreate(email=email, password=password)
-    crud.create_user(session=db, user_create=user_in)
-
-    login_data = {"username": email, "password": password}
-    r = client.post(f"{settings.API_V1_STR}/login/access-token", data=login_data)
-    token = r.json()["access_token"]
-    return {"Authorization": f"Bearer {token}"}
+from app.models import Tag
+from tests.utils.user import new_user_headers
+from tests.utils.utils import random_lower_string
 
 
 def _create_project(client: TestClient, headers: dict[str, str], name: str) -> str:
@@ -61,7 +49,7 @@ def _stored_tag_count(db: Session, name: str) -> int:
 def test_a_tag_is_created_by_typing_it_onto_a_task(
     client: TestClient, db: Session
 ) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
 
     task = _create_task(client, headers, "Buy milk", tags=["errands"])
     assert task["tags"] == ["errands"]
@@ -69,7 +57,7 @@ def test_a_tag_is_created_by_typing_it_onto_a_task(
 
 
 def test_applying_an_existing_tag_reuses_it(client: TestClient, db: Session) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     name = random_lower_string()
 
     first = _create_task(client, headers, "First", tags=[name])
@@ -82,8 +70,8 @@ def test_applying_an_existing_tag_reuses_it(client: TestClient, db: Session) -> 
 
 
 def test_two_users_can_use_the_same_tag_name(client: TestClient, db: Session) -> None:
-    headers_a = _headers_for_new_user(client, db)
-    headers_b = _headers_for_new_user(client, db)
+    headers_a = new_user_headers(client, db)
+    headers_b = new_user_headers(client, db)
     name = random_lower_string()
 
     _create_task(client, headers_a, "A's task", tags=[name])
@@ -98,8 +86,8 @@ def test_two_users_can_use_the_same_tag_name(client: TestClient, db: Session) ->
 def test_a_users_tags_do_not_leak_to_another_user(
     client: TestClient, db: Session
 ) -> None:
-    headers_a = _headers_for_new_user(client, db)
-    headers_b = _headers_for_new_user(client, db)
+    headers_a = new_user_headers(client, db)
+    headers_b = new_user_headers(client, db)
 
     _create_task(client, headers_a, "A's task", tags=["private"])
 
@@ -107,7 +95,7 @@ def test_a_users_tags_do_not_leak_to_another_user(
 
 
 def test_a_tag_crosses_projects(client: TestClient, db: Session) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     work_id = _create_project(client, headers, "Work")
     home_id = _create_project(client, headers, "Home")
 
@@ -125,7 +113,7 @@ def test_a_tag_crosses_projects(client: TestClient, db: Session) -> None:
 def test_removing_a_tag_leaves_other_tasks_alone(
     client: TestClient, db: Session
 ) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     name = random_lower_string()
     kept = _create_task(client, headers, "Kept", tags=[name])
     stripped = _create_task(client, headers, "Stripped", tags=[name, "other"])
@@ -140,7 +128,7 @@ def test_removing_a_tag_leaves_other_tasks_alone(
 
 
 def test_a_tag_left_on_no_task_stays(client: TestClient, db: Session) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     name = random_lower_string()
     task = _create_task(client, headers, "Only task", tags=[name])
 
@@ -153,7 +141,7 @@ def test_a_tag_left_on_no_task_stays(client: TestClient, db: Session) -> None:
 
 
 def test_tags_survive_a_deleted_task(client: TestClient, db: Session) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     name = random_lower_string()
     task = _create_task(client, headers, "Doomed", tags=[name])
 
@@ -165,7 +153,7 @@ def test_tags_survive_a_deleted_task(client: TestClient, db: Session) -> None:
 
 
 def test_tags_can_be_replaced_wholesale(client: TestClient, db: Session) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     task = _create_task(client, headers, "Task", tags=["one", "two"])
 
     r = _set_tags(client, headers, task["id"], ["two", "three"])
@@ -174,7 +162,7 @@ def test_tags_can_be_replaced_wholesale(client: TestClient, db: Session) -> None
 
 
 def test_omitting_tags_leaves_them_untouched(client: TestClient, db: Session) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     task = _create_task(client, headers, "Task", tags=["keep"])
 
     r = client.patch(
@@ -189,7 +177,7 @@ def test_omitting_tags_leaves_them_untouched(client: TestClient, db: Session) ->
 def test_tags_are_reported_in_a_stable_order_without_duplicates(
     client: TestClient, db: Session
 ) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
 
     task = _create_task(client, headers, "Task", tags=["beta", "alpha", "beta"])
     assert task["tags"] == ["alpha", "beta"]
@@ -199,14 +187,14 @@ def test_tags_are_reported_in_a_stable_order_without_duplicates(
 
 
 def test_tag_names_are_trimmed(client: TestClient, db: Session) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
 
     task = _create_task(client, headers, "Task", tags=["  spaced  "])
     assert task["tags"] == ["spaced"]
 
 
 def test_a_blank_tag_is_rejected(client: TestClient, db: Session) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
 
     r = client.post(
         f"{settings.API_V1_STR}/tasks/",
@@ -217,7 +205,7 @@ def test_a_blank_tag_is_rejected(client: TestClient, db: Session) -> None:
 
 
 def test_an_overlong_tag_is_rejected(client: TestClient, db: Session) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
 
     r = client.post(
         f"{settings.API_V1_STR}/tasks/",
@@ -230,7 +218,7 @@ def test_an_overlong_tag_is_rejected(client: TestClient, db: Session) -> None:
 def test_a_subtask_carries_tags_like_any_other_task(
     client: TestClient, db: Session
 ) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     root = _create_task(client, headers, "Root", tags=["shared"])
 
     subtask = _create_task(
@@ -241,7 +229,7 @@ def test_a_subtask_carries_tags_like_any_other_task(
 
 
 def test_tags_can_be_filtered_for_autocomplete(client: TestClient, db: Session) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     _create_task(client, headers, "Task", tags=["Reading", "running", "errands"])
 
     assert _listed_tags(client, headers) == ["errands", "Reading", "running"]
@@ -253,8 +241,8 @@ def test_tags_can_be_filtered_for_autocomplete(client: TestClient, db: Session) 
 def test_tags_of_another_users_task_cannot_be_set(
     client: TestClient, db: Session
 ) -> None:
-    headers_a = _headers_for_new_user(client, db)
-    headers_b = _headers_for_new_user(client, db)
+    headers_a = new_user_headers(client, db)
+    headers_b = new_user_headers(client, db)
     task = _create_task(client, headers_a, "A's task")
 
     r = _set_tags(client, headers_b, task["id"], ["hijacked"])
