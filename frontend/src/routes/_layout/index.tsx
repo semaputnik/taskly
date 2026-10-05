@@ -3,6 +3,11 @@ import { createFileRoute } from "@tanstack/react-router"
 import { Suspense, useEffect, useState } from "react"
 
 import { CaptureLine } from "@/components/Dashboard/CaptureLine"
+import {
+  Changes,
+  ChangesPending,
+  changesQuery,
+} from "@/components/Dashboard/Changes"
 import { Day, DayHeading, DayPending } from "@/components/Dashboard/DayPage"
 import { markSeen, visitSince } from "@/components/Dashboard/day"
 import {
@@ -10,11 +15,6 @@ import {
   InProgressPending,
   inProgressQuery,
 } from "@/components/Dashboard/InProgress"
-import {
-  recentActivityQuery,
-  WhileYouWereAway,
-  WhileYouWereAwayPending,
-} from "@/components/Dashboard/WhileYouWereAway"
 
 export const Route = createFileRoute("/_layout/")({
   component: Dashboard,
@@ -75,7 +75,7 @@ function Dashboard() {
   // Started here, beside the bands' own requests, rather than after the
   // bands have suspended and resumed: the sections below them are not
   // rendered until they resume.
-  usePrefetchQuery(recentActivityQuery())
+  usePrefetchQuery(changesQuery(since))
   usePrefetchQuery(inProgressQuery())
 
   return (
@@ -95,7 +95,7 @@ function Dashboard() {
             <DayPending />
             <div className="flex flex-col gap-6">
               <InProgressPending />
-              <WhileYouWereAwayPending />
+              <ChangesPending />
             </div>
           </>
         }
@@ -103,7 +103,7 @@ function Dashboard() {
         <Day since={since} />
         <div className="flex flex-col gap-6">
           <InProgress />
-          <WhileYouWereAway />
+          <Changes since={since} />
         </div>
       </Suspense>
     </div>
