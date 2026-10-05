@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query"
-import { ChevronDown, X } from "lucide-react"
-import type { ReactNode } from "react"
+import { Check, ChevronDown, X } from "lucide-react"
+import { type ReactNode, useState } from "react"
 
 import { DayField } from "@/components/Common/DayField"
 import { navItemFocus } from "@/components/Sidebar/styles"
@@ -18,6 +18,16 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
+import {
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet"
+import { useIsPhone } from "@/hooks/useIsPhone"
 import { projectsQuery, tagsQuery } from "@/lib/serverState"
 import { cn } from "@/lib/utils"
 import { useBotUsers } from "./assignee"
@@ -109,13 +119,117 @@ function Filter({
           onClick={onRemove}
           className={cn(
             navItemFocus,
-            "text-ink-3 hover:bg-rule hover:text-ink grid size-3.5 place-items-center rounded-full transition-colors",
+            // A finger needs more than 14px: the hit area grows past the mark
+            // without moving anything.
+            "text-ink-3 hover:bg-rule hover:text-ink relative grid size-3.5 place-items-center rounded-full transition-colors pointer-coarse:after:absolute pointer-coarse:after:-inset-3.5",
           )}
         >
           <X aria-hidden className="size-2.5" strokeWidth={2} />
         </button>
       )}
     </span>
+  )
+}
+
+/**
+ * A menu on a phone: a sheet that rises from the bottom, where a thumb is,
+ * with rows 44px tall. The trigger is whatever button the caller wraps in
+ * `SheetTrigger`; this is the sheet it opens.
+ */
+function PickSheet({
+  title,
+  description,
+  children,
+  done,
+}: {
+  title: string
+  description: string
+  children: ReactNode
+  /** A closing button at the foot, for a sheet that is used more than once. */
+  done?: boolean
+}) {
+  return (
+    <SheetContent
+      side="bottom"
+      className="bg-page max-h-[85svh] gap-0 rounded-t-xl pb-[env(safe-area-inset-bottom)] shadow-none"
+    >
+      <SheetHeader className="px-4 pt-4 pb-1">
+        <SheetTitle className="text-[15px]">{title}</SheetTitle>
+        <SheetDescription className="sr-only">{description}</SheetDescription>
+      </SheetHeader>
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-2">
+        {children}
+      </div>
+      {done && (
+        <div className="border-rule border-t px-4 py-2">
+          <SheetClose className="bg-ink text-page h-11 w-full rounded-md text-[15px] font-medium">
+            Done
+          </SheetClose>
+        </div>
+      )}
+    </SheetContent>
+  )
+}
+
+/** One row of a sheet: 44px, the chosen one in ink with a check. */
+function SheetOption({
+  selected,
+  onClick,
+  children,
+}: {
+  selected: boolean
+  onClick: () => void
+  children: ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={selected}
+      onClick={onClick}
+      className={cn(
+        "hover:bg-hover flex min-h-11 w-full items-center gap-3 px-4 text-left text-[15px]",
+        selected ? "text-ink font-medium" : "text-ink-2",
+      )}
+    >
+      <span className="min-w-0 flex-1 truncate">{children}</span>
+      {selected && <Check aria-hidden className="size-4 shrink-0" />}
+    </button>
+  )
+}
+
+/** The choices of one filter as sheet rows, "any" first. */
+function ChoiceOptions({
+  anyLabel,
+  value,
+  selected,
+  choices,
+  onChange,
+}: {
+  anyLabel: string
+  value: string | undefined
+  selected: string | undefined
+  choices: Choice[]
+  onChange: (value: string | undefined) => void
+}) {
+  const marked = selected ?? (value ? "" : ANY)
+  return (
+    <>
+      <SheetOption
+        selected={marked === ANY}
+        onClick={() => onChange(undefined)}
+      >
+        {anyLabel}
+      </SheetOption>
+      {choices.map((choice) => (
+        <SheetOption
+          key={choice.value}
+          selected={marked === choice.value}
+          onClick={() => onChange(choice.value)}
+        >
+          {choice.display ?? choice.label}
+        </SheetOption>
+      ))}
+    </>
   )
 }
 
@@ -138,34 +252,58 @@ function ChoiceFilter({
   /** The chosen value, or undefined for "any". */
   onChange: (value: string | undefined) => void
 }) {
+  const phone = useIsPhone()
+  const [sheetOpen, setSheetOpen] = useState(false)
   return (
     <Filter
       noun={noun}
       anyLabel={anyLabel}
       value={value}
       onRemove={() => onChange(undefined)}
-      menu={(button) => (
-        <DropdownMenu modal={false}>
-          <DropdownMenuTrigger asChild>{button}</DropdownMenuTrigger>
-          <DropdownMenuContent align="start" aria-label={noun}>
-            <DropdownMenuRadioGroup
-              value={selected ?? (value ? "" : ANY)}
-              onValueChange={(next) =>
-                onChange(next === ANY ? undefined : next)
-              }
-            >
-              <DropdownMenuRadioItem value={ANY}>
-                {anyLabel}
-              </DropdownMenuRadioItem>
-              {choices.map((choice) => (
-                <DropdownMenuRadioItem key={choice.value} value={choice.value}>
-                  {choice.display ?? choice.label}
+      menu={(button) =>
+        phone ? (
+          // A phone's menu is a sheet; choosing a row closes it.
+          <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+            <SheetTrigger asChild>{button}</SheetTrigger>
+            <PickSheet title={noun} description="Choose what to filter by.">
+              <ChoiceOptions
+                anyLabel={anyLabel}
+                value={value}
+                selected={selected}
+                choices={choices}
+                onChange={(next) => {
+                  onChange(next)
+                  setSheetOpen(false)
+                }}
+              />
+            </PickSheet>
+          </Sheet>
+        ) : (
+          <DropdownMenu modal={false}>
+            <DropdownMenuTrigger asChild>{button}</DropdownMenuTrigger>
+            <DropdownMenuContent align="start" aria-label={noun}>
+              <DropdownMenuRadioGroup
+                value={selected ?? (value ? "" : ANY)}
+                onValueChange={(next) =>
+                  onChange(next === ANY ? undefined : next)
+                }
+              >
+                <DropdownMenuRadioItem value={ANY}>
+                  {anyLabel}
                 </DropdownMenuRadioItem>
-              ))}
-            </DropdownMenuRadioGroup>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      )}
+                {choices.map((choice) => (
+                  <DropdownMenuRadioItem
+                    key={choice.value}
+                    value={choice.value}
+                  >
+                    {choice.display ?? choice.label}
+                  </DropdownMenuRadioItem>
+                ))}
+              </DropdownMenuRadioGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )
+      }
     />
   )
 }
@@ -181,9 +319,54 @@ function singleStatus(statuses: OpenStatus[] | undefined): string | undefined {
 }
 
 /**
+ * The time filter's two questions: overdue, and a range of due days. It is
+ * the only filter that is not a pick from a list, and is in a popover on a
+ * wide screen and in the More sheet on a phone.
+ */
+function TimeFields({
+  search,
+  onChange,
+}: {
+  search: TaskSearch
+  onChange: (next: Partial<TaskSearch>) => void
+}) {
+  return (
+    <div className="flex flex-col gap-3.5">
+      <Label className="min-h-6 gap-2.5 font-normal pointer-coarse:min-h-11">
+        <Checkbox
+          checked={search.overdue === true}
+          onCheckedChange={(checked) =>
+            onChange({ overdue: checked === true ? true : undefined })
+          }
+        />
+        Overdue
+      </Label>
+      <div className="flex flex-col gap-1.5">
+        <Label className="text-ink-3 text-xs font-normal">Due from</Label>
+        <DayField
+          label="Due from"
+          value={search.due_from}
+          onChange={(day) => onChange({ due_from: day ?? undefined })}
+        />
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <Label className="text-ink-3 text-xs font-normal">Due to</Label>
+        <DayField
+          label="Due to"
+          value={search.due_to}
+          onChange={(day) => onChange({ due_to: day ?? undefined })}
+        />
+      </div>
+    </div>
+  )
+}
+
+/** Clears the time filter's three parts. */
+const NO_TIME = { overdue: undefined, due_from: undefined, due_to: undefined }
+
+/**
  * The time filter: overdue, or a range of due dates. Two kinds of question in
- * one menu, since a day is all either one is about, and it is the only filter
- * that is not a pick from a list.
+ * one menu, since a day is all either one is about.
  */
 function TimeFilter({
   search,
@@ -198,42 +381,12 @@ function TimeFilter({
       noun="Time"
       anyLabel="Any time"
       value={label}
-      onRemove={() =>
-        onChange({ overdue: undefined, due_from: undefined, due_to: undefined })
-      }
+      onRemove={() => onChange(NO_TIME)}
       menu={(button) => (
         <Popover>
           <PopoverTrigger asChild>{button}</PopoverTrigger>
           <PopoverContent align="start" aria-label="Time" className="w-64">
-            <div className="flex flex-col gap-3.5">
-              <Label className="gap-2.5 font-normal">
-                <Checkbox
-                  checked={search.overdue === true}
-                  onCheckedChange={(checked) =>
-                    onChange({ overdue: checked === true ? true : undefined })
-                  }
-                />
-                Overdue
-              </Label>
-              <div className="flex flex-col gap-1.5">
-                <Label className="text-ink-3 text-xs font-normal">
-                  Due from
-                </Label>
-                <DayField
-                  label="Due from"
-                  value={search.due_from}
-                  onChange={(day) => onChange({ due_from: day ?? undefined })}
-                />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <Label className="text-ink-3 text-xs font-normal">Due to</Label>
-                <DayField
-                  label="Due to"
-                  value={search.due_to}
-                  onChange={(day) => onChange({ due_to: day ?? undefined })}
-                />
-              </div>
-            </div>
+            <TimeFields search={search} onChange={onChange} />
           </PopoverContent>
         </Popover>
       )}
@@ -265,6 +418,43 @@ function OrderMenu({
   onOrder: (sort: Sort | undefined) => void
 }) {
   const { label } = orderChoice(search)
+  const phone = useIsPhone()
+  const [sheetOpen, setSheetOpen] = useState(false)
+  if (phone) {
+    return (
+      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+        <SheetTrigger asChild>
+          <button
+            type="button"
+            aria-label={`Order: ${label}`}
+            className={cn(control, "-mr-1.5")}
+          >
+            {label}
+            <ChevronDown aria-hidden className="size-2.5 opacity-70" />
+          </button>
+        </SheetTrigger>
+        <PickSheet title="Order" description="Choose how the list is ordered.">
+          {ORDERS.map(({ sort, label: name }) => (
+            <SheetOption
+              key={sort ?? "default"}
+              selected={sort === search.sort}
+              onClick={() => {
+                onOrder(sort)
+                setSheetOpen(false)
+              }}
+            >
+              {name}
+              {sort && sort === search.sort && (
+                <span className="text-ink-3 ml-3 text-xs font-normal">
+                  Choose again to reverse
+                </span>
+              )}
+            </SheetOption>
+          ))}
+        </PickSheet>
+      </Sheet>
+    )
+  }
   return (
     <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
@@ -344,9 +534,36 @@ export function TaskFilters({
   }))
 
   const status = describeStatusFilter(search.status)
+  // On a phone the row keeps the project, the assignee and the status; the
+  // priority and the tag fold behind More with the time, since a narrow row
+  // has room for the filters people reach for and no more.
+  const phone = useIsPhone()
+  const [moreOpen, setMoreOpen] = useState(false)
+  const priorityFilter = {
+    noun: "Priority",
+    anyLabel: "Any priority",
+    value: search.priority,
+    selected: search.priority,
+    choices: PRIORITIES.map((priority) => ({
+      value: priority,
+      label: priority,
+      display: <PriorityOption priority={priority} />,
+    })),
+    onChange: (value: string | undefined) =>
+      onChange({ priority: value as TaskSearch["priority"] }),
+  }
+  const tagFilter = {
+    noun: "Tag",
+    anyLabel: "Any tag",
+    value: search.tag,
+    selected: tagChoices.find((tag) => tag.label === search.tag)?.value,
+    choices: tagChoices,
+    onChange: (id: string | undefined) =>
+      onChange({ tag: tagChoices.find((tag) => tag.value === id)?.label }),
+  }
 
-  return (
-    <fieldset className="border-rule-strong m-0 min-w-0 text-ink-3 flex flex-wrap items-center gap-x-3 gap-y-1 border-0 border-b p-0 pb-2.5 text-[13.5px]">
+  const row = (
+    <fieldset className="border-rule-strong m-0 min-w-0 text-ink-3 border-0 border-b p-0 pb-2.5 text-[13.5px]">
       <legend className="sr-only">Filters</legend>
       <div className="-ml-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
         <ChoiceFilter
@@ -427,45 +644,93 @@ export function TaskFilters({
             })
           }
         />
-        <ChoiceFilter
-          noun="Priority"
-          anyLabel="Any priority"
-          value={search.priority}
-          selected={search.priority}
-          choices={PRIORITIES.map((priority) => ({
-            value: priority,
-            label: priority,
-            display: <PriorityOption priority={priority} />,
-          }))}
-          onChange={(value) =>
-            onChange({ priority: value as TaskSearch["priority"] })
-          }
-        />
-        <ChoiceFilter
-          noun="Tag"
-          anyLabel="Any tag"
-          value={search.tag}
-          selected={tagChoices.find((tag) => tag.label === search.tag)?.value}
-          choices={tagChoices}
-          onChange={(id) =>
-            onChange({ tag: tagChoices.find((tag) => tag.value === id)?.label })
-          }
-        />
-        <TimeFilter search={search} onChange={onChange} />
+        {phone ? (
+          <>
+            {/* The rarer filters are folded behind More, but a set one is
+                still said here, in ink, with its ×: opening it opens the
+                sheet it is set in. */}
+            {search.priority && (
+              <Filter
+                noun="Priority"
+                anyLabel="Any priority"
+                value={search.priority}
+                onRemove={() => onChange({ priority: undefined })}
+                menu={(button) => <SheetTrigger asChild>{button}</SheetTrigger>}
+              />
+            )}
+            {search.tag && (
+              <Filter
+                noun="Tag"
+                anyLabel="Any tag"
+                value={search.tag}
+                onRemove={() => onChange({ tag: undefined })}
+                menu={(button) => <SheetTrigger asChild>{button}</SheetTrigger>}
+              />
+            )}
+            {timeLabel(search) && (
+              <Filter
+                noun="Time"
+                anyLabel="Any time"
+                value={timeLabel(search)}
+                onRemove={() => onChange(NO_TIME)}
+                menu={(button) => <SheetTrigger asChild>{button}</SheetTrigger>}
+              />
+            )}
+            <SheetTrigger asChild>
+              <button type="button" className={control}>
+                More
+                <ChevronDown aria-hidden className="size-2.5 opacity-70" />
+              </button>
+            </SheetTrigger>
+          </>
+        ) : (
+          <>
+            <ChoiceFilter {...priorityFilter} />
+            <ChoiceFilter {...tagFilter} />
+            <TimeFilter search={search} onChange={onChange} />
+          </>
+        )}
+        {hasActiveFilters(search) && (
+          <button
+            type="button"
+            aria-label="Clear all filters"
+            onClick={() => onChange(clearedFilters())}
+            className={cn(control, "-ml-1")}
+          >
+            Clear
+          </button>
+        )}
+        <div className="ml-auto">
+          <OrderMenu search={search} onOrder={onOrder} />
+        </div>
       </div>
-      {hasActiveFilters(search) && (
-        <button
-          type="button"
-          aria-label="Clear all filters"
-          onClick={() => onChange(clearedFilters())}
-          className={cn(control, "-ml-1")}
+      {phone && (
+        <PickSheet
+          title="More filters"
+          description="Filter by priority, tag or time."
+          done
         >
-          Clear
-        </button>
+          <h3 className="text-ink-3 px-4 pt-2 pb-1 text-[12.5px]">Priority</h3>
+          <ChoiceOptions {...priorityFilter} />
+          <h3 className="text-ink-3 px-4 pt-4 pb-1 text-[12.5px]">Tag</h3>
+          {tagChoices.length > 0 ? (
+            <ChoiceOptions {...tagFilter} />
+          ) : (
+            <p className="text-ink-3 px-4 py-2.5 text-[15px]">No tags yet</p>
+          )}
+          <h3 className="text-ink-3 px-4 pt-4 pb-1 text-[12.5px]">Time</h3>
+          <div className="px-4 pb-2">
+            <TimeFields search={search} onChange={onChange} />
+          </div>
+        </PickSheet>
       )}
-      <div className="ml-auto">
-        <OrderMenu search={search} onOrder={onOrder} />
-      </div>
     </fieldset>
+  )
+  return phone ? (
+    <Sheet open={moreOpen} onOpenChange={setMoreOpen}>
+      {row}
+    </Sheet>
+  ) : (
+    row
   )
 }

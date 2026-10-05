@@ -1,5 +1,5 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query"
-import { Plus } from "lucide-react"
+import { ArrowUp, Plus } from "lucide-react"
 import { useId, useLayoutEffect, useRef, useState } from "react"
 
 import type { TaskPublic } from "@/client"
@@ -12,6 +12,8 @@ import {
   useUndoCapture,
 } from "@/components/Tasks/useTaskWrites"
 import { useDebouncedValue } from "@/hooks/useDebouncedValue"
+import { useIsPhone } from "@/hooks/useIsPhone"
+import { useVisualViewport } from "@/hooks/useVisualViewport"
 import { projectsQuery, taskTitleSearchQuery } from "@/lib/serverState"
 import { toastCreated } from "@/lib/toasts"
 import { cn } from "@/lib/utils"
@@ -46,7 +48,7 @@ const MATCHES_HEIGHT = 360
  * Open (its panel) and Undo (which deletes it; the deletion is restorable
  * from the activity log). A task that needs a day, a priority or another
  * project before it exists is written in the full draft, which the `c` key
- * and the phone's button open.
+ * opens.
  *
  * It also searches. Once two characters are typed, the open tasks whose title
  * contains them are offered under the line, each as a task line in miniature
@@ -55,12 +57,21 @@ const MATCHES_HEIGHT = 360
  * The field is a combobox over a listbox, so a screen reader hears the count
  * of matches and which one is chosen.
  *
- * `opens` fixes the side the matches open on. Left alone, they open toward
- * whichever side of the line has the room: below it at the top of a page,
- * above it where the line is pinned low on a phone (FR-06.15).
+ * On a phone the line leaves the top of the page and is pinned to the bottom
+ * of the screen, where a thumb rests (FR-06.15). It follows the visual
+ * viewport, so it rides above Safari's own bar and above the keyboard while
+ * one is up (`useVisualViewport`); the list scrolls under it with a short
+ * fade; its matches open upward; and while a record's column covers the
+ * screen it is not there at all.
+ *
+ * `opens` fixes the side the matches open on. Left alone, a phone's open
+ * upward and a wider screen's toward whichever side of the line has the room.
  */
 export function CaptureLine({ opens }: { opens?: "down" | "up" }) {
   const panels = useRecordPanels()
+  const phone = useIsPhone()
+  useVisualViewport(phone)
+  const side = opens ?? (phone ? "up" : undefined)
   const undo = useUndoCapture()
   const [title, setTitle] = useState("")
   const target = useCaptureTarget()
@@ -112,7 +123,7 @@ export function CaptureLine({ opens }: { opens?: "down" | "up" }) {
   const [upward, setUpward] = useState(false)
   useLayoutEffect(() => {
     if (!open) return
-    if (opens) return setUpward(opens === "up")
+    if (side) return setUpward(side === "up")
     const line = wrapper.current?.getBoundingClientRect()
     if (!line) return
     setUpward(
@@ -122,7 +133,7 @@ export function CaptureLine({ opens }: { opens?: "down" | "up" }) {
         MATCHES_HEIGHT,
       ),
     )
-  }, [open, opens])
+  }, [open, side])
 
   const projectNames = Object.fromEntries(
     (projects?.data ?? []).map((project) => [project.id, project.name]),
@@ -156,120 +167,151 @@ export function CaptureLine({ opens }: { opens?: "down" | "up" }) {
   const heading = term ? `Open tasks matching “${term}”` : ""
 
   return (
-    <div ref={wrapper} className="relative">
-      <label className="text-ink-3 border-rule-strong focus-within:border-ink flex h-10 items-center gap-2.5 border-b transition-colors">
-        <Plus aria-hidden className="size-4 shrink-0" strokeWidth={1.5} />
-        <input
-          type="text"
-          role="combobox"
-          aria-expanded={open}
-          aria-controls={open && matches.length > 0 ? listId : undefined}
-          aria-activedescendant={chosen ? optionId(active) : undefined}
-          aria-autocomplete="list"
-          autoComplete="off"
-          aria-label={`Add a task${where}`}
-          placeholder={`Add a task${where}…`}
-          value={title}
-          onChange={(event) => {
-            setTitle(event.target.value)
-            setDismissed(false)
-            setActiveId(null)
-          }}
-          onFocus={() => setFocused(true)}
-          onBlur={() => setFocused(false)}
-          onKeyDown={(event) => {
-            if (event.nativeEvent.isComposing) return
-            if (event.key === "Escape" && open) {
-              // Closes the matches and nothing else: the text stays, and the
-              // column behind the page does not hear this Escape.
-              event.preventDefault()
-              setDismissed(true)
-              setActiveId(null)
-              return
-            }
-            if (
-              (event.key === "ArrowDown" || event.key === "ArrowUp") &&
-              open &&
-              matches.length > 0
-            ) {
-              // The record column walks its list with these keys when focus
-              // is not in a field; here they walk the matches instead.
-              event.preventDefault()
-              const key = event.key
-              setActiveId(
-                matches[stepActive(active, matches.length, key)]?.id ?? null,
-              )
-              return
-            }
-            if (event.key !== "Enter") return
-            event.preventDefault()
-            if (chosen) openMatch(chosen)
-            else void commit()
-          }}
-          className="text-ink placeholder:text-ink-3 h-full min-w-0 flex-1 bg-transparent text-[15px] outline-none"
-        />
-        {/* The key works from every screen; the cap is for a keyboard, so a
-            touch screen, which has none, goes without it. */}
-        <kbd
-          aria-hidden
-          className="border-rule-strong rounded border px-[5px] font-mono text-[11px] leading-4 pointer-coarse:hidden"
-        >
-          C
-        </kbd>
-      </label>
-
-      {/* Said whenever the matches change, whether or not they can be seen. */}
-      <div role="status" className="sr-only">
-        {open &&
-          current &&
-          (matches.length === 0
-            ? "No open task matches"
-            : `${matches.length} open ${matches.length === 1 ? "task matches" : "tasks match"}`)}
-      </div>
-
-      {open && term && (
-        <div
-          className={cn(
-            "bg-popover border-rule-strong absolute inset-x-0 z-20 rounded-lg border py-1.5 shadow-md",
-            upward ? "bottom-full mb-2" : "top-full mt-1.5",
-          )}
-        >
-          <div className="text-ink-3 truncate px-3.5 pt-1.5 pb-1 text-[12.5px]">
-            {matches.length === 0
-              ? `No open task has “${term}” in its title`
-              : heading}
-          </div>
-          {matches.length > 0 && (
-            <div id={listId} role="listbox" aria-label={heading}>
-              {matches.map((task, index) => (
-                <Match
-                  key={task.id}
-                  id={optionId(index)}
-                  task={task}
-                  term={term}
-                  projectName={projectNames[task.project_id]}
-                  selected={index === active}
-                  onChoose={() => openMatch(task)}
-                />
-              ))}
-            </div>
-          )}
-          <div className="text-ink-3 border-rule mt-1 flex justify-between gap-3 border-t px-3.5 pt-2 pb-1 text-xs">
-            <span className="min-w-0 truncate">
-              <KeyCap className="pointer-coarse:hidden">↵</KeyCap>
-              <span className="hidden pointer-coarse:inline">Return</span>{" "}
-              creates “{title.trim()}” in {target.projectName}
-            </span>
-            <span className="shrink-0 pointer-coarse:hidden">
-              <KeyCap>↑</KeyCap>
-              <KeyCap>↓</KeyCap> then <KeyCap>↵</KeyCap> opens a match
-            </span>
-            <span className="hidden shrink-0 pointer-coarse:inline">
-              Tap a match to open it
-            </span>
-          </div>
-        </div>
+    <div
+      className={cn(
+        // Pinned on a phone: the ground and a hairline over the list, the
+        // keyboard's height as its offset, the home indicator's as its foot
+        // (which a keyboard covers, so it counts for nothing then).
+        "max-md:bg-page max-md:border-rule-strong max-md:fixed max-md:inset-x-0 max-md:bottom-[var(--kb-inset,0px)] max-md:z-30 max-md:border-t max-md:px-4 max-md:pb-[max(0px,calc(env(safe-area-inset-bottom)-var(--kb-inset,0px)))]",
+        "max-md:group-has-[[data-record-column]]/shell:hidden",
       )}
+    >
+      {/* The list's last lines fade out under the pinned line. */}
+      <div
+        aria-hidden
+        className="to-page pointer-events-none absolute inset-x-0 bottom-full h-7 bg-linear-to-b from-transparent md:hidden"
+      />
+      <div ref={wrapper} className="relative">
+        <label className="text-ink-3 border-rule-strong focus-within:border-ink flex h-10 items-center gap-2.5 border-b transition-colors max-md:h-[52px] max-md:border-b-0">
+          <Plus aria-hidden className="size-4 shrink-0" strokeWidth={1.5} />
+          <input
+            type="text"
+            role="combobox"
+            aria-expanded={open}
+            aria-controls={open && matches.length > 0 ? listId : undefined}
+            aria-activedescendant={chosen ? optionId(active) : undefined}
+            aria-autocomplete="list"
+            autoComplete="off"
+            aria-label={`Add a task${where}`}
+            placeholder={`Add a task${where}…`}
+            value={title}
+            onChange={(event) => {
+              setTitle(event.target.value)
+              setDismissed(false)
+              setActiveId(null)
+            }}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
+            onKeyDown={(event) => {
+              if (event.nativeEvent.isComposing) return
+              if (event.key === "Escape" && open) {
+                // Closes the matches and nothing else: the text stays, and the
+                // column behind the page does not hear this Escape.
+                event.preventDefault()
+                setDismissed(true)
+                setActiveId(null)
+                return
+              }
+              if (
+                (event.key === "ArrowDown" || event.key === "ArrowUp") &&
+                open &&
+                matches.length > 0
+              ) {
+                // The record column walks its list with these keys when focus
+                // is not in a field; here they walk the matches instead.
+                event.preventDefault()
+                const key = event.key
+                setActiveId(
+                  matches[stepActive(active, matches.length, key)]?.id ?? null,
+                )
+                return
+              }
+              if (event.key !== "Enter") return
+              event.preventDefault()
+              if (chosen) openMatch(chosen)
+              else void commit()
+            }}
+            // 16px on a phone: iOS zooms the page in to any field set smaller.
+            className="text-ink placeholder:text-ink-3 h-full min-w-0 flex-1 bg-transparent text-[15px] outline-none max-md:text-base"
+          />
+          {/* The key works from every screen; the cap is for a keyboard, so a
+            touch screen, which has none, goes without it. */}
+          <kbd
+            aria-hidden
+            className="border-rule-strong rounded border px-[5px] font-mono text-[11px] leading-4 pointer-coarse:hidden"
+          >
+            C
+          </kbd>
+          {/* A phone's keyboard has a Return key, but a thumb is surer of a
+            button. It keeps focus where it is, so the keyboard stays up. */}
+          {title.trim() && (
+            <button
+              type="button"
+              aria-label="Create task"
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => void commit()}
+              className="-mr-1.5 grid size-11 shrink-0 place-items-center md:hidden"
+            >
+              <span className="bg-ink text-page grid size-8 place-items-center rounded-full">
+                <ArrowUp aria-hidden className="size-4" strokeWidth={1.8} />
+              </span>
+            </button>
+          )}
+        </label>
+
+        {/* Said whenever the matches change, whether or not they can be seen. */}
+        <div role="status" className="sr-only">
+          {open &&
+            current &&
+            (matches.length === 0
+              ? "No open task matches"
+              : `${matches.length} open ${matches.length === 1 ? "task matches" : "tasks match"}`)}
+        </div>
+
+        {open && term && (
+          <div
+            className={cn(
+              "bg-popover border-rule-strong absolute inset-x-0 z-20 rounded-lg border py-1.5 shadow-md max-md:max-h-[calc(var(--vv-height,100svh)-8rem)] max-md:overflow-y-auto",
+              upward ? "bottom-full mb-2" : "top-full mt-1.5",
+            )}
+          >
+            <div className="text-ink-3 truncate px-3.5 pt-1.5 pb-1 text-[12.5px]">
+              {matches.length === 0
+                ? `No open task has “${term}” in its title`
+                : heading}
+            </div>
+            {matches.length > 0 && (
+              <div id={listId} role="listbox" aria-label={heading}>
+                {matches.map((task, index) => (
+                  <Match
+                    key={task.id}
+                    id={optionId(index)}
+                    task={task}
+                    term={term}
+                    projectName={projectNames[task.project_id]}
+                    selected={index === active}
+                    onChoose={() => openMatch(task)}
+                  />
+                ))}
+              </div>
+            )}
+            <div className="text-ink-3 border-rule mt-1 flex justify-between gap-3 border-t px-3.5 pt-2 pb-1 text-xs">
+              <span className="min-w-0 truncate">
+                <KeyCap className="pointer-coarse:hidden">↵</KeyCap>
+                <span className="hidden pointer-coarse:inline">Return</span>{" "}
+                creates “{title.trim()}” in {target.projectName}
+              </span>
+              <span className="shrink-0 pointer-coarse:hidden">
+                <KeyCap>↑</KeyCap>
+                <KeyCap>↓</KeyCap> then <KeyCap>↵</KeyCap> opens a match
+              </span>
+              <span className="hidden shrink-0 pointer-coarse:inline">
+                Tap a match to open it
+              </span>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
