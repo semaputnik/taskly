@@ -32,6 +32,22 @@ interface CompleteTaskProps {
 }
 
 /**
+ * The notice that confirms a task closed from a list it then leaves, and
+ * offers the way back (ADR-0006). For `useTaskStatus`'s `onCompleted`.
+ */
+export function completionReceipt(task: TaskPublic) {
+  return (reopen: () => Promise<boolean>) =>
+    toastSuccess(`“${task.title}” done`, {
+      label: "Undo",
+      // Back to to do, as reopening always is: undoing a close cannot know
+      // which open status the task held before it. `reopen` rather than
+      // `change`, because this notice outlives the row it came from and
+      // still holds the task as it was before the move.
+      onClick: () => void reopen(),
+    })
+}
+
+/**
  * The fastest way to close a task, whatever status it is in (FR-01.5).
  *
  * It is checked only when the task is done. Checking moves the task to done,
@@ -46,17 +62,7 @@ export function CompleteTask({
   className,
 }: CompleteTaskProps) {
   const status = useTaskStatus(task, {
-    onCompleted: receipt
-      ? (reopen) =>
-          toastSuccess(`“${task.title}” done`, {
-            label: "Undo",
-            // Back to to do, as reopening always is: undoing a close cannot
-            // know which open status the task held before it. `reopen`
-            // rather than `change`, because this notice outlives the row it
-            // came from and still holds the task as it was before the move.
-            onClick: () => void reopen(),
-          })
-      : undefined,
+    onCompleted: receipt ? completionReceipt(task) : undefined,
   })
   const done = task.status === "done"
   const action = done ? "Reopen task" : "Mark as done"

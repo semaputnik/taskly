@@ -11,10 +11,10 @@ import {
 import { Day, DayHeading, DayPending } from "@/components/Dashboard/DayPage"
 import { markSeen, visitSince } from "@/components/Dashboard/day"
 import {
-  InProgress,
-  InProgressPending,
-  inProgressQuery,
-} from "@/components/Dashboard/InProgress"
+  MyWork,
+  MyWorkPending,
+  usePrefetchMyWork,
+} from "@/components/Dashboard/MyWork"
 
 export const Route = createFileRoute("/_layout/")({
   component: Dashboard,
@@ -68,7 +68,7 @@ function useVisitSince(): string | null {
 /**
  * The day page: today read as one column. The capture line first, then the
  * date and one sentence of what needs the reader, then the date bands, and
- * beneath them what is under way and what changed.
+ * beneath them what is in the reader's hands and what changed.
  */
 function Dashboard() {
   const since = useVisitSince()
@@ -76,7 +76,7 @@ function Dashboard() {
   // bands have suspended and resumed: the sections below them are not
   // rendered until they resume.
   usePrefetchQuery(changesQuery(since))
-  usePrefetchQuery(inProgressQuery())
+  usePrefetchMyWork()
 
   return (
     <div className="max-w-[820px]">
@@ -87,24 +87,19 @@ function Dashboard() {
       <DayHeading />
 
       {/* One boundary: every section appears in the same frame, so none
-          moves another once it is drawn. The two panels below keep their
-          old form until their own slices replace them. */}
+          moves another once it is drawn. */}
       <Suspense
         fallback={
           <>
             <DayPending />
-            <div className="flex flex-col gap-6">
-              <InProgressPending />
-              <ChangesPending />
-            </div>
+            <MyWorkPending />
+            <ChangesPending />
           </>
         }
       >
         <Day since={since} />
-        <div className="flex flex-col gap-6">
-          <InProgress />
-          <Changes since={since} />
-        </div>
+        <MyWork />
+        <Changes since={since} />
       </Suspense>
     </div>
   )

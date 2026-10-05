@@ -922,6 +922,21 @@ export type TaskCreate = {
 };
 
 /**
+ * TaskHandover
+ *
+ * How a task came to be in Review when a bot user put it there: which bot
+ * user handed its work over, and when (ADR-0008). Read off the activity
+ * log, so it names a deleted bot user as it was called.
+ */
+export type TaskHandover = {
+    bot_user: BotUserRef;
+    /**
+     * At
+     */
+    at: string;
+};
+
+/**
  * TaskPriority
  */
 export type TaskPriority = 'P1' | 'P2' | 'P3' | 'P4';
@@ -983,6 +998,7 @@ export type TaskPublic = {
      * Subtasks Done
      */
     subtasks_done?: number;
+    handover?: TaskHandover | null;
 };
 
 /**

@@ -1590,6 +1590,26 @@ export const TaskCreateSchema = {
     title: 'TaskCreate'
 } as const;
 
+export const TaskHandoverSchema = {
+    properties: {
+        bot_user: {
+            $ref: '#/components/schemas/BotUserRef'
+        },
+        at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'At'
+        }
+    },
+    type: 'object',
+    required: [
+        'bot_user',
+        'at'
+    ],
+    title: 'TaskHandover',
+    description: 'How a task came to be in Review when a bot user put it there: which bot\nuser handed its work over, and when (ADR-0008). Read off the activity\nlog, so it names a deleted bot user as it was called.'
+} as const;
+
 export const TaskPrioritySchema = {
     type: 'string',
     enum: [
@@ -1750,6 +1770,16 @@ export const TaskPublicSchema = {
             type: 'integer',
             title: 'Subtasks Done',
             default: 0
+        },
+        handover: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/TaskHandover'
+                },
+                {
+                    type: 'null'
+                }
+            ]
         }
     },
     type: 'object',

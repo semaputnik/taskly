@@ -368,6 +368,17 @@ class BotUserRef(SQLModel):
     deleted: bool
 
 
+class TaskHandover(SQLModel):
+    """
+    How a task came to be in Review when a bot user put it there: which bot
+    user handed its work over, and when (ADR-0008). Read off the activity
+    log, so it names a deleted bot user as it was called.
+    """
+
+    bot_user: BotUserRef
+    at: datetime
+
+
 class TagCreate(SQLModel):
     name: TagName
 
@@ -897,6 +908,10 @@ class TaskPublic(TaskBase):
     # for a list row to say "2/5" without fetching the tree.
     subtask_count: int = 0
     subtasks_done: int = 0
+    # Set on a task in Review that a bot user moved there: the bot user's
+    # hand-over of finished work (ADR-0008). Null when the owner made the
+    # move, and on every task out of Review.
+    handover: TaskHandover | None = None
 
 
 class TasksPublic(SQLModel):
