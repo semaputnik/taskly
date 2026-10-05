@@ -307,7 +307,10 @@ test("A late waiting task is in Waiting on others, not in Overdue", async ({
   // Dated first, undated last; the late one still says it is late, in red.
   await expect(rows.nth(0)).toHaveText("Chase the plumber")
   await expect(rows.nth(1)).toHaveText("Hear back someday")
-  await expect(waiting.getByText(/days late/)).toHaveClass(/text-destructive/)
+  // The tone sits on the due fact, around its glyph and its words.
+  await expect(waiting.getByText(/days late/).locator("..")).toHaveClass(
+    /text-late/,
+  )
 
   await waiting.getByRole("link", { name: "See all" }).click()
   await expect(page).toHaveURL(/\/tasks/)
