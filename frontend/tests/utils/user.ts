@@ -22,3 +22,17 @@ export async function logOutUser(page: Page) {
   await page.getByRole("menuitem", { name: "Log out" }).click()
   await page.goto("/login")
 }
+
+/**
+ * Open a page that the app is about to send the reader away from. A refused
+ * credential is answered with a full-page redirect to the sign-in screen
+ * (`main.tsx`), and when it lands before the page has loaded it aborts the
+ * navigation that opened it: that is the app working, so the abort is not an
+ * error here. What the test is about is where the reader ends up, which the
+ * caller asserts.
+ */
+export async function gotoAndBeSentAway(page: Page, url: string) {
+  await page.goto(url, { waitUntil: "commit" }).catch((error: unknown) => {
+    if (!String(error).includes("ERR_ABORTED")) throw error
+  })
+}

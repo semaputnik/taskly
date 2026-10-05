@@ -536,6 +536,12 @@ test("The chord from the description creates, clears the words and keeps the set
   ).toBeVisible()
   await page.keyboard.press("Enter")
   await page.keyboard.press("Escape")
+  // Closed means gone, not on its way out: a popover that is still sliding
+  // away is still the topmost layer, and takes the Escape that closes the
+  // panel at the end of this test.
+  await expect(
+    page.getByRole("combobox", { name: "Search or create a tag" }),
+  ).toBeHidden()
 
   await titleField(page).fill("Buy stamps")
   const description = panel.getByRole("textbox", { name: "Task description" })

@@ -44,6 +44,9 @@ import type { RecordLoad } from "./panels"
 export const ghost =
   "record-control border-transparent bg-transparent shadow-none hover:bg-accent focus-visible:border-ring dark:bg-transparent dark:hover:bg-accent/50"
 
+/** Where notices are shown, outside any panel. */
+const NOTICES_SELECTOR = "[data-sonner-toaster]"
+
 export function RecordPanel({
   open,
   onClose,
@@ -74,6 +77,17 @@ export function RecordPanel({
       <SheetContent
         side="right"
         className="w-full gap-0 overflow-y-auto p-0 outline-none sm:max-w-xl"
+        // A notice is not the page behind the panel, so touching one never
+        // dismisses it. The notice a capture leaves arrives while the panel
+        // is still sliding out, and its Open opens the new task in this very
+        // panel. Radix delivers an outside press only when the click ends, by
+        // when Open has made the panel open again: without this the panel
+        // closed straight after it opened. Any notice, an error's included.
+        onInteractOutside={(event) => {
+          if ((event.target as Element | null)?.closest(NOTICES_SELECTOR)) {
+            event.preventDefault()
+          }
+        }}
         // Opening a record puts focus on the panel itself, not on its first
         // control: that would be the name field, which a reader who only came
         // to look must not find already in their hands. Tab starts from here,
