@@ -56,7 +56,7 @@ test("An empty in-progress sheet says so rather than disappearing", async ({
   await expect(band(page, /^In progress/)).toContainText("Nothing in progress")
 })
 
-test("A compact row shows subtasks, due day and tags, and its priority on the checkbox", async ({
+test("A compact row shows subtasks, due day and tags, and its status mark in its priority's colour", async ({
   page,
 }) => {
   await newUser(page)
@@ -73,14 +73,21 @@ test("A compact row shows subtasks, due day and tags, and its priority on the ch
   await expect(row).toContainText("Today")
   await expect(row).toContainText("home")
 
+  // The mark is the completion control, named for its status and priority
+  // since its shape and colour say nothing to a screen reader.
   const urgent = row.getByRole("checkbox", {
-    name: "Mark as done, priority P1",
+    name: "Mark as done (In progress, priority P1)",
   })
-  await expect(urgent).toHaveClass(/border-priority-p1/)
-  // A low priority is its own hue, not the same ring in another place.
+  await expect(urgent).not.toBeChecked()
+  await expect(urgent.locator("svg")).toHaveClass(/text-priority-p1/)
+  // A low priority is its own hue, not the same mark in another place.
   await expect(
-    started.getByRole("checkbox", { name: "Mark as done, priority P3" }),
-  ).toHaveClass(/border-priority-p3/)
+    started
+      .getByRole("checkbox", {
+        name: "Mark as done (In progress, priority P3)",
+      })
+      .locator("svg"),
+  ).toHaveClass(/text-priority-p3/)
 })
 
 test("The task list opens in compact rows, and switches to the table and back, keeping its filters", async ({

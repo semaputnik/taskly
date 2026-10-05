@@ -32,9 +32,9 @@ const capturePanel = (page: Page) =>
 const titleField = (page: Page) =>
   page.getByRole("textbox", { name: "Task title" })
 
-/** Open capture from the sidebar's Add Task action. */
+/** Open capture from the navigation's Add a task entry. */
 async function startCapture(page: Page) {
-  await page.getByRole("button", { name: "Add Task" }).click()
+  await page.getByRole("button", { name: "Add a task" }).first().click()
   await expect(titleField(page)).toBeFocused()
 }
 
@@ -228,7 +228,9 @@ test("The keyboard opens capture, and a run of them costs one gesture each", asy
   await newUser(page)
   await page.goto("/")
   // The shell has to be listening before a key means anything to it.
-  await expect(page.getByRole("button", { name: "Add Task" })).toBeVisible()
+  await expect(
+    page.getByRole("button", { name: "Add a task" }).first(),
+  ).toBeVisible()
 
   // From the dashboard, with no mouse.
   await page.keyboard.press("c")

@@ -62,7 +62,7 @@ export function WhileYouWereAway() {
           </p>
           <RouterLink
             to="/bots"
-            className="text-link mt-1 text-sm underline-offset-4 hover:underline"
+            className="text-link decoration-rule-strong mt-1 text-sm underline underline-offset-4 hover:decoration-current"
           >
             Connect a bot user
           </RouterLink>

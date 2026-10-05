@@ -77,7 +77,11 @@ def _open_occurrence(
     """The one open task with this title, asserting there is exactly one."""
     matching = [
         t
-        for t in _tasks(client, headers, status=["todo", "in_progress", "waiting"])
+        for t in _tasks(
+            client,
+            headers,
+            status=["backlog", "todo", "in_progress", "review", "waiting"],
+        )
         if t["title"] == title and t["parent_id"] is None
     ]
     assert len(matching) == 1, matching
@@ -275,7 +279,14 @@ def test_a_task_stops_recurring_when_its_recurrence_is_cleared(
     assert r.json()["recurrence"] is None
 
     _complete(client, headers, task["id"])
-    assert _tasks(client, headers, status=["todo", "in_progress", "waiting"]) == []
+    assert (
+        _tasks(
+            client,
+            headers,
+            status=["backlog", "todo", "in_progress", "review", "waiting"],
+        )
+        == []
+    )
 
 
 def test_a_completed_task_cannot_change_how_it_recurs(
@@ -422,7 +433,11 @@ def test_the_next_occurrence_copies_the_subtask_tree_not_completed(
     successor = _open_occurrence(client, headers, "Weekly review")
     by_title = {
         t["title"]: t
-        for t in _tasks(client, headers, status=["todo", "in_progress", "waiting"])
+        for t in _tasks(
+            client,
+            headers,
+            status=["backlog", "todo", "in_progress", "review", "waiting"],
+        )
     }
     assert set(by_title) == {
         "Weekly review",
@@ -461,7 +476,11 @@ def test_leaving_subtasks_uncompleted_still_starts_the_next_tree_fresh(
 
     open_titles = sorted(
         t["title"]
-        for t in _tasks(client, headers, status=["todo", "in_progress", "waiting"])
+        for t in _tasks(
+            client,
+            headers,
+            status=["backlog", "todo", "in_progress", "review", "waiting"],
+        )
     )
     assert open_titles == ["Fill the can", "Fill the can", "Water the plants"]
 
@@ -583,7 +602,7 @@ def test_completion_and_the_next_occurrence_commit_together(
 
     remaining = _tasks(client, headers)
     assert [t["id"] for t in remaining] == [task["id"]]
-    assert remaining[0]["status"] == "todo"
+    assert remaining[0]["status"] == "backlog"
 
 
 # --- Moving the due date of an open occurrence --------------------------------

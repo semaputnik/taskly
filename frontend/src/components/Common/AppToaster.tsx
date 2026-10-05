@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/sonner"
 import { useIsMobile } from "@/hooks/useMobile"
 
 /**
- * Where the Add Task button floats (below `md`), notices sit above it rather
+ * Where the Add a task button floats (below `md`), notices sit above it rather
  * than on it: its height and bottom gap, plus the safe area it keeps clear of,
  * plus a gap of their own. Sonner switches offsets at 600px, not at `md`, so
  * the same clearance is given to both of its offsets for the whole range.

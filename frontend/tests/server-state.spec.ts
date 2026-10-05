@@ -49,7 +49,7 @@ test("A captured task counts on the Projects list at once", async ({
   await expect(inbox).toContainText("No tasks")
 
   // Captured over the list, which lands the task in the Inbox.
-  await page.getByRole("button", { name: "Add Task" }).first().click()
+  await page.getByRole("button", { name: "Add a task" }).first().click()
   const title = page.getByRole("textbox", { name: "Task title" })
   await title.fill("Prune the roses")
   await title.press("Enter")

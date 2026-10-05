@@ -449,6 +449,9 @@ def _stage_copy(
     """A to-do copy of `source`'s own fields and tags, and nothing else."""
     copy = Task(
         title=source.title,
+        # Not Backlog, where a new task starts: the decision to do recurring
+        # work was made when its series was set up (ADR-0008).
+        status=TaskStatus.TODO,
         description=source.description,
         priority=source.priority,
         assignee_id=source.assignee_id,

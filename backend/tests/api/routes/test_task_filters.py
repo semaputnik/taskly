@@ -139,14 +139,16 @@ def test_filter_by_priority_treats_unset_as_p4(client: TestClient, db: Session) 
     assert sorted(_titles(client, headers, priority="P4")) == ["Bottom", "Unset"]
 
 
-OPEN = ["todo", "in_progress", "waiting"]
+OPEN = ["backlog", "todo", "in_progress", "review", "waiting"]
 
 
 def test_filter_by_one_or_more_statuses(client: TestClient, db: Session) -> None:
     headers = new_user_headers(client, db)
     for title, status in (
+        ("Noted", "backlog"),
         ("Planned", "todo"),
         ("Started", "in_progress"),
+        ("Handed over", "review"),
         ("Parked", "waiting"),
         ("Finished", "done"),
     ):
@@ -164,13 +166,16 @@ def test_filter_by_one_or_more_statuses(client: TestClient, db: Session) -> None
         "Planned",
         "Started",
     ]
+    assert _titles(client, headers, status="review") == ["Handed over"]
     assert sorted(_titles(client, headers, status=OPEN)) == [
+        "Handed over",
+        "Noted",
         "Parked",
         "Planned",
         "Started",
     ]
     # No status asked for is every status.
-    assert len(_titles(client, headers)) == 4
+    assert len(_titles(client, headers)) == 6
 
 
 def test_an_unknown_status_is_refused(client: TestClient, db: Session) -> None:

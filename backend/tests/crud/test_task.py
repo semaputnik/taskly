@@ -49,7 +49,7 @@ def test_create_task(db: Session) -> None:
     assert task.description == "2%"
     assert task.due_date == datetime.date(2026, 1, 1)
     assert task.priority == TaskPriority.P2
-    assert task.status is TaskStatus.TODO
+    assert task.status is TaskStatus.BACKLOG
     assert task.project_id == inbox.id
     assert task.owner_id == user.id
     assert task.assignee_id is None

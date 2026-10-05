@@ -76,7 +76,7 @@ Taskly is self-hosted, and the data stays on the owner's own server. That is the
 ## Evidence on Hand
 
 - `docs/features.md` holds the confirmed requirements. `docs/adr/` holds the decisions on recurrence, attachment storage and tags.
-- `frontend/public/assets/images/favicon.png` is the only brand asset in the repository.
+- The brand is the wordmark *Taskly* alone; `frontend/public/assets/images/favicon.svg` (its initial, ink on a rounded square) is the only brand asset in the repository.
 - No customers, testimonials, usage figures or pricing exist. Future work must not invent them.
 
 ## Product Principles

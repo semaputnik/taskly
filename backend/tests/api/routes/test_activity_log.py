@@ -89,7 +89,7 @@ def test_creating_a_task_is_logged(client: TestClient, db: Session) -> None:
     assert snapshot["project"] == {"id": project["id"], "name": "Home"}
     assert snapshot["priority"] == "P2"
     assert snapshot["tags"] == ["plumbing"]
-    assert snapshot["status"] == "todo"
+    assert snapshot["status"] == "backlog"
 
 
 def test_changing_a_task_is_logged_with_what_changed(
@@ -443,7 +443,7 @@ def test_resending_unchanged_fields_writes_nothing(
         title="Call the bank",
         description=None,
         tags=["money"],
-        status="todo",
+        status="backlog",
     )
 
     assert _log_after(client, headers, seen) == []

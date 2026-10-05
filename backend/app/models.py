@@ -464,14 +464,24 @@ class TaskPriority(StrEnum):
 
 class TaskStatus(StrEnum):
     """
-    Where a task stands (FR-01.4). Four fixed values rather than user-defined
-    ones (ADR-0004): every rule in the product only needs to know whether a
-    task is open or done, and the three open values tell apart who holds the
-    next move.
+    Where a task stands (FR-01.4). Six fixed values rather than user-defined
+    ones (ADR-0004, ADR-0008): every rule in the product only needs to know
+    whether a task is open or done, and the five open values tell apart
+    whether the work is decided on and who holds the next move. Declared in
+    the order the interface lists them.
+
+    A new task starts in `backlog`. A bot user hands finished work over by
+    moving it to `review` and assigning it to the owner; entering review
+    does not change the assignee on its own (FR-01.4a).
     """
 
+    # Written down but not yet decided on. Where every new task starts.
+    BACKLOG = "backlog"
     TODO = "todo"
     IN_PROGRESS = "in_progress"
+    # The doer has finished and the next move is the owner's: check the work
+    # and close it, or send it back. How a bot user hands work over.
+    REVIEW = "review"
     # Open, but the next move belongs to someone or something other than the
     # owner. Still open: waiting on a reply is not the work being finished.
     WAITING = "waiting"
@@ -731,7 +741,7 @@ class TaskCreate(TaskBase):
     # The owner's id, or the id of one of the owner's bot users (FR-01.7).
     assignee_id: uuid.UUID | None = None
     recurrence: Recurrence | None = None
-    status: TaskStatus = TaskStatus.TODO
+    status: TaskStatus = TaskStatus.BACKLOG
 
 
 # Properties to receive via API on update, all are optional
@@ -796,7 +806,7 @@ class Task(TaskBase, table=True):
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     status: TaskStatus = Field(
-        default=TaskStatus.TODO,
+        default=TaskStatus.BACKLOG,
         # Stored by value, so the partial index above reads the API's words.
         sa_type=SAEnum(  # type: ignore
             TaskStatus,

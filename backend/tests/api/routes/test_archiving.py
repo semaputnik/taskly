@@ -503,7 +503,7 @@ def test_an_archived_project_stays_readable(client: TestClient, db: Session) -> 
 FILTERS: list[dict[str, object]] = [
     {"tag": "focus"},
     {"priority": "P1"},
-    {"status": "todo"},
+    {"status": "backlog"},
     {"due_from": YESTERDAY.isoformat(), "due_to": YESTERDAY.isoformat()},
     {"overdue": True},
     {"assignee": "me"},

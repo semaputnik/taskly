@@ -31,7 +31,7 @@ test("A task is assigned to a bot user from the task form and found by it", asyn
   await page.goto("/tasks?view=table")
   // Captured in one field, then assigned in the panel that capture leaves
   // open — the same controls that edit a task any other day.
-  await page.getByRole("button", { name: "Add Task" }).click()
+  await page.getByRole("button", { name: "Add a task" }).first().click()
   const title = page.getByRole("textbox", { name: "Task title" })
   await title.fill("Sort the inbox")
   await title.press("Enter")
@@ -44,7 +44,7 @@ test("A task is assigned to a bot user from the task form and found by it", asyn
   )
   await page.keyboard.press("Escape")
 
-  await page.getByRole("button", { name: "Add Task" }).click()
+  await page.getByRole("button", { name: "Add a task" }).first().click()
   await title.fill("Call the bank")
   await title.press("Enter")
   await openCaptured(page)

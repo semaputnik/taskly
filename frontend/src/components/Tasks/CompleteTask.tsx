@@ -1,21 +1,25 @@
+import * as CheckboxPrimitive from "@radix-ui/react-checkbox"
+
 import type { TaskPublic } from "@/client"
 import { Checkbox } from "@/components/ui/checkbox"
 import { toastSuccess } from "@/lib/toasts"
 import { cn } from "@/lib/utils"
-import { PRIORITY_CHECK, priorityTone } from "./priority"
+import { StatusMark } from "./status"
+import { markName } from "./statuses"
 import { useTaskStatus } from "./useTaskWrites"
 
 interface CompleteTaskProps {
   task: TaskPublic
   /**
-   * Carry the task's priority on the checkbox itself — its ring in the
-   * priority's hue — for rows that have no priority column (the compact row).
-   * The priority is then part of the checkbox's name, since the ring alone
-   * says nothing to a screen reader.
+   * Draw the control as the task's status mark, in its priority's colour,
+   * rather than as a round checkbox — for rows that have neither a status nor
+   * a priority column (the compact row). The status and priority are then
+   * part of the control's name, since the shape and colour alone say nothing
+   * to a screen reader.
    */
-  showPriority?: boolean
+  asMark?: boolean
   /**
-   * This checkbox's row leaves the list when it is ticked, so confirm the
+   * This control's row leaves the list when it is ticked, so confirm the
    * move and offer the way back.
    *
    * Everywhere else the value on screen is the receipt and the write is
@@ -28,8 +32,7 @@ interface CompleteTaskProps {
 }
 
 /**
- * The round checkbox: the fastest way to close a task, whatever status it is
- * in (FR-01.5).
+ * The fastest way to close a task, whatever status it is in (FR-01.5).
  *
  * It is checked only when the task is done. Checking moves the task to done,
  * through the same path as every other status control, so open subtasks raise
@@ -38,7 +41,7 @@ interface CompleteTaskProps {
  */
 export function CompleteTask({
   task,
-  showPriority = false,
+  asMark = false,
   receipt = false,
   className,
 }: CompleteTaskProps) {
@@ -56,25 +59,44 @@ export function CompleteTask({
       : undefined,
   })
   const done = task.status === "done"
-  const tone = showPriority ? priorityTone(task.priority) : null
   const action = done ? "Reopen task" : "Mark as done"
+  const toggle = (checked: boolean) =>
+    void status.change(checked ? "done" : "todo")
+
+  if (asMark) {
+    return (
+      <>
+        {/* A checkbox in every way but its look: ticking it is the same act
+            as ticking the round one, and it says so to assistive technology. */}
+        <CheckboxPrimitive.Root
+          checked={done}
+          disabled={status.isPending}
+          onCheckedChange={(checked) => toggle(checked === true)}
+          aria-label={`${action} (${markName(task.status, task.priority)})`}
+          className={cn(
+            // The mark is 18px; the padding takes the target to 26px without
+            // moving it off the title's line.
+            "focus-visible:ring-ring/50 -m-1 shrink-0 rounded-full p-1 outline-none focus-visible:ring-[3px] disabled:opacity-50",
+            className,
+          )}
+        >
+          <StatusMark status={task.status} priority={task.priority} />
+        </CheckboxPrimitive.Root>
+        {status.prompt}
+      </>
+    )
+  }
 
   return (
     <>
       <Checkbox
         // Round: a square check in this table selects a row, and closing a
         // task is neither a selection nor a value — it is the task's state.
-        className={cn("rounded-full", tone && PRIORITY_CHECK[tone], className)}
+        className={cn("rounded-full", className)}
         checked={done}
         disabled={status.isPending}
-        onCheckedChange={(checked) =>
-          void status.change(checked === true ? "done" : "todo")
-        }
-        aria-label={
-          showPriority && task.priority
-            ? `${action}, priority ${task.priority}`
-            : action
-        }
+        onCheckedChange={(checked) => toggle(checked === true)}
+        aria-label={action}
       />
       {status.prompt}
     </>

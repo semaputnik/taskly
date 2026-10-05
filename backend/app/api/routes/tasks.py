@@ -176,7 +176,9 @@ def create_task(*, session: SessionDep, caller: CallerDep, task_in: TaskCreate) 
     Create a task, or a subtask of one. A task created without a project lands
     in the Inbox; a subtask follows its parent's project instead.
 
-    A task created with a recurrence is the first occurrence of its series.
+    A task starts in `backlog` unless the request names another status. A task
+    created with a recurrence is the first occurrence of its series; the
+    occurrences after it start in `todo`.
 
     A bot user creates only where its scope reaches — the Inbox included, which
     has to be in its scope like any other project. It applies its owner's tags
@@ -465,6 +467,13 @@ def update_task(
     Moving a task to done while it still has open subtasks is refused unless
     the request says what happens to them, through `subtasks`. Moving between
     open statuses never touches the subtasks.
+
+    Handing finished work over: a bot user that has done a task sets its
+    status to `review` and, by convention, assigns it to the owner
+    (`assignee_id` set to the owner's id) in the same request. The two are
+    independent — nothing assigns a task to the owner because it entered
+    review, and a task left assigned to the bot does not reach the owner's
+    dashboard (FR-01.4a, FR-06.7).
 
     Moving an occurrence of a recurring task to done creates the next one. Moving
     the due date of an open occurrence needs `due_date_scope` to say whether

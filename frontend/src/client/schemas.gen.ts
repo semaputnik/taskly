@@ -1580,7 +1580,7 @@ export const TaskCreateSchema = {
         },
         status: {
             $ref: '#/components/schemas/TaskStatus',
-            default: 'todo'
+            default: 'backlog'
         }
     },
     type: 'object',
@@ -1776,13 +1776,15 @@ export const TaskSortSchema = {
 export const TaskStatusSchema = {
     type: 'string',
     enum: [
+        'backlog',
         'todo',
         'in_progress',
+        'review',
         'waiting',
         'done'
     ],
     title: 'TaskStatus',
-    description: 'Where a task stands (FR-01.4). Four fixed values rather than user-defined\nones (ADR-0004): every rule in the product only needs to know whether a\ntask is open or done, and the three open values tell apart who holds the\nnext move.'
+    description: 'Where a task stands (FR-01.4). Six fixed values rather than user-defined\nones (ADR-0004, ADR-0008): every rule in the product only needs to know\nwhether a task is open or done, and the five open values tell apart\nwhether the work is decided on and who holds the next move. Declared in\nthe order the interface lists them.\n\nA new task starts in `backlog`. A bot user hands finished work over by\nmoving it to `review` and assigning it to the owner; entering review\ndoes not change the assignee on its own (FR-01.4a).'
 } as const;
 
 export const TaskUpdateSchema = {

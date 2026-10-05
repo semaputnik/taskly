@@ -251,7 +251,7 @@ def test_restoring_would_not_open_a_second_occurrence_of_the_same_series(
         for t in client.get(
             f"{API}/tasks/",
             headers=headers,
-            params={"status": ["todo", "in_progress", "waiting"]},
+            params={"status": ["backlog", "todo", "in_progress", "review", "waiting"]},
         ).json()["data"]
         if t["title"] == "Water plants"
     )

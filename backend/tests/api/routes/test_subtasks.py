@@ -81,7 +81,7 @@ def test_subtask_is_a_full_task(client: TestClient, db: Session) -> None:
     assert subtask["description"] == "Details"
     assert subtask["due_date"] == "2026-01-01"
     assert subtask["priority"] == "P1"
-    assert subtask["status"] == "todo"
+    assert subtask["status"] == "backlog"
 
     r = client.patch(
         f"{settings.API_V1_STR}/tasks/{subtask['id']}",
@@ -214,7 +214,7 @@ def test_completing_a_task_with_uncompleted_subtasks_is_refused(
     r = _complete(client, headers, root["id"])
     assert r.status_code == 409
     assert r.json()["detail"]["code"] == "task_has_uncompleted_subtasks"
-    assert _read_task(client, headers, root["id"])["status"] == "todo"
+    assert _read_task(client, headers, root["id"])["status"] == "backlog"
 
 
 def test_refusal_looks_at_the_whole_subtree(client: TestClient, db: Session) -> None:
@@ -229,7 +229,7 @@ def test_refusal_looks_at_the_whole_subtree(client: TestClient, db: Session) -> 
     r = _complete(client, headers, root["id"])
     assert r.status_code == 409
     assert r.json()["detail"]["code"] == "task_has_uncompleted_subtasks"
-    assert _read_task(client, headers, grandchild["id"])["status"] == "todo"
+    assert _read_task(client, headers, grandchild["id"])["status"] == "backlog"
 
 
 def test_refusal_is_distinct_from_other_client_errors(
@@ -262,8 +262,8 @@ def test_completing_with_subtasks_left_uncompleted(
     assert r.status_code == 200
     assert r.json()["status"] == "done"
 
-    assert _read_task(client, headers, child["id"])["status"] == "todo"
-    assert _read_task(client, headers, grandchild["id"])["status"] == "todo"
+    assert _read_task(client, headers, child["id"])["status"] == "backlog"
+    assert _read_task(client, headers, grandchild["id"])["status"] == "backlog"
 
 
 def test_completing_with_subtasks_completed_too(
@@ -294,7 +294,7 @@ def test_completing_every_subtask_leaves_the_parent_uncompleted(
         r = _complete(client, headers, task["id"])
         assert r.status_code == 200
 
-    assert _read_task(client, headers, root["id"])["status"] == "todo"
+    assert _read_task(client, headers, root["id"])["status"] == "backlog"
 
 
 def test_completing_a_parent_whose_subtasks_are_done_needs_no_directive(
