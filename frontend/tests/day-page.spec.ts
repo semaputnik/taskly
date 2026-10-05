@@ -172,7 +172,7 @@ test("The capture line makes the task at once, and the key still opens the draft
   await newUser(page)
   await page.goto("/")
 
-  const line = page.getByRole("textbox", { name: "Add a task" })
+  const line = page.getByRole("combobox", { name: "Add a task" })
   const sent = page.waitForRequest(
     (request) =>
       request.method() === "POST" && /\/tasks\/$/.test(request.url()),
@@ -218,7 +218,7 @@ test("An empty line makes nothing", async ({ page }) => {
   page.on("request", (request) => {
     if (request.method() === "POST") requests.push(request.url())
   })
-  const line = page.getByRole("textbox", { name: "Add a task" })
+  const line = page.getByRole("combobox", { name: "Add a task" })
   await line.press("Enter")
   await line.fill("   ")
   await line.press("Enter")
@@ -231,7 +231,7 @@ test("The notice's Open lands on the task's panel", async ({ page }) => {
   await newUser(page)
   await page.goto("/")
 
-  const line = page.getByRole("textbox", { name: "Add a task" })
+  const line = page.getByRole("combobox", { name: "Add a task" })
   await line.fill("Order milk")
   await line.press("Enter")
   await notice(page).getByRole("button", { name: "Open" }).click()
@@ -248,7 +248,7 @@ test("Undo deletes the task, and the activity log keeps both acts", async ({
   await newUser(page)
   await page.goto("/")
 
-  const line = page.getByRole("textbox", { name: "Add a task" })
+  const line = page.getByRole("combobox", { name: "Add a task" })
   await line.fill("Order milk")
   await line.press("Enter")
   await notice(page).getByRole("button", { name: "Undo" }).click()
@@ -412,7 +412,9 @@ test.describe("on a phone", () => {
 
     const top = async (locator: Locator) =>
       (await locator.boundingBox())?.y ?? Number.NaN
-    const capture = await top(page.getByRole("textbox", { name: "Add a task" }))
+    const capture = await top(
+      page.getByRole("combobox", { name: "Add a task" }),
+    )
     const date = await top(page.getByRole("heading", { level: 1 }))
     const overdue = await top(page.getByRole("heading", { name: /^Overdue/ }))
     const today = await top(page.getByRole("heading", { name: /^Due today/ }))

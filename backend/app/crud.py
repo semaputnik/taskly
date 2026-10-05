@@ -593,6 +593,10 @@ def _task_filters(*, owner_id: uuid.UUID, query: TaskQuery) -> list[Any]:
         )
         conditions.append(col(Task.id).in_(tagged))
 
+    if query.title is not None:
+        # `%` and `_` in the typed text are letters, not wildcards.
+        conditions.append(col(Task.title).icontains(query.title, autoescape=True))
+
     if query.priority is not None:
         if query.priority is TaskPriority.P4:
             # A task with no priority behaves as P4 (FR-01.3), so it answers to

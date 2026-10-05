@@ -589,6 +589,9 @@ class TaskQuery(SQLModel):
     # a reporter (FR-01.29).
     reporter_id: uuid.UUID | None = None
     tag: str | None = None
+    # Titles that contain this text, whatever its case (FR-06.14). Only the
+    # title is searched, and blank text is refused rather than matching all.
+    title: str | None = Field(default=None, min_length=1)
     priority: TaskPriority | None = None
     # Any of the listed statuses matches; none listed means every status. A
     # list rather than an "open" flag, so a client can ask for exactly the

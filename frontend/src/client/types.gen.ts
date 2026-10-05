@@ -1847,6 +1847,10 @@ export type tasksReadTasksData = {
          */
         tag?: string | null;
         /**
+         * Title
+         */
+        title?: string | null;
+        /**
          * Priority
          */
         priority?: TaskPriority | null;

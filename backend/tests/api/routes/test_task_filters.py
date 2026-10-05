@@ -10,6 +10,7 @@ from tests.utils.accounts import (
     create_bot_user,
     create_project,
     create_task_record,
+    issue_bot_headers,
     my_id,
 )
 from tests.utils.user import new_user_headers
@@ -530,3 +531,88 @@ def test_filter_by_another_users_task_as_parent_is_refused(
         params={"parent_id": parent["id"]},
     )
     assert r.status_code == 404
+
+
+def test_filter_by_title_contains_the_text_in_any_case(
+    client: TestClient, db: Session
+) -> None:
+    headers = new_user_headers(client, db)
+    create_task_record(client, headers, "Renew the Passport")
+    create_task_record(client, headers, "passport photos")
+    create_task_record(client, headers, "Book flights", description="passport")
+
+    assert sorted(_titles(client, headers, title="PASSPORT")) == [
+        "Renew the Passport",
+        "passport photos",
+    ]
+    assert _titles(client, headers, title="visa") == []
+
+
+def test_filter_by_title_reads_percent_and_underscore_literally(
+    client: TestClient, db: Session
+) -> None:
+    headers = new_user_headers(client, db)
+    create_task_record(client, headers, "Save 50% on rent")
+    create_task_record(client, headers, "Save 500 on rent")
+    create_task_record(client, headers, "snake_case rename")
+    create_task_record(client, headers, "snakeXcase rename")
+
+    assert _titles(client, headers, title="50%") == ["Save 50% on rent"]
+    assert _titles(client, headers, title="e_c") == ["snake_case rename"]
+
+
+def test_filter_by_title_combines_with_the_other_filters(
+    client: TestClient, db: Session
+) -> None:
+    headers = new_user_headers(client, db)
+    work_id = create_project(client, headers, "Work")
+    create_task_record(client, headers, "Plan the launch", project_id=work_id)
+    create_task_record(client, headers, "Plan the move")
+    create_task_record(client, headers, "Plan done", status="done")
+
+    assert sorted(_titles(client, headers, title="plan")) == [
+        "Plan done",
+        "Plan the launch",
+        "Plan the move",
+    ]
+    assert _titles(client, headers, title="plan", project_id=work_id) == [
+        "Plan the launch"
+    ]
+    assert sorted(
+        _titles(client, headers, title="plan", status=["backlog", "todo"])
+    ) == ["Plan the launch", "Plan the move"]
+
+
+def test_filter_by_title_is_scoped_to_the_owner(
+    client: TestClient, db: Session
+) -> None:
+    headers_a = new_user_headers(client, db)
+    headers_b = new_user_headers(client, db)
+    create_task_record(client, headers_a, "Shared words")
+    create_task_record(client, headers_b, "Shared words too")
+
+    assert _titles(client, headers_a, title="shared") == ["Shared words"]
+
+
+def test_filter_by_title_gives_a_bot_user_only_its_scope(
+    client: TestClient, db: Session
+) -> None:
+    headers = new_user_headers(client, db)
+    in_scope = create_project(client, headers, "In scope")
+    out_of_scope = create_project(client, headers, "Out of scope")
+    create_task_record(client, headers, "Invoice in scope", project_id=in_scope)
+    create_task_record(client, headers, "Invoice out", project_id=out_of_scope)
+    bot_headers = issue_bot_headers(
+        client, headers, project_ids=[in_scope], permissions=ALL_PERMISSIONS
+    )
+
+    assert _titles(client, bot_headers, title="invoice") == ["Invoice in scope"]
+
+
+def test_filter_by_an_empty_title_is_refused(client: TestClient, db: Session) -> None:
+    headers = new_user_headers(client, db)
+
+    r = client.get(
+        f"{settings.API_V1_STR}/tasks/", headers=headers, params={"title": ""}
+    )
+    assert r.status_code == 422

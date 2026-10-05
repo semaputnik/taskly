@@ -441,7 +441,7 @@ test("The capture line writes into the narrowed project, and into the Inbox othe
 
   // Narrowed: it says where, and writes there.
   await page.goto(`/tasks?project_id=${project.id}`)
-  const line = page.getByRole("textbox", {
+  const line = page.getByRole("combobox", {
     name: "Add a task to Kitchen rebuild",
   })
   await expect(line).toHaveAttribute(
@@ -468,7 +468,7 @@ test("The capture line writes into the narrowed project, and into the Inbox othe
 
   // Not narrowed: the Inbox, and the line says no project.
   await page.goto("/tasks")
-  const plain = page.getByRole("textbox", { name: "Add a task", exact: true })
+  const plain = page.getByRole("combobox", { name: "Add a task", exact: true })
   await expect(plain).toHaveAttribute("placeholder", "Add a task…")
   await plain.fill("Pick up the parcel")
   await plain.press("Enter")
@@ -524,7 +524,7 @@ test("Every filter and the order are focusable buttons with names and a visible 
 
   // Reached by the keyboard alone, in the order they are read in, each with
   // a ring (a 2px outline) of its own.
-  await page.getByRole("textbox", { name: "Add a task" }).focus()
+  await page.getByRole("combobox", { name: "Add a task" }).focus()
   for (const name of names) {
     await page.keyboard.press("Tab")
     // The capture line's key cap is not focusable, and nothing else sits
