@@ -570,6 +570,32 @@ export function SectionHeading({
   )
 }
 
+/**
+ * One section of a record: a heading over a hairline with its count in mono
+ * and, at the right, the section's own action. The section is a named region,
+ * so a screen reader can jump to it and a spec can find it.
+ */
+export function RecordSection({
+  title,
+  count,
+  action,
+  children,
+}: {
+  title: string
+  count?: React.ReactNode
+  action?: React.ReactNode
+  children: React.ReactNode
+}) {
+  return (
+    <section aria-label={title} className={cn("pt-[18px] pb-1", gutter)}>
+      <SectionHeading count={count} action={action}>
+        {title}
+      </SectionHeading>
+      {children}
+    </section>
+  )
+}
+
 /** The section a record's description sits in, on a record and a draft. */
 export function DescriptionSection({
   children,
@@ -577,10 +603,9 @@ export function DescriptionSection({
   children: React.ReactNode
 }) {
   return (
-    <section className={cn("pt-[18px] pb-1", gutter)}>
-      <SectionHeading>Description</SectionHeading>
+    <RecordSection title="Description">
       <div className="pt-2">{children}</div>
-    </section>
+    </RecordSection>
   )
 }
 

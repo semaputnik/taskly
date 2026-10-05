@@ -273,7 +273,7 @@ test("The shortcut never steals a keystroke from a field being typed into", asyn
   await expect(name).toHaveValue("Coastal routec")
 })
 
-test("A subtask is captured from its parent's Subtasks tab", async ({
+test("A subtask is captured inline in its parent's Subtasks section", async ({
   page,
 }) => {
   await newUser(page)
@@ -293,8 +293,15 @@ test("A subtask is captured from its parent's Subtasks tab", async ({
 
   await page.goto(`/tasks?view=table&task=${parent.id}`)
   const panel = page.getByRole("complementary", { name: "Pack the study" })
-  await panel.getByRole("tab", { name: "Subtasks" }).click()
-  const subtaskField = panel.getByRole("textbox", { name: "Subtask title" })
+  const subtasks = panel.getByRole("region", { name: "Subtasks" })
+  const subtaskField = subtasks.getByRole("textbox", { name: "New subtask" })
+  await expect(subtaskField).toHaveAttribute("placeholder", "Add a subtask…")
+  const creates: Record<string, unknown>[] = []
+  page.on("request", (r) => {
+    if (r.method() === "POST" && r.url().endsWith("/tasks/")) {
+      creates.push(r.postDataJSON())
+    }
+  })
   await subtaskField.fill("Empty the desk drawers")
   await subtaskField.press("Enter")
 
@@ -304,6 +311,26 @@ test("A subtask is captured from its parent's Subtasks tab", async ({
   ).toBeVisible()
   await expect(subtaskField).toHaveValue("")
   await expect(page).toHaveURL(new RegExp(`task=${parent.id}`))
+  // One request, with defaults: the title, the parent, nothing else.
+  expect(creates).toHaveLength(1)
+  expect(creates[0]).toMatchObject({
+    title: "Empty the desk drawers",
+    parent_id: parent.id,
+    due_date: null,
+    priority: null,
+  })
+  expect(creates[0].status).toBeUndefined()
+  // The heading counts progress, and the field stays for the next one.
+  await expect(
+    subtasks.getByRole("heading", { name: /Subtasks\s*0\/1/ }),
+  ).toBeVisible()
+  await expect(subtaskField).toBeFocused()
+
+  // Closing the line moves the count and strikes the title.
+  await subtasks.getByRole("checkbox", { name: /Mark as done/ }).click()
+  await expect(
+    subtasks.getByRole("heading", { name: /Subtasks\s*1\/1/ }),
+  ).toBeVisible()
 
   // The child follows its parent's project rather than owning one.
   await panel.getByRole("button", { name: "Empty the desk drawers" }).click()
@@ -311,9 +338,43 @@ test("A subtask is captured from its parent's Subtasks tab", async ({
     name: "Empty the desk drawers",
   })
   await expect(child).toContainText("Follows its parent task")
+  await expect(child.getByRole("combobox", { name: "Status" })).toContainText(
+    "Done",
+  )
   await expect(child).toContainText(
     "Only a task at the top of its tree can repeat",
   )
+})
+
+test("A refused subtask hands its title back and keeps the field", async ({
+  page,
+}) => {
+  await newUser(page)
+  const { url, headers } = await api(page)
+  const parent = await (
+    await page.request.post(`${url}/tasks/`, {
+      headers,
+      data: { title: "Pack the study" },
+    })
+  ).json()
+  await page.route("**/api/v1/tasks/", (route) =>
+    route.request().method() === "POST"
+      ? route.fulfill({
+          status: 503,
+          contentType: "application/json",
+          body: JSON.stringify({ detail: "The server is busy" }),
+        })
+      : route.fallback(),
+  )
+
+  await page.goto(`/tasks?view=table&task=${parent.id}`)
+  const panel = page.getByRole("complementary", { name: "Pack the study" })
+  const field = panel.getByRole("textbox", { name: "New subtask" })
+  await field.fill("Empty the desk drawers")
+  await field.press("Enter")
+
+  await expect(page.getByText("The server is busy")).toBeVisible()
+  await expect(field).toHaveValue("Empty the desk drawers")
 })
 
 test("A captured task is one creation entry in the activity log", async ({
@@ -503,7 +564,8 @@ test("Enter creates the whole draft as one task and one log entry", async ({
     record.getByRole("button", { name: "Remove tag finance" }),
   ).toBeVisible()
   // What only a record has joins it.
-  await expect(record.getByRole("tab", { name: "Comments" })).toBeVisible()
+  await expect(record.getByRole("region", { name: "Comments" })).toBeVisible()
+  await expect(record.getByRole("tab")).toHaveCount(0)
   await expect(record.getByRole("combobox", { name: "Status" })).toBeVisible()
   expect(creates).toHaveLength(1)
   expect(creates[0]).toMatchObject({

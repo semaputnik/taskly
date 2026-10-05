@@ -135,7 +135,5 @@ test("A notice raised from inside a panel is at the top of the screen too", asyn
   expect(Math.abs(place.x + place.width / 2 - 1280 / 2)).toBeLessThan(2)
   // And its action works from there, the column being no modal.
   await notice.getByRole("button", { name: "Undo" }).click()
-  await expect(
-    panel.getByRole("tabpanel").getByText("Sign it by Friday"),
-  ).toBeVisible()
+  await expect(panel.getByText("Sign it by Friday")).toBeVisible()
 })
