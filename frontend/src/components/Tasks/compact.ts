@@ -1,4 +1,5 @@
 import type { TaskPublic } from "@/client"
+import { describeRecurrence } from "./recurrence"
 
 /**
  * The words a compact task row puts on a task: its due day said the way a
@@ -72,4 +73,56 @@ export function subtaskProgress(
   const total = task.subtask_count ?? 0
   if (total === 0) return null
   return `${task.subtasks_done ?? 0}/${total}`
+}
+
+/**
+ * One thing the meta line says about a task. The row draws each with its own
+ * glyph; the due day also carries its tone.
+ */
+export type MetaItem =
+  | { kind: "subtasks"; text: string }
+  | { kind: "due"; text: string; tone: DueTone }
+  | { kind: "recurrence"; text: string }
+  | { kind: "tag"; text: string }
+  | { kind: "project"; text: string }
+
+/**
+ * What the line beneath a task's title says, in the order it says it: how far
+ * through its subtasks it is, when it is due, how it repeats, its tags, and
+ * last its project, which the row sets at the far right. Whatever the task
+ * does not have is left out, so a task with nothing to say has an empty meta
+ * line and its row stays one line tall.
+ */
+export function metaLine(
+  task: Partial<
+    Pick<
+      TaskPublic,
+      | "subtask_count"
+      | "subtasks_done"
+      | "due_date"
+      | "recurrence"
+      | "tags"
+      | "status"
+    >
+  >,
+  { today, projectName }: { today: string; projectName?: string },
+): MetaItem[] {
+  const items: MetaItem[] = []
+  const progress = subtaskProgress(task)
+  if (progress) items.push({ kind: "subtasks", text: progress })
+  if (task.due_date) {
+    const due = describeDue(task.due_date, today, {
+      done: task.status === "done",
+    })
+    items.push({ kind: "due", ...due })
+  }
+  if (task.recurrence) {
+    items.push({
+      kind: "recurrence",
+      text: describeRecurrence(task.recurrence),
+    })
+  }
+  for (const tag of task.tags ?? []) items.push({ kind: "tag", text: tag })
+  if (projectName) items.push({ kind: "project", text: projectName })
+  return items
 }
