@@ -2,7 +2,7 @@
 target: task panel and record column (slice 2)
 total_score: 30
 max_score: 40
-na_heuristics: 
+na_heuristics:
 p0_count: 0
 p1_count: 0
 target_identity: "file:/Users/semaputnikov/Documents/Projects/taskly/.claude/worktrees/agent-ace929aa05201fc44/frontend/src/components/Tasks/TaskDetail.tsx"
