@@ -40,7 +40,8 @@ for (const theme of ["light", "dark"] as const) {
       expect(await textOn(subtitle, ground)).toBeGreaterThanOrEqual(AA)
 
       // A text link is read on the page ground and on the sheets laid on it.
-      const link = page.getByRole("link", { name: "Connect a bot user" })
+      // The empty Changes log points at the bot users in its sentence.
+      const link = page.getByRole("link", { name: "bot users", exact: true })
       expect(await textOn(link, ground)).toBeGreaterThanOrEqual(AA)
       expect(
         await textOn(link, await token(page, "--card")),
