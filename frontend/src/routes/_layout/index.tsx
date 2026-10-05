@@ -1,85 +1,116 @@
 import { usePrefetchQuery } from "@tanstack/react-query"
 import { createFileRoute } from "@tanstack/react-router"
-import { Suspense } from "react"
+import { Suspense, useEffect, useState } from "react"
 
+import { CaptureLine } from "@/components/Dashboard/CaptureLine"
+import { Changes, ChangesPending } from "@/components/Dashboard/Changes"
 import {
-  InProgress,
-  InProgressPending,
-  inProgressQuery,
-} from "@/components/Dashboard/InProgress"
-import { NeedsYou, NeedsYouPending } from "@/components/Dashboard/NeedsYou"
+  botChangesQuery,
+  Day,
+  DayHeading,
+  DayPending,
+} from "@/components/Dashboard/DayPage"
+import { markSeen, visitSince } from "@/components/Dashboard/day"
 import {
-  recentActivityQuery,
-  WhileYouWereAway,
-  WhileYouWereAwayPending,
-} from "@/components/Dashboard/WhileYouWereAway"
-import { partOfDay } from "@/components/Dashboard/when"
-import useAuth from "@/hooks/useAuth"
+  MyWork,
+  MyWorkPending,
+  usePrefetchMyWork,
+} from "@/components/Dashboard/MyWork"
+import { Section } from "@/components/Dashboard/Section"
+import { changesQuery } from "@/components/Dashboard/shared"
 
 export const Route = createFileRoute("/_layout/")({
   component: Dashboard,
   head: () => ({
     meta: [
       {
-        title: "Dashboard - Taskly",
+        title: "Today - Taskly",
       },
     ],
   }),
 })
 
-/** The first name alone, where there is one: a greeting is not a form field. */
-function greetingName(fullName?: string | null, email?: string): string {
-  const name = fullName?.trim()
-  if (name) {
-    return name.split(/\s+/)[0]
-  }
-  return email?.split("@")[0] ?? "there"
+/** When this visit counts the bot users' changes from, fixed for the session. */
+function useVisitSince(): string | null {
+  const [since] = useState(() => {
+    // Merely reaching for storage throws where site data is blocked.
+    try {
+      return visitSince(
+        { local: localStorage, session: sessionStorage },
+        new Date(),
+      )
+    } catch {
+      return null
+    }
+  })
+
+  // The page is read until the reader leaves it — another screen, another
+  // tab, or the browser closing — so that is when the look is remembered.
+  useEffect(() => {
+    const seen = () => {
+      try {
+        markSeen({ local: localStorage, session: sessionStorage }, new Date())
+      } catch {
+        // As above: blocked storage only costs the next visit its count.
+      }
+    }
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") seen()
+    }
+    document.addEventListener("visibilitychange", onVisibility)
+    window.addEventListener("pagehide", seen)
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility)
+      window.removeEventListener("pagehide", seen)
+      seen()
+    }
+  }, [])
+  return since
 }
 
+/**
+ * The day page: today read as one column. The capture line first, then the
+ * date and one sentence of what needs the reader, then the date bands, and
+ * beneath them what is in the reader's hands and what changed.
+ */
 function Dashboard() {
-  const { user: currentUser } = useAuth()
-  // Started here, beside the queue's own requests, rather than after the
-  // queue has suspended and resumed: the sheets beside it are not rendered
-  // until it resumes.
-  usePrefetchQuery(recentActivityQuery())
-  usePrefetchQuery(inProgressQuery())
+  const since = useVisitSince()
+  // Started here, beside the bands' own requests, rather than after the
+  // bands have suspended and resumed: the sections below them are not
+  // rendered until they resume.
+  usePrefetchQuery(changesQuery(since))
+  usePrefetchQuery(botChangesQuery(since))
+  usePrefetchMyWork()
 
   return (
-    <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">
-          Good {partOfDay()},{" "}
-          {greetingName(currentUser?.full_name, currentUser?.email)}
-        </h1>
-        <p className="text-muted-foreground">
-          What needs you now, and what changed without you
-        </p>
+    <div className="max-w-[820px]">
+      <div className="mb-6 md:mb-9">
+        <CaptureLine />
       </div>
+      {/* Needs nothing from the server, so it is never a skeleton. */}
+      <DayHeading />
 
-      {/* The queue leads; beside it, what is already under way, then the log
-          as context — not below the fold. On a phone the three stack in that
-          order. */}
-      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
-        {/* One boundary: every sheet appears in the same frame, so none moves
-            another once it is drawn. */}
-        <Suspense
-          fallback={
-            <>
-              <NeedsYouPending />
-              <div className="flex flex-col gap-6">
-                <InProgressPending />
-                <WhileYouWereAwayPending />
-              </div>
-            </>
-          }
-        >
-          <NeedsYou />
-          <div className="flex flex-col gap-6">
-            <InProgress />
-            <WhileYouWereAway />
-          </div>
-        </Suspense>
-      </div>
+      {/* One boundary: every section appears in the same frame, so none
+          moves another once it is drawn. */}
+      <Suspense
+        fallback={
+          <>
+            <DayPending />
+            <MyWorkPending />
+            <ChangesPending />
+          </>
+        }
+      >
+        <Section name="What is due">
+          <Day since={since} />
+        </Section>
+        <Section name="In my hands">
+          <MyWork />
+        </Section>
+        <Section name="Changes">
+          <Changes since={since} />
+        </Section>
+      </Suspense>
     </div>
   )
 }

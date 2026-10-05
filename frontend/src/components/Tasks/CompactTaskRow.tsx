@@ -54,6 +54,8 @@ export function CompactTaskRow({
   task,
   projectName,
   receipt = false,
+  flush = false,
+  children,
 }: {
   task: TaskPublic
   /** Set at the far right of the meta line. */
@@ -63,6 +65,13 @@ export function CompactTaskRow({
    * mark confirms the move and offers the way back (ADR-0006).
    */
   receipt?: boolean
+  /**
+   * Set on a page that is its own column, with no frame around the list:
+   * the line runs to the column's edges, as the rules between lines do.
+   */
+  flush?: boolean
+  /** Set under the meta line, in the title's column: a line about the task. */
+  children?: React.ReactNode
 }) {
   const done = task.status === "done"
   const { facts, project } = metaLine(task, {
@@ -71,7 +80,12 @@ export function CompactTaskRow({
   })
 
   return (
-    <div className="hover:from-hover flex gap-3 border-b border-rule px-4 py-2.5 transition-colors last:border-b-0 hover:bg-linear-to-r hover:to-transparent hover:to-85%">
+    <div
+      className={cn(
+        "hover:from-hover border-rule flex gap-3 border-b py-2.5 transition-colors last:border-b-0 hover:bg-linear-to-r hover:to-transparent hover:to-85%",
+        flush ? "px-0" : "px-4",
+      )}
+    >
       {/* Held to the title's line, not centred on the whole task line, and
           nudged so the two share a centre: the mark itself sits a pixel
           down, inside its larger target. */}
@@ -125,6 +139,7 @@ export function CompactTaskRow({
             )}
           </div>
         )}
+        {children}
       </div>
     </div>
   )
@@ -147,9 +162,14 @@ function Fact({ fact }: { fact: MetaFact }) {
 }
 
 /** The line while its task is on its way: the same two lines, in outline. */
-export function CompactTaskRowPending() {
+export function CompactTaskRowPending({ flush = false }: { flush?: boolean }) {
   return (
-    <div className="flex gap-3 border-b border-rule px-4 py-2.5 last:border-b-0">
+    <div
+      className={cn(
+        "border-rule flex gap-3 border-b py-2.5 last:border-b-0",
+        flush ? "px-0" : "px-4",
+      )}
+    >
       <Skeleton className="mt-px size-[1.125rem] shrink-0 rounded-full" />
       <div className="flex flex-1 flex-col gap-1.5">
         <Skeleton className="h-4 w-48 max-w-full" />

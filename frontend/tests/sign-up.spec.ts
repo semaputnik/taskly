@@ -1,160 +1,66 @@
-import { expect, type Page, test } from "@playwright/test"
-
-import { randomEmail, randomPassword } from "./utils/random"
+import { expect, test } from "@playwright/test"
+import {
+  addVirtualAuthenticator,
+  registerWithPasskey,
+  withoutPasskeySupport,
+} from "./utils/passkeys.ts"
+import { createUser } from "./utils/privateApi.ts"
+import { randomEmail } from "./utils/random"
 
 test.use({ storageState: { cookies: [], origins: [] } })
 
-const fillForm = async (
-  page: Page,
-  full_name: string,
-  email: string,
-  password: string,
-  confirm_password: string,
-) => {
-  await page.getByTestId("full-name-input").fill(full_name)
+test("Registering asks for an email and nothing else", async ({ page }) => {
+  await page.goto("/signup")
+
+  await expect(page.getByTestId("email-input")).toBeEditable()
+  await expect(
+    page.getByRole("button", { name: "Create account" }),
+  ).toBeVisible()
+  await expect(page.getByLabel(/password/i)).toHaveCount(0)
+  await expect(page.getByRole("link", { name: "Sign in" })).toBeVisible()
+})
+
+test("Registering makes a passkey and signs in", async ({ page }) => {
+  const authenticator = await addVirtualAuthenticator(page)
+
+  await registerWithPasskey(page, randomEmail())
+
+  const [passkey] = await authenticator.credentials()
+  // Discoverable, so signing in can ask for nothing (FR-12.3).
+  expect(passkey.isResidentCredential).toBe(true)
+  await page.goto("/settings?tab=passkeys")
+  await expect(
+    page.getByTestId("passkey-list").getByRole("listitem"),
+  ).toHaveCount(1)
+})
+
+test("Registering a taken email is refused", async ({ page }) => {
+  await addVirtualAuthenticator(page)
+  const email = randomEmail()
+  await createUser({ email })
+
+  await page.goto("/signup")
   await page.getByTestId("email-input").fill(email)
-  await page.getByTestId("password-input").fill(password)
-  await page.getByTestId("confirm-password-input").fill(confirm_password)
-}
+  await page.getByRole("button", { name: "Create account" }).click()
 
-const verifyInput = async (page: Page, testId: string) => {
-  const input = page.getByTestId(testId)
-  await expect(input).toBeVisible()
-  await expect(input).toHaveText("")
-  await expect(input).toBeEditable()
-}
-
-test("Inputs are visible, empty and editable", async ({ page }) => {
-  await page.goto("/signup")
-
-  await verifyInput(page, "full-name-input")
-  await verifyInput(page, "email-input")
-  await verifyInput(page, "password-input")
-  await verifyInput(page, "confirm-password-input")
+  await expect(
+    page.getByText("An account with this email already exists."),
+  ).toBeVisible()
+  await expect(page).toHaveURL(/\/signup/)
 })
 
-test("Sign Up button is visible", async ({ page }) => {
+test("Registering with an invalid email", async ({ page }) => {
   await page.goto("/signup")
-
-  await expect(page.getByRole("button", { name: "Sign Up" })).toBeVisible()
-})
-
-test("Log In link is visible", async ({ page }) => {
-  await page.goto("/signup")
-
-  await expect(page.getByRole("link", { name: "Log In" })).toBeVisible()
-})
-
-test("Sign up with valid name, email, and password", async ({ page }) => {
-  const full_name = "Test User"
-  const email = randomEmail()
-  const password = randomPassword()
-
-  await page.goto("/signup")
-  await fillForm(page, full_name, email, password, password)
-  await page.getByRole("button", { name: "Sign Up" }).click()
-})
-
-test("Sign up with invalid email", async ({ page }) => {
-  await page.goto("/signup")
-
-  await fillForm(
-    page,
-    "Playwright Test",
-    "invalid-email",
-    "changethis",
-    "changethis",
-  )
-  await page.getByRole("button", { name: "Sign Up" }).click()
+  await page.getByTestId("email-input").fill("invalid-email")
+  await page.getByRole("button", { name: "Create account" }).click()
 
   await expect(page.getByText("Invalid email address")).toBeVisible()
 })
 
-test("Sign up with existing email", async ({ page }) => {
-  const fullName = "Test User"
-  const email = randomEmail()
-  const password = randomPassword()
-
+test("A browser without passkeys cannot register", async ({ page }) => {
+  await withoutPasskeySupport(page)
   await page.goto("/signup")
 
-  await fillForm(page, fullName, email, password, password)
-  await page.getByRole("button", { name: "Sign Up" }).click()
-  await expect(page).toHaveURL(/\/login$/)
-
-  await page.goto("/signup")
-
-  await fillForm(page, fullName, email, password, password)
-  await page.getByRole("button", { name: "Sign Up" }).click()
-
-  await expect(
-    page.getByText("The user with this email already exists in the system"),
-  ).toBeVisible()
-})
-
-test("Sign up with weak password", async ({ page }) => {
-  const fullName = "Test User"
-  const email = randomEmail()
-  const password = "weak"
-
-  await page.goto("/signup")
-
-  await fillForm(page, fullName, email, password, password)
-  await page.getByRole("button", { name: "Sign Up" }).click()
-
-  await expect(
-    page.getByText("Password must be at least 8 characters"),
-  ).toBeVisible()
-})
-
-test("Sign up with mismatched passwords", async ({ page }) => {
-  const fullName = "Test User"
-  const email = randomEmail()
-  const password = randomPassword()
-  const password2 = randomPassword()
-
-  await page.goto("/signup")
-
-  await fillForm(page, fullName, email, password, password2)
-  await page.getByRole("button", { name: "Sign Up" }).click()
-
-  await expect(page.getByText("The passwords don't match")).toBeVisible()
-})
-
-test("Sign up with missing full name", async ({ page }) => {
-  const fullName = ""
-  const email = randomEmail()
-  const password = randomPassword()
-
-  await page.goto("/signup")
-
-  await fillForm(page, fullName, email, password, password)
-  await page.getByRole("button", { name: "Sign Up" }).click()
-
-  await expect(page.getByText("Full Name is required")).toBeVisible()
-})
-
-test("Sign up with missing email", async ({ page }) => {
-  const fullName = "Test User"
-  const email = ""
-  const password = randomPassword()
-
-  await page.goto("/signup")
-
-  await fillForm(page, fullName, email, password, password)
-  await page.getByRole("button", { name: "Sign Up" }).click()
-
-  await expect(page.getByText("Invalid email address")).toBeVisible()
-})
-
-test("Sign up with missing password", async ({ page }) => {
-  const fullName = ""
-  const email = randomEmail()
-  const password = ""
-
-  await page.goto("/signup")
-
-  await fillForm(page, fullName, email, password, password)
-  await page.getByRole("button", { name: "Sign Up" }).click()
-
-  await expect(page.getByText("Password is required")).toBeVisible()
+  await expect(page.getByTestId("passkeys-unsupported")).toBeVisible()
+  await expect(page.getByTestId("email-input")).toHaveCount(0)
 })

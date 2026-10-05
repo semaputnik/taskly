@@ -1,6 +1,5 @@
 import { expect, test } from "@playwright/test"
-import { createUser } from "./utils/privateApi.ts"
-import { randomEmail, randomPassword } from "./utils/random"
+import { randomEmail } from "./utils/random"
 import { logInUser } from "./utils/user"
 
 test.use({ storageState: { cookies: [], origins: [] } })
@@ -10,9 +9,7 @@ test("A bot user's comment names the bot and offers no edit or delete", async ({
   request,
 }) => {
   const email = randomEmail()
-  const password = randomPassword()
-  await createUser({ email, password })
-  await logInUser(page, email, password)
+  await logInUser(page, email)
 
   // Everything up to the comment happens over the API, as an integration
   // would do it; what is under test is how the thread shows it.

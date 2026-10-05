@@ -1,7 +1,6 @@
 import { expect, type Page, test } from "@playwright/test"
 import { newUser, userApi } from "./utils/account"
-import { createUser } from "./utils/privateApi.ts"
-import { randomEmail, randomPassword } from "./utils/random"
+import { randomEmail } from "./utils/random"
 import { logInUser } from "./utils/user"
 
 test.use({ storageState: { cookies: [], origins: [] } })
@@ -50,10 +49,8 @@ test("Another user's record reads exactly like a missing one", async ({
   })
 
   const email = randomEmail()
-  const password = randomPassword()
-  await createUser({ email, password })
   await page.evaluate(() => localStorage.removeItem("access_token"))
-  await logInUser(page, email, password)
+  await logInUser(page, email)
 
   await expectCannotOpen(page, "/tasks", `task=${theirs.id}`)
   await expect(page.getByText("Private plans")).toHaveCount(0)

@@ -1,4 +1,4 @@
-import { formatDayOf, isoDay } from "@/lib/dates"
+import { isoDay } from "@/lib/dates"
 
 /**
  * Dates the dashboard asks the API about, and the words it puts on them.
@@ -17,24 +17,3 @@ function shiftDays(days: number): Date {
 export const today = () => isoDay(new Date())
 export const tomorrow = () => isoDay(shiftDays(1))
 export const inAWeek = () => isoDay(shiftDays(7))
-
-/** "4h ago" for an activity timestamp, shrinking to a date after a week. */
-export function timeAgo(timestamp: string): string {
-  const then = new Date(timestamp)
-  const minutes = Math.round((Date.now() - then.getTime()) / 60_000)
-  if (minutes < 1) return "just now"
-  if (minutes < 60) return `${minutes}m ago`
-  const hours = Math.round(minutes / 60)
-  if (hours < 24) return `${hours}h ago`
-  const days = Math.round(hours / 24)
-  if (days < 7) return `${days}d ago`
-  return formatDayOf(timestamp)
-}
-
-/** The half of the day the reader is in, for the greeting. */
-export function partOfDay(): "morning" | "afternoon" | "evening" {
-  const hour = new Date().getHours()
-  if (hour < 12) return "morning"
-  if (hour < 18) return "afternoon"
-  return "evening"
-}

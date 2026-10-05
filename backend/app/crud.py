@@ -6,15 +6,13 @@ from collections.abc import Collection, Iterable, Sequence
 from datetime import UTC, date, datetime, timedelta
 from typing import Any, NamedTuple
 
-from sqlalchemy import and_, case, nullslast, or_
+from sqlalchemy import ARRAY, Text, and_, case, literal, nullslast, or_
 from sqlalchemy.orm import aliased
 from sqlmodel import Session, col, func, select
 
 from app.core.security import (
     generate_bot_token,
-    get_password_hash,
     hash_bot_token,
-    verify_password,
 )
 from app.models import (
     ActivityAction,
@@ -57,28 +55,36 @@ from app.models import (
 )
 
 
-def create_user(*, session: Session, user_create: UserCreate) -> User:
-    db_obj = User.model_validate(
-        user_create, update={"hashed_password": get_password_hash(user_create.password)}
-    )
+def create_user(
+    *,
+    session: Session,
+    user_create: UserCreate,
+    user_id: uuid.UUID | None = None,
+    commit: bool = True,
+) -> User:
+    """
+    Create a user and their Inbox. `user_id` is for registering, where the
+    account's id is fixed before it exists: it is what the first passkey is
+    made under. With `commit=False` the caller commits, so the account and
+    its first passkey land together.
+    """
+    db_obj = User.model_validate(user_create)
+    if user_id is not None:
+        db_obj.id = user_id
     session.add(db_obj)
     # Flush so the user row exists before the FK-dependent Inbox insert, while
     # keeping both inserts in the same transaction as the eventual commit.
     session.flush()
     session.add(Project(name="Inbox", is_inbox=True, owner_id=db_obj.id))
-    session.commit()
-    session.refresh(db_obj)
+    if commit:
+        session.commit()
+        session.refresh(db_obj)
     return db_obj
 
 
 def update_user(*, session: Session, db_user: User, user_in: UserUpdate) -> Any:
     user_data = user_in.model_dump(exclude_unset=True)
-    extra_data = {}
-    if "password" in user_data:
-        password = user_data["password"]
-        hashed_password = get_password_hash(password)
-        extra_data["hashed_password"] = hashed_password
-    db_user.sqlmodel_update(user_data, update=extra_data)
+    db_user.sqlmodel_update(user_data)
     session.add(db_user)
     session.commit()
     session.refresh(db_user)
@@ -1428,29 +1434,6 @@ def delete_attachment(*, session: Session, attachment: Attachment) -> None:
     session.commit()
 
 
-# Dummy hash to use for timing attack prevention when user is not found
-# This is an Argon2 hash of a random password, used to ensure constant-time comparison
-DUMMY_HASH = "$argon2id$v=19$m=65536,t=3,p=4$MjQyZWE1MzBjYjJlZTI0Yw$YTU4NGM5ZTZmYjE2NzZlZjY0ZWY3ZGRkY2U2OWFjNjk"
-
-
-def authenticate(*, session: Session, email: str, password: str) -> User | None:
-    db_user = get_user_by_email(session=session, email=email)
-    if not db_user:
-        # Prevent timing attacks by running password verification even when user doesn't exist
-        # This ensures the response time is similar whether or not the email exists
-        verify_password(password, DUMMY_HASH)
-        return None
-    verified, updated_password_hash = verify_password(password, db_user.hashed_password)
-    if not verified:
-        return None
-    if updated_password_hash:
-        db_user.hashed_password = updated_password_hash
-        session.add(db_user)
-        session.commit()
-        session.refresh(db_user)
-    return db_user
-
-
 def create_bot_user(
     *, session: Session, bot_user_create: BotUserCreate, owner_id: uuid.UUID
 ) -> BotUser:
@@ -1590,4 +1573,100 @@ def get_bot_user_refs(
     return {
         bot.id: BotUserRef(id=bot.id, name=bot.name, deleted=bot.deleted_at is not None)
         for bot in bots
+    }
+
+
+class ReviewMove(NamedTuple):
+    """The bot user that moved a task into Review, and when."""
+
+    bot_user_id: uuid.UUID
+    at: datetime
+
+
+# Every entry that names one task and can say its status: a task filed in
+# one, a move between open statuses, and a move into or out of done. A plain
+# edit, an assignment or a restore leaves the status where it was, so it says
+# nothing about how the task got there. Batches name their tasks in their
+# details instead, and are matched there.
+_STATUS_ACTIONS = (
+    ActivityAction.TASK_CREATED,
+    ActivityAction.TASK_STATUS_CHANGED,
+    ActivityAction.TASK_REOPENED,
+    ActivityAction.TASK_COMPLETED,
+)
+
+
+def _status_move(entry: ActivityEntry) -> tuple[list[str], str | None]:
+    """
+    The tasks `entry` set a status on, as the log writes their ids, and the
+    status it left them in, or None if it set none. A batch names its tasks
+    in its details; every other entry is about its own entity.
+    """
+    details = entry.details
+    match entry.action:
+        case ActivityAction.TASKS_BULK_CHANGED:
+            changes = details.get("changes", {})
+            return details.get("task_ids", []), changes.get("status")
+        case ActivityAction.TASK_CREATED:
+            status = details.get("task", {}).get("status")
+        case ActivityAction.TASK_COMPLETED:
+            status = TaskStatus.DONE
+        case _:
+            status = details.get("to")
+    return [str(entry.entity_id)], status
+
+
+def get_review_moves(
+    *, session: Session, owner_id: uuid.UUID, task_ids: Collection[uuid.UUID]
+) -> dict[uuid.UUID, ReviewMove]:
+    """
+    The hand-overs among the given tasks, keyed by task id: the bot user whose
+    move put each one in Review, read off the activity log (ADR-0008). Pass
+    only tasks that are in Review now.
+
+    Only the latest move counts, so a task the owner moved out of Review and
+    back again is the owner's, and one the owner moved there was handed over
+    by nobody. A batch is always the owner's (the bulk endpoint is
+    human-only), but it still counts as the latest move.
+    """
+    if not task_ids:
+        return {}
+    wanted = {str(task_id) for task_id in task_ids}
+    statement = (
+        select(ActivityEntry)
+        .where(
+            ActivityEntry.owner_id == owner_id,
+            ActivityEntry.entity_type == ActivityEntityType.TASK,
+            or_(
+                and_(
+                    col(ActivityEntry.action).in_(_STATUS_ACTIONS),
+                    col(ActivityEntry.entity_id).in_(task_ids),
+                ),
+                and_(
+                    col(ActivityEntry.action) == ActivityAction.TASKS_BULK_CHANGED,
+                    col(ActivityEntry.details)["task_ids"].has_any(
+                        literal(sorted(wanted), ARRAY(Text))
+                    ),
+                ),
+            ),
+        )
+        .order_by(col(ActivityEntry.position).desc())
+    )
+    # Task ids as the log writes them, as text: a batch's are kept in JSON.
+    latest: dict[str, tuple[ActivityEntry, str]] = {}
+    for entry in session.exec(statement).all():
+        named, status = _status_move(entry)
+        if status is None:
+            # A batch that changed something other than the status.
+            continue
+        for task_id in named:
+            if task_id in wanted:
+                latest.setdefault(task_id, (entry, status))
+
+    return {
+        uuid.UUID(task_id): ReviewMove(entry.actor_bot_user_id, entry.created_at)
+        for task_id, (entry, status) in latest.items()
+        if status == TaskStatus.REVIEW
+        and entry.actor_bot_user_id is not None
+        and entry.created_at is not None
     }

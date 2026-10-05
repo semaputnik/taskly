@@ -1,8 +1,8 @@
 import { expect, type Page, test } from "@playwright/test"
 import { newUser, userApi } from "./utils/account"
 import { openCaptured } from "./utils/capture"
-import { createUser } from "./utils/privateApi.ts"
-import { randomEmail, randomPassword } from "./utils/random"
+import { addVirtualAuthenticator } from "./utils/passkeys.ts"
+import { randomEmail } from "./utils/random"
 
 test.use({ storageState: { cookies: [], origins: [] } })
 
@@ -17,7 +17,7 @@ const today = () => {
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
 }
 
-test("An edit shows in While you were away without a reload", async ({
+test("An edit shows in the day page's Changes without a reload", async ({
   page,
 }) => {
   await newUser(page)
@@ -76,12 +76,14 @@ test("Signing in as someone else in the same tab shows none of the first account
   await page.getByRole("menuitem", { name: "Log out" }).click()
   await page.waitForURL("/login")
 
-  const email = randomEmail()
-  const password = randomPassword()
-  await createUser({ email, password })
-  await page.getByTestId("email-input").fill(email)
-  await page.getByTestId("password-input").fill(password)
-  await page.getByRole("button", { name: "Log In" }).click()
+  await addVirtualAuthenticator(page)
+  await page.getByRole("link", { name: "Create account" }).click()
+  // The sign-in screen has an email field too: fill the one on sign-up.
+  await expect(
+    page.getByRole("heading", { name: "Create an account" }),
+  ).toBeVisible()
+  await page.getByTestId("email-input").fill(randomEmail())
+  await page.getByRole("button", { name: "Create account" }).click()
   await page.waitForURL("/")
 
   await goVia(page, "Projects")

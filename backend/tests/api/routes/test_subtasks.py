@@ -3,22 +3,8 @@ import uuid
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
-from app import crud
 from app.core.config import settings
-from app.models import UserCreate
-from tests.utils.utils import random_email, random_lower_string
-
-
-def _headers_for_new_user(client: TestClient, db: Session) -> dict[str, str]:
-    email = random_email()
-    password = random_lower_string()
-    user_in = UserCreate(email=email, password=password)
-    crud.create_user(session=db, user_create=user_in)
-
-    login_data = {"username": email, "password": password}
-    r = client.post(f"{settings.API_V1_STR}/login/access-token", data=login_data)
-    token = r.json()["access_token"]
-    return {"Authorization": f"Bearer {token}"}
+from tests.utils.user import new_user_headers
 
 
 def _inbox_id(client: TestClient, headers: dict[str, str]) -> str:
@@ -64,7 +50,7 @@ def _complete(
 
 
 def test_task_can_be_nested_to_arbitrary_depth(client: TestClient, db: Session) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
 
     root = _create_task(client, headers, "Root")
     child = _create_task(client, headers, "Child", parent_id=root["id"])
@@ -80,7 +66,7 @@ def test_task_can_be_nested_to_arbitrary_depth(client: TestClient, db: Session) 
 
 
 def test_subtask_is_a_full_task(client: TestClient, db: Session) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     root = _create_task(client, headers, "Root")
 
     subtask = _create_task(
@@ -110,7 +96,7 @@ def test_subtask_is_a_full_task(client: TestClient, db: Session) -> None:
 def test_subtask_resolves_to_the_project_of_its_root_ancestor(
     client: TestClient, db: Session
 ) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     project_id = _create_project(client, headers, "Work")
 
     root = _create_task(client, headers, "Root", project_id=project_id)
@@ -133,7 +119,7 @@ def test_subtask_resolves_to_the_project_of_its_root_ancestor(
 def test_subtask_cannot_be_given_its_own_project(
     client: TestClient, db: Session
 ) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     other_project_id = _create_project(client, headers, "Elsewhere")
     root = _create_task(client, headers, "Root")
 
@@ -152,7 +138,7 @@ def test_subtask_cannot_be_given_its_own_project(
 def test_subtask_cannot_be_moved_to_another_project(
     client: TestClient, db: Session
 ) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     other_project_id = _create_project(client, headers, "Elsewhere")
     root = _create_task(client, headers, "Root")
     child = _create_task(client, headers, "Child", parent_id=root["id"])
@@ -171,7 +157,7 @@ def test_subtask_cannot_be_moved_to_another_project(
 def test_moving_a_root_task_moves_its_whole_subtree(
     client: TestClient, db: Session
 ) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     inbox_id = _inbox_id(client, headers)
     work_id = _create_project(client, headers, "Work")
 
@@ -195,8 +181,8 @@ def test_moving_a_root_task_moves_its_whole_subtree(
 def test_subtask_of_another_users_task_is_rejected(
     client: TestClient, db: Session
 ) -> None:
-    headers_a = _headers_for_new_user(client, db)
-    headers_b = _headers_for_new_user(client, db)
+    headers_a = new_user_headers(client, db)
+    headers_b = new_user_headers(client, db)
     root = _create_task(client, headers_a, "A's task")
 
     r = client.post(
@@ -208,7 +194,7 @@ def test_subtask_of_another_users_task_is_rejected(
 
 
 def test_unknown_parent_is_rejected(client: TestClient, db: Session) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
 
     r = client.post(
         f"{settings.API_V1_STR}/tasks/",
@@ -221,7 +207,7 @@ def test_unknown_parent_is_rejected(client: TestClient, db: Session) -> None:
 def test_completing_a_task_with_uncompleted_subtasks_is_refused(
     client: TestClient, db: Session
 ) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     root = _create_task(client, headers, "Root")
     _create_task(client, headers, "Child", parent_id=root["id"])
 
@@ -232,7 +218,7 @@ def test_completing_a_task_with_uncompleted_subtasks_is_refused(
 
 
 def test_refusal_looks_at_the_whole_subtree(client: TestClient, db: Session) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     root = _create_task(client, headers, "Root")
     child = _create_task(client, headers, "Child", parent_id=root["id"])
     grandchild = _create_task(client, headers, "Grandchild", parent_id=child["id"])
@@ -249,7 +235,7 @@ def test_refusal_looks_at_the_whole_subtree(client: TestClient, db: Session) -> 
 def test_refusal_is_distinct_from_other_client_errors(
     client: TestClient, db: Session
 ) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     other_project_id = _create_project(client, headers, "Elsewhere")
     root = _create_task(client, headers, "Root")
     child = _create_task(client, headers, "Child", parent_id=root["id"])
@@ -267,7 +253,7 @@ def test_refusal_is_distinct_from_other_client_errors(
 def test_completing_with_subtasks_left_uncompleted(
     client: TestClient, db: Session
 ) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     root = _create_task(client, headers, "Root")
     child = _create_task(client, headers, "Child", parent_id=root["id"])
     grandchild = _create_task(client, headers, "Grandchild", parent_id=child["id"])
@@ -283,7 +269,7 @@ def test_completing_with_subtasks_left_uncompleted(
 def test_completing_with_subtasks_completed_too(
     client: TestClient, db: Session
 ) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     root = _create_task(client, headers, "Root")
     child = _create_task(client, headers, "Child", parent_id=root["id"])
     grandchild = _create_task(client, headers, "Grandchild", parent_id=child["id"])
@@ -299,7 +285,7 @@ def test_completing_with_subtasks_completed_too(
 def test_completing_every_subtask_leaves_the_parent_uncompleted(
     client: TestClient, db: Session
 ) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     root = _create_task(client, headers, "Root")
     first = _create_task(client, headers, "First", parent_id=root["id"])
     second = _create_task(client, headers, "Second", parent_id=root["id"])
@@ -314,7 +300,7 @@ def test_completing_every_subtask_leaves_the_parent_uncompleted(
 def test_completing_a_parent_whose_subtasks_are_done_needs_no_directive(
     client: TestClient, db: Session
 ) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     root = _create_task(client, headers, "Root")
     child = _create_task(client, headers, "Child", parent_id=root["id"])
     _complete(client, headers, child["id"])
@@ -327,7 +313,7 @@ def test_completing_a_parent_whose_subtasks_are_done_needs_no_directive(
 def test_returning_a_task_to_not_completed_is_never_refused(
     client: TestClient, db: Session
 ) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     root = _create_task(client, headers, "Root")
     _create_task(client, headers, "Child", parent_id=root["id"])
     _complete(client, headers, root["id"], subtasks="leave_uncompleted")
@@ -344,7 +330,7 @@ def test_returning_a_task_to_not_completed_is_never_refused(
 def test_editing_a_parent_without_completing_it_is_never_refused(
     client: TestClient, db: Session
 ) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     root = _create_task(client, headers, "Root")
     _create_task(client, headers, "Child", parent_id=root["id"])
 
@@ -360,7 +346,7 @@ def test_editing_a_parent_without_completing_it_is_never_refused(
 def test_subtask_directive_without_completion_is_rejected(
     client: TestClient, db: Session
 ) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     root = _create_task(client, headers, "Root")
     _create_task(client, headers, "Child", parent_id=root["id"])
 

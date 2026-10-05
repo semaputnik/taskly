@@ -38,6 +38,9 @@ inherit it and add only their own surface strategy.
   ring, Review dot in a ring, Waiting a monochrome eye, Done a filled green check. Priority is the
   mark's colour (P1 red, P2 amber, P3 blue, otherwise ink).
 - Review hand-off offers only "Close it"; there is no send-back action yet.
+- The navigation opens with an "Add a task" entry and its `C` key cap above the screens (issue
+  #135, written by the user), so every screen has a pointer entry to capture; on the day page it
+  sits beside the capture line.
 - Project is a neutral square marker plus name at the right end of the meta line; tags sit in the
   meta line with a tag glyph, no pills; subtask progress is `2/5` with a small tree glyph.
 

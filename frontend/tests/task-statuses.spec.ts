@@ -282,41 +282,6 @@ test("Bulk Set status moves every selected task", async ({ page }) => {
   await expect(statusTrigger(page, "Two")).toContainText("In progress")
 })
 
-test("A late waiting task is in Waiting on others, not in Overdue", async ({
-  page,
-}) => {
-  await newUser(page)
-  await seed(page, [
-    { title: "Chase the plumber", status: "waiting", due_date: "2026-01-01" },
-    { title: "Pay the rent", due_date: "2026-01-01" },
-    { title: "Hear back someday", status: "waiting" },
-  ])
-  await page.goto("/")
-
-  const overdue = page
-    .locator("section")
-    .filter({ has: page.getByRole("heading", { name: /^Overdue/ }) })
-  await expect(overdue).toContainText("Pay the rent")
-  await expect(overdue).not.toContainText("Chase the plumber")
-
-  const waiting = page
-    .locator("section")
-    .filter({ has: page.getByRole("heading", { name: /^Waiting on others/ }) })
-  await expect(waiting).toBeVisible()
-  const rows = waiting.getByRole("link")
-  // Dated first, undated last; the late one still says it is late, in red.
-  await expect(rows.nth(0)).toHaveText("Chase the plumber")
-  await expect(rows.nth(1)).toHaveText("Hear back someday")
-  // The tone sits on the due fact, around its glyph and its words.
-  await expect(waiting.getByText(/days late/).locator("..")).toHaveClass(
-    /text-late/,
-  )
-
-  await waiting.getByRole("link", { name: "See all" }).click()
-  await expect(page).toHaveURL(/\/tasks/)
-  await expect(page.getByText("Status: Waiting")).toBeVisible()
-})
-
 test("The activity log says a task moved to Waiting", async ({ page }) => {
   await newUser(page)
   const { api, ids } = await seed(page, [{ title: "Renew the lease" }])

@@ -14,7 +14,14 @@ from collections.abc import Mapping, Sequence
 from sqlmodel import Session
 
 from app import crud
-from app.models import Recurrence, Task, TaskPublic
+from app.models import (
+    BotUserRef,
+    Recurrence,
+    Task,
+    TaskHandover,
+    TaskPublic,
+    TaskStatus,
+)
 
 
 def task_publics(
@@ -48,15 +55,29 @@ def task_publics(
     subtasks = crud.get_subtask_counts(
         session=session, task_ids=[task.id for task in tasks]
     )
-    # Both bot-user references in one lookup: a task can name one bot user as
-    # its assignee and another as the one that filed it, and asking twice
-    # would cost a query per role rather than per page.
+    # Only a task in Review can have been handed over, so a page without one
+    # does not read the log at all.
+    handovers = crud.get_review_moves(
+        session=session,
+        owner_id=tasks[0].owner_id,
+        task_ids=[task.id for task in tasks if task.status is TaskStatus.REVIEW],
+    )
+    # Every bot-user reference in one lookup: a task can name one bot user as
+    # its assignee, another as the one that filed it and a third as the one
+    # that handed it over, and asking per role would cost a query per role
+    # rather than per page.
     bot_users = crud.get_bot_user_refs(
         session=session,
         bot_user_ids=[
-            bot_user_id
-            for task in tasks
-            for bot_user_id in (task.assignee_bot_user_id, task.reporter_bot_user_id)
+            *(
+                bot_user_id
+                for task in tasks
+                for bot_user_id in (
+                    task.assignee_bot_user_id,
+                    task.reporter_bot_user_id,
+                )
+            ),
+            *(move.bot_user_id for move in handovers.values()),
         ],
     )
 
@@ -77,7 +98,16 @@ def task_publics(
                 else None,
                 "subtask_count": subtasks[task.id].total,
                 "subtasks_done": subtasks[task.id].done,
+                "handover": _handover(handovers.get(task.id), bot_users),
             },
         )
         for task in tasks
     ]
+
+
+def _handover(
+    move: crud.ReviewMove | None, bot_users: Mapping[uuid.UUID, BotUserRef]
+) -> TaskHandover | None:
+    if move is None or move.bot_user_id not in bot_users:
+        return None
+    return TaskHandover(bot_user=bot_users[move.bot_user_id], at=move.at)

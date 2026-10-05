@@ -10,6 +10,8 @@ interface ActorLabelProps {
   currentUserId?: string
   /** Drop the "Bot" badge where the surrounding copy already says so. */
   showBadge?: boolean
+  /** Drop the bot glyph where weight and ink already set a bot apart. */
+  showIcon?: boolean
 }
 
 /**
@@ -25,11 +27,14 @@ export function ActorLabel({
   entry,
   currentUserId,
   showBadge = true,
+  showIcon = true,
 }: ActorLabelProps) {
   if (entry.actor_bot_user_id) {
     return (
       <span className="inline-flex items-center gap-1.5">
-        <Bot className="text-muted-foreground size-4" aria-hidden />
+        {showIcon && (
+          <Bot className="text-muted-foreground size-4" aria-hidden />
+        )}
         <Link
           {...recordLink("bot", entry.actor_bot_user_id)}
           className="font-medium underline-offset-4 hover:underline"

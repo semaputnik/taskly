@@ -40,7 +40,11 @@ export function User({
 
   if (!user) return null
 
-  const name = user.full_name || user.email
+  // Without a name the row says the email's local part: the whole address
+  // does not fit the column and would be cut mid-domain. The menu keeps it
+  // whole.
+  const name = user.full_name || user.email.split("@")[0]
+  const label = user.full_name || user.email
 
   return (
     <div className="-ml-2 flex items-center gap-1">
@@ -58,14 +62,14 @@ export function User({
           >
             {name.charAt(0).toUpperCase()}
           </span>
-          <span className="min-w-0 truncate" title={name}>
+          <span className="min-w-0 truncate" title={label}>
             {name}
           </span>
           <ChevronDown aria-hidden className="text-ink-3 size-3 flex-none" />
         </DropdownMenuTrigger>
         <DropdownMenuContent className="min-w-56" side="top" align="start">
           <DropdownMenuLabel className="font-normal">
-            <p className="truncate text-sm font-medium">{name}</p>
+            <p className="truncate text-sm font-medium">{label}</p>
             {user.full_name && (
               <p className="text-muted-foreground truncate text-xs">
                 {user.email}

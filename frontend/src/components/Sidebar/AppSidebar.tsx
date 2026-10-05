@@ -2,7 +2,7 @@ import { Link as RouterLink } from "@tanstack/react-router"
 import { Plus } from "lucide-react"
 import { useId } from "react"
 
-import { Logo } from "@/components/Common/Logo"
+import { Wordmark } from "@/components/Common/Wordmark"
 import { useRecordPanels } from "@/components/Records/panels"
 import useAuth from "@/hooks/useAuth"
 import { cn } from "@/lib/utils"
@@ -55,7 +55,7 @@ function CaptureEntry({ onNavigate }: { onNavigate?: () => void }) {
       </span>
       <kbd
         aria-hidden
-        className="text-ink-3 border-rule-strong rounded border px-[5px] font-mono text-[11px] leading-4"
+        className="text-ink-3 border-rule-strong rounded border px-[5px] font-mono text-[11px] leading-4 pointer-coarse:hidden"
       >
         C
       </kbd>
@@ -131,7 +131,7 @@ export function Navigation({ onNavigate }: { onNavigate?: () => void }) {
       // outlines that reach past the column inside the scrolling box.
       className="-m-2 flex h-[calc(100%+1rem)] min-h-0 flex-col gap-[26px] overflow-y-auto p-2"
     >
-      <Logo className={cn(navItemFocus, "self-start rounded-sm")} />
+      <Wordmark className={cn(navItemFocus, "self-start rounded-sm")} />
       <ul className="flex flex-col gap-0.5">
         <li>
           <CaptureEntry onNavigate={onNavigate} />

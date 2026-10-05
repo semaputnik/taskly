@@ -1,22 +1,8 @@
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
-from app import crud
 from app.core.config import settings
-from app.models import UserCreate
-from tests.utils.utils import random_email, random_lower_string
-
-
-def _headers_for_new_user(client: TestClient, db: Session) -> dict[str, str]:
-    email = random_email()
-    password = random_lower_string()
-    user_in = UserCreate(email=email, password=password)
-    crud.create_user(session=db, user_create=user_in)
-
-    login_data = {"username": email, "password": password}
-    r = client.post(f"{settings.API_V1_STR}/login/access-token", data=login_data)
-    token = r.json()["access_token"]
-    return {"Authorization": f"Bearer {token}"}
+from tests.utils.user import new_user_headers
 
 
 def _create_task(
@@ -46,7 +32,7 @@ def _list_comments(client: TestClient, headers: dict[str, str], task_id: str):
 
 
 def test_a_comment_can_be_added_to_a_task(client: TestClient, db: Session) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     task = _create_task(client, headers, "Buy milk")
 
     r = _add_comment(client, headers, task["id"], "On it")
@@ -62,7 +48,7 @@ def test_a_comment_can_be_added_to_a_task(client: TestClient, db: Session) -> No
 
 
 def test_a_comment_can_be_added_to_a_subtask(client: TestClient, db: Session) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     root = _create_task(client, headers, "Root")
     subtask = _create_task(client, headers, "Subtask", parent_id=root["id"])
 
@@ -71,7 +57,7 @@ def test_a_comment_can_be_added_to_a_subtask(client: TestClient, db: Session) ->
 
 
 def test_comments_are_listed_oldest_first(client: TestClient, db: Session) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     task = _create_task(client, headers, "Task")
 
     _add_comment(client, headers, task["id"], "First")
@@ -83,7 +69,7 @@ def test_comments_are_listed_oldest_first(client: TestClient, db: Session) -> No
 
 
 def test_a_user_can_edit_their_own_comment(client: TestClient, db: Session) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     task = _create_task(client, headers, "Task")
     comment = _add_comment(client, headers, task["id"], "Original").json()
 
@@ -100,7 +86,7 @@ def test_a_user_can_edit_their_own_comment(client: TestClient, db: Session) -> N
 
 
 def test_a_user_can_delete_their_own_comment(client: TestClient, db: Session) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     task = _create_task(client, headers, "Task")
     comment = _add_comment(client, headers, task["id"], "Gone soon").json()
 
@@ -117,8 +103,8 @@ def test_a_user_can_delete_their_own_comment(client: TestClient, db: Session) ->
 def test_a_user_cannot_read_comments_on_another_users_task(
     client: TestClient, db: Session
 ) -> None:
-    headers_a = _headers_for_new_user(client, db)
-    headers_b = _headers_for_new_user(client, db)
+    headers_a = new_user_headers(client, db)
+    headers_b = new_user_headers(client, db)
     task = _create_task(client, headers_a, "A's task")
     _add_comment(client, headers_a, task["id"], "Private note")
 
@@ -129,8 +115,8 @@ def test_a_user_cannot_read_comments_on_another_users_task(
 def test_a_user_cannot_add_a_comment_to_another_users_task(
     client: TestClient, db: Session
 ) -> None:
-    headers_a = _headers_for_new_user(client, db)
-    headers_b = _headers_for_new_user(client, db)
+    headers_a = new_user_headers(client, db)
+    headers_b = new_user_headers(client, db)
     task = _create_task(client, headers_a, "A's task")
 
     r = _add_comment(client, headers_b, task["id"], "Sneaky")
@@ -140,8 +126,8 @@ def test_a_user_cannot_add_a_comment_to_another_users_task(
 def test_a_user_cannot_edit_another_users_comment(
     client: TestClient, db: Session
 ) -> None:
-    headers_a = _headers_for_new_user(client, db)
-    headers_b = _headers_for_new_user(client, db)
+    headers_a = new_user_headers(client, db)
+    headers_b = new_user_headers(client, db)
     task = _create_task(client, headers_a, "A's task")
     comment = _add_comment(client, headers_a, task["id"], "Original").json()
 
@@ -156,8 +142,8 @@ def test_a_user_cannot_edit_another_users_comment(
 def test_a_user_cannot_delete_another_users_comment(
     client: TestClient, db: Session
 ) -> None:
-    headers_a = _headers_for_new_user(client, db)
-    headers_b = _headers_for_new_user(client, db)
+    headers_a = new_user_headers(client, db)
+    headers_b = new_user_headers(client, db)
     task = _create_task(client, headers_a, "A's task")
     comment = _add_comment(client, headers_a, task["id"], "Original").json()
 
@@ -171,7 +157,7 @@ def test_a_user_cannot_delete_another_users_comment(
 
 
 def test_a_blank_comment_is_rejected(client: TestClient, db: Session) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     task = _create_task(client, headers, "Task")
 
     r = _add_comment(client, headers, task["id"], "   ")
@@ -179,7 +165,7 @@ def test_a_blank_comment_is_rejected(client: TestClient, db: Session) -> None:
 
 
 def test_comment_body_is_trimmed(client: TestClient, db: Session) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     task = _create_task(client, headers, "Task")
 
     r = _add_comment(client, headers, task["id"], "  spaced  ")
@@ -190,7 +176,7 @@ def test_comment_body_is_trimmed(client: TestClient, db: Session) -> None:
 def test_commenting_on_an_unknown_task_is_rejected(
     client: TestClient, db: Session
 ) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
 
     r = _add_comment(client, headers, "00000000-0000-0000-0000-000000000000", "Hi")
     assert r.status_code == 404
@@ -199,7 +185,7 @@ def test_commenting_on_an_unknown_task_is_rejected(
 def test_a_comment_cannot_carry_an_attachment_field(
     client: TestClient, db: Session
 ) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     task = _create_task(client, headers, "Task")
 
     # There is no such field to send: the schema offers no attachment relation
@@ -216,7 +202,7 @@ def test_a_comment_cannot_carry_an_attachment_field(
 def test_a_comment_on_a_deleted_task_cannot_be_edited_or_deleted(
     client: TestClient, db: Session
 ) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     task = _create_task(client, headers, "Doomed")
     comment = _add_comment(client, headers, task["id"], "Before deletion").json()
 
@@ -237,7 +223,7 @@ def test_a_comment_on_a_deleted_task_cannot_be_edited_or_deleted(
 
 
 def test_comments_survive_a_deleted_task(client: TestClient, db: Session) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     task = _create_task(client, headers, "Doomed")
     _add_comment(client, headers, task["id"], "Before deletion")
 

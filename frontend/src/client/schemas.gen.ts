@@ -283,66 +283,6 @@ export const Body_attachments_upload_attachmentSchema = {
     title: 'Body_attachments-upload_attachment'
 } as const;
 
-export const Body_login_login_access_tokenSchema = {
-    properties: {
-        grant_type: {
-            anyOf: [
-                {
-                    type: 'string',
-                    pattern: '^password$'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Grant Type'
-        },
-        username: {
-            type: 'string',
-            title: 'Username'
-        },
-        password: {
-            type: 'string',
-            format: 'password',
-            title: 'Password'
-        },
-        scope: {
-            type: 'string',
-            title: 'Scope',
-            default: ''
-        },
-        client_id: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Client Id'
-        },
-        client_secret: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            format: 'password',
-            title: 'Client Secret'
-        }
-    },
-    type: 'object',
-    required: [
-        'username',
-        'password'
-    ],
-    title: 'Body_login-login_access_token'
-} as const;
-
 export const BotPermissionsSchema = {
     properties: {
         create_tasks: {
@@ -771,6 +711,22 @@ export const CommentsPublicSchema = {
     title: 'CommentsPublic'
 } as const;
 
+export const ConfirmationSchema = {
+    properties: {
+        confirmation: {
+            additionalProperties: true,
+            type: 'object',
+            title: 'Confirmation'
+        }
+    },
+    type: 'object',
+    required: [
+        'confirmation'
+    ],
+    title: 'Confirmation',
+    description: 'A fresh assertion with one of the caller\'s own passkeys, answering a\nconfirmation challenge (FR-12.7, FR-12.16).'
+} as const;
+
 export const DueDateScopeSchema = {
     type: 'string',
     enum: [
@@ -809,25 +765,113 @@ export const MessageSchema = {
     title: 'Message'
 } as const;
 
-export const NewPasswordSchema = {
+export const PasskeyCredentialSchema = {
     properties: {
-        token: {
-            type: 'string',
-            title: 'Token'
-        },
-        new_password: {
-            type: 'string',
-            maxLength: 128,
-            minLength: 8,
-            title: 'New Password'
+        credential: {
+            additionalProperties: true,
+            type: 'object',
+            title: 'Credential'
         }
     },
     type: 'object',
     required: [
-        'token',
-        'new_password'
+        'credential'
     ],
-    title: 'NewPassword'
+    title: 'PasskeyCredential',
+    description: 'The browser\'s answer to a passkey ceremony, as WebAuthn\'s\n`PublicKeyCredential.toJSON()` gives it.'
+} as const;
+
+export const PasskeyPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        created_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Created At'
+        },
+        last_used_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Last Used At'
+        }
+    },
+    type: 'object',
+    required: [
+        'id',
+        'name',
+        'created_at',
+        'last_used_at'
+    ],
+    title: 'PasskeyPublic'
+} as const;
+
+export const PasskeysPublicSchema = {
+    properties: {
+        data: {
+            items: {
+                $ref: '#/components/schemas/PasskeyPublic'
+            },
+            type: 'array',
+            title: 'Data'
+        },
+        count: {
+            type: 'integer',
+            title: 'Count'
+        }
+    },
+    type: 'object',
+    required: [
+        'data',
+        'count'
+    ],
+    title: 'PasskeysPublic'
+} as const;
+
+export const PrivateRecoveryCodeSchema = {
+    properties: {
+        email: {
+            type: 'string',
+            title: 'Email'
+        }
+    },
+    type: 'object',
+    required: [
+        'email'
+    ],
+    title: 'PrivateRecoveryCode'
+} as const;
+
+export const PrivateSessionSchema = {
+    properties: {
+        user: {
+            $ref: '#/components/schemas/UserPublic'
+        },
+        access_token: {
+            type: 'string',
+            title: 'Access Token'
+        }
+    },
+    type: 'object',
+    required: [
+        'user',
+        'access_token'
+    ],
+    title: 'PrivateSession'
 } as const;
 
 export const PrivateUserCreateSchema = {
@@ -836,25 +880,26 @@ export const PrivateUserCreateSchema = {
             type: 'string',
             title: 'Email'
         },
-        password: {
-            type: 'string',
-            title: 'Password'
-        },
         full_name: {
-            type: 'string',
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
             title: 'Full Name'
         },
-        is_verified: {
+        is_superuser: {
             type: 'boolean',
-            title: 'Is Verified',
+            title: 'Is Superuser',
             default: false
         }
     },
     type: 'object',
     required: [
-        'email',
-        'password',
-        'full_name'
+        'email'
     ],
     title: 'PrivateUserCreate'
 } as const;
@@ -999,6 +1044,48 @@ export const ProjectsPublicSchema = {
     title: 'ProjectsPublic'
 } as const;
 
+export const RecoveryCodeIssuedSchema = {
+    properties: {
+        code: {
+            type: 'string',
+            title: 'Code'
+        },
+        expires_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Expires At'
+        }
+    },
+    type: 'object',
+    required: [
+        'code',
+        'expires_at'
+    ],
+    title: 'RecoveryCodeIssued'
+} as const;
+
+export const RecoveryStartSchema = {
+    properties: {
+        email: {
+            type: 'string',
+            maxLength: 255,
+            format: 'email',
+            title: 'Email'
+        },
+        code: {
+            type: 'string',
+            maxLength: 64,
+            title: 'Code'
+        }
+    },
+    type: 'object',
+    required: [
+        'email',
+        'code'
+    ],
+    title: 'RecoveryStart'
+} as const;
+
 export const RecurrenceSchema = {
     properties: {
         frequency: {
@@ -1034,6 +1121,22 @@ export const RecurrenceFrequencySchema = {
         'every_n_days'
     ],
     title: 'RecurrenceFrequency'
+} as const;
+
+export const RegistrationStartSchema = {
+    properties: {
+        email: {
+            type: 'string',
+            maxLength: 255,
+            format: 'email',
+            title: 'Email'
+        }
+    },
+    type: 'object',
+    required: [
+        'email'
+    ],
+    title: 'RegistrationStart'
 } as const;
 
 export const SortOrderSchema = {
@@ -1487,6 +1590,26 @@ export const TaskCreateSchema = {
     title: 'TaskCreate'
 } as const;
 
+export const TaskHandoverSchema = {
+    properties: {
+        bot_user: {
+            $ref: '#/components/schemas/BotUserRef'
+        },
+        at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'At'
+        }
+    },
+    type: 'object',
+    required: [
+        'bot_user',
+        'at'
+    ],
+    title: 'TaskHandover',
+    description: 'How a task came to be in Review when a bot user put it there: which bot\nuser handed its work over, and when (ADR-0008). Read off the activity\nlog, so it names a deleted bot user as it was called.'
+} as const;
+
 export const TaskPrioritySchema = {
     type: 'string',
     enum: [
@@ -1647,6 +1770,16 @@ export const TaskPublicSchema = {
             type: 'integer',
             title: 'Subtasks Done',
             default: 0
+        },
+        handover: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/TaskHandover'
+                },
+                {
+                    type: 'null'
+                }
+            ]
         }
     },
     type: 'object',
@@ -1858,29 +1991,6 @@ export const TokenSchema = {
     title: 'Token'
 } as const;
 
-export const UpdatePasswordSchema = {
-    properties: {
-        current_password: {
-            type: 'string',
-            maxLength: 128,
-            minLength: 8,
-            title: 'Current Password'
-        },
-        new_password: {
-            type: 'string',
-            maxLength: 128,
-            minLength: 8,
-            title: 'New Password'
-        }
-    },
-    type: 'object',
-    required: [
-        'current_password',
-        'new_password'
-    ],
-    title: 'UpdatePassword'
-} as const;
-
 export const UserPublicSchema = {
     properties: {
         email: {
@@ -1935,41 +2045,6 @@ export const UserPublicSchema = {
         'id'
     ],
     title: 'UserPublic'
-} as const;
-
-export const UserRegisterSchema = {
-    properties: {
-        email: {
-            type: 'string',
-            maxLength: 255,
-            format: 'email',
-            title: 'Email'
-        },
-        password: {
-            type: 'string',
-            maxLength: 128,
-            minLength: 8,
-            title: 'Password'
-        },
-        full_name: {
-            anyOf: [
-                {
-                    type: 'string',
-                    maxLength: 255
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Full Name'
-        }
-    },
-    type: 'object',
-    required: [
-        'email',
-        'password'
-    ],
-    title: 'UserRegister'
 } as const;
 
 export const UserUpdateMeSchema = {

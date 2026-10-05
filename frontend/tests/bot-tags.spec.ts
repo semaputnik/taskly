@@ -1,6 +1,5 @@
 import { expect, test } from "@playwright/test"
-import { createUser } from "./utils/privateApi.ts"
-import { randomEmail, randomPassword } from "./utils/random"
+import { randomEmail } from "./utils/random"
 import { storeTokenAndClose } from "./utils/tokenDialog"
 import { logInUser } from "./utils/user"
 
@@ -11,9 +10,7 @@ test("Granting a bot user “Create tags” lets it add to the vocabulary", asyn
   request,
 }) => {
   const email = randomEmail()
-  const password = randomPassword()
-  await createUser({ email, password })
-  await logInUser(page, email, password)
+  await logInUser(page, email)
   const api = `${process.env.VITE_API_URL}/api/v1`
   const userToken = await page.evaluate(() =>
     localStorage.getItem("access_token"),

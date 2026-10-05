@@ -3,22 +3,9 @@ import uuid
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
-from app import crud
 from app.core.config import settings
-from app.models import Deletion, Project, Task, UserCreate
-from tests.utils.utils import random_email, random_lower_string
-
-
-def _headers_for_new_user(client: TestClient, db: Session) -> dict[str, str]:
-    email = random_email()
-    password = random_lower_string()
-    user_in = UserCreate(email=email, password=password)
-    crud.create_user(session=db, user_create=user_in)
-
-    login_data = {"username": email, "password": password}
-    r = client.post(f"{settings.API_V1_STR}/login/access-token", data=login_data)
-    token = r.json()["access_token"]
-    return {"Authorization": f"Bearer {token}"}
+from app.models import Deletion, Project, Task
+from tests.utils.user import new_user_headers
 
 
 def _inbox_id(client: TestClient, headers: dict[str, str]) -> str:
@@ -80,7 +67,7 @@ def _stored_project(db: Session, project_id: str) -> Project:
 def test_deleting_a_task_hides_it_but_keeps_the_row(
     client: TestClient, db: Session
 ) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     task = _create_task(client, headers, "Throwaway")
 
     r = _delete_task(client, headers, task["id"])
@@ -98,7 +85,7 @@ def test_deleting_a_task_hides_it_but_keeps_the_row(
 def test_deleting_a_task_with_subtasks_is_refused(
     client: TestClient, db: Session
 ) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     root = _create_task(client, headers, "Root")
     child = _create_task(client, headers, "Child", parent_id=root["id"])
 
@@ -114,7 +101,7 @@ def test_deleting_a_task_with_subtasks_is_refused(
 def test_deleting_a_task_with_subtasks_cascades_when_confirmed(
     client: TestClient, db: Session
 ) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     root = _create_task(client, headers, "Root")
     child = _create_task(client, headers, "Child", parent_id=root["id"])
     grandchild = _create_task(client, headers, "Grandchild", parent_id=child["id"])
@@ -132,7 +119,7 @@ def test_deleting_a_task_with_subtasks_cascades_when_confirmed(
 def test_a_whole_cascade_shares_one_deletion_event(
     client: TestClient, db: Session
 ) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     root = _create_task(client, headers, "Root")
     child = _create_task(client, headers, "Child", parent_id=root["id"])
     grandchild = _create_task(client, headers, "Grandchild", parent_id=child["id"])
@@ -154,7 +141,7 @@ def test_a_whole_cascade_shares_one_deletion_event(
 def test_a_subtask_deleted_on_its_own_stays_distinguishable(
     client: TestClient, db: Session
 ) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     root = _create_task(client, headers, "Root")
     early = _create_task(client, headers, "Deleted early", parent_id=root["id"])
     sibling = _create_task(client, headers, "Sibling", parent_id=root["id"])
@@ -174,7 +161,7 @@ def test_a_subtask_deleted_on_its_own_stays_distinguishable(
 def test_a_task_whose_subtasks_are_all_deleted_needs_no_confirmation(
     client: TestClient, db: Session
 ) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     root = _create_task(client, headers, "Root")
     child = _create_task(client, headers, "Child", parent_id=root["id"])
 
@@ -185,7 +172,7 @@ def test_a_task_whose_subtasks_are_all_deleted_needs_no_confirmation(
 
 
 def test_deleting_a_project_deletes_its_tasks(client: TestClient, db: Session) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     project_id = _create_project(client, headers, "Work")
 
     root = _create_task(client, headers, "Root", project_id=project_id)
@@ -214,7 +201,7 @@ def test_deleting_a_project_deletes_its_tasks(client: TestClient, db: Session) -
 def test_deleting_a_project_leaves_a_task_deleted_earlier_alone(
     client: TestClient, db: Session
 ) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     project_id = _create_project(client, headers, "Work")
     early = _create_task(client, headers, "Deleted early", project_id=project_id)
     other = _create_task(client, headers, "Still there", project_id=project_id)
@@ -231,7 +218,7 @@ def test_deleting_a_project_leaves_a_task_deleted_earlier_alone(
 def test_a_deleted_subtask_does_not_block_completing_its_parent(
     client: TestClient, db: Session
 ) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     root = _create_task(client, headers, "Root")
     child = _create_task(client, headers, "Child", parent_id=root["id"])
 
@@ -249,7 +236,7 @@ def test_a_deleted_subtask_does_not_block_completing_its_parent(
 def test_a_deleted_task_cannot_be_used_as_a_parent(
     client: TestClient, db: Session
 ) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     task = _create_task(client, headers, "Gone")
     _delete_task(client, headers, task["id"])
 
@@ -264,7 +251,7 @@ def test_a_deleted_task_cannot_be_used_as_a_parent(
 def test_a_deleted_project_cannot_take_new_tasks(
     client: TestClient, db: Session
 ) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     project_id = _create_project(client, headers, "Work")
     client.delete(f"{settings.API_V1_STR}/projects/{project_id}", headers=headers)
 
@@ -285,7 +272,7 @@ def test_a_deleted_project_cannot_take_new_tasks(
 
 
 def test_deleting_a_task_twice_returns_404(client: TestClient, db: Session) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     task = _create_task(client, headers, "Throwaway")
 
     assert _delete_task(client, headers, task["id"]).status_code == 200
@@ -293,8 +280,8 @@ def test_deleting_a_task_twice_returns_404(client: TestClient, db: Session) -> N
 
 
 def test_users_cannot_delete_each_others_tasks(client: TestClient, db: Session) -> None:
-    headers_a = _headers_for_new_user(client, db)
-    headers_b = _headers_for_new_user(client, db)
+    headers_a = new_user_headers(client, db)
+    headers_b = new_user_headers(client, db)
     task = _create_task(client, headers_a, "A's task")
 
     assert _delete_task(client, headers_b, task["id"]).status_code == 404
@@ -304,14 +291,14 @@ def test_users_cannot_delete_each_others_tasks(client: TestClient, db: Session) 
 def test_deleting_a_nonexistent_task_returns_404(
     client: TestClient, db: Session
 ) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
 
     r = _delete_task(client, headers, str(uuid.uuid4()))
     assert r.status_code == 404
 
 
 def test_deleting_the_inbox_is_still_refused(client: TestClient, db: Session) -> None:
-    headers = _headers_for_new_user(client, db)
+    headers = new_user_headers(client, db)
     inbox_id = _inbox_id(client, headers)
 
     r = client.delete(f"{settings.API_V1_STR}/projects/{inbox_id}", headers=headers)

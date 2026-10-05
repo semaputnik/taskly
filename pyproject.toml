@@ -30,3 +30,7 @@ extend-ignore-re = [
 
 [tool.typos.default.extend-identifiers]
 alls = "alls"
+
+[tool.typos.default.extend-words]
+# CBOR Object Signing and Encryption, the key format of a passkey.
+cose = "cose"

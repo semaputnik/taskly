@@ -4,10 +4,12 @@ from pathlib import Path
 
 import sentry_sdk
 from fastapi import FastAPI, Request, Response
+from fastapi.responses import JSONResponse
 from fastapi.routing import APIRoute
 from starlette.middleware.cors import CORSMiddleware
 from starlette.middleware.gzip import GZipMiddleware
 
+from app import passkeys
 from app.api.main import api_router
 from app.core.config import settings
 
@@ -74,6 +76,18 @@ async def cache_frontend_files(
     if cache_control and response.status_code == 200:
         response.headers["Cache-Control"] = cache_control
     return response
+
+
+@app.exception_handler(passkeys.PasskeyError)
+async def passkey_refused(_request: Request, error: Exception) -> Response:
+    """
+    A ceremony or account change the caller is refused (F-12), in words safe
+    to show: 404 for something that is not there, 400 for everything else.
+    """
+    not_found = isinstance(error, passkeys.PasskeyNotFound | passkeys.UserNotFound)
+    return JSONResponse(
+        status_code=404 if not_found else 400, content={"detail": str(error)}
+    )
 
 
 app.include_router(api_router, prefix=settings.API_V1_STR)

@@ -268,7 +268,9 @@ def test_a_human_jwt_is_not_a_bot_token(client: TestClient, db: Session) -> None
 
     # A well-signed session token that names the bot user's id resolves to no
     # one: bot users are not reachable through the human session at all.
-    forged = security.create_access_token(bot["id"], timedelta(minutes=5))
+    forged = security.create_access_token(
+        bot["id"], timedelta(minutes=5), session_version=0
+    )
     r = client.get(f"{API}/tasks/", headers={"Authorization": f"Bearer {forged}"})
     assert r.status_code == 401
 

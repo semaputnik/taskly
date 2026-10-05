@@ -3,8 +3,6 @@
 set -e
 set -x
 
-# Run migrations
+# Run migrations. Nothing is seeded: the first superuser registers like anyone
+# else, with the address FIRST_SUPERUSER names (FR-09.6).
 alembic upgrade head
-
-# Create initial data in DB
-python app/initial_data.py

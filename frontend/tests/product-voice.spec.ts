@@ -3,7 +3,7 @@ import { newUser, userApi } from "./utils/account"
 
 test.use({ storageState: { cookies: [], origins: [] } })
 
-const SIGNED_OUT = ["/login", "/signup", "/recover-password", "/reset-password"]
+const SIGNED_OUT = ["/login", "/signup", "/recover"]
 const SIGNED_IN = [
   "/",
   "/tasks",
@@ -166,9 +166,12 @@ test("Heading levels descend without skipping on every screen", async ({
   })
 
   await page.goto("/settings")
-  for (const tab of ["Password", "Danger zone"]) {
+  for (const [tab, expected] of [
+    ["Passkeys", [1, 2, 2]],
+    ["Danger zone", [1, 2]],
+  ] as const) {
     await page.getByRole("tab", { name: tab }).click()
     const levels = await outline()
-    expect(levels, tab).toEqual([1, 2])
+    expect(levels, tab).toEqual(expected)
   }
 })

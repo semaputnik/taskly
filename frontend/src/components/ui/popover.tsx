@@ -22,7 +22,7 @@ function PopoverAnchor({
 }
 
 /**
- * A surface that has left the page: Paper, a hairline, and the same shadow
+ * A surface that has left the page: the raised ground, a hairline, and the same shadow
  * as the menus and selects that float beside it.
  */
 function PopoverContent({

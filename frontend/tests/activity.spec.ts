@@ -1,7 +1,6 @@
 import { expect, test } from "@playwright/test"
 import { openCaptured } from "./utils/capture"
-import { createUser } from "./utils/privateApi.ts"
-import { randomEmail, randomPassword } from "./utils/random"
+import { randomEmail } from "./utils/random"
 import { logInUser } from "./utils/user"
 
 test.use({ storageState: { cookies: [], origins: [] } })
@@ -10,9 +9,7 @@ test("A user's own changes appear on the Activity page, newest first", async ({
   page,
 }) => {
   const email = randomEmail()
-  const password = randomPassword()
-  await createUser({ email, password })
-  await logInUser(page, email, password)
+  await logInUser(page, email)
 
   await page.goto("/tasks?view=table")
   await page.getByRole("button", { name: "Add a task" }).first().click()
@@ -55,9 +52,7 @@ test("A deleted task can be restored from the Activity page", async ({
   page,
 }) => {
   const email = randomEmail()
-  const password = randomPassword()
-  await createUser({ email, password })
-  await logInUser(page, email, password)
+  await logInUser(page, email)
 
   await page.goto("/tasks?view=table")
   await page.getByRole("button", { name: "Add a task" }).first().click()
@@ -109,9 +104,7 @@ test("A bot user's changes appear on the Activity page under its name", async ({
   request,
 }) => {
   const email = randomEmail()
-  const password = randomPassword()
-  await createUser({ email, password })
-  await logInUser(page, email, password)
+  await logInUser(page, email)
 
   // The bot user is set up over the API: its management page has its own
   // test, and what matters here is how its changes are shown.

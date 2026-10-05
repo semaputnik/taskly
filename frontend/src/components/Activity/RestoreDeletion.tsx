@@ -64,32 +64,32 @@ function describe(entry: ActivityEntryPublic) {
 
 /**
  * Restoring what a deletion entry took down — a task with its subtasks, or a
- * project with its tasks — behind a confirmation that says what else comes
- * back (FR-10.4).
- *
- * When a restore has nowhere to come back to, the API says why, and that
- * message is what the user sees.
+ * project with its tasks (FR-10.4). The toast says what came back; when a
+ * restore has nowhere to come back to, the API says why, and that message is
+ * what the user sees.
  */
-export function RestoreDeletion({ entry }: RestoreDeletionProps) {
-  const [isOpen, setIsOpen] = useState(false)
+export function useRestoreDeletion(entry: ActivityEntryPublic) {
   const reportChange = useReportChange()
-  const { heading, name, comesBack } = describe(entry)
-
+  const described = describe(entry)
   const mutation = useMutation({
     mutationFn: () =>
       ActivityService.restoreFromActivityEntry({
         path: { entry_id: entry.id },
       }),
-    onSuccess: () => {
-      toastSuccess(`“${name}” restored`)
-      setIsOpen(false)
-    },
-    onError: (error: Error) => {
-      setIsOpen(false)
-      toastError(error)
-    },
+    onSuccess: () => toastSuccess(`“${described.name}” restored`),
+    onError: (error: Error) => toastError(error),
     onSettled: () => reportChange({ type: "deletion restored" }),
   })
+  return { ...described, mutation }
+}
+
+/**
+ * The full log's Restore, behind a confirmation that says what else comes
+ * back.
+ */
+export function RestoreDeletion({ entry }: RestoreDeletionProps) {
+  const [isOpen, setIsOpen] = useState(false)
+  const { heading, name, comesBack, mutation } = useRestoreDeletion(entry)
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -113,7 +113,9 @@ export function RestoreDeletion({ entry }: RestoreDeletionProps) {
           </DialogClose>
           <LoadingButton
             loading={mutation.isPending}
-            onClick={() => mutation.mutate()}
+            onClick={() =>
+              mutation.mutate(undefined, { onSettled: () => setIsOpen(false) })
+            }
           >
             Restore
           </LoadingButton>

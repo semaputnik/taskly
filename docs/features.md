@@ -352,6 +352,13 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
   the user as assignee. Waiting tasks have no band of their own: a Waiting
   task on the user is read in My work, and one on a bot user or unassigned is
   read on the Tasks page.
+- **FR-06.12** The dashboard opens with the date and one sentence of real
+  counts: how many tasks need the user today — those in Overdue and Due
+  today — and how many changes their bot users made since the user's last
+  visit. A visit is one browser tab's session, counted from the last time the
+  dashboard was read on that device; a first visit counts every change the
+  bot users have made. When nothing is overdue or due today, the dashboard
+  says so in a sentence instead of drawing the bands.
 
 ### F-07. REST API
 

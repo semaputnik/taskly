@@ -2,17 +2,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
 
 import {
-  type Body_login_login_access_token as AccessToken,
-  LoginService,
-  type UserRegister,
-  UsersService,
-} from "@/client"
-import {
-  clearServerState,
-  currentUserQuery,
-  useReportChange,
-} from "@/lib/serverState"
-import { toastError } from "@/lib/toasts"
+  recoverAccount,
+  registerAccount,
+  reportUnlessDismissed,
+  signInWithPasskey,
+} from "@/lib/passkeys"
+import { clearServerState, currentUserQuery } from "@/lib/serverState"
 
 const isLoggedIn = () => {
   return localStorage.getItem("access_token") !== null
@@ -21,38 +16,50 @@ const isLoggedIn = () => {
 const useAuth = () => {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const reportChange = useReportChange()
 
   const { data: user } = useQuery({
     ...currentUserQuery(),
     enabled: isLoggedIn(),
   })
 
-  const signUpMutation = useMutation({
-    mutationFn: (data: UserRegister) =>
-      UsersService.registerUser({ body: data }),
-    onSuccess: () => {
-      navigate({ to: "/login" })
-    },
-    onError: (error) => toastError(error),
-    onSettled: () => {
-      reportChange({ type: "users changed" })
-    },
-  })
-
-  const login = async (data: AccessToken) => {
-    const response = await LoginService.loginAccessToken({
-      body: data,
-    })
-    localStorage.setItem("access_token", response.data.access_token)
+  const startSession = (token: string) => {
+    // Whatever another account read in this tab must not show for this one.
+    clearServerState(queryClient)
+    localStorage.setItem("access_token", token)
   }
 
-  const loginMutation = useMutation({
-    mutationFn: login,
-    onSuccess: () => {
+  const signInMutation = useMutation({
+    mutationFn: (options: { autofill?: boolean } = {}) =>
+      signInWithPasskey(options),
+    onSuccess: (token) => {
+      startSession(token)
       navigate({ to: "/" })
     },
-    onError: (error) => toastError(error),
+    onError: reportUnlessDismissed,
+  })
+
+  const registerMutation = useMutation({
+    mutationFn: (email: string) => registerAccount(email),
+    onSuccess: (token) => {
+      startSession(token)
+      navigate({ to: "/" })
+    },
+    onError: reportUnlessDismissed,
+  })
+
+  const recoverMutation = useMutation({
+    mutationFn: ({ email, code }: { email: string; code: string }) =>
+      recoverAccount(email, code),
+    onSuccess: (token) => {
+      startSession(token)
+      // Straight to the passkeys, to remove any the user does not recognise
+      // (FR-12.17).
+      navigate({
+        to: "/settings",
+        search: { tab: "passkeys", recovered: true },
+      })
+    },
+    onError: reportUnlessDismissed,
   })
 
   const logout = () => {
@@ -63,8 +70,9 @@ const useAuth = () => {
   }
 
   return {
-    signUpMutation,
-    loginMutation,
+    signInMutation,
+    registerMutation,
+    recoverMutation,
     logout,
     user,
   }

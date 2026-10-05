@@ -4,17 +4,26 @@ import { newUser, userApi } from "./utils/account"
 
 test.use({ storageState: { cookies: [], origins: [] } })
 
-const band = (page: Page, name: RegExp) =>
-  page.locator("section").filter({ has: page.getByRole("heading", { name }) })
+/** One of My work's status groups on the day page. */
+const group = (page: Page, name: string) =>
+  page
+    .locator("section")
+    .filter({
+      has: page.getByRole("heading", { level: 2, name: /In my hands/ }),
+    })
+    .locator("section")
+    .filter({ has: page.getByRole("heading", { level: 3, name }) })
 
 /** A root task with two subtasks, one done, due today and tagged. */
 async function seedStarted(page: Page) {
   const api = await userApi(page)
+  const me = await (await api.get("/users/me")).json()
   const today = isoDay(new Date())
   const low = await api.create("/tasks/", {
     title: "Tidy the shed",
     status: "in_progress",
     priority: "P3",
+    assignee_id: me.id,
   })
   const high = await api.create("/tasks/", {
     title: "File the taxes",
@@ -22,6 +31,7 @@ async function seedStarted(page: Page) {
     priority: "P1",
     due_date: today,
     tags: ["home"],
+    assignee_id: me.id,
   })
   const first = await api.create("/tasks/", {
     title: "Find the receipts",
@@ -33,27 +43,18 @@ async function seedStarted(page: Page) {
   return { api, low, high }
 }
 
-test("The dashboard has a sheet of what is in progress, most pressing first", async ({
+test("My work lists what is in progress, most pressing first", async ({
   page,
 }) => {
   await newUser(page)
   await seedStarted(page)
   await page.goto("/")
 
-  const started = band(page, /^In progress/)
-  await expect(started.getByRole("heading")).toHaveText(/In progress\s*2/)
+  const started = group(page, "In progress")
   const titles = started.getByRole("link")
   await expect(titles.nth(0)).toHaveText("File the taxes")
   await expect(titles.nth(1)).toHaveText("Tidy the shed")
   await expect(started).not.toContainText("Water the plants")
-})
-
-test("An empty in-progress sheet says so rather than disappearing", async ({
-  page,
-}) => {
-  await newUser(page)
-  await page.goto("/")
-  await expect(band(page, /^In progress/)).toContainText("Nothing in progress")
 })
 
 test("A compact row shows subtasks, due day, tags and project, and its status mark in its priority's colour", async ({
@@ -63,7 +64,7 @@ test("A compact row shows subtasks, due day, tags and project, and its status ma
   await seedStarted(page)
   await page.goto("/")
 
-  const started = band(page, /^In progress/)
+  const started = group(page, "In progress")
   const row = started
     .locator("div")
     .filter({ has: page.getByRole("link", { name: "File the taxes" }) })
