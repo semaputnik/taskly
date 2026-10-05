@@ -120,7 +120,7 @@ def _on_task(task_id: uuid.UUID) -> Any:
     touched, and names the rest in `task_ids`.
     """
     return or_(
-        ActivityEntry.entity_id == task_id,
+        col(ActivityEntry.entity_id) == task_id,
         literal_column(TASK_REF) == str(task_id),
         and_(
             col(ActivityEntry.action) == ActivityAction.TASKS_BULK_CHANGED,
