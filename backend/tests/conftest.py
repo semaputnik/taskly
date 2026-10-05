@@ -60,4 +60,4 @@ def storage() -> Generator[InMemoryAttachmentStorage]:
     fake_storage = InMemoryAttachmentStorage()
     app.dependency_overrides[get_attachment_storage] = lambda: fake_storage
     yield fake_storage
-    del app.dependency_overrides[get_attachment_storage]
+    app.dependency_overrides.pop(get_attachment_storage, None)

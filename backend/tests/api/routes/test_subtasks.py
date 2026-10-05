@@ -4,7 +4,11 @@ from fastapi.testclient import TestClient
 from sqlmodel import Session
 
 from app.core.config import settings
-from tests.utils.accounts import create_project, create_task_record, inbox_project_id
+from tests.utils.accounts import (
+    create_project,
+    create_task_record,
+    inbox_project_id,
+)
 from tests.utils.user import new_user_headers
 
 
