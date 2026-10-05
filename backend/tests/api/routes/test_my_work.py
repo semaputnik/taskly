@@ -87,8 +87,12 @@ def test_my_work_lists_only_what_is_on_the_user_most_pressing_first(
     client: TestClient, owner: Headers, agent: dict[str, Any]
 ) -> None:
     me = _me(client, owner)
-    _create(client, owner, title="Mine, P3", assignee_id=me, status="todo", priority="P3")
-    _create(client, owner, title="Mine, P1", assignee_id=me, status="todo", priority="P1")
+    _create(
+        client, owner, title="Mine, P3", assignee_id=me, status="todo", priority="P3"
+    )
+    _create(
+        client, owner, title="Mine, P1", assignee_id=me, status="todo", priority="P1"
+    )
     _create(client, owner, title="Mine, review", assignee_id=me, status="review")
     _create(client, owner, title="Mine, waiting", assignee_id=me, status="waiting")
     _create(client, owner, title="Mine, backlog", assignee_id=me, status="backlog")
@@ -149,7 +153,9 @@ def test_a_task_a_bot_user_files_in_review_is_handed_over(
         client, agent["headers"], project_id=agent["project_id"], status="review"
     )
 
-    assert _shown(client, owner, task["id"])["handover"]["bot_user"]["id"] == agent["id"]
+    assert (
+        _shown(client, owner, task["id"])["handover"]["bot_user"]["id"] == agent["id"]
+    )
 
 
 def test_a_bot_user_reopening_a_task_into_review_hands_it_over(
@@ -159,7 +165,9 @@ def test_a_bot_user_reopening_a_task_into_review_hands_it_over(
 
     _move(client, agent["headers"], task["id"], "review")
 
-    assert _shown(client, owner, task["id"])["handover"]["bot_user"]["id"] == agent["id"]
+    assert (
+        _shown(client, owner, task["id"])["handover"]["bot_user"]["id"] == agent["id"]
+    )
 
 
 def test_the_user_moving_a_task_to_review_hands_nothing_over(

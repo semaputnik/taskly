@@ -5,11 +5,9 @@ test.use({ storageState: { cookies: [], origins: [] } })
 
 /** The In my hands panel on the day page. */
 const panel = (page: Page) =>
-  page
-    .locator("section")
-    .filter({
-      has: page.getByRole("heading", { level: 2, name: /In my hands/ }),
-    })
+  page.locator("section").filter({
+    has: page.getByRole("heading", { level: 2, name: /In my hands/ }),
+  })
 
 /** One of its status groups. */
 const group = (page: Page, name: string) =>
