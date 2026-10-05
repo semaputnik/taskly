@@ -302,6 +302,7 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
 
 - **FR-06.1** Tasks are displayed as a list.
 - **FR-06.2** The task list can be filtered by:
+  - title text (contains, case-insensitive; FR-06.14)
   - project
   - assignee
   - reporter — the user, or one of their bot users (FR-01.29); there is no
@@ -315,12 +316,17 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
   when each task was filed. Each order has a natural direction it runs in
   when none is named: soonest first, P1 first, and newest first. Choosing an
   order gives that direction; choosing it again reverses it. The order and
-  any reversal live in the list's URL, and the list's default order — most
-  pressing first, subtasks under their root task — is none of these.
-- **FR-06.5** The task list can be shown as compact rows, which it opens in,
-  or as a table. A compact row shows the title, and beneath it the task's
-  subtask progress, due date, recurrence and tags. The choice is part of the
-  list's URL and does not change its filters, order or page.
+  any reversal live in the list's URL. The list's default order is newest
+  filed first, with every subtask shown under its root task rather than at
+  its own place in the order; the day page, not the list, answers what is
+  most pressing.
+- **FR-06.5** The task list has one view: task lines. A line shows the
+  status mark, the title, and beneath it the task's subtask progress, due
+  date, recurrence, tags and assignee (FR-06.13), with the project at the
+  end. There is no table view and no selection of several lines: a change to
+  many tasks at once is made by a bot user through the REST API's batch
+  endpoint, which stays (FR-10.9). A subtask line is indented under its root
+  task with a branch mark.
 - **FR-06.6** Priorities are told apart by colour as well as by name: P1 red,
   P2 amber/yellow, P3 blue, and P4 (or no priority) uncoloured. A compact row
   shows its task's priority as the colour of its completion checkbox.
@@ -359,6 +365,23 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
   dashboard was read on that device; a first visit counts every change the
   bot users have made. When nothing is overdue or due today, the dashboard
   says so in a sentence instead of drawing the bands.
+- **FR-06.13** Wherever a task line is shown, its meta line names the
+  assignee when there is one: "you", the bot user's name, or, for a task in
+  Review that a bot user handed over, the bot user's name followed by an
+  arrow and "you". An unassigned task names nobody.
+- **FR-06.14** Typing in the capture line also searches: while the typed
+  text is at least two characters long, the line offers the open tasks whose
+  title contains it, case-insensitively, newest first, at most eight, each
+  with its status mark and project, the matched text marked. Enter still
+  creates a task from the typed text; the arrow keys and Enter, or a tap,
+  open a match instead. The REST API's task list accepts the same title
+  filter. Nothing is searched while the line is empty, and nothing beyond
+  open tasks' titles is searched (descriptions and comments are not).
+- **FR-06.15** The capture line is at the top of the page on a desktop and
+  pinned to the bottom of the screen on a phone, above the browser's own
+  bar, with its matches opening upward; there is no floating button and no
+  "Add a task" entry in the navigation. The `c` key still opens the full
+  draft from any screen.
 
 ### F-07. REST API
 
@@ -665,7 +688,10 @@ Not requirements yet. Recorded so they are not lost.
   than a bot user, events other than the two in FR-11.4 and FR-11.6, and
   disabling a webhook automatically after failed deliveries.
 - Nested projects (projects are flat — see FR-05.5).
-- Text search over tasks.
+- Full-text search over descriptions and comments; the only search is the
+  capture line's match on open tasks' titles (FR-06.14).
+- Selecting several tasks in the interface and changing them in one act;
+  the REST API's batch endpoint remains for bot users.
 - Keeping a copy of a PDF in Taskly beside the one in Paperless, sending
   anything but PDFs to Paperless, serving Paperless's archived copy, and
   deleting anything from Paperless.

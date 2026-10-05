@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Taskly · Tasks (slice 3 mock)</title>
+<style>
+  :root { color-scheme: light; --page:#ffffff; --ink:#0b0e11; --ink-2:#3d444d; --ink-3:#656d76; --rule:#e6e8eb; --rule-strong:#c9cdd2; --hover:#f3f4f6; --done:#1a7f37; --late:#cf222e; --p2:#8a5c00; --p3:#0969da;
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", "Noto Sans", Arial, sans-serif; --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+  [data-theme="dark"] { color-scheme: dark; --page:#0f1115; --ink:#e9ecef; --ink-2:#c4c9d0; --ink-3:#8a8f98; --rule:#23272d; --rule-strong:#353a42; --hover:#1e2228; --done:#3fb950; --late:#f0616d; --p2:#e3a443; --p3:#6ea8ff; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--page); color:var(--ink); font-family:var(--font); font-size:15px; line-height:1.45; -webkit-font-smoothing:antialiased; }
+  a { color:inherit; text-decoration:none; } a:hover { text-decoration:underline; text-underline-offset:3px; }
+  button { font:inherit; color:inherit; background:none; border:0; padding:0; cursor:pointer; }
+  :focus-visible { outline:2px solid var(--ink); outline-offset:2px; border-radius:2px; }
+  .mono { font-family:var(--mono); font-size:12px; font-variant-numeric:tabular-nums; }
+
+  .app { display:grid; grid-template-columns:200px minmax(0,1fr); min-height:100vh; }
+  .nav { padding:28px 20px 28px 28px; display:flex; flex-direction:column; gap:26px; position:sticky; top:0; height:100vh; }
+  .wordmark { font-weight:600; letter-spacing:-.01em; }
+  .nav ul { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:2px; }
+  .nav li a { display:flex; justify-content:space-between; align-items:center; height:30px; padding:0 8px; margin:0 -8px; border-radius:6px; color:var(--ink-2); }
+  .nav li a[aria-current] { color:var(--ink); font-weight:600; }
+  .nav li a .n { font-family:var(--mono); font-size:12px; color:var(--ink-3); }
+  .nav .add { display:flex; align-items:center; gap:8px; color:var(--ink-2); }
+  .nav .add kbd { font-family:var(--mono); font-size:11px; border:1px solid var(--rule-strong); border-radius:4px; padding:0 5px; color:var(--ink-3); margin-left:auto; }
+  .nav .foot { margin-top:auto; display:flex; align-items:center; gap:8px; font-size:13px; color:var(--ink-2); }
+  .nav .foot .av { width:20px; height:20px; border-radius:50%; background:var(--ink); color:var(--page); font-size:11px; font-weight:600; display:grid; place-items:center; }
+
+  main { padding:36px 48px 96px; max-width:900px; min-width:0; }
+  .capture { display:flex; align-items:center; gap:10px; height:40px; border-bottom:1px solid var(--rule-strong); margin-bottom:28px; color:var(--ink-3); }
+  .capture span { flex:1; }
+  .capwrap { position:relative; margin-bottom:28px; }
+  .capwrap .capture { margin-bottom:0; }
+  .capture.typing { color:var(--ink); border-bottom-color:var(--ink); }
+  .capture .typed { color:var(--ink); } .caret { display:inline-block; width:1px; height:16px; background:var(--ink); vertical-align:-3px; margin-left:1px; }
+  .matches { position:absolute; left:0; right:0; top:100%; margin-top:6px; background:var(--page); border:1px solid var(--rule-strong); border-radius:8px; box-shadow:0 10px 24px -8px rgba(0,0,0,.25), 0 2px 6px rgba(0,0,0,.08); padding:6px 0; z-index:3; }
+  .mh { font-size:12.5px; color:var(--ink-3); padding:6px 14px 4px; }
+  .m { display:grid; grid-template-columns:18px minmax(0,1fr) auto; gap:12px; align-items:center; padding:8px 14px; font-size:14px; }
+  .m:hover, .m:focus { background:var(--hover); text-decoration:none; }
+  .m .mt { font-weight:500; } .m .mt b { font-weight:700; }
+  .m .mp { font-size:12.5px; color:var(--ink-3); }
+  .mf { display:flex; justify-content:space-between; gap:12px; padding:8px 14px 4px; font-size:12px; color:var(--ink-3); border-top:1px solid var(--rule); margin-top:4px; }
+  .mf kbd { font-family:var(--mono); font-size:11px; border:1px solid var(--rule-strong); border-radius:4px; padding:0 4px; margin:0 1px; } .capture kbd { font-family:var(--mono); font-size:11px; border:1px solid var(--rule-strong); border-radius:4px; padding:0 5px; }
+  h1 { margin:0 0 4px; font-size:22px; font-weight:600; letter-spacing:-.015em; line-height:1.2; }
+  .lede { margin:0 0 20px; color:var(--ink-3); } .lede b { color:var(--ink); font-weight:500; }
+
+  /* filter row: text controls, weight marks what is set */
+  .filters { display:flex; align-items:center; gap:4px 12px; flex-wrap:wrap; font-size:13.5px; color:var(--ink-3); padding:0 0 10px; border-bottom:1px solid var(--rule-strong); }
+  .f { display:inline-flex; align-items:center; gap:5px; height:28px; padding:0 6px; border-radius:6px; white-space:nowrap; }
+  .filters > .f:first-child { margin-left:-6px; }
+  .filters .right > .f:last-child { margin-right:-6px; }
+  .f:hover { background:var(--hover); color:var(--ink); }
+  .f.set { color:var(--ink); font-weight:500; }
+  .f .ch { width:10px; height:10px; opacity:.7; }
+  .f .x { width:14px; height:14px; margin-left:2px; border-radius:50%; display:grid; place-items:center; color:var(--ink-3); } .f .x:hover { background:var(--rule); color:var(--ink); }
+  .filters .right { margin-left:auto; display:flex; gap:18px; align-items:center; }
+  .view { display:inline-flex; gap:10px; }
+  .view a { color:var(--ink-3); } .view a.on { color:var(--ink); font-weight:600; }
+  .clear { color:var(--ink-3); padding:0 6px; }
+
+  /* selection bar, replaces the filter row's place while something is selected */
+  .bulk { display:flex; align-items:center; gap:4px 18px; flex-wrap:wrap; font-size:13.5px; padding:10px 0; border-bottom:1px solid var(--rule-strong); margin-top:-1px; }
+  .bulk b { font-weight:600; }
+  .bulk .all { color:var(--ink-3); }
+  .bulk .f { color:var(--ink-2); }
+  .bulk .del { color:var(--ink-3); } .bulk .del:hover { color:var(--late); }
+  .bulk .x { margin-left:auto; color:var(--ink-3); }
+
+  .list { margin-top:4px; }
+  .task { display:grid; grid-template-columns:18px minmax(0,1fr); gap:0 12px; align-items:start; padding:9px 0; border-bottom:1px solid var(--rule); }
+  .task:hover { box-shadow:inset 0 0 0 0 transparent; background:linear-gradient(to right, var(--hover), transparent 92%); margin:0 -12px; padding-left:12px; padding-right:12px; }
+  .task.sel { background:var(--hover); }
+  .task .cb { width:14px; height:14px; border:1.5px solid var(--rule-strong); border-radius:3px; margin-top:3px; opacity:0; background:var(--page); }
+  .task:hover .cb, .task.sel .cb, .selecting .task .cb { opacity:1; }
+  .task.sel .cb { background:var(--ink); border-color:var(--ink); position:relative; }
+  .task.sel .cb::after { content:""; position:absolute; left:4px; top:1px; width:4px; height:7px; border:solid var(--page); border-width:0 1.5px 1.5px 0; transform:rotate(45deg); }
+  .mark { width:18px; height:18px; color:var(--ink-2); margin-top:1px; display:block; } .mark svg { width:18px; height:18px; display:block; }
+  .mark.p1 { color:var(--late); } .mark.p2 { color:var(--p2); } .mark.p3 { color:var(--p3); }
+  .task .t { font-weight:500; line-height:1.35; }
+  .task.child { grid-template-columns:12px 18px minmax(0,1fr); padding-left:30px; }
+  .task.child:hover { padding-left:42px; }
+  .branch { width:10px; height:10px; margin-top:5px; border-left:1.5px solid var(--rule-strong); border-bottom:1.5px solid var(--rule-strong); border-radius:0 0 0 3px; }
+  .meta { display:flex; align-items:center; gap:12px; color:var(--ink-3); font-size:12.5px; margin-top:3px; font-variant-numeric:tabular-nums; }
+  .meta span { display:inline-flex; align-items:center; gap:4px; white-space:nowrap; } .meta svg { width:13px; height:13px; }
+  .meta .late { color:var(--late); font-weight:500; } .meta .today { color:var(--ink); font-weight:500; }
+  .meta .who { color:var(--ink-2); }
+  .meta .proj { margin-left:auto; } .meta .proj i { width:8px; height:8px; border-radius:2px; background:currentColor; opacity:.55; }
+  .pager { display:flex; align-items:center; gap:18px; padding-top:14px; font-size:13px; color:var(--ink-3); }
+  .pager .right { margin-left:auto; display:flex; gap:14px; }
+  .pager .right a.off { opacity:.4; }
+
+  .fab { display:none; }
+  @media (max-width: 760px) {
+    .fab { display:grid; place-items:center; position:fixed; right:16px; bottom:16px; width:52px; height:52px; border-radius:50%; background:var(--ink); color:var(--page); box-shadow:0 6px 16px rgba(0,0,0,.18); z-index:4; }
+    .app { grid-template-columns:1fr; }
+    .nav { position:sticky; height:auto; flex-direction:row; align-items:center; padding:12px 16px; gap:12px; background:var(--page); border-bottom:1px solid var(--rule); z-index:2; }
+    .nav ul, .nav .foot { display:none; }
+    main { padding:20px 16px 96px; }
+    .filters .hide { display:none; }
+    .task.child { padding-left:26px; } .task.child:hover { padding-left:38px; }
+    .meta .proj { max-width:40%; overflow:hidden; } .meta .proj em { font-style:normal; overflow:hidden; text-overflow:ellipsis; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <nav class="nav" aria-label="Main">
+    <div class="wordmark">Taskly</div>
+    <ul><li><a href="#">Today</a></li><li><a href="#" aria-current="page">Tasks <span class="n">23</span></a></li><li><a href="#">Projects <span class="n">4</span></a></li><li><a href="#">Tags</a></li><li><a href="#">Bots <span class="n">4</span></a></li><li><a href="#">Activity</a></li><li><a href="#">Archive</a></li></ul>
+    <div class="foot"><span class="av">S</span> Sam</div>
+  </nav>
+
+  <main>
+    <div class="capwrap">
+      <div class="capture typing"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 3v10M3 8h10"/></svg><span class="typed">redirect<i class="caret"></i></span><kbd>C</kbd></div>
+      <div class="matches" role="listbox" aria-label="Open tasks matching">
+        <div class="mh">Open tasks matching “redirect”</div>
+        <a href="#" class="m" role="option"><span class="mark"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="9" cy="9" r="7"/><circle cx="9" cy="9" r="2.6" fill="currentColor" stroke="none"/></svg></span><span class="mt">Check the <b>redirect</b> map</span><span class="mp">Website relaunch</span></a>
+        <a href="#" class="m" role="option"><span class="mark"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="9" cy="9" r="7"/></svg></span><span class="mt"><b>Redirect</b> the old URLs</span><span class="mp">Website relaunch</span></a>
+        <div class="mf"><span><kbd>↵</kbd> creates “redirect” in Website relaunch</span><span><kbd>↑</kbd><kbd>↓</kbd> then <kbd>↵</kbd> opens a match</span></div>
+      </div>
+    </div>
+    <h1>Tasks</h1>
+    <p class="lede"><b>23 open.</b> 9 in Backlog, 4 on bot users, 2 overdue.</p>
+
+    <div class="filters">
+      <a href="#" class="f set">Website relaunch <span class="x" aria-label="Remove project filter">×</span></a>
+      <a href="#" class="f">Anyone <svg class="ch" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 3.5l3 3 3-3"/></svg></a>
+      <a href="#" class="f">Any status <svg class="ch" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 3.5l3 3 3-3"/></svg></a>
+      <a href="#" class="f">Any priority <svg class="ch" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 3.5l3 3 3-3"/></svg></a>
+      <a href="#" class="f hide">Any tag <svg class="ch" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 3.5l3 3 3-3"/></svg></a>
+      <a href="#" class="f hide">Any time <svg class="ch" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 3.5l3 3 3-3"/></svg></a>
+      <a href="#" class="clear">Clear</a>
+      <div class="right">
+        <a href="#" class="f">Newest first <svg class="ch" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 3.5l3 3 3-3"/></svg></a>
+
+      </div>
+    </div>
+
+    <div class="list">
+      <div class="task"><span class="mark p1"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M1.8 9c1.9-3.4 4.3-5 7.2-5s5.3 1.6 7.2 5c-1.9 3.4-4.3 5-7.2 5S3.7 12.4 1.8 9z"/><circle cx="9" cy="9" r="2.4"/><circle cx="9" cy="9" r=".9" fill="currentColor" stroke="none"/></svg></span><div><div class="t">Renew the domain</div><div class="meta"><span class="late">2 days late</span><span>blocked</span><span class="proj"><i></i><em>Website relaunch</em></span></div></div></div>
+      <div class="task"><span class="mark p2"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="9" cy="9" r="7"/><path d="M9 4.5a4.5 4.5 0 0 1 0 9z" fill="currentColor" stroke="none"/></svg></span><div><div class="t">Migrate the marketing pages</div><div class="meta"><span>2/5</span><span>Wed</span><span class="who">you</span><span class="proj"><i></i><em>Website relaunch</em></span></div></div></div>
+      <div class="task child"><span class="branch"></span><span class="mark p2"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="9" cy="9" r="7"/><path d="M9 4.5a4.5 4.5 0 0 1 0 9z" fill="currentColor" stroke="none"/></svg></span><div><div class="t">Move the home page</div><div class="meta"><span>Wed</span><span class="proj"><i></i><em>Website relaunch</em></span></div></div></div>
+      <div class="task child"><span class="branch"></span><span class="mark"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="9" cy="9" r="7"/></svg></span><div><div class="t">Redirect the old URLs</div><div class="meta"><span class="who">release-bot</span><span class="proj"><i></i><em>Website relaunch</em></span></div></div></div>
+      <div class="task"><span class="mark p2"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="9" cy="9" r="7"/></svg></span><div><div class="t">Rewrite the pricing copy</div><div class="meta"><span>Thu</span><span>copy</span><span class="proj"><i></i><em>Website relaunch</em></span></div></div></div>
+      <div class="task"><span class="mark"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="9" cy="9" r="7"/><circle cx="9" cy="9" r="2.6" fill="currentColor" stroke="none"/></svg></span><div><div class="t">Check the redirect map</div><div class="meta"><span class="who">release-bot → you</span><span class="proj"><i></i><em>Website relaunch</em></span></div></div></div>
+      <div class="task"><span class="mark"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="9" cy="9" r="7" stroke-dasharray="2.6 2.4"/></svg></span><div><div class="t">Old staging banner</div><div class="meta"><span>Backlog</span><span class="proj"><i></i><em>Website relaunch</em></span></div></div></div>
+      <div class="task"><span class="mark"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="9" cy="9" r="7" stroke-dasharray="2.6 2.4"/></svg></span><div><div class="t">Collect testimonials for the new home page</div><div class="meta"><span>Backlog</span><span>every 2 weeks</span><span class="proj"><i></i><em>Website relaunch</em></span></div></div></div>
+      <div class="task"><span class="mark"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="9" cy="9" r="7" stroke-dasharray="2.6 2.4"/></svg></span><div><div class="t">Retire the old analytics snippet</div><div class="meta"><span>Backlog</span><span class="proj"><i></i><em>Website relaunch</em></span></div></div></div>
+    </div>
+
+    <div class="pager"><span>9 tasks</span><div class="right"><a href="#" class="off">Previous</a><a href="#" class="off">Next</a></div></div>
+  </main>
+</div>
+<button class="fab" aria-label="Add a task"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg></button>
+</body>
+</html>
