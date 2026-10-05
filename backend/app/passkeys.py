@@ -186,7 +186,8 @@ def finish_registration(
         user_id=row.user_handle,
         commit=False,
     )
-    session.add(_new_passkey(user.id, credential, verified, user_agent))
+    # Registering signs in with the new passkey: that is its first use.
+    session.add(_new_passkey(user.id, credential, verified, user_agent, used=True))
     session.commit()
     session.refresh(user)
     return user
@@ -435,7 +436,7 @@ def finish_recovery(
     if user is None or recovery is None or recovery.expires_at <= datetime.now(UTC):
         raise RecoveryRefused()
     verified = _verify_registration(credential, row.challenge)
-    session.add(_new_passkey(user.id, credential, verified, user_agent))
+    session.add(_new_passkey(user.id, credential, verified, user_agent, used=True))
     session.delete(recovery)
     user.session_version += 1
     session.add(user)
@@ -643,6 +644,8 @@ def _new_passkey(
     credential: dict[str, Any],
     verified: _Registration,
     user_agent: str | None,
+    *,
+    used: bool = False,
 ) -> Passkey:
     transports = credential.get("response", {}).get("transports") or []
     return Passkey(
@@ -652,6 +655,7 @@ def _new_passkey(
         sign_count=verified.sign_count,
         transports=[str(transport) for transport in transports],
         name=passkey_name(user_agent),
+        last_used_at=datetime.now(UTC) if used else None,
     )
 
 

@@ -1,10 +1,14 @@
 import { expect, test } from "@playwright/test"
-import { firstSuperuser, firstSuperuserPassword } from "./config.ts"
+import { firstSuperuser } from "./config.ts"
+import {
+  addVirtualAuthenticator,
+  registerWithPasskey,
+} from "./utils/passkeys.ts"
 import { createUser } from "./utils/privateApi.ts"
-import { randomEmail, randomPassword } from "./utils/random"
+import { randomEmail } from "./utils/random"
 import { logInUser, logOutUser } from "./utils/user"
 
-const tabs = ["My profile", "Password", "Danger zone"]
+const tabs = ["My profile", "Passkeys", "Danger zone"]
 
 test("My profile tab is active by default", async ({ page }) => {
   await page.goto("/settings")
@@ -24,16 +28,14 @@ test("All tabs are visible", async ({ page }) => {
 test.describe("Edit user profile", () => {
   test.use({ storageState: { cookies: [], origins: [] } })
   let email: string
-  let password: string
 
   test.beforeAll(async () => {
     email = randomEmail()
-    password = randomPassword()
-    await createUser({ email, password })
+    await createUser({ email })
   })
 
   test.beforeEach(async ({ page }) => {
-    await logInUser(page, email, password)
+    await logInUser(page, email)
     await page.goto("/settings")
     await page.getByRole("tab", { name: "My profile" }).click()
   })
@@ -69,11 +71,10 @@ test.describe("Edit user email", () => {
 
   test("Edit user email with a valid email", async ({ page }) => {
     const email = randomEmail()
-    const password = randomPassword()
     const updatedEmail = randomEmail()
 
-    await createUser({ email, password })
-    await logInUser(page, email, password)
+    await createUser({ email })
+    await logInUser(page, email)
     await page.goto("/settings")
     await page.getByRole("tab", { name: "My profile" }).click()
 
@@ -93,10 +94,9 @@ test.describe("Cancel edit actions", () => {
 
   test("Cancel edit action restores original name", async ({ page }) => {
     const email = randomEmail()
-    const password = randomPassword()
-    const user = await createUser({ email, password })
+    const user = await createUser({ email })
 
-    await logInUser(page, email, password)
+    await logInUser(page, email)
     await page.goto("/settings")
     await page.getByRole("tab", { name: "My profile" }).click()
     await page.getByRole("button", { name: "Edit profile" }).click()
@@ -110,10 +110,9 @@ test.describe("Cancel edit actions", () => {
 
   test("Cancel edit action restores original email", async ({ page }) => {
     const email = randomEmail()
-    const password = randomPassword()
-    await createUser({ email, password })
+    await createUser({ email })
 
-    await logInUser(page, email, password)
+    await logInUser(page, email)
     await page.goto("/settings")
     await page.getByRole("tab", { name: "My profile" }).click()
     await page.getByRole("button", { name: "Edit profile" }).click()
@@ -126,81 +125,46 @@ test.describe("Cancel edit actions", () => {
   })
 })
 
-test.describe("Change password", () => {
+test.describe("Passkeys", () => {
   test.use({ storageState: { cookies: [], origins: [] } })
 
-  test("Update password successfully", async ({ page }) => {
-    const email = randomEmail()
-    const password = randomPassword()
-    const newPassword = randomPassword()
-
-    await createUser({ email, password })
-    await logInUser(page, email, password)
-
-    await page.goto("/settings")
-    await page.getByRole("tab", { name: "Password" }).click()
-    await page.getByTestId("current-password-input").fill(password)
-    await page.getByTestId("new-password-input").fill(newPassword)
-    await page.getByTestId("confirm-password-input").fill(newPassword)
-    await page.getByRole("button", { name: "Update Password" }).click()
-
-    await expect(page.getByText("Password updated successfully")).toBeVisible()
-
-    await logOutUser(page)
-    await logInUser(page, email, newPassword)
-  })
-})
-
-test.describe("Change password validation", () => {
-  test.use({ storageState: { cookies: [], origins: [] } })
-  let email: string
-  let password: string
-
-  test.beforeAll(async () => {
-    email = randomEmail()
-    password = randomPassword()
-    await createUser({ email, password })
-  })
-
-  test.beforeEach(async ({ page }) => {
-    await logInUser(page, email, password)
-    await page.goto("/settings")
-    await page.getByRole("tab", { name: "Password" }).click()
-  })
-
-  test("Update password with weak passwords", async ({ page }) => {
-    const weakPassword = "weak"
-
-    await page.getByTestId("current-password-input").fill(password)
-    await page.getByTestId("new-password-input").fill(weakPassword)
-    await page.getByTestId("confirm-password-input").fill(weakPassword)
-    await page.getByRole("button", { name: "Update Password" }).click()
-
-    await expect(
-      page.getByText("Password must be at least 8 characters"),
-    ).toBeVisible()
-  })
-
-  test("New password and confirmation password do not match", async ({
+  test("Settings lists the account's passkeys, and the only one stays", async ({
     page,
   }) => {
-    await page.getByTestId("current-password-input").fill(password)
-    await page.getByTestId("new-password-input").fill(randomPassword())
-    await page.getByTestId("confirm-password-input").fill(randomPassword())
-    await page.getByRole("button", { name: "Update Password" }).click()
+    await addVirtualAuthenticator(page)
+    await registerWithPasskey(page, randomEmail())
 
-    await expect(page.getByText("The passwords don't match")).toBeVisible()
+    await page.goto("/settings")
+    await page.getByRole("tab", { name: "Passkeys" }).click()
+
+    const rows = page.getByTestId("passkey-list").getByRole("listitem")
+    await expect(rows).toHaveCount(1)
+    await expect(rows.first()).toContainText("Created")
+    // Registering signed in with it.
+    await expect(rows.first()).toContainText("last used")
+    // The last passkey cannot be removed (FR-12.8).
+    await expect(
+      rows.first().getByRole("button", { name: /Remove/ }),
+    ).toBeDisabled()
   })
 
-  test("Current password and new password are the same", async ({ page }) => {
-    await page.getByTestId("current-password-input").fill(password)
-    await page.getByTestId("new-password-input").fill(password)
-    await page.getByTestId("confirm-password-input").fill(password)
-    await page.getByRole("button", { name: "Update Password" }).click()
+  test("Sign out everywhere ends this session too", async ({ page }) => {
+    await logInUser(page, randomEmail())
+    const token = await page.evaluate(() =>
+      localStorage.getItem("access_token"),
+    )
 
-    await expect(
-      page.getByText("New password cannot be the same as the current one"),
-    ).toBeVisible()
+    await page.goto("/settings?tab=passkeys")
+    await page.getByRole("button", { name: "Sign out everywhere" }).click()
+
+    await page.waitForURL("/login")
+    const r = await page.request.get(
+      `${process.env.VITE_API_URL}/api/v1/users/me`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      },
+    )
+    expect(r.status()).toBe(401)
   })
 })
 
@@ -249,7 +213,7 @@ test("Selected mode is preserved across sessions", async ({ page }) => {
   expect(isDarkMode).toBe(true)
 
   await logOutUser(page)
-  await logInUser(page, firstSuperuser, firstSuperuserPassword)
+  await logInUser(page, firstSuperuser)
 
   isDarkMode = await page.evaluate(() =>
     document.documentElement.classList.contains("dark"),

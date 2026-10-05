@@ -39,3 +39,23 @@ def test_an_existing_user_is_signed_in_as_they_are(
     assert again["user"]["id"] == first["user"]["id"]
     user = db.exec(select(User).where(User.email == email)).one()
     assert user.is_superuser is False
+
+
+def test_a_recovery_code_for_anyone(client: TestClient, db: Session) -> None:
+    email = random_email()
+    client.post(f"{API}/private/users/", json={"email": email, "is_superuser": True})
+
+    r = client.post(f"{API}/private/recovery-code", json={"email": email})
+
+    assert r.status_code == 200
+    options = client.post(
+        f"{API}/login/recovery/options", json={"email": email, "code": r.json()["code"]}
+    )
+    assert options.status_code == 200
+    user = db.exec(select(User).where(User.email == email)).one()
+    assert user.is_superuser is True
+
+
+def test_a_recovery_code_for_nobody(client: TestClient) -> None:
+    r = client.post(f"{API}/private/recovery-code", json={"email": random_email()})
+    assert r.status_code == 404

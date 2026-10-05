@@ -6,8 +6,7 @@ import {
   isTouched,
 } from "../src/components/Tasks/draft"
 import { openCaptured } from "./utils/capture"
-import { createUser } from "./utils/privateApi.ts"
-import { randomEmail, randomPassword } from "./utils/random"
+import { randomEmail } from "./utils/random"
 import { logInUser } from "./utils/user"
 
 test.use({ storageState: { cookies: [], origins: [] } })
@@ -15,10 +14,8 @@ test.use({ storageState: { cookies: [], origins: [] } })
 /** A user of this test's own: the suite shares a database with development. */
 async function newUser(page: Page) {
   const email = randomEmail()
-  const password = randomPassword()
-  await createUser({ email, password })
-  await logInUser(page, email, password)
-  return { email, password }
+  await logInUser(page, email)
+  return { email }
 }
 
 async function api(page: Page) {

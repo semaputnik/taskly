@@ -37,12 +37,11 @@ You can also configure these environment variables as needed:
 
 ### Secrets
 
-Generate and set secure values for the database password, token signing key, and first superuser password:
+Generate and set secure values for the database password and token signing key:
 
 ```bash
 export POSTGRES_PASSWORD="$(python -c 'import secrets; print(secrets.token_urlsafe(32))')"
 export SECRET_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(32))')"
-export FIRST_SUPERUSER_PASSWORD="$(python -c 'import secrets; print(secrets.token_urlsafe(32))')"
 ```
 
 To use an authenticated email provider, also set `SMTP_PASSWORD`.
@@ -88,7 +87,6 @@ Add these repository secrets:
 
 * `POSTGRES_PASSWORD`
 * `SECRET_KEY`
-* `FIRST_SUPERUSER_PASSWORD`
 
 To use an authenticated email provider, add the optional `SMTP_PASSWORD` repository secret.
 
@@ -156,7 +154,7 @@ cd /root/taskly
 mv .env.release.example .env
 ```
 
-Set `TASKLY_IMAGE` to the published image, such as `docker.io/your-account/taskly`, and `TASKLY_TAG` to the released version, such as `1.2.3`. Pinning the version rather than `latest` means a restart brings back the same image. The application refuses to start while `SECRET_KEY`, `FIRST_SUPERUSER_PASSWORD` or `POSTGRES_PASSWORD` is still `changethis`.
+Set `TASKLY_IMAGE` to the published image, such as `docker.io/your-account/taskly`, and `TASKLY_TAG` to the released version, such as `1.2.3`. Pinning the version rather than `latest` means a restart brings back the same image. The application refuses to start while `SECRET_KEY` or `POSTGRES_PASSWORD` is still `changethis`.
 
 For an image in a private Docker Hub repository, log in on the server first with `docker login`.
 
@@ -168,7 +166,7 @@ docker compose -f compose.release.yml up -d
 ```
 
 Migrations are not a step to remember. The stack has a `prestart` service that
-runs them and creates the first superuser, and the application is not started
+runs them, and the application is not started
 until it has finished, so an image whose code expects a column the database
 does not have never reaches a request. It runs on every `up` and does nothing
 when the database is already at the right revision.
@@ -188,6 +186,35 @@ docker compose -f compose.release.yml exec db psql -U postgres app
 ```
 
 The stack is named `taskly`, so its volumes are `taskly_app-db-data` and `taskly_attachments-data` wherever the file is placed. A server already running the build-from-source stack from `/root/code/app` keeps its data under that directory's project name instead, so moving to `compose.release.yml` there starts from empty volumes unless the data is migrated across.
+
+## Passkeys and the Hostname
+
+Taskly signs people in with passkeys only (ADR-0007). Every passkey is bound to the hostname in `FRONTEND_HOST` (for `compose.release.yml`, the `DOMAIN` it is built from). **Changing that hostname makes every passkey issued so far unusable**, and every user then needs a recovery code to get back in. Pick the hostname before people register.
+
+Browsers only offer passkeys on a secure origin: serve Taskly over HTTPS, or on `localhost` for development.
+
+### The First Superuser
+
+Nothing is seeded. Once the stack is up, open `/signup` and register the address in `FIRST_SUPERUSER`: whoever registers it while the installation has no superuser becomes it.
+
+### Recovery
+
+A user who lost every passkey asks the superuser, who issues a recovery code from the users list. The superuser's own code comes from the server:
+
+```bash
+docker compose -f compose.release.yml exec backend python -m app.superuser_recovery_code
+```
+
+(For the stack built from source, use `-f compose.yml -f compose.deploy.yml` instead.) The code is good for 24 hours and is entered with the e-mail under “Have a recovery code?” on the sign-in screen.
+
+### Upgrading from Password Sign-in
+
+Accounts created with a password keep their data but lose their way in when you upgrade, since passwords are gone. After the upgrade:
+
+1. Print the superuser's recovery code with the command above, and spend it to give the superuser a passkey.
+2. As the superuser, open the users list and issue a recovery code to each other user, and hand it to them yourself. Each one spends theirs on a new passkey.
+
+`FIRST_SUPERUSER_PASSWORD` is no longer read; remove it from your environment and secrets.
 
 ## URLs
 

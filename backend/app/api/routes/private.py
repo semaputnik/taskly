@@ -1,13 +1,13 @@
 from typing import Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from sqlmodel import SQLModel
 
-from app import crud
+from app import crud, passkeys
 from app.api.deps import SessionDep
 from app.core import security
-from app.models import UserCreate, UserPublic
+from app.models import RecoveryCodeIssued, UserCreate, UserPublic
 
 router = APIRouter(tags=["private"], prefix="/private")
 
@@ -45,3 +45,20 @@ def create_user(user_in: PrivateUserCreate, session: SessionDep) -> Any:
         user=UserPublic.model_validate(user),
         access_token=security.session_token(user.id, user.session_version),
     )
+
+
+class PrivateRecoveryCode(BaseModel):
+    email: str
+
+
+@router.post("/recovery-code", response_model=RecoveryCodeIssued)
+def issue_recovery_code(body: PrivateRecoveryCode, session: SessionDep) -> Any:
+    """
+    A recovery code for any user, superuser included, the way the server's
+    recovery command gives one (FR-12.19): for the end-to-end tests of
+    recovering an account. Only mounted in development.
+    """
+    user = crud.get_user_by_email(session=session, email=body.email)
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    return passkeys.issue_recovery_code(session, user=user)

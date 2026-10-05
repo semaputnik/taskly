@@ -1,6 +1,7 @@
 import type { ColumnDef } from "@tanstack/react-table"
 
 import type { UserPublic } from "@/client"
+import { IssueRecoveryCode } from "@/components/Admin/IssueRecoveryCode"
 import type { DataTableFeatures } from "@/components/Common/DataTable"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
@@ -10,8 +11,9 @@ export type UserTableData = UserPublic & {
 }
 
 /**
- * The registered accounts, read-only: listing them is the whole of what a
- * superuser can do with other people's accounts (FR-09.2, FR-09.3).
+ * The registered accounts. Listing them and issuing a recovery code to
+ * someone who lost every passkey are the whole of what a superuser can do
+ * with other people's accounts (FR-09.2, FR-09.3, FR-12.16).
  */
 export const columns: ColumnDef<DataTableFeatures, UserTableData>[] = [
   {
@@ -75,5 +77,17 @@ export const columns: ColumnDef<DataTableFeatures, UserTableData>[] = [
         </span>
       </div>
     ),
+  },
+  {
+    id: "recovery",
+    header: () => <span className="sr-only">Recovery</span>,
+    cell: ({ row }) =>
+      // The superuser's own code comes from the server's command line
+      // (FR-12.19).
+      row.original.isCurrentUser ? null : (
+        <div className="flex justify-end">
+          <IssueRecoveryCode user={row.original} />
+        </div>
+      ),
   },
 ]

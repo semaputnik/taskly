@@ -1,7 +1,6 @@
 import { expect, test } from "@playwright/test"
 import { openCaptured } from "./utils/capture"
-import { createUser } from "./utils/privateApi.ts"
-import { randomEmail, randomPassword } from "./utils/random"
+import { randomEmail } from "./utils/random"
 import { logInUser } from "./utils/user"
 
 test.use({ storageState: { cookies: [], origins: [] } })
@@ -11,9 +10,7 @@ test("A task is assigned to a bot user from the task form and found by it", asyn
   request,
 }) => {
   const email = randomEmail()
-  const password = randomPassword()
-  await createUser({ email, password })
-  await logInUser(page, email, password)
+  await logInUser(page, email)
 
   // The bot user is created over the API; the Bots page has its own test.
   const userToken = await page.evaluate(() =>

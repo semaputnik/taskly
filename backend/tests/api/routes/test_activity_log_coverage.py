@@ -86,6 +86,7 @@ NOT_LOGGED = {
     ),
     f"POST {API}/utils/test-email/": "Sends an email; changes nothing",
     f"POST {API}/private/users/": "Local development helper for test accounts",
+    f"POST {API}/private/recovery-code": "Local development helper for test accounts",
 }
 
 

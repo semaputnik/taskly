@@ -436,3 +436,5 @@ def test_registering_names_the_passkey_from_the_browser(
     passkey = db.exec(select(Passkey).where(Passkey.user_id == user.id)).one()
     assert passkey.name == "Firefox on Linux"
     assert passkey.transports == ["internal"]
+    # Registering signed in with it, so it has been used.
+    assert passkey.last_used_at is not None

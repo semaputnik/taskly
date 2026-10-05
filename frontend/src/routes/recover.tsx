@@ -6,12 +6,12 @@ import {
 } from "@tanstack/react-router"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
+
 import { AuthLayout } from "@/components/Common/AuthLayout"
 import { PasskeysUnsupported } from "@/components/Common/PasskeysUnsupported"
 import {
   Form,
   FormControl,
-  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -24,12 +24,13 @@ import { passkeysSupported } from "@/lib/passkeys"
 
 const formSchema = z.object({
   email: z.email({ message: "Invalid email address" }),
+  code: z.string().trim().min(1, { message: "Enter the recovery code" }),
 })
 
 type FormData = z.infer<typeof formSchema>
 
-export const Route = createFileRoute("/signup")({
-  component: SignUp,
+export const Route = createFileRoute("/recover")({
+  component: Recover,
   beforeLoad: async () => {
     if (isLoggedIn()) {
       throw redirect({
@@ -40,37 +41,41 @@ export const Route = createFileRoute("/signup")({
   head: () => ({
     meta: [
       {
-        title: "Create account - Taskly",
+        title: "Recover your account - Taskly",
       },
     ],
   }),
 })
 
-function SignUp() {
+function Recover() {
   return (
     <AuthLayout>
       <div className="flex flex-col gap-6">
         <div className="flex flex-col items-center gap-2 text-center">
-          <h1 className="text-2xl font-bold">Create an account</h1>
+          <h1 className="text-2xl font-bold">Recover your account</h1>
+          <p className="text-muted-foreground text-sm">
+            Lost every passkey? Ask the person who runs this Taskly for a
+            recovery code, then make a new passkey with it here.
+          </p>
         </div>
-        {passkeysSupported() ? <SignUpForm /> : <PasskeysUnsupported />}
+        {passkeysSupported() ? <RecoverForm /> : <PasskeysUnsupported />}
       </div>
     </AuthLayout>
   )
 }
 
-function SignUpForm() {
-  const { registerMutation } = useAuth()
+function RecoverForm() {
+  const { recoverMutation } = useAuth()
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     mode: "onBlur",
     criteriaMode: "all",
-    defaultValues: { email: "" },
+    defaultValues: { email: "", code: "" },
   })
 
   const onSubmit = (data: FormData) => {
-    if (registerMutation.isPending) return
-    registerMutation.mutate(data.email)
+    if (recoverMutation.isPending) return
+    recoverMutation.mutate(data)
   }
 
   return (
@@ -95,10 +100,26 @@ function SignUpForm() {
                     {...field}
                   />
                 </FormControl>
-                <FormDescription>
-                  Your device then makes a passkey for this account. It is how
-                  you sign in from now on; there is no password.
-                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="code"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Recovery code</FormLabel>
+                <FormControl>
+                  <Input
+                    data-testid="recovery-code-input"
+                    placeholder="XXXX-XXXX-XXXX-XXXX"
+                    autoComplete="one-time-code"
+                    spellCheck={false}
+                    className="font-mono"
+                    {...field}
+                  />
+                </FormControl>
                 <FormMessage />
               </FormItem>
             )}
@@ -107,16 +128,15 @@ function SignUpForm() {
           <LoadingButton
             type="submit"
             className="w-full"
-            loading={registerMutation.isPending}
+            loading={recoverMutation.isPending}
           >
-            Create account
+            Create a new passkey
           </LoadingButton>
         </div>
 
         <div className="text-center text-sm">
-          Already have an account?{" "}
           <RouterLink to="/login" className="underline underline-offset-4">
-            Sign in
+            Back to sign in
           </RouterLink>
         </div>
       </form>

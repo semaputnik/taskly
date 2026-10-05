@@ -111,6 +111,8 @@ def test_adding_a_passkey_after_confirming(client: TestClient, db: Session) -> N
 
     assert r.status_code == 200, r.text
     assert r.json()["name"] == "Safari on iPad"
+    # Added, not yet signed in with.
+    assert r.json()["last_used_at"] is None
     assert len(_passkey_ids(client, headers)) == 2
     # The new one signs in too.
     sign_in(client, new)

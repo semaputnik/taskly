@@ -1,14 +1,10 @@
 import type { Page } from "@playwright/test"
-import { createUser } from "./privateApi.ts"
-import { randomEmail, randomPassword } from "./random"
+import { randomEmail } from "./random"
 import { logInUser } from "./user"
 
 /** A user of this test's own: the suite shares a database with development. */
 export async function newUser(page: Page) {
-  const email = randomEmail()
-  const password = randomPassword()
-  await createUser({ email, password })
-  await logInUser(page, email, password)
+  await logInUser(page, randomEmail())
 }
 
 /** The REST API as the logged-in user, for setting a scene the way a client would. */

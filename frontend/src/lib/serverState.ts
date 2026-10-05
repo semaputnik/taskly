@@ -45,6 +45,7 @@ const FIRST_PAGE = { skip: 0, limit: 100 }
 // make one kind stale without touching the rest.
 const ROOT = {
   currentUser: "currentUser",
+  passkeys: "passkeys",
   users: "users",
   projects: "projects",
   project: "project",
@@ -67,6 +68,13 @@ export const currentUserQuery = () =>
   queryOptions({
     queryKey: [ROOT.currentUser],
     queryFn: async () => (await UsersService.readUserMe()).data,
+  })
+
+/** The signed-in user's own passkeys (FR-12.6). */
+export const passkeysQuery = () =>
+  queryOptions({
+    queryKey: [ROOT.passkeys],
+    queryFn: async () => (await UsersService.readPasskeys()).data,
   })
 
 export const usersQuery = () =>
@@ -304,6 +312,8 @@ export type Change =
   | { type: "attachments changed"; taskId: string }
   /** The signed-in account itself changed: everything read may be stale. */
   | { type: "account changed" }
+  /** A passkey was added to or removed from the signed-in account. */
+  | { type: "passkeys changed" }
   | { type: "users changed" }
 
 // What each change makes stale. A root on its own stands for every key under
@@ -355,6 +365,8 @@ export function staleKeys(change: Change): QueryKey[] {
       return [[ROOT.attachments, change.taskId], [ROOT.activity]]
     case "account changed":
       return [[]]
+    case "passkeys changed":
+      return [[ROOT.passkeys]]
     case "users changed":
       return [[ROOT.users]]
   }

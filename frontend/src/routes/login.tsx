@@ -1,36 +1,22 @@
-import { zodResolver } from "@hookform/resolvers/zod"
 import {
   createFileRoute,
   Link as RouterLink,
   redirect,
 } from "@tanstack/react-router"
-import { useForm } from "react-hook-form"
-import { z } from "zod"
+import { KeyRound } from "lucide-react"
+import { type FormEvent, useEffect } from "react"
 
-import type { Body_login_login_access_token as AccessToken } from "@/client"
 import { AuthLayout } from "@/components/Common/AuthLayout"
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form"
+import { PasskeysUnsupported } from "@/components/Common/PasskeysUnsupported"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { LoadingButton } from "@/components/ui/loading-button"
-import { PasswordInput } from "@/components/ui/password-input"
 import useAuth, { isLoggedIn } from "@/hooks/useAuth"
-
-const formSchema = z.object({
-  username: z.email({ message: "Invalid email address" }),
-  password: z
-    .string()
-    .min(1, { message: "Password is required" })
-    .min(8, { message: "Password must be at least 8 characters" }),
-}) satisfies z.ZodType<AccessToken>
-
-type FormData = z.infer<typeof formSchema>
+import {
+  autofillSupported,
+  cancelCeremony,
+  passkeysSupported,
+} from "@/lib/passkeys"
 
 export const Route = createFileRoute("/login")({
   component: Login,
@@ -44,99 +30,93 @@ export const Route = createFileRoute("/login")({
   head: () => ({
     meta: [
       {
-        title: "Log In - Taskly",
+        title: "Sign in - Taskly",
       },
     ],
   }),
 })
 
 function Login() {
-  const { loginMutation } = useAuth()
-  const form = useForm<FormData>({
-    resolver: zodResolver(formSchema),
-    mode: "onBlur",
-    criteriaMode: "all",
-    defaultValues: {
-      username: "",
-      password: "",
-    },
-  })
-
-  const onSubmit = (data: FormData) => {
-    if (loginMutation.isPending) return
-    loginMutation.mutate(data)
-  }
+  const supported = passkeysSupported()
 
   return (
     <AuthLayout>
-      <Form {...form}>
-        <form
-          onSubmit={form.handleSubmit(onSubmit)}
-          className="flex flex-col gap-6"
-        >
-          <div className="flex flex-col items-center gap-2 text-center">
-            <h1 className="text-2xl font-bold">Log in to your account</h1>
-          </div>
-
-          <div className="grid gap-4">
-            <FormField
-              control={form.control}
-              name="username"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Email</FormLabel>
-                  <FormControl>
-                    <Input
-                      data-testid="email-input"
-                      placeholder="user@example.com"
-                      type="email"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage className="text-xs" />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="password"
-              render={({ field }) => (
-                <FormItem>
-                  <div className="flex items-center">
-                    <FormLabel>Password</FormLabel>
-                    <RouterLink
-                      to="/recover-password"
-                      className="ml-auto text-sm underline-offset-4 hover:underline"
-                    >
-                      Forgot your password?
-                    </RouterLink>
-                  </div>
-                  <FormControl>
-                    <PasswordInput
-                      data-testid="password-input"
-                      placeholder="Password"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage className="text-xs" />
-                </FormItem>
-              )}
-            />
-
-            <LoadingButton type="submit" loading={loginMutation.isPending}>
-              Log In
-            </LoadingButton>
-          </div>
-
-          <div className="text-center text-sm">
-            Don't have an account yet?{" "}
-            <RouterLink to="/signup" className="underline underline-offset-4">
-              Sign up
-            </RouterLink>
-          </div>
-        </form>
-      </Form>
+      <div className="flex flex-col gap-6">
+        <div className="flex flex-col items-center gap-2 text-center">
+          <h1 className="text-2xl font-bold">Sign in to Taskly</h1>
+          <p className="text-muted-foreground text-sm">
+            With the passkey on this device or in your password manager.
+          </p>
+        </div>
+        {supported ? <PasskeySignIn /> : <PasskeysUnsupported />}
+      </div>
     </AuthLayout>
+  )
+}
+
+function PasskeySignIn() {
+  const { signInMutation } = useAuth()
+  const { mutate } = signInMutation
+
+  // Offer the browser's passkeys in the e-mail field's suggestions as well,
+  // waiting in the background until one is picked (FR-12.3).
+  useEffect(() => {
+    let cancelled = false
+    autofillSupported().then((available) => {
+      if (available && !cancelled) mutate({ autofill: true })
+    })
+    return () => {
+      cancelled = true
+      cancelCeremony()
+    }
+  }, [mutate])
+
+  const signIn = (event?: FormEvent) => {
+    event?.preventDefault()
+    // The waiting autofill ceremony gives way to the one asked for.
+    cancelCeremony()
+    signInMutation.mutate({})
+  }
+
+  return (
+    <form onSubmit={signIn} className="flex flex-col gap-6">
+      <div className="grid gap-4">
+        <div className="grid gap-2">
+          <Label htmlFor="email">Email</Label>
+          <Input
+            id="email"
+            name="email"
+            data-testid="email-input"
+            placeholder="user@example.com"
+            type="email"
+            // "webauthn" puts the passkeys among the field's suggestions.
+            autoComplete="username webauthn"
+          />
+        </div>
+        <LoadingButton
+          type="submit"
+          loading={
+            signInMutation.isPending && !signInMutation.variables?.autofill
+          }
+        >
+          <KeyRound />
+          Sign in with passkey
+        </LoadingButton>
+      </div>
+
+      <div className="flex flex-col gap-2 text-center text-sm">
+        <p>
+          New to Taskly?{" "}
+          <RouterLink to="/signup" className="underline underline-offset-4">
+            Create account
+          </RouterLink>
+        </p>
+        <p>
+          <RouterLink to="/recover" className="underline underline-offset-4">
+            Have a recovery code?
+          </RouterLink>
+        </p>
+      </div>
+    </form>
   )
 }
