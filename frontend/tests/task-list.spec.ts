@@ -490,7 +490,9 @@ test("The navigation has no Add a task entry, and the c key still opens the full
 
   const navigation = page.getByRole("navigation", { name: "Main" })
   await expect(navigation).toBeVisible()
-  await expect(navigation.getByRole("button")).toHaveCount(0)
+  await expect(
+    navigation.getByRole("button", { name: "Add a task" }),
+  ).toHaveCount(0)
   await expect(navigation.getByText("Add a task")).toHaveCount(0)
 
   await page.keyboard.press("c")
