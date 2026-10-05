@@ -6,7 +6,6 @@ import { useRecordPanel } from "@/components/Records/panels"
 import {
   EditableText,
   RecordPanel,
-  RecordSection,
   TitleRow,
   taskTitleClass,
 } from "@/components/Records/RecordPanel"
@@ -18,8 +17,8 @@ import { CompleteTask } from "./CompleteTask"
 import { useCaptureTarget } from "./capture"
 import DeleteTask from "./DeleteTask"
 import { NewTask } from "./NewTask"
+import { TaskActivity } from "./TaskActivity"
 import { TaskAttachments } from "./TaskAttachments"
-import { TaskComments } from "./TaskComments"
 import { reporterName, TaskProperties } from "./TaskProperties"
 import { TaskSubtasks } from "./TaskSubtasks"
 import { useTaskUpdate } from "./useTaskWrites"
@@ -137,12 +136,7 @@ export function TaskDetail() {
             onOpen={onOpenTask}
           />
           <TaskAttachments key={`files-${task.id}`} task={task} />
-          {/* Kept as it was, for now; the Activity section replaces it. */}
-          <RecordSection title="Comments">
-            <div className="pt-2">
-              <TaskComments key={task.id} task={task} />
-            </div>
-          </RecordSection>
+          <TaskActivity key={`activity-${task.id}`} task={task} />
         </>
       )}
     </RecordPanel>

@@ -55,3 +55,24 @@ export function isoDay(date: Date): string {
   const day = String(date.getDate()).padStart(2, "0")
   return `${year}-${month}-${day}`
 }
+
+/** The time of day of a timestamp, to the minute, as a history column shows it. */
+export function formatTimeOf(timestamp: string): string {
+  return new Date(timestamp).toLocaleTimeString(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+  })
+}
+
+/**
+ * A day as a history separator names it: "Today" and "Yesterday" while those
+ * are what the reader would say, the product's numeric day after that.
+ */
+export function dayHeading(timestamp: string, now: Date = new Date()): string {
+  const day = isoDay(new Date(timestamp))
+  if (day === isoDay(now)) return "Today"
+  const yesterday = new Date(now)
+  yesterday.setDate(now.getDate() - 1)
+  if (day === isoDay(yesterday)) return "Yesterday"
+  return formatDayOf(timestamp)
+}

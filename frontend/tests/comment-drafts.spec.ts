@@ -11,13 +11,13 @@ test("A comment draft survives following a subtask", async ({ page }) => {
 
   await page.goto(`/tasks?view=table&task=${task.id}`)
   const panel = page.getByRole("complementary", { name: "Move house" })
-  const draft = panel.getByPlaceholder("Add a comment")
+  const draft = panel.getByPlaceholder("Write a comment…")
   await draft.fill("Movers booked for the 12th, still need")
 
   // Opening a subtask and coming back through the breadcrumb costs nothing.
   await panel.getByRole("button", { name: "Pack the books" }).click()
   const child = page.getByRole("complementary", { name: "Pack the books" })
-  await expect(child.getByPlaceholder("Add a comment")).toHaveValue("")
+  await expect(child.getByPlaceholder("Write a comment…")).toHaveValue("")
   await child.getByRole("button", { name: "Move house" }).click()
 
   await expect(draft).toHaveValue("Movers booked for the 12th, still need")
@@ -51,7 +51,7 @@ test("Opening a task fetches its files once, with the rest of the task", async (
   })
   await page.goto(`/tasks?view=table&task=${task.id}`)
   const panel = page.getByRole("complementary", { name: "Move house" })
-  await expect(panel.getByText("No comments yet.")).toBeVisible()
+  await expect(panel.getByRole("region", { name: "Activity" })).toBeVisible()
   await expect(
     panel.getByRole("button", { name: "Attach a file" }),
   ).toBeVisible()

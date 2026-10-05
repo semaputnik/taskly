@@ -106,19 +106,19 @@ test("A date reads the same in the table and in the panel's date field", async (
   await expect(row).toContainText(shown)
   await expect(row).not.toContainText("2026-09-01")
 
-  // Moments in the panel share one format, to the minute and no further.
+  // Moments in the panel are written to the minute and no further: the
+  // Created row with its day, the history's time column with the time alone.
   await page.goto(`/tasks?view=table&task=${task.id}`)
   const panel = page.getByRole("complementary", { name: "Renew the lease" })
   const created = await panel.locator("time").first().textContent()
   const commented = await panel
-    .locator("div.rounded-md")
+    .getByRole("listitem")
     .filter({ hasText: "Signed" })
-    .locator("span.text-xs")
+    .locator("time")
     .textContent()
-  const shape = (text: string | null) =>
-    (text ?? "").replace(/\d/g, "0").replace(/\b(AM|PM)\b/, "XM")
-  expect(shape(created)).toBe(shape(commented))
+  expect(commented).toMatch(/^\d{1,2}:\d\d/)
   expect(created).not.toMatch(/\d:\d\d:\d\d/)
+  expect(commented).not.toMatch(/\d:\d\d:\d\d/)
 })
 
 test("Heading levels descend without skipping on every screen", async ({

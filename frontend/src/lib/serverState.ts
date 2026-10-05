@@ -1,4 +1,5 @@
 import {
+  infiniteQueryOptions,
   type QueryClient,
   type QueryKey,
   queryOptions,
@@ -269,6 +270,35 @@ export const activityQuery = (query: ReadActivityQuery = {}) =>
     queryKey: [ROOT.activity, query],
     queryFn: async () =>
       (await ActivityService.readActivityLog({ query })).data,
+  })
+
+/** How many of a task's log entries one page of its history holds. */
+export const TASK_HISTORY_PAGE = 50
+
+/**
+ * One task's log entries, newest first, a page at a time: the task panel
+ * reads its history from the newest end and goes back for earlier pages only
+ * when the reader asks. Under the activity root, so whatever changes the log
+ * refreshes it.
+ */
+export const taskActivityQuery = (taskId: string) =>
+  infiniteQueryOptions({
+    queryKey: [ROOT.activity, "task", taskId],
+    initialPageParam: 0,
+    queryFn: async ({ pageParam }) =>
+      (
+        await ActivityService.readActivityLog({
+          query: {
+            task_id: taskId,
+            skip: pageParam,
+            limit: TASK_HISTORY_PAGE,
+          },
+        })
+      ).data,
+    getNextPageParam: (last, pages) => {
+      const loaded = pages.reduce((n, page) => n + page.data.length, 0)
+      return loaded < last.count ? loaded : undefined
+    },
   })
 
 export const commentsQuery = (taskId: string) =>
