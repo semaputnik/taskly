@@ -165,9 +165,10 @@ test("The capture line opens capture with what was typed", async ({ page }) => {
   await expect(panel.getByRole("textbox", { name: "Task title" })).toHaveValue(
     "Call the bank",
   )
-  await expect(line).toHaveValue("")
   await panel.getByRole("button", { name: "Create task" }).click()
   await expect(page.getByText("“Call the bank” created")).toBeVisible()
+  // Read once the panel has closed: while it is open the page is inert.
+  await expect(line).toHaveValue("")
 
   // The key still opens an empty capture from the page.
   await page.getByRole("heading", { level: 1 }).click()

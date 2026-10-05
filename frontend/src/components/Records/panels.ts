@@ -179,7 +179,9 @@ export function useRecordPanels() {
         to: ".",
         search: (previous: Record<string, unknown>) =>
           panelLink(previous, next),
-        state,
+        // Left out unless there is some, so every other panel opens exactly
+        // as it did before capture carried a title.
+        ...(state ? { state } : {}),
       }),
     [navigate],
   )
