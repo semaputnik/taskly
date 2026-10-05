@@ -3,6 +3,7 @@ import {
   addVirtualAuthenticator,
   registerWithPasskey,
   signInWithPasskey,
+  withoutPasskeyAutofill,
   withoutPasskeySupport,
 } from "./utils/passkeys.ts"
 import { randomEmail } from "./utils/random.ts"
@@ -29,6 +30,7 @@ test("The sign-in screen asks for nothing but a passkey", async ({ page }) => {
 })
 
 test("Sign in with a passkey made when registering", async ({ page }) => {
+  await withoutPasskeyAutofill(page)
   const authenticator = await addVirtualAuthenticator(page)
   const email = randomEmail()
   await registerWithPasskey(page, email)
@@ -41,9 +43,27 @@ test("Sign in with a passkey made when registering", async ({ page }) => {
   await expect(page.locator("form").getByText(email)).toBeVisible()
 })
 
+test("The email field's autofill offers the passkey and signs in", async ({
+  page,
+}) => {
+  await addVirtualAuthenticator(page)
+  const email = randomEmail()
+  await registerWithPasskey(page, email)
+  await logOutUser(page)
+
+  // Nothing is clicked: the virtual authenticator answers the autofill
+  // ceremony the sign-in screen starts on its own (FR-12.3).
+  await page.goto("/login")
+  await page.waitForURL("/")
+
+  await page.goto("/settings")
+  await expect(page.locator("form").getByText(email)).toBeVisible()
+})
+
 test("A passkey this installation does not know is refused", async ({
   page,
 }) => {
+  await withoutPasskeyAutofill(page)
   const authenticator = await addVirtualAuthenticator(page)
   await registerWithPasskey(page, randomEmail())
   await logOutUser(page)
@@ -72,10 +92,8 @@ test("A passkey this installation does not know is refused", async ({
   await page.goto("/login")
   await page.getByRole("button", { name: "Sign in with passkey" }).click()
 
-  // The autofill ceremony may answer with the same passkey and be refused
-  // the same way, so the refusal can show twice.
   await expect(
-    page.getByText("This passkey could not sign you in. Try again.").first(),
+    page.getByText("This passkey could not sign you in. Try again."),
   ).toBeVisible()
   await expect(page).toHaveURL(/\/login/)
 })

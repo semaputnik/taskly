@@ -43,7 +43,22 @@ export async function registerWithPasskey(page: Page, email: string) {
   ).toBeVisible()
 }
 
-/** Sign in from the sign-in screen with whichever passkey the browser holds. */
+/**
+ * Make the browser one that offers no passkeys in autofill. A virtual
+ * authenticator answers the sign-in screen's autofill ceremony on its own,
+ * signing in before anything is clicked; without autofill, the button is the
+ * only way in.
+ */
+export async function withoutPasskeyAutofill(page: Page) {
+  await page.addInitScript(() => {
+    PublicKeyCredential.isConditionalMediationAvailable = async () => false
+  })
+}
+
+/**
+ * Sign in from the sign-in screen with the "Sign in with passkey" button and
+ * whichever passkey the browser holds. Call `withoutPasskeyAutofill` first.
+ */
 export async function signInWithPasskey(page: Page) {
   await page.goto("/login")
   await page.getByRole("button", { name: "Sign in with passkey" }).click()
