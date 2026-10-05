@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 
 import { describeDue, metaLine, subtaskProgress } from "./compact"
-import { priorityTone } from "./priority"
+import { priorityTone } from "./priorityTone"
 
 // A Friday, so "this week" and "next week" are both a few days away.
 const TODAY = "2026-09-18"

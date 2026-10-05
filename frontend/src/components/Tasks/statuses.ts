@@ -1,5 +1,5 @@
 import type { TaskPriority, TaskStatus } from "@/client"
-import { type PriorityTone, priorityTone } from "./priority"
+import { type PriorityTone, priorityTone } from "./priorityTone"
 
 /**
  * The six statuses a task can be in, and the one list of them the interface
