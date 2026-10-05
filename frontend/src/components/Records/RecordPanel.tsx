@@ -45,7 +45,7 @@ export const ghost =
   "record-control border-transparent bg-transparent shadow-none hover:bg-accent focus-visible:border-ring dark:bg-transparent dark:hover:bg-accent/50"
 
 /** Where notices are shown, outside any panel. */
-const NOTICES = "[data-sonner-toaster]"
+const NOTICES_SELECTOR = "[data-sonner-toaster]"
 
 export function RecordPanel({
   open,
@@ -77,14 +77,14 @@ export function RecordPanel({
       <SheetContent
         side="right"
         className="w-full gap-0 overflow-y-auto p-0 outline-none sm:max-w-xl"
-        // A notice is not the page behind the panel. The notice a capture
-        // leaves arrives while the panel is still sliding out, and its Open
-        // opens the new task in this very panel: the click starts outside a
-        // panel that is on its way out, and the dismissal it started is only
-        // delivered once the click ends, by when Open has made the panel
-        // open again — so the panel was closed straight after it opened.
+        // A notice is not the page behind the panel, so touching one never
+        // dismisses it. The notice a capture leaves arrives while the panel
+        // is still sliding out, and its Open opens the new task in this very
+        // panel. Radix delivers an outside press only when the click ends, by
+        // when Open has made the panel open again: without this the panel
+        // closed straight after it opened. Any notice, an error's included.
         onInteractOutside={(event) => {
-          if ((event.target as Element | null)?.closest(NOTICES)) {
+          if ((event.target as Element | null)?.closest(NOTICES_SELECTOR)) {
             event.preventDefault()
           }
         }}
