@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import { describeDue, subtaskProgress } from "./compact"
+import { describeDue, metaLine, subtaskProgress } from "./compact"
 import { priorityTone } from "./priority"
 
 // A Friday, so "this week" and "next week" are both a few days away.
@@ -109,5 +109,81 @@ describe("priority tone", () => {
     expect(priorityTone("P4")).toBeNull()
     expect(priorityTone(null)).toBeNull()
     expect(priorityTone(undefined)).toBeNull()
+  })
+})
+
+describe("the meta line", () => {
+  const bare = {
+    subtask_count: 0,
+    subtasks_done: 0,
+    due_date: null,
+    recurrence: null,
+    tags: [],
+    status: "todo" as const,
+  }
+
+  const kinds = (line: ReturnType<typeof metaLine>) =>
+    line.facts.map((fact) => fact.kind)
+
+  test("says subtasks, due day, recurrence and tags in that order, then the project", () => {
+    const line = metaLine(
+      {
+        ...bare,
+        subtask_count: 5,
+        subtasks_done: 2,
+        due_date: "2026-09-18",
+        recurrence: { frequency: "weekly" },
+        tags: ["copy", "web"],
+      },
+      { today: TODAY, projectName: "Website relaunch" },
+    )
+    expect(kinds(line)).toEqual(["subtasks", "due", "recurrence", "tag", "tag"])
+    expect(line.facts.map((fact) => fact.text)).toEqual([
+      "2/5",
+      "Today",
+      "Weekly",
+      "copy",
+      "web",
+    ])
+    expect(line.project).toBe("Website relaunch")
+  })
+
+  test("carries the due day's tone, so a late day can be red and today ink", () => {
+    const late = metaLine({ ...bare, due_date: "2026-09-16" }, { today: TODAY })
+    expect(late.facts).toEqual([
+      { kind: "due", text: "2 days late", tone: "late" },
+    ])
+    const today = metaLine(
+      { ...bare, due_date: "2026-09-18" },
+      { today: TODAY },
+    )
+    expect(today.facts).toEqual([{ kind: "due", text: "Today", tone: "today" }])
+  })
+
+  test("reads a done task's due day plainly", () => {
+    const line = metaLine(
+      { ...bare, status: "done", due_date: "2026-09-16" },
+      { today: TODAY },
+    )
+    expect(line.facts[0]).toMatchObject({ kind: "due", tone: "later" })
+  })
+
+  test("leaves out what the task does not have", () => {
+    const tagged = metaLine(
+      { ...bare, tags: ["home"] },
+      { today: TODAY, projectName: "Home" },
+    )
+    expect(kinds(tagged)).toEqual(["tag"])
+    expect(tagged.project).toBe("Home")
+    const split = metaLine({ ...bare, subtask_count: 2 }, { today: TODAY })
+    expect(kinds(split)).toEqual(["subtasks"])
+    expect(split.project).toBeNull()
+  })
+
+  test("is empty for a task with nothing to say, so its line is one line tall", () => {
+    const empty = { facts: [], project: null }
+    expect(metaLine(bare, { today: TODAY })).toEqual(empty)
+    expect(metaLine({}, { today: TODAY })).toEqual(empty)
+    expect(metaLine(bare, { today: TODAY, projectName: "" })).toEqual(empty)
   })
 })

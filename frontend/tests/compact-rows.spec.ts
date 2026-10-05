@@ -56,7 +56,7 @@ test("An empty in-progress sheet says so rather than disappearing", async ({
   await expect(band(page, /^In progress/)).toContainText("Nothing in progress")
 })
 
-test("A compact row shows subtasks, due day and tags, and its status mark in its priority's colour", async ({
+test("A compact row shows subtasks, due day, tags and project, and its status mark in its priority's colour", async ({
   page,
 }) => {
   await newUser(page)
@@ -69,9 +69,10 @@ test("A compact row shows subtasks, due day and tags, and its status mark in its
     .filter({ has: page.getByRole("link", { name: "File the taxes" }) })
     // The outermost match is the row; the rest are its own lines.
     .first()
-  await expect(row).toContainText("1/2")
-  await expect(row).toContainText("Today")
-  await expect(row).toContainText("home")
+  // The meta line in its order: subtasks, due day, tags, then the project.
+  await expect(row).toContainText(
+    /Subtasks done:\s*1\/2.*Due:\s*Today.*Tag:\s*home.*Project:\s*Inbox/,
+  )
 
   // The mark is the completion control, named for its status and priority
   // since its shape and colour say nothing to a screen reader.

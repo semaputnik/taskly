@@ -95,6 +95,7 @@ export function NeedsYou() {
                   key={task.id}
                   task={task}
                   projectName={names[task.project_id]}
+                  receipt
                 />
               ))}
               {overdueCount > PREVIEW_ROWS && (
@@ -113,6 +114,7 @@ export function NeedsYou() {
                   key={task.id}
                   task={task}
                   projectName={names[task.project_id]}
+                  receipt
                 />
               ))}
               {dueCount > PREVIEW_ROWS && (
@@ -158,6 +160,7 @@ export function NeedsYou() {
                 key={task.id}
                 task={task}
                 projectName={names[task.project_id]}
+                receipt
               />
             ))}
             <MoreLink

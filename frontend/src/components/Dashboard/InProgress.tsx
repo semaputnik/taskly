@@ -60,6 +60,7 @@ export function InProgress() {
                 key={task.id}
                 task={task}
                 projectName={names[task.project_id]}
+                receipt
               />
             ))}
             {count > PREVIEW_ROWS && (
