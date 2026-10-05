@@ -233,8 +233,8 @@ export function TaskDetail() {
 /**
  * The bar's account of how the task came to be: "opened by you, 24.09.2026",
  * or by the bot user that filed it. A task from before the reporter was kept
- * says only when. The day is written the product's way (One Way to Write a
- * Date), as the Created row beneath writes it.
+ * says only when. The day is written the product's way, numerically in the
+ * reader's locale, as the Created row beneath writes its day (it adds the time).
  */
 function opened(task: TaskPublic): string {
   const by = reporterName(task)
