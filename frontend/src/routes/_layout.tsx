@@ -7,7 +7,6 @@ import { panelSearchSchema } from "@/components/Records/panels"
 import { RecordPanels } from "@/components/Records/RecordPanels"
 import { Navigation } from "@/components/Sidebar/AppSidebar"
 import { navItemFocus } from "@/components/Sidebar/styles"
-import { AddTaskButton } from "@/components/Tasks/AddTaskButton"
 import {
   Sheet,
   SheetContent,
@@ -93,8 +92,8 @@ function Layout() {
         {/* `min-w-0`: a grid item never shrinks below its content by default,
             so one long table row would widen the whole page instead of
             scrolling inside its own container. On a phone the foot is kept
-            clear of the Add a task button, so the last row can always be
-            scrolled out from under it. */}
+            clear of the capture line pinned to the bottom of the screen, so
+            the last row can always be scrolled out from under it. */}
         <main
           id="main"
           tabIndex={-1}
@@ -108,7 +107,6 @@ function Layout() {
             on, and capture starts from any of them. */}
         <RecordPanels />
       </div>
-      <AddTaskButton />
     </>
   )
 }

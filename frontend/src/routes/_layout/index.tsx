@@ -84,7 +84,7 @@ function Dashboard() {
 
   return (
     <div className="max-w-[820px]">
-      <div className="mb-6 md:mb-9">
+      <div className="md:mb-9">
         <CaptureLine />
       </div>
       {/* Needs nothing from the server, so it is never a skeleton. */}

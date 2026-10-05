@@ -392,7 +392,7 @@ test.describe("on a phone", () => {
     isMobile: true,
   })
 
-  test("Capture first, then the date, then the bands, with no sideways scroll", async ({
+  test("The date, then the bands, with the capture line pinned beneath them and no sideways scroll", async ({
     page,
   }) => {
     await newUser(page)
@@ -418,7 +418,8 @@ test.describe("on a phone", () => {
     const date = await top(page.getByRole("heading", { level: 1 }))
     const overdue = await top(page.getByRole("heading", { name: /^Overdue/ }))
     const today = await top(page.getByRole("heading", { name: /^Due today/ }))
-    expect(capture).toBeLessThan(date)
+    // The line is not at the top on a phone: it is the bottom bar (FR-06.15).
+    expect(capture).toBeGreaterThan(812 - 90)
     expect(date).toBeLessThan(overdue)
     expect(overdue).toBeLessThan(today)
 

@@ -168,7 +168,7 @@ function Tasks() {
 
   return (
     <div className="max-w-[820px]">
-      <div className="mb-6 md:mb-7">
+      <div className="md:mb-7">
         <CaptureLine />
       </div>
       <h1 className="mb-1 text-[22px] leading-[1.2] font-semibold tracking-[-0.015em]">

@@ -379,9 +379,15 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
   open tasks' titles is searched (descriptions and comments are not).
 - **FR-06.15** The capture line is at the top of the page on a desktop and
   pinned to the bottom of the screen on a phone, above the browser's own
-  bar, with its matches opening upward; there is no floating button and no
+  bar and above the keyboard while one is up, with its matches opening
+  upward, and out of the way while a record's column covers the screen; there is no floating button and no
   "Add a task" entry in the navigation. The `c` key still opens the full
   draft from any screen.
+  On a phone the filter row keeps the project, assignee and status filters
+  and the order, and folds the priority, tag and time filters behind "More",
+  which opens a sheet; a filter that is set stays on the row whichever group
+  it belongs to. Menus open as bottom sheets with rows at least 44px tall,
+  and the list never scrolls sideways.
 
 ### F-07. REST API
 
