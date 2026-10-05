@@ -14,9 +14,7 @@ export async function logInUser(page: Page, email: string) {
     token,
   )
   await page.goto("/")
-  await expect(
-    page.getByText("What needs you now, and what changed without you"),
-  ).toBeVisible()
+  await expect(page.getByRole("textbox", { name: "Add a task" })).toBeVisible()
 }
 
 export async function logOutUser(page: Page) {

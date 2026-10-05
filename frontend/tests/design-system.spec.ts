@@ -35,9 +35,8 @@ for (const theme of ["light", "dark"] as const) {
     test("Page subtitles and text links are readable", async ({ page }) => {
       await page.goto("/")
       const ground = await pageGround(page)
-      const subtitle = page.getByText(
-        "What needs you now, and what changed without you",
-      )
+      // The muted half of the sentence under the date.
+      const subtitle = page.getByText("Your agents have made no changes yet.")
       expect(await textOn(subtitle, ground)).toBeGreaterThanOrEqual(AA)
 
       // A text link is read on the page ground and on the sheets laid on it.

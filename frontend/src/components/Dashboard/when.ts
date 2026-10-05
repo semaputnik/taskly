@@ -30,11 +30,3 @@ export function timeAgo(timestamp: string): string {
   if (days < 7) return `${days}d ago`
   return formatDayOf(timestamp)
 }
-
-/** The half of the day the reader is in, for the greeting. */
-export function partOfDay(): "morning" | "afternoon" | "evening" {
-  const hour = new Date().getHours()
-  if (hour < 12) return "morning"
-  if (hour < 18) return "afternoon"
-  return "evening"
-}

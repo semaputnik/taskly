@@ -3,7 +3,7 @@ import { useBlocker } from "@tanstack/react-router"
 import { useEffect, useRef, useState } from "react"
 
 import type { TaskPublic } from "@/client"
-import { useCaptureFocus } from "@/components/Records/panels"
+import { useCaptureFocus, useCaptureTitle } from "@/components/Records/panels"
 import {
   DescriptionSection,
   ghost,
@@ -61,7 +61,13 @@ export function NewTask({
 }) {
   const capture = useTaskCapture(target, onCreated)
   const [defaults, setDefaults] = useState(() => emptyDraft(target))
-  const [draft, setDraft] = useState(defaults)
+  // A title typed before the panel opened is the reader's own words, so the
+  // draft holds it from the first frame and closing it asks first.
+  const typedTitle = useCaptureTitle()
+  const [draft, setDraft] = useState(() => ({
+    ...defaults,
+    title: typedTitle ?? "",
+  }))
   const touched = isTouched(draft, defaults)
   const titleRef = useCaptureFocus<HTMLInputElement>()
   // Set while a commit is taking the reader onto the new record, which is a

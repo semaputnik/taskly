@@ -2579,6 +2579,14 @@ export type activityReadActivityLogData = {
          * Kind
          */
         kind?: ActivityKind | null;
+        /**
+         * By Bots
+         */
+        by_bots?: boolean;
+        /**
+         * Since
+         */
+        since?: string | null;
     };
     url: '/api/v1/activity-log/';
 };

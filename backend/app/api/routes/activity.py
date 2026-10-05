@@ -1,5 +1,6 @@
 import uuid
 from collections.abc import Sequence
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
@@ -128,6 +129,8 @@ def read_activity_log(
     limit: int = Query(default=50, ge=1, le=200),
     actor_bot_user_id: uuid.UUID | None = Query(default=None),
     kind: ActivityKind | None = Query(default=None),
+    by_bots: bool = Query(default=False),
+    since: datetime | None = Query(default=None),
 ) -> Any:
     """
     Retrieve the current user's activity log, newest first.
@@ -143,6 +146,11 @@ def read_activity_log(
     two narrowings are independent and combine: what this integration
     finished is both of them at once.
 
+    `by_bots` keeps the changes any of the user's bot users made, and `since`
+    the entries written after a moment. Together they are what the dashboard
+    counts when it says how many changes the user's bot users made since their
+    last visit (FR-06.12). A moment without an offset is read as UTC.
+
     Always the requesting user's own entries and nothing wider: there is no
     parameter or role that reaches another user's log, the superuser's
     included (FR-10.7). Narrowing by a bot user somebody else owns is
@@ -155,6 +163,12 @@ def read_activity_log(
         where.append(ActivityEntry.actor_bot_user_id == actor_bot_user_id)
     if kind is not None:
         where.append(_of_kind(kind))
+    if by_bots:
+        where.append(col(ActivityEntry.actor_bot_user_id).is_not(None))
+    if since is not None:
+        if since.tzinfo is None:
+            since = since.replace(tzinfo=UTC)
+        where.append(col(ActivityEntry.created_at) > since)
 
     count = session.exec(
         select(func.count()).select_from(ActivityEntry).where(*where)
