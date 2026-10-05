@@ -15,7 +15,7 @@ from httpx import Response
 from sqlmodel import Session
 
 from app.core.config import settings
-from tests.utils.bot import (
+from tests.utils.accounts import (
     ALL_PERMISSIONS,
     create_bot_user,
     create_project,

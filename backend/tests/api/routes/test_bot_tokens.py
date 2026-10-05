@@ -13,7 +13,7 @@ from sqlmodel import Session
 
 from app.core.config import settings
 from app.models import BotUser
-from tests.utils.bot import (
+from tests.utils.accounts import (
     ALL_PERMISSIONS,
     create_bot_user,
     create_project,

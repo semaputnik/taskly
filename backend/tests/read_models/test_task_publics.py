@@ -13,7 +13,7 @@ from sqlmodel import Session
 
 from app.models import Task
 from app.read_models import task_publics
-from tests.utils.bot import (
+from tests.utils.accounts import (
     ALL_PERMISSIONS,
     API,
     create_bot_user,

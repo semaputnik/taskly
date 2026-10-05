@@ -7,50 +7,19 @@ from fastapi.testclient import TestClient
 from sqlmodel import Session
 
 from app import crud
-from app.api.deps import get_attachment_storage
 from app.core.config import settings
-from app.main import app
 from app.models import Task, TaskStatus
-from tests.api.routes.test_attachments import InMemoryAttachmentStorage
-from tests.utils.bot import create_project, create_user_headers, issue_bot_headers
+from tests.utils.accounts import (
+    create_project,
+    create_recurring_task,
+    create_task_record,
+    create_user_headers,
+    issue_bot_headers,
+)
 from tests.utils.user import new_user_headers
 
 API = settings.API_V1_STR
 WEEKLY = {"frequency": "weekly"}
-
-
-@pytest.fixture(autouse=True)
-def storage():
-    fake_storage = InMemoryAttachmentStorage()
-    app.dependency_overrides[get_attachment_storage] = lambda: fake_storage
-    yield fake_storage
-    del app.dependency_overrides[get_attachment_storage]
-
-
-def _create_task(
-    client: TestClient, headers: dict[str, str], title: str, **fields: object
-) -> dict:
-    r = client.post(f"{API}/tasks/", headers=headers, json={"title": title, **fields})
-    assert r.status_code == 200, r.text
-    return r.json()
-
-
-def _create_recurring(
-    client: TestClient,
-    headers: dict[str, str],
-    due: date,
-    recurrence: dict = WEEKLY,
-    title: str = "Water the plants",
-    **fields: object,
-) -> dict:
-    return _create_task(
-        client,
-        headers,
-        title,
-        due_date=due.isoformat(),
-        recurrence=recurrence,
-        **fields,
-    )
 
 
 def _patch(
@@ -102,7 +71,7 @@ def test_a_recurring_task_reports_its_recurrence(
     client: TestClient, db: Session
 ) -> None:
     headers = new_user_headers(client, db)
-    task = _create_recurring(
+    task = create_recurring_task(
         client,
         headers,
         date(2026, 3, 2),
@@ -118,7 +87,7 @@ def test_a_recurring_task_reports_its_recurrence(
 
 def test_a_plain_task_reports_no_recurrence(client: TestClient, db: Session) -> None:
     headers = new_user_headers(client, db)
-    task = _create_task(client, headers, "Once")
+    task = create_task_record(client, headers, "Once")
     assert task["recurrence"] is None
 
 
@@ -157,7 +126,7 @@ def test_every_n_days_starts_at_two_days(
         headers=headers,
         json={"title": "Created", "due_date": "2026-03-02", "recurrence": recurrence},
     )
-    task = _create_task(client, headers, "Updated", due_date="2026-03-02")
+    task = create_task_record(client, headers, "Updated", due_date="2026-03-02")
     updated = _patch(client, headers, task["id"], recurrence=recurrence)
 
     assert (created.status_code == 200) is accepted, created.text
@@ -213,12 +182,12 @@ def test_a_task_cannot_recur_without_a_due_date(
     assert r.status_code == 400
     assert r.json()["detail"] == "A recurring task needs a due date"
 
-    plain = _create_task(client, headers, "Undated")
+    plain = create_task_record(client, headers, "Undated")
     r = _patch(client, headers, plain["id"], recurrence=WEEKLY)
     assert r.status_code == 400
     assert r.json()["detail"] == "A recurring task needs a due date"
 
-    recurring = _create_recurring(client, headers, date(2026, 3, 2))
+    recurring = create_recurring_task(client, headers, date(2026, 3, 2))
     r = _patch(
         client,
         headers,
@@ -232,7 +201,7 @@ def test_a_task_cannot_recur_without_a_due_date(
 
 def test_a_subtask_cannot_recur(client: TestClient, db: Session) -> None:
     headers = new_user_headers(client, db)
-    root = _create_task(client, headers, "Root")
+    root = create_task_record(client, headers, "Root")
 
     r = client.post(
         f"{API}/tasks/",
@@ -247,7 +216,7 @@ def test_a_subtask_cannot_recur(client: TestClient, db: Session) -> None:
     assert r.status_code == 400
     assert r.json()["detail"] == "Only a task at the top of its tree can recur"
 
-    child = _create_task(
+    child = create_task_record(
         client, headers, "Child", parent_id=root["id"], due_date="2026-03-02"
     )
     r = _patch(client, headers, child["id"], recurrence=WEEKLY)
@@ -258,7 +227,9 @@ def test_an_existing_task_can_be_made_recurring(
     client: TestClient, db: Session
 ) -> None:
     headers = new_user_headers(client, db)
-    task = _create_task(client, headers, "Water the plants", due_date="2026-03-02")
+    task = create_task_record(
+        client, headers, "Water the plants", due_date="2026-03-02"
+    )
 
     r = _patch(client, headers, task["id"], recurrence=WEEKLY)
     assert r.status_code == 200, r.text
@@ -272,7 +243,7 @@ def test_a_task_stops_recurring_when_its_recurrence_is_cleared(
     client: TestClient, db: Session
 ) -> None:
     headers = new_user_headers(client, db)
-    task = _create_recurring(client, headers, date(2026, 3, 2))
+    task = create_recurring_task(client, headers, date(2026, 3, 2))
 
     r = _patch(client, headers, task["id"], recurrence=None)
     assert r.status_code == 200, r.text
@@ -293,7 +264,7 @@ def test_a_completed_task_cannot_change_how_it_recurs(
     client: TestClient, db: Session
 ) -> None:
     headers = new_user_headers(client, db)
-    task = _create_recurring(client, headers, date(2026, 3, 2))
+    task = create_recurring_task(client, headers, date(2026, 3, 2))
     _complete(client, headers, task["id"])
 
     r = _patch(client, headers, task["id"], recurrence={"frequency": "daily"})
@@ -308,7 +279,7 @@ def test_changing_the_rule_restarts_the_schedule_from_this_occurrence(
     client: TestClient, db: Session
 ) -> None:
     headers = new_user_headers(client, db)
-    task = _create_recurring(client, headers, date(2026, 3, 2))
+    task = create_recurring_task(client, headers, date(2026, 3, 2))
     second = _complete_and_get_next(client, headers, task["id"])
     assert second["due_date"] == "2026-03-09"
 
@@ -348,7 +319,7 @@ def test_each_interval_type_schedules_the_next_occurrences(
     expected: list[str],
 ) -> None:
     headers = new_user_headers(client, db)
-    task = _create_recurring(client, headers, start, recurrence=recurrence)
+    task = create_recurring_task(client, headers, start, recurrence=recurrence)
 
     second = _complete_and_get_next(client, headers, task["id"])
     third = _complete_and_get_next(client, headers, second["id"])
@@ -360,7 +331,7 @@ def test_completing_an_occurrence_creates_a_new_task_and_keeps_the_old_one_compl
     client: TestClient, db: Session
 ) -> None:
     headers = new_user_headers(client, db)
-    task = _create_recurring(client, headers, date(2026, 3, 2))
+    task = create_recurring_task(client, headers, date(2026, 3, 2))
 
     completed = _complete(client, headers, task["id"])
     assert completed["status"] == "done"
@@ -382,7 +353,7 @@ def test_the_next_occurrence_copies_the_task_fields(
     project = client.post(
         f"{API}/projects/", headers=headers, json={"name": "Home"}
     ).json()
-    task = _create_recurring(
+    task = create_recurring_task(
         client,
         headers,
         date(2026, 3, 2),
@@ -411,8 +382,10 @@ def test_the_next_occurrence_copies_the_subtask_tree_not_completed(
     client: TestClient, db: Session
 ) -> None:
     headers = new_user_headers(client, db)
-    task = _create_recurring(client, headers, date(2026, 3, 9), title="Weekly review")
-    inbox = _create_task(
+    task = create_recurring_task(
+        client, headers, date(2026, 3, 9), title="Weekly review"
+    )
+    inbox = create_task_record(
         client,
         headers,
         "Clear the inbox",
@@ -420,9 +393,9 @@ def test_the_next_occurrence_copies_the_subtask_tree_not_completed(
         tags=["email"],
         due_date="2026-03-08",
     )
-    _create_task(client, headers, "Archive threads", parent_id=inbox["id"])
-    plan = _create_task(client, headers, "Plan the week", parent_id=task["id"])
-    gone = _create_task(client, headers, "Dropped step", parent_id=task["id"])
+    create_task_record(client, headers, "Archive threads", parent_id=inbox["id"])
+    plan = create_task_record(client, headers, "Plan the week", parent_id=task["id"])
+    gone = create_task_record(client, headers, "Dropped step", parent_id=task["id"])
     assert _patch(client, headers, plan["id"], status="done").status_code == 200
     r = client.delete(f"{API}/tasks/{gone['id']}", headers=headers)
     assert r.status_code == 200
@@ -468,8 +441,8 @@ def test_leaving_subtasks_uncompleted_still_starts_the_next_tree_fresh(
     client: TestClient, db: Session
 ) -> None:
     headers = new_user_headers(client, db)
-    task = _create_recurring(client, headers, date(2026, 3, 2))
-    _create_task(client, headers, "Fill the can", parent_id=task["id"])
+    task = create_recurring_task(client, headers, date(2026, 3, 2))
+    create_task_record(client, headers, "Fill the can", parent_id=task["id"])
 
     r = _patch(client, headers, task["id"], status="done", subtasks="leave_uncompleted")
     assert r.status_code == 200, r.text
@@ -489,7 +462,7 @@ def test_comments_and_attachments_stay_with_the_completed_occurrence(
     client: TestClient, db: Session
 ) -> None:
     headers = new_user_headers(client, db)
-    task = _create_recurring(client, headers, date(2026, 3, 2))
+    task = create_recurring_task(client, headers, date(2026, 3, 2))
     r = client.post(
         f"{API}/tasks/{task['id']}/comments/", headers=headers, json={"body": "Done"}
     )
@@ -513,7 +486,7 @@ def test_comments_and_attachments_stay_with_the_completed_occurrence(
 def test_late_completion_keeps_to_the_schedule(client: TestClient, db: Session) -> None:
     headers = new_user_headers(client, db)
     due = date.today() - timedelta(days=17)
-    task = _create_recurring(client, headers, due)
+    task = create_recurring_task(client, headers, due)
 
     successor = _complete_and_get_next(client, headers, task["id"])
 
@@ -526,7 +499,7 @@ def test_completing_a_completed_occurrence_again_creates_nothing(
     client: TestClient, db: Session
 ) -> None:
     headers = new_user_headers(client, db)
-    task = _create_recurring(client, headers, date(2026, 3, 2))
+    task = create_recurring_task(client, headers, date(2026, 3, 2))
     _complete(client, headers, task["id"])
     _complete(client, headers, task["id"])
 
@@ -541,7 +514,7 @@ def test_a_superseded_occurrence_cannot_be_reopened(
     client: TestClient, db: Session
 ) -> None:
     headers = new_user_headers(client, db)
-    task = _create_recurring(client, headers, date(2026, 3, 2))
+    task = create_recurring_task(client, headers, date(2026, 3, 2))
     _complete(client, headers, task["id"])
 
     r = _patch(client, headers, task["id"], status="todo")
@@ -555,7 +528,7 @@ def test_the_latest_occurrence_can_be_reopened_once_its_successor_is_deleted(
     client: TestClient, db: Session
 ) -> None:
     headers = new_user_headers(client, db)
-    task = _create_recurring(client, headers, date(2026, 3, 2))
+    task = create_recurring_task(client, headers, date(2026, 3, 2))
     successor = _complete_and_get_next(client, headers, task["id"])
 
     r = client.delete(f"{API}/tasks/{successor['id']}", headers=headers)
@@ -573,7 +546,7 @@ def test_the_database_refuses_a_second_open_occurrence(
     client: TestClient, db: Session
 ) -> None:
     headers = new_user_headers(client, db)
-    task = _create_recurring(client, headers, date(2026, 3, 2))
+    task = create_recurring_task(client, headers, date(2026, 3, 2))
     _complete(client, headers, task["id"])
 
     db.expire_all()
@@ -590,7 +563,7 @@ def test_completion_and_the_next_occurrence_commit_together(
     client: TestClient, db: Session, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     headers = new_user_headers(client, db)
-    task = _create_recurring(client, headers, date(2026, 3, 2))
+    task = create_recurring_task(client, headers, date(2026, 3, 2))
 
     def fail(**_kwargs: object) -> None:
         raise RuntimeError("storage fell over")
@@ -612,7 +585,7 @@ def test_moving_an_open_occurrence_requires_a_scope(
     client: TestClient, db: Session
 ) -> None:
     headers = new_user_headers(client, db)
-    task = _create_recurring(client, headers, date(2026, 3, 2))
+    task = create_recurring_task(client, headers, date(2026, 3, 2))
 
     r = _patch(client, headers, task["id"], due_date="2026-03-04")
     assert r.status_code == 400
@@ -626,7 +599,7 @@ def test_resending_the_same_due_date_needs_no_scope(
     client: TestClient, db: Session
 ) -> None:
     headers = new_user_headers(client, db)
-    task = _create_recurring(client, headers, date(2026, 3, 2))
+    task = create_recurring_task(client, headers, date(2026, 3, 2))
 
     r = _patch(client, headers, task["id"], due_date="2026-03-02", title="Renamed")
     assert r.status_code == 200, r.text
@@ -637,13 +610,13 @@ def test_a_scope_is_refused_where_there_is_no_series_to_reschedule(
     client: TestClient, db: Session, scope: str
 ) -> None:
     headers = new_user_headers(client, db)
-    plain = _create_task(client, headers, "Once", due_date="2026-03-02")
+    plain = create_task_record(client, headers, "Once", due_date="2026-03-02")
     r = _patch(
         client, headers, plain["id"], due_date="2026-03-04", due_date_scope=scope
     )
     assert r.status_code == 400
 
-    recurring = _create_recurring(client, headers, date(2026, 3, 2))
+    recurring = create_recurring_task(client, headers, date(2026, 3, 2))
     r = _patch(client, headers, recurring["id"], title="No date", due_date_scope=scope)
     assert r.status_code == 400
 
@@ -658,7 +631,7 @@ def test_a_completed_occurrence_moves_like_any_task(
     client: TestClient, db: Session
 ) -> None:
     headers = new_user_headers(client, db)
-    task = _create_recurring(client, headers, date(2026, 3, 2))
+    task = create_recurring_task(client, headers, date(2026, 3, 2))
     _complete(client, headers, task["id"])
 
     r = _patch(client, headers, task["id"], due_date="2026-03-01")
@@ -670,7 +643,7 @@ def test_only_this_occurrence_leaves_the_schedule_alone(
     client: TestClient, db: Session
 ) -> None:
     headers = new_user_headers(client, db)
-    first = _create_recurring(client, headers, date(2026, 3, 2))
+    first = create_recurring_task(client, headers, date(2026, 3, 2))
 
     r = _patch(
         client,
@@ -702,7 +675,7 @@ def test_this_and_following_occurrences_shift_the_series(
     client: TestClient, db: Session
 ) -> None:
     headers = new_user_headers(client, db)
-    first = _create_recurring(client, headers, date(2026, 3, 2))
+    first = create_recurring_task(client, headers, date(2026, 3, 2))
 
     r = _patch(
         client,
@@ -730,7 +703,7 @@ def test_the_scope_holds_when_the_whole_task_is_resent(
 ) -> None:
     """An edit form sends every field back, the unchanged recurrence included."""
     headers = new_user_headers(client, db)
-    first = _create_recurring(client, headers, date(2026, 3, 2))
+    first = create_recurring_task(client, headers, date(2026, 3, 2))
 
     r = _patch(
         client,
@@ -751,7 +724,7 @@ def test_rescheduling_and_completing_in_one_request(
     client: TestClient, db: Session
 ) -> None:
     headers = new_user_headers(client, db)
-    first = _create_recurring(client, headers, date(2026, 3, 2))
+    first = create_recurring_task(client, headers, date(2026, 3, 2))
 
     r = _patch(
         client,

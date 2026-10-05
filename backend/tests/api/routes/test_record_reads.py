@@ -15,9 +15,10 @@ from fastapi.testclient import TestClient
 from sqlmodel import Session
 
 from app.core.config import settings
-from tests.utils.bot import (
+from tests.utils.accounts import (
     ALL_PERMISSIONS,
     READ_ONLY,
+    create_archived_project,
     create_bot_user,
     create_project,
     create_task,
@@ -90,11 +91,7 @@ def test_an_archived_project_is_still_read_by_its_id(
     client: TestClient, owner: Headers
 ) -> None:
     """The panel is where unarchiving happens, so it has to open."""
-    project_id = create_project(client, owner, "Old house")
-    assert (
-        client.post(f"{API}/projects/{project_id}/archive", headers=owner).status_code
-        == 200
-    )
+    project_id = create_archived_project(client, owner, "Old house")
 
     r = _project(client, owner, project_id)
     assert r.status_code == 200, r.text

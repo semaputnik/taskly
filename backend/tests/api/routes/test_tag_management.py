@@ -12,7 +12,7 @@ from sqlmodel import Session, select
 
 from app.core.config import settings
 from app.models import TaskTag
-from tests.utils.bot import (
+from tests.utils.accounts import (
     ALL_PERMISSIONS,
     create_project,
     create_user_headers,
