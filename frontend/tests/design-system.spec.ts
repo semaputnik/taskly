@@ -36,7 +36,9 @@ for (const theme of ["light", "dark"] as const) {
       await page.goto("/")
       const ground = await pageGround(page)
       // The muted half of the sentence under the date.
-      const subtitle = page.getByText("Your agents have made no changes yet.")
+      const subtitle = page.getByText(
+        "Your bot users have made no changes yet.",
+      )
       expect(await textOn(subtitle, ground)).toBeGreaterThanOrEqual(AA)
 
       // A text link is read on the page ground and on the sheets laid on it.

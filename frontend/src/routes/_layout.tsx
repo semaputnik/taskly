@@ -2,7 +2,7 @@ import { createFileRoute, Outlet, redirect } from "@tanstack/react-router"
 import { Menu } from "lucide-react"
 import { useState } from "react"
 
-import { Logo } from "@/components/Common/Logo"
+import { Wordmark } from "@/components/Common/Wordmark"
 import { panelSearchSchema } from "@/components/Records/panels"
 import { RecordPanels } from "@/components/Records/RecordPanels"
 import { Navigation } from "@/components/Sidebar/AppSidebar"
@@ -41,7 +41,7 @@ function TopBar() {
   const close = () => setOpen(false)
   return (
     <header className="bg-page border-rule sticky top-0 z-10 flex h-14 items-center gap-3 border-b px-4 md:hidden">
-      <Logo className={cn(navItemFocus, "rounded-sm")} />
+      <Wordmark className={cn(navItemFocus, "rounded-sm")} />
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetTrigger
           aria-label="Menu"

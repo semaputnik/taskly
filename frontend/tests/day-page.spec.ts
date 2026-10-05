@@ -76,9 +76,16 @@ test("The bands take every open status but Waiting, and the sentence counts them
   await expect(page.getByRole("heading", { name: /Waiting/ })).toHaveCount(0)
 
   await expect(page.getByText("5 need you.")).toBeVisible()
-  // A first visit counts every change the bot users have made.
+  // A first visit counts every change the bot users have made. The Changes
+  // log counts the reader's own seeding too, so the sentence names the bot
+  // users' share of the very figure the log's heading shows.
+  const logHeading = page.getByRole("heading", { name: /^Changes/ })
+  await expect(logHeading).toHaveText(/^Changes\s*\d+/)
+  const logCount = (await logHeading.innerText()).match(/\d+/)?.[0]
   await expect(
-    page.getByText("Your agents have made 1 change so far."),
+    page.getByText(
+      `Your bot users have made 1 of the ${logCount} changes so far.`,
+    ),
   ).toBeVisible()
 
   const week = page.getByRole("link", { name: /2 more due later this week/ })
@@ -129,26 +136,26 @@ test("A clear day says so in a sentence, not an empty box", async ({
   await expect(page.getByRole("heading", { name: /^Due today/ })).toHaveCount(0)
 })
 
-test("The next visit counts the agents' changes since the last one", async ({
+test("The next visit counts the bot users' changes since the last one", async ({
   page,
   context,
 }) => {
   await newUser(page)
   await page.goto("/")
   await expect(
-    page.getByText("Your agents have made no changes yet."),
+    page.getByText("Your bot users have made no changes yet."),
   ).toBeVisible()
   // A reload is the same visit.
   await page.reload()
   await expect(
-    page.getByText("Your agents have made no changes yet."),
+    page.getByText("Your bot users have made no changes yet."),
   ).toBeVisible()
 
   // A new tab is a new visit, counted from the last look.
   const later = await context.newPage()
   await later.goto("/")
   await expect(
-    later.getByText("Your agents made no changes since your last visit."),
+    later.getByText("Your bot users made no changes since your last visit."),
   ).toBeVisible()
 })
 
@@ -367,4 +374,44 @@ test.describe("on a phone", () => {
       await line.evaluate((node) => node.scrollWidth <= node.clientWidth),
     ).toBe(true)
   })
+})
+
+test("A section that cannot load says so and leaves the rest of the page", async ({
+  page,
+}) => {
+  await newUser(page)
+  const api = await userApi(page)
+  const myId = (await (await api.get("/users/me")).json()).id
+  await api.create("/tasks/", {
+    title: "Water the plants",
+    status: "in_progress",
+    assignee_id: myId,
+  })
+  // The activity log refuses. The Changes log and the sentence's second
+  // half read it; the bands and the reader's own work do not.
+  let refuse = true
+  await page.route(
+    (url) => url.pathname === "/api/v1/activity-log/",
+    (route) =>
+      refuse
+        ? route.fulfill({ status: 404, json: { detail: "Not found" } })
+        : route.fallback(),
+  )
+  await page.goto("/")
+
+  // The sentence under the date loses its half about the bot users; the
+  // bands, which read only tasks, stand.
+  const alerts = page.getByRole("alert")
+  await expect(alerts).toHaveText(["Changes could not be loaded. Try again"])
+  await expect(page.getByText("Nothing needs you today.")).toBeVisible()
+  await expect(page.getByText(/Your bot users/)).toHaveCount(0)
+  const myWork = page
+    .locator("section")
+    .filter({ has: page.getByRole("heading", { name: /^In my hands/ }) })
+  await expect(myWork).toContainText("Water the plants")
+
+  refuse = false
+  await alerts.getByRole("button", { name: "Try again" }).click()
+  await expect(alerts).toHaveCount(0)
+  await expect(page.getByRole("heading", { name: /^Changes/ })).toBeVisible()
 })

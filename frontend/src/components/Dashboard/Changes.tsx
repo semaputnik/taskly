@@ -8,17 +8,9 @@ import { useRestoreDeletion } from "@/components/Activity/RestoreDeletion"
 import { Skeleton } from "@/components/ui/skeleton"
 import useAuth from "@/hooks/useAuth"
 import { formatDateTime } from "@/lib/dates"
-import { activityQuery } from "@/lib/serverState"
 import { cn } from "@/lib/utils"
-import { textLink } from "./DayPage"
 import { byDay, clock, windowLabel } from "./log"
-
-/** How many lines the day page shows before handing off to the full log. */
-const LOG_LINES = 8
-
-/** The account's changes in the window the page counts from, newest first. */
-export const changesQuery = (since: string | null) =>
-  activityQuery({ since: since ?? undefined, limit: LOG_LINES })
+import { changesQuery, textLink } from "./shared"
 
 // The time in a narrow column, the actor, then the sentence. On a phone the
 // sentence drops beneath the time and the actor rather than squeezing them.

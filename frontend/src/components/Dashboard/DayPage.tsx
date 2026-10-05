@@ -1,5 +1,6 @@
 import { useSuspenseQueries } from "@tanstack/react-query"
 import { Link as RouterLink } from "@tanstack/react-router"
+import { ErrorBoundary } from "react-error-boundary"
 
 import type { TaskPublic } from "@/client"
 import {
@@ -11,7 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { activityQuery, projectsQuery, tasksQuery } from "@/lib/serverState"
 import { cn } from "@/lib/utils"
 import { dayHeading, lede } from "./day"
-import { PREVIEW_ROWS } from "./sheet"
+import { changesQuery, PREVIEW_ROWS, textLink } from "./shared"
 import { inAWeek, today, tomorrow } from "./when"
 
 /**
@@ -43,34 +44,53 @@ const BANDS = {
 } satisfies Record<string, () => TasksQuery>
 
 /**
- * The page's requests, shared by the sentence and the bands through the
- * cache. The week asks for a count alone; the bot users' changes too.
+ * The bands' requests, shared with the sentence's first half through the
+ * cache. The week asks for a count alone.
  */
-const dayQueries = (since: string | null) =>
+const dayQueries = () =>
   [
     tasksQuery({ ...BANDS.overdue(), limit: PREVIEW_ROWS }),
     tasksQuery({ ...BANDS.today(), limit: PREVIEW_ROWS }),
     tasksQuery({ ...BANDS.week(), limit: 1 }),
-    activityQuery({ by_bots: true, since: since ?? undefined, limit: 1 }),
     projectsQuery(),
   ] as const
 
-function useDay(since: string | null) {
+/**
+ * The sentence's second half reads the activity log: the bot users' changes
+ * as a count alone, and the Changes log's own request, so the sentence
+ * counts what the log counts. Started by the page beside the bands.
+ */
+export const botChangesQuery = (since: string | null) =>
+  activityQuery({ by_bots: true, since: since ?? undefined, limit: 1 })
+
+function useDay() {
   // One hook, so the requests run side by side and the page is drawn once
   // they have all answered: a band arriving on its own would push the rest
   // of the page down after first paint.
-  const [overdue, due, week, changes, projects] = useSuspenseQueries({
-    queries: dayQueries(since),
+  const [overdue, due, week, projects] = useSuspenseQueries({
+    queries: dayQueries(),
   })
   return {
     overdue: overdue.data,
     due: due.data,
     weekCount: week.data.count,
-    changeCount: changes.data.count,
     projectNames: Object.fromEntries(
       projects.data.data.map((project) => [project.id, project.name]),
     ) as Record<string, string>,
   }
+}
+
+/** How many changes the bot users made, as the second half of the sentence. */
+function BotChanges({ since }: { since: string | null }) {
+  const [bots, log] = useSuspenseQueries({
+    queries: [botChangesQuery(since), changesQuery(since)],
+  })
+  return lede({
+    needYou: 0,
+    changes: bots.data.count,
+    total: log.data.count,
+    window: since ? "visit" : "ever",
+  }).changes
 }
 
 /** The date: the day of the month large, the weekday, month and year beside. */
@@ -117,19 +137,24 @@ export function DayPending() {
  * drawing an empty box.
  */
 export function Day({ since }: { since: string | null }) {
-  const { overdue, due, weekCount, changeCount, projectNames } = useDay(since)
-  const sentence = lede({
+  const { overdue, due, weekCount, projectNames } = useDay()
+  const { needs } = lede({
     needYou: overdue.count + due.count,
-    changes: changeCount,
-    window: since ? "visit" : "ever",
+    changes: 0,
+    total: 0,
+    window: "visit",
   })
   const clear = overdue.count === 0 && due.count === 0
 
   return (
     <>
       <p className="text-ink-3 mb-8">
-        <span className="text-ink font-medium">{sentence.needs}</span>{" "}
-        {sentence.changes}
+        <span className="text-ink font-medium">{needs}</span>{" "}
+        {/* An activity log that cannot be read costs this half of the
+            sentence and the Changes log, which says so; the bands stand. */}
+        <ErrorBoundary fallback={null}>
+          <BotChanges since={since} />
+        </ErrorBoundary>
       </p>
 
       {clear ? (
@@ -226,9 +251,6 @@ function Lines({
     />
   ))
 }
-
-export const textLink =
-  "focus-visible:ring-ring/50 rounded-sm underline-offset-[3px] outline-none hover:underline focus-visible:ring-[3px]"
 
 /** The link that ends a band too long to show, into the task list. */
 function BandMoreLink({

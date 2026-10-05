@@ -2,7 +2,7 @@ import { Link } from "@tanstack/react-router"
 
 import { cn } from "@/lib/utils"
 
-interface LogoProps {
+interface WordmarkProps {
   size?: "sm" | "lg"
   className?: string
   asLink?: boolean
@@ -17,7 +17,11 @@ const WORD_SIZE = {
  * The brand is the wordmark alone, set in the UI face at semibold. The old
  * mark is retired; a new one waits until it is designed inside this world.
  */
-export function Logo({ size = "sm", className, asLink = true }: LogoProps) {
+export function Wordmark({
+  size = "sm",
+  className,
+  asLink = true,
+}: WordmarkProps) {
   const word = (
     <span className={cn("font-semibold tracking-[-0.01em]", WORD_SIZE[size])}>
       Taskly
