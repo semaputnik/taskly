@@ -46,7 +46,7 @@ export function CaptureLine() {
     // The same title again while it is still being written is the one refusal
     // that says nothing: the task is already on its way, so the words do not
     // come back.
-    if (capture.sending(typed)) return
+    if (capture.isSending(typed)) return
     const created = await capture.create(typed, false)
     // A refusal says why in its own notice; the words come back unless the
     // reader has already started the next ones.

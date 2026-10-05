@@ -310,7 +310,7 @@ export function useTaskCapture(
      * without a word, so a caller that hands refused words back must ask first:
      * the title is not lost, it is already on its way.
      */
-    sending: (title: string) => inFlight.current.has(title.trim()),
+    isSending: (title: string) => inFlight.current.has(title.trim()),
     /** Read by a screen reader; the sighted reader has the record itself. */
     announcement,
   }
