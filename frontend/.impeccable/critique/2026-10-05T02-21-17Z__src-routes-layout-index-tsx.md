@@ -2,7 +2,7 @@
 target: app shell and day page (slice 1)
 total_score: 27
 max_score: 40
-na_heuristics: 
+na_heuristics:
 p0_count: 0
 p1_count: 1
 target_identity: "file:/Users/semaputnikov/Documents/Projects/taskly/.claude/worktrees/agent-a181eab3bd1e90294/frontend/src/routes/_layout/index.tsx"
