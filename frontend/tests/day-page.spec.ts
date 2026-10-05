@@ -318,7 +318,9 @@ test.describe("on a phone", () => {
     await page.goto("/")
     // Measured once the bands have arrived: their skeleton draws the same
     // headings, and a box read off it is gone by the next assertion.
-    await expect(page.getByRole("link", { name: "Due now" })).toBeVisible()
+    await expect(
+      page.getByRole("link", { name: "Due now" }).first(),
+    ).toBeVisible()
 
     const top = async (locator: Locator) =>
       (await locator.boundingBox())?.y ?? Number.NaN
