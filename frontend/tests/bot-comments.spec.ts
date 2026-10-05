@@ -57,13 +57,13 @@ test("A bot user's comment names the bot and offers no edit or delete", async ({
     .getByText("Ship 1.2")
     .click()
 
-  // Comments are the panel's first tab.
+  // Comments are in the panel's Activity section.
   const dialog = page.getByRole("complementary", { name: /Ship 1\.2/ })
   const botComment = dialog
-    .locator("div.rounded-md")
+    .getByRole("listitem")
     .filter({ hasText: "Deployed to staging" })
   await expect(botComment).toContainText("Status bot")
-  await expect(botComment).toContainText("Bot")
+  await expect(botComment).toContainText("bot user")
   await expect(
     botComment.getByRole("button", { name: "Edit comment" }),
   ).toHaveCount(0)
@@ -72,11 +72,9 @@ test("A bot user's comment names the bot and offers no edit or delete", async ({
   ).toHaveCount(0)
 
   // The user's own comment keeps both.
-  await dialog.getByPlaceholder("Add a comment").fill("Thanks")
+  await dialog.getByPlaceholder("Write a comment…").fill("Thanks")
   await dialog.getByRole("button", { name: "Comment", exact: true }).click()
-  const ownComment = dialog
-    .locator("div.rounded-md")
-    .filter({ hasText: "Thanks" })
+  const ownComment = dialog.getByRole("listitem").filter({ hasText: "Thanks" })
   await expect(
     ownComment.getByRole("button", { name: "Edit comment" }),
   ).toBeVisible()

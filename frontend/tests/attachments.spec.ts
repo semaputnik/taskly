@@ -25,7 +25,9 @@ async function openFiles(page: Page) {
 
   await page.goto(`/tasks?view=table&task=${task.id}`)
   const panel = page.getByRole("complementary", { name: "File the taxes" })
-  await expect(panel.getByText("receipts-2025.pdf")).toBeVisible()
+  await expect(
+    panel.getByRole("region", { name: "Files" }).getByText("receipts-2025.pdf"),
+  ).toBeVisible()
   return { api, task, panel }
 }
 
@@ -43,7 +45,9 @@ test("Deleting an attachment asks first, and names the file", async ({
   // Cancelling leaves the file where it was.
   await confirm.getByRole("button", { name: "Cancel" }).click()
   await expect(confirm).toBeHidden()
-  await expect(panel.getByText("receipts-2025.pdf")).toBeVisible()
+  await expect(
+    panel.getByRole("region", { name: "Files" }).getByText("receipts-2025.pdf"),
+  ).toBeVisible()
   const kept = await (await api.get(`/tasks/${task.id}/attachments/`)).json()
   expect(kept.count).toBe(1)
 
@@ -51,7 +55,9 @@ test("Deleting an attachment asks first, and names the file", async ({
   await panel.getByRole("button", { name: "Remove receipts-2025.pdf" }).click()
   await confirm.getByRole("button", { name: "Delete file" }).click()
   await expect(confirm).toBeHidden()
-  await expect(panel.getByText("receipts-2025.pdf")).toHaveCount(0)
+  await expect(
+    panel.getByRole("region", { name: "Files" }).getByText("receipts-2025.pdf"),
+  ).toHaveCount(0)
   // An empty section is its heading and its action, and nothing else.
   const files = panel.getByRole("region", { name: "Files" })
   await expect(files.getByRole("listitem")).toHaveCount(0)
@@ -119,7 +125,9 @@ test("A failed deletion leaves the attachment and says what failed", async ({
   await expect(page.getByText("Storage is unavailable")).toBeVisible()
   await expect(confirm).toBeVisible()
   await confirm.getByRole("button", { name: "Cancel" }).click()
-  await expect(panel.getByText("receipts-2025.pdf")).toBeVisible()
+  await expect(
+    panel.getByRole("region", { name: "Files" }).getByText("receipts-2025.pdf"),
+  ).toBeVisible()
 })
 
 test.describe("on a touch screen", () => {

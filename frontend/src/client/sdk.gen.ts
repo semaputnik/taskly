@@ -967,6 +967,14 @@ export class ActivityService {
      * counts when it says how many changes the user's bot users made since their
      * last visit (FR-06.12). A moment without an offset is read as UTC.
      *
+     * `task_id` narrows it to one task's history: the entries about the task,
+     * about the comments and files on it, and the batches that touched it. It
+     * is what the task panel's Activity section reads, and it combines with the
+     * other narrowings. Unlike a bot user, a task is one of the caller's own
+     * records, so one that is not theirs, or does not exist, is a 404 — the
+     * same answer for both — rather than a history that looks empty. A deleted
+     * task's history still reads.
+     *
      * Always the requesting user's own entries and nothing wider: there is no
      * parameter or role that reaches another user's log, the superuser's
      * included (FR-10.7). Narrowing by a bot user somebody else owns is

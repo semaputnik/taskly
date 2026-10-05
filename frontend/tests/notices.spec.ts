@@ -120,7 +120,7 @@ test("A notice raised from inside a panel is at the top of the screen too", asyn
   await page.goto(`/tasks?view=table&task=${task.id}`)
   const panel = page.getByRole("complementary", { name: "Renew the lease" })
   await panel
-    .locator("div.rounded-md")
+    .getByRole("listitem")
     .filter({ hasText: "Sign it by Friday" })
     .getByRole("button", { name: "Delete comment" })
     .click()

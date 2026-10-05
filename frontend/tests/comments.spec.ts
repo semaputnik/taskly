@@ -4,7 +4,7 @@ import { newUser, userApi } from "./utils/account"
 test.use({ storageState: { cookies: [], origins: [] } })
 
 /**
- * A task carrying the user's own comment, open on its Comments tab. With
+ * A task carrying the user's own comment, open on the panel's Activity section. With
  * `clock`, time only moves when the test moves it.
  */
 async function openComment(page: Page, { clock = true } = {}) {
@@ -19,7 +19,7 @@ async function openComment(page: Page, { clock = true } = {}) {
   await page.goto(`/tasks?view=table&task=${task.id}`)
   const panel = page.getByRole("complementary", { name: "Renew the lease" })
   const shown = panel
-    .locator("div.rounded-md")
+    .getByRole("listitem")
     .filter({ hasText: "Landlord wants it signed by Friday" })
   await expect(shown).toBeVisible()
   const stored = async () =>
@@ -62,7 +62,7 @@ test("Undo is reachable from the keyboard", async ({ page }) => {
 })
 
 test("A comment is deleted once the undo window lapses", async ({ page }) => {
-  const { panel, shown, stored } = await openComment(page)
+  const { shown, stored } = await openComment(page)
 
   await shown.getByRole("button", { name: "Delete comment" }).click()
   await expect(page.getByRole("button", { name: "Undo" })).toBeVisible()
@@ -77,7 +77,6 @@ test("A comment is deleted once the undo window lapses", async ({ page }) => {
   await page.clock.fastForward(10_000)
   await expect.poll(stored).toEqual([])
   await expect(shown).toHaveCount(0)
-  await expect(panel.getByText("No comments yet.")).toBeVisible()
 })
 
 test("Closing the panel leaves the notice, and the deletion waits for its window", async ({

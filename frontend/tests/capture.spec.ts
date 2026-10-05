@@ -564,7 +564,7 @@ test("Enter creates the whole draft as one task and one log entry", async ({
     record.getByRole("button", { name: "Remove tag finance" }),
   ).toBeVisible()
   // What only a record has joins it.
-  await expect(record.getByRole("region", { name: "Comments" })).toBeVisible()
+  await expect(record.getByRole("region", { name: "Activity" })).toBeVisible()
   await expect(record.getByRole("tab")).toHaveCount(0)
   await expect(record.getByRole("combobox", { name: "Status" })).toBeVisible()
   expect(creates).toHaveLength(1)

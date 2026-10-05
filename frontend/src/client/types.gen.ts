@@ -2603,6 +2603,10 @@ export type activityReadActivityLogData = {
          * Since
          */
         since?: string | null;
+        /**
+         * Task Id
+         */
+        task_id?: string | null;
     };
     url: '/api/v1/activity-log/';
 };

@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
-from sqlalchemy import and_, not_
+from sqlalchemy import and_, literal_column, not_, or_
 from sqlmodel import col, func, select
 
 from app import crud, deletions
@@ -24,6 +24,7 @@ from app.models import (
     Message,
     Project,
     Tag,
+    Task,
     TaskStatus,
 )
 
@@ -105,6 +106,29 @@ def _of_kind(kind: ActivityKind) -> Any:
     return actions
 
 
+# What a comment or attachment entry names its task by. Spelled out as SQL so
+# it is exactly the expression `ix_activityentry_owner_id_task` indexes: a
+# bound path would leave the planner unable to match the two.
+TASK_REF = "(details -> 'task' ->> 'id')"
+
+
+def _on_task(task_id: uuid.UUID) -> Any:
+    """
+    What an entry has to satisfy to belong to the history of one task: it is
+    about the task itself, about a comment or file on it, or it is a batch
+    that touched it. A batch is one entry, filed under the first task it
+    touched, and names the rest in `task_ids`.
+    """
+    return or_(
+        ActivityEntry.entity_id == task_id,
+        literal_column(TASK_REF) == str(task_id),
+        and_(
+            col(ActivityEntry.action) == ActivityAction.TASKS_BULK_CHANGED,
+            col(ActivityEntry.details).contains({"task_ids": [str(task_id)]}),
+        ),
+    )
+
+
 # A restore that cannot go ahead is a state the user can resolve, not a
 # malformed request: each cause has its own code so the client can say which
 # thing is in the way (semaputnik/taskly#8, story 27).
@@ -131,6 +155,7 @@ def read_activity_log(
     kind: ActivityKind | None = Query(default=None),
     by_bots: bool = Query(default=False),
     since: datetime | None = Query(default=None),
+    task_id: uuid.UUID | None = Query(default=None),
 ) -> Any:
     """
     Retrieve the current user's activity log, newest first.
@@ -151,6 +176,14 @@ def read_activity_log(
     counts when it says how many changes the user's bot users made since their
     last visit (FR-06.12). A moment without an offset is read as UTC.
 
+    `task_id` narrows it to one task's history: the entries about the task,
+    about the comments and files on it, and the batches that touched it. It
+    is what the task panel's Activity section reads, and it combines with the
+    other narrowings. Unlike a bot user, a task is one of the caller's own
+    records, so one that is not theirs, or does not exist, is a 404 — the
+    same answer for both — rather than a history that looks empty. A deleted
+    task's history still reads.
+
     Always the requesting user's own entries and nothing wider: there is no
     parameter or role that reaches another user's log, the superuser's
     included (FR-10.7). Narrowing by a bot user somebody else owns is
@@ -159,6 +192,13 @@ def read_activity_log(
     bot user it is, or whether it exists at all.
     """
     where: list[Any] = [ActivityEntry.owner_id == current_user.id]
+    if task_id is not None:
+        task_owner = session.exec(
+            select(Task.owner_id).where(Task.id == task_id)
+        ).first()
+        if task_owner != current_user.id:
+            raise HTTPException(status_code=404, detail="Task not found")
+        where.append(_on_task(task_id))
     if actor_bot_user_id is not None:
         where.append(ActivityEntry.actor_bot_user_id == actor_bot_user_id)
     if kind is not None:

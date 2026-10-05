@@ -1117,6 +1117,15 @@ class ActivityEntry(SQLModel, table=True):
             "action",
             "position",
         ),
+        # One task's history: what happened to it, and to the comments and
+        # files on it, which name it in their details rather than pointing at
+        # it. The panel of a task reads this every time it opens.
+        Index("ix_activityentry_owner_id_entity_id", "owner_id", "entity_id"),
+        Index(
+            "ix_activityentry_owner_id_task",
+            "owner_id",
+            text("(details -> 'task' ->> 'id')"),
+        ),
         # A change is made by exactly one actor: a user, or a bot user.
         CheckConstraint(
             "(actor_id IS NULL) <> (actor_bot_user_id IS NULL)",
