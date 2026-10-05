@@ -49,16 +49,16 @@ test("A tap on the due date lands on the native date field, and the day it picks
   await expect(field).not.toHaveAccessibleName("Due date: not set")
 })
 
-test("Add Task is one tap from any screen, in the thumb's corner", async ({
+test("Add a task is one tap from any screen, in the thumb's corner", async ({
   page,
 }) => {
   await newUser(page)
   await page.goto("/")
 
-  const add = page.getByRole("button", { name: "Add Task" })
+  const add = page.getByRole("button", { name: "Add a task" })
   await expect(add).toBeVisible()
   const box = await add.boundingBox()
-  if (!box) throw new Error("Add Task has no box")
+  if (!box) throw new Error("Add a task has no box")
   expect(box.width).toBeGreaterThanOrEqual(44)
   expect(box.x + box.width).toBeGreaterThan(375 - 40)
   expect(box.y + box.height).toBeGreaterThan(812 - 60)

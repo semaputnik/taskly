@@ -3,11 +3,32 @@
 
 @custom-variant dark (&:is(.dark *));
 
+@theme {
+  /* The platform's own UI face; monospace only for times, counts and ids. */
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
+    "Noto Sans", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+
 @theme inline {
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+  /* The Changelog palette, by its own names. */
+  --color-page: var(--page);
+  --color-raised: var(--raised);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-rule: var(--rule);
+  --color-rule-strong: var(--rule-strong);
+  --color-hover: var(--hover);
+  --color-done: var(--done);
+  --color-late: var(--late);
+  /* The shadcn names, mapped onto the palette so the screens not yet
+     redesigned read as the same world until their own slice. */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -25,143 +46,143 @@
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
   --color-priority-p1: var(--priority-p1);
   --color-priority-p2: var(--priority-p2);
   --color-priority-p3: var(--priority-p3);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --color-chart-1: var(--chart-1);
-  --color-chart-2: var(--chart-2);
-  --color-chart-3: var(--chart-3);
-  --color-chart-4: var(--chart-4);
-  --color-chart-5: var(--chart-5);
-  --color-sidebar: var(--sidebar);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-ring: var(--sidebar-ring);
 }
 
+/*
+ * The Changelog: a white page, near-black ink, two greys for secondary text,
+ * hairlines at two strengths. Colour exists only for state that asks for
+ * action: red for overdue, green for done. Nothing marks location; weight
+ * does.
+ *
+ * Every text colour is checked against every ground it is laid on, in both
+ * themes, by `src/theme.test.ts`: change a value here and that list says
+ * whether the pair still clears 4.5:1. Colours are written as six-digit hex
+ * so the check reads them exactly as they are written.
+ */
 :root {
   color-scheme: light;
-  --radius: 0.625rem;
-  /* The ground the work area sits on. It is a step below --card on purpose:
-     tables, dialogs and popovers are sheets laid on it, and without the step
-     they would be white on white, held together by their border alone. Dark
-     mode has always had this relationship; light mode did not. */
-  --background: oklch(0.97 0 0);
-  /* Ink: 18.2:1 on --background, 19.8:1 on --card. */
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  /* Every colour is defined with what is laid on it and the contrast of that
-     pair, and a recalibration re-checks both sides (the Mirrored Theme Rule).
-     Signal Teal under --primary-foreground: 4.9:1. */
-  --primary: oklch(0.52 0.10687 182.4689);
-  --primary-foreground: oklch(0.985 0 0);
-  /* Signal Teal as text: 4.7:1 on --background, 5.1:1 on --card. */
-  --link: oklch(0.52 0.10687 182.4689);
-  /* What a modal layer lays over the page: the ground falls 0.39 in OKLab
+  --radius: 0.5rem;
+
+  /* Grounds. The page is the only surface: a sheet (a card) is the page
+     itself, held by a hairline; a popover or dialog lifts by its shadow. */
+  --page: #ffffff;
+  --raised: #ffffff;
+  /* A hovered or selected line, and the quiet fill of a secondary control. */
+  --hover: #f3f4f6;
+
+  /* Ink and the two greys. On --page / --hover:
+     ink 19.4 / 17.6, ink-2 9.8 / 8.9, ink-3 5.2 / 4.8. */
+  --ink: #0b0e11;
+  --ink-2: #3d444d;
+  --ink-3: #656d76;
+
+  /* Hairlines: the rule between lines, and the stronger one under a heading
+     or a field. Structure, not text, so they carry no contrast floor. */
+  --rule: #e6e8eb;
+  --rule-strong: #c9cdd2;
+
+  /* State. Overdue on --page / --hover: 5.4 / 4.9. Done: 5.1 / 4.6. */
+  --late: #cf222e;
+  --done: #1a7f37;
+
+  /* Priority is the colour of a status mark; P4 has none and stays ink.
+     P1 is overdue's red: urgent and late both ask for action now.
+     P2: 5.8 / 5.3. P3: 5.2 / 4.7. */
+  --priority-p1: var(--late);
+  --priority-p2: #8a5c00;
+  --priority-p3: #0969da;
+
+  /* What a modal layer lays over the page: the ground falls 0.40 in OKLab
      lightness under it (the Scrim Rule asks for at least 0.06). */
-  --scrim: oklch(0 0 0 / 50%);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  /* 5.1:1 on --background and --muted, 5.5:1 on --card. */
-  --muted-foreground: oklch(0.52 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  /* The priority hues: the one category allowed a colour of its own (the
-     Priority Hue Rule). P4 has none and stays ink. Each is both a text colour
-     and the ring of the compact checkbox, so each clears 4.5:1 on both grounds
-     it is laid on. P1 is its own red, not --destructive: urgent is not late.
-     P1: 5.4:1 on --card, 4.9:1 on --background.
-     P2 (amber, since yellow cannot carry text on white): 5.2:1, 4.8:1.
-     P3: 5.4:1, 4.9:1. */
-  --priority-p1: oklch(0.55 0.2 20);
-  --priority-p2: oklch(0.54 0.115 70);
-  --priority-p3: oklch(0.53 0.17 255);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  /* Signal Teal again, under the same label: 4.9:1. */
-  --sidebar-primary: oklch(0.52 0.10687 182.4689);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --scrim: rgb(0 0 0 / 50%);
+
+  /* The shadcn names. */
+  --background: var(--page);
+  --foreground: var(--ink);
+  --card: var(--page);
+  --card-foreground: var(--ink);
+  --popover: var(--raised);
+  --popover-foreground: var(--ink);
+  /* The primary action is ink: page on ink, 19.4:1. */
+  --primary: var(--ink);
+  --primary-foreground: var(--page);
+  /* A text link is ink and underlined; colour never carries it alone. */
+  --link: var(--ink);
+  --secondary: var(--hover);
+  --secondary-foreground: var(--ink);
+  --muted: var(--hover);
+  --muted-foreground: var(--ink-3);
+  --accent: var(--hover);
+  --accent-foreground: var(--ink);
+  /* White on overdue's red: 5.4:1. */
+  --destructive: var(--late);
+  --destructive-foreground: #ffffff;
+  --border: var(--rule);
+  --input: var(--rule-strong);
+  /* Focus is drawn in ink, the strongest mark on the page. */
+  --ring: var(--ink);
 }
 
 .dark {
   color-scheme: dark;
-  /* Raised off the floor so a modal veil can still visibly darken it: at
-     0.145 no veil moved it more than 0.05. Ink on it: 17.0:1. */
-  --background: oklch(0.21 0 0);
-  --foreground: oklch(0.985 0 0);
-  /* A step above the ground. Ink on it: 14.9:1. */
-  --card: oklch(0.26 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.26 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  /* The fill keeps the light theme's value: lifting it for weight against the
-     dark ground took its label down to 2.9:1, and a readable label outranks
-     equal apparent weight. Label on fill: 4.9:1; as the checked mark of a
-     checkbox, 3.1:1 against --card (non-text needs 3:1). */
-  --primary: oklch(0.52 0.10687 182.4689);
-  --primary-foreground: oklch(0.985 0 0);
-  /* As text the teal does lift, since its ground is dark: 7.0:1 on
-     --background, 6.1:1 on --card, 5.0:1 on --muted. */
-  --link: oklch(0.7 0.10687 182.4689);
-  /* Denser than in light: the ground falls 0.096 in OKLab lightness. */
-  --scrim: oklch(0 0 0 / 80%);
-  /* The recessive fill, a step above --card. Ink on it: 12.2:1. */
-  --secondary: oklch(0.32 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.32 0 0);
-  /* 6.8:1 on --background, 6.0:1 on --card, 4.9:1 on --muted. */
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.32 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  /* Lifted for the dark ground; yellow can be yellow here.
-     P1: 5.8:1 on --card, 6.6:1 on --background, 4.7:1 on --muted.
-     P2: 9.4:1, 10.7:1, 7.7:1. P3: 6.8:1, 7.7:1, 5.5:1. */
-  --priority-p1: oklch(0.72 0.17 20);
-  --priority-p2: oklch(0.84 0.16 85);
-  --priority-p3: oklch(0.74 0.13 250);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  /* Night Panel, as --card. */
-  --sidebar: oklch(0.26 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  /* As --primary: 4.9:1 under its label. */
-  --sidebar-primary: oklch(0.52 0.10687 182.4689);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.32 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+
+  /* Mirrored from the light calibration. The page is near-black, and a
+     popover or dialog is a step above it, so it separates without a frame. */
+  --page: #0f1115;
+  --raised: #171a1f;
+  --hover: #1e2228;
+
+  /* On --page / --raised / --hover:
+     ink 15.9 / 14.7 / 13.5, ink-2 11.3 / 10.5 / 9.6, ink-3 5.8 / 5.4 / 4.9. */
+  --ink: #e9ecef;
+  --ink-2: #c4c9d0;
+  --ink-3: #8a8f98;
+
+  --rule: #23272d;
+  --rule-strong: #353a42;
+
+  /* Overdue: 6.0 / 5.5 / 5.0. Done: 7.4 / 6.9 / 6.3. */
+  --late: #f0616d;
+  --done: #3fb950;
+
+  /* P2: 8.7 / 8.0 / 7.3. P3: 7.8 / 7.2 / 6.6. */
+  --priority-p1: var(--late);
+  --priority-p2: #e3a443;
+  --priority-p3: #6ea8ff;
+
+  /* Denser than in light, since a dark ground has less to lose: it falls
+     0.076 in OKLab lightness under this veil. */
+  --scrim: rgb(0 0 0 / 80%);
+
+  --background: var(--page);
+  --foreground: var(--ink);
+  --card: var(--page);
+  --card-foreground: var(--ink);
+  --popover: var(--raised);
+  --popover-foreground: var(--ink);
+  /* Page on ink: 15.9:1. */
+  --primary: var(--ink);
+  --primary-foreground: var(--page);
+  --link: var(--ink);
+  --secondary: var(--hover);
+  --secondary-foreground: var(--ink);
+  --muted: var(--hover);
+  --muted-foreground: var(--ink-3);
+  --accent: var(--hover);
+  --accent-foreground: var(--ink);
+  /* Page on overdue's red: 6.0:1. */
+  --destructive: var(--late);
+  --destructive-foreground: var(--page);
+  --border: var(--rule);
+  --input: var(--rule-strong);
+  --ring: var(--ink);
 }
 
 @layer base {
@@ -169,7 +190,13 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans antialiased;
+    /* 15px body, the meta line 13px beneath it. */
+    font-size: 0.9375rem;
+    line-height: 1.45;
+  }
+  ::selection {
+    background-color: color-mix(in oklab, var(--ink) 16%, transparent);
   }
   button,
   [role="button"] {

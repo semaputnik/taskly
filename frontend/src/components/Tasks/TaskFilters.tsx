@@ -49,9 +49,8 @@ interface TaskFiltersProps {
 }
 
 /**
- * Compact rows or the table. The current one is marked the way the sidebar marks
- * where the reader is — a quiet fill, not the teal — since it is a place, not
- * an action.
+ * Compact rows or the table. The current one is marked with a quiet fill, not
+ * a colour, since it is a place, not an action.
  */
 function ViewSwitch({
   view,

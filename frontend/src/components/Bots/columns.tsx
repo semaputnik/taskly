@@ -106,7 +106,7 @@ export function getColumns(
       header: "Last used",
       // Whether an integration is alive is the question a list of agents is
       // scanned for. It is said in words and weight rather than in a colour:
-      // teal is for action, location and focus, and nothing else.
+      // colour is for state that asks for action, and nothing else.
       cell: ({ row }) => (
         <span
           className={

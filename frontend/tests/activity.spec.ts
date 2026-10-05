@@ -15,7 +15,7 @@ test("A user's own changes appear on the Activity page, newest first", async ({
   await logInUser(page, email, password)
 
   await page.goto("/tasks?view=table")
-  await page.getByRole("button", { name: "Add Task" }).click()
+  await page.getByRole("button", { name: "Add a task" }).first().click()
   const title = page.getByRole("textbox", { name: "Task title" })
   await title.fill("Renew the passport")
   await title.press("Enter")
@@ -60,7 +60,7 @@ test("A deleted task can be restored from the Activity page", async ({
   await logInUser(page, email, password)
 
   await page.goto("/tasks?view=table")
-  await page.getByRole("button", { name: "Add Task" }).click()
+  await page.getByRole("button", { name: "Add a task" }).first().click()
   const title = page.getByRole("textbox", { name: "Task title" })
   await title.fill("Cancel the gym")
   await title.press("Enter")

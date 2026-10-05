@@ -275,7 +275,7 @@ export function useRecordPanel<K extends RecordKind>(kind: K) {
  * Put focus on a capture field as its panel opens.
  *
  * Done here rather than through `autoFocus`, which a sheet's own opening focus
- * would win against. It is claimed twice: on a phone the sidebar is a sheet of
+ * would win against. It is claimed twice: on a phone the navigation is a sheet of
  * its own, and it hands focus back to the button that opened capture as it
  * finishes closing, a moment after this panel arrives.
  */

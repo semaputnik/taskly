@@ -24,8 +24,11 @@ for (const theme of ["light", "dark"] as const) {
     })
 
     test("The primary action is readable on its fill", async ({ page }) => {
+      // A new account's empty list offers it as a filled button.
       await page.goto("/tasks?view=table")
-      const add = page.getByRole("button", { name: "Add Task" }).first()
+      const add = page
+        .getByRole("main")
+        .getByRole("button", { name: "Add a task" })
       expect(await textOnFill(add)).toBeGreaterThanOrEqual(AA)
     })
 
@@ -50,7 +53,7 @@ for (const theme of ["light", "dark"] as const) {
     }) => {
       await page.goto("/tasks?view=table")
       const ground = await pageGround(page)
-      await page.getByRole("button", { name: "Add Task" }).first().click()
+      await page.getByRole("button", { name: "Add a task" }).first().click()
       const overlay = page.locator("[data-slot=sheet-overlay]")
       await expect(overlay).toBeVisible()
       await overlay.evaluate((node) =>
