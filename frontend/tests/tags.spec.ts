@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test"
 import { randomEmail } from "./utils/random"
+import { taskLine } from "./utils/tasks"
 import { logInUser } from "./utils/user"
 
 test.use({ storageState: { cookies: [], origins: [] } })
@@ -75,8 +76,8 @@ test("A tag is created, renamed and deleted on the Tags page", async ({
   await expect(renamed).toHaveCount(0)
   await expect(page.getByRole("row", { name: "Open weekend" })).toBeVisible()
 
-  await page.goto("/tasks?view=table")
-  const task = page.getByRole("row", { name: /Buy stamps/ })
+  await page.goto("/tasks")
+  const task = taskLine(page, "Buy stamps")
   await expect(task).toContainText("weekend")
   await expect(task).not.toContainText("errands")
 

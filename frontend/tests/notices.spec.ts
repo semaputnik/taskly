@@ -117,7 +117,7 @@ test("A notice raised from inside a panel is at the top of the screen too", asyn
   const task = await api.create("/tasks/", { title: "Renew the lease" })
   await api.create(`/tasks/${task.id}/comments/`, { body: "Sign it by Friday" })
 
-  await page.goto(`/tasks?view=table&task=${task.id}`)
+  await page.goto(`/tasks?task=${task.id}`)
   const panel = page.getByRole("complementary", { name: "Renew the lease" })
   await panel
     .getByRole("listitem")

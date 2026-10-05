@@ -84,15 +84,6 @@ test("Every destructive confirmation names its consequence before its button", a
     "Tasks assigned to it stay assigned",
   )
 
-  await page.goto("/tasks?view=table")
-  await page.getByRole("checkbox", { name: "Select Prune the roses" }).check()
-  await page.getByRole("button", { name: "Delete", exact: true }).click()
-  await expectConsequenceFirst(
-    page.getByRole("dialog", { name: "Delete 1 task?" }),
-    "Delete",
-    "can be restored",
-  )
-
   await page.goto("/settings")
   await page.getByRole("tab", { name: "Danger zone" }).click()
   await page.getByRole("button", { name: "Delete Account" }).click()

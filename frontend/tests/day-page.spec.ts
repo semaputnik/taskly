@@ -93,7 +93,9 @@ test("The bands take every open status but Waiting, and the sentence counts them
   await week.click()
   await expect(page).toHaveURL(/\/tasks/)
   await expect(
-    page.getByText("Status: Backlog, To do, In progress, Review"),
+    page.getByRole("button", {
+      name: "Status: Backlog, To do, In progress, Review",
+    }),
   ).toBeVisible()
 })
 
@@ -115,7 +117,9 @@ test("A band too long to show hands off to the list narrowed the same way", asyn
   await overdue.getByRole("link", { name: "2 more" }).click()
   await expect(page).toHaveURL(/\/tasks\?.*overdue=true/)
   await expect(
-    page.getByText("Status: Backlog, To do, In progress, Review"),
+    page.getByRole("button", {
+      name: "Status: Backlog, To do, In progress, Review",
+    }),
   ).toBeVisible()
   await expect(page.getByText("Late 7")).toBeVisible()
 })

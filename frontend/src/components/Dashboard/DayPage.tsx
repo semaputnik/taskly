@@ -50,8 +50,10 @@ const BANDS = {
  */
 const dayQueries = () =>
   [
-    tasksQuery({ ...BANDS.overdue(), limit: PREVIEW_ROWS }),
-    tasksQuery({ ...BANDS.today(), limit: PREVIEW_ROWS }),
+    // The most pressing first: the list's own order is newest filed, which
+    // is not what a band is for.
+    tasksQuery({ ...BANDS.overdue(), sort: "priority", limit: PREVIEW_ROWS }),
+    tasksQuery({ ...BANDS.today(), sort: "priority", limit: PREVIEW_ROWS }),
     tasksQuery({ ...BANDS.week(), limit: 1 }),
     projectsQuery(),
   ] as const

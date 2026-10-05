@@ -1,6 +1,6 @@
 import { expect, type Page, test } from "@playwright/test"
 import { newUser, userApi } from "./utils/account"
-import { openCaptured } from "./utils/capture"
+import { openCaptured, openDraft } from "./utils/capture"
 import { addVirtualAuthenticator } from "./utils/passkeys.ts"
 import { randomEmail } from "./utils/random"
 
@@ -49,7 +49,7 @@ test("A captured task counts on the Projects list at once", async ({
   await expect(inbox).toContainText("No tasks")
 
   // Captured over the list, which lands the task in the Inbox.
-  await page.getByRole("button", { name: "Add a task" }).first().click()
+  await openDraft(page)
   const title = page.getByRole("textbox", { name: "Task title" })
   await title.fill("Prune the roses")
   await title.press("Enter")

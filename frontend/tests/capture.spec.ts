@@ -5,8 +5,9 @@ import {
   emptyDraft,
   isTouched,
 } from "../src/components/Tasks/draft"
-import { openCaptured } from "./utils/capture"
+import { openCaptured, openDraft } from "./utils/capture"
 import { randomEmail } from "./utils/random"
+import { chooseFilter, taskLine } from "./utils/tasks"
 import { logInUser } from "./utils/user"
 
 test.use({ storageState: { cookies: [], origins: [] } })
@@ -34,7 +35,7 @@ const titleField = (page: Page) =>
 
 /** Open capture from the navigation's Add a task entry. */
 async function startCapture(page: Page) {
-  await page.getByRole("button", { name: "Add a task" }).first().click()
+  await openDraft(page)
   await expect(titleField(page)).toBeFocused()
 }
 
@@ -42,7 +43,7 @@ test("Capture creates a task from one field, closes, and offers the way to it", 
   page,
 }) => {
   await newUser(page)
-  await page.goto("/tasks?view=table")
+  await page.goto("/tasks")
 
   await startCapture(page)
   await titleField(page).fill("Book the dentist")
@@ -52,9 +53,7 @@ test("Capture creates a task from one field, closes, and offers the way to it", 
   // and the list holds the task.
   await expect(page.locator("[data-record-column]")).toHaveCount(0)
   await expect(page).not.toHaveURL(/capture=|task=/)
-  await expect(
-    page.getByRole("row", { name: /Book the dentist/ }),
-  ).toBeVisible()
+  await expect(taskLine(page, "Book the dentist")).toBeVisible()
 
   // The notice is the receipt, and opens what was made.
   const notice = page.getByText("“Book the dentist” created")
@@ -70,7 +69,7 @@ test("Capture creates a task from one field, closes, and offers the way to it", 
 
 test("Escape before a title is committed creates nothing", async ({ page }) => {
   await newUser(page)
-  await page.goto("/tasks?view=table")
+  await page.goto("/tasks")
 
   await startCapture(page)
   await titleField(page).press("Escape")
@@ -102,7 +101,7 @@ test("Closing the panel after the title is committed leaves the task in place", 
   page,
 }) => {
   await newUser(page)
-  await page.goto("/tasks?view=table")
+  await page.goto("/tasks")
 
   await startCapture(page)
   await titleField(page).fill("Renew the passport")
@@ -115,16 +114,14 @@ test("Closing the panel after the title is committed leaves the task in place", 
   await page.keyboard.press("Escape")
   await expect(page.locator("[data-record-column]")).toBeHidden()
   await expect(page).not.toHaveURL(/task=/)
-  await expect(
-    page.getByRole("row", { name: /Renew the passport/ }),
-  ).toBeVisible()
+  await expect(taskLine(page, "Renew the passport")).toBeVisible()
 })
 
 test("A property set straight after capture persists with no Save", async ({
   page,
 }) => {
   await newUser(page)
-  await page.goto("/tasks?view=table")
+  await page.goto("/tasks")
 
   await startCapture(page)
   await titleField(page).fill("File the tax return")
@@ -161,10 +158,8 @@ test("Capture lands in the project the list is filtered to, and in Inbox otherwi
     expect(created.ok()).toBe(true)
   }
 
-  await page.goto("/tasks?view=table")
-  await page.getByRole("button", { name: "Filters" }).click()
-  await page.getByRole("combobox", { name: "Project" }).first().click()
-  await page.getByRole("option", { name: "Kitchen rebuild" }).click()
+  await page.goto("/tasks")
+  await chooseFilter(page, "Any project", "Kitchen rebuild")
   await expect(page).toHaveURL(/project_id=/)
 
   await startCapture(page)
@@ -179,7 +174,7 @@ test("Capture lands in the project the list is filtered to, and in Inbox otherwi
   ).toContainText("Kitchen rebuild")
 
   // Unfiltered, the default is Inbox again.
-  await page.goto("/tasks?view=table")
+  await page.goto("/tasks")
   await startCapture(page)
   await expect(capturePanel(page)).toContainText("Inbox")
   await titleField(page).fill("Pick up the parcel")
@@ -209,7 +204,7 @@ test("An archived project is never a capture context", async ({ page }) => {
     ).ok(),
   ).toBe(true)
 
-  await page.goto(`/tasks?view=table&project_id=${project.id}`)
+  await page.goto(`/tasks?project_id=${project.id}`)
   await startCapture(page)
   await expect(capturePanel(page)).toContainText("Inbox")
   await titleField(page).fill("Sort the loft")
@@ -227,10 +222,7 @@ test("The keyboard opens capture, and a run of them costs one gesture each", asy
 }) => {
   await newUser(page)
   await page.goto("/")
-  // The shell has to be listening before a key means anything to it.
-  await expect(
-    page.getByRole("button", { name: "Add a task" }).first(),
-  ).toBeVisible()
+  await expect(page.getByRole("navigation", { name: "Main" })).toBeVisible()
 
   // From the dashboard, with no mouse.
   await page.keyboard.press("c")
@@ -248,13 +240,9 @@ test("The keyboard opens capture, and a run of them costs one gesture each", asy
   await expect(
     page.getByRole("complementary", { name: "Call the plumber" }),
   ).toBeVisible()
-  await page.goto("/tasks?view=table")
-  await expect(
-    page.getByRole("row", { name: /Water the plants/ }),
-  ).toBeVisible()
-  await expect(
-    page.getByRole("row", { name: /Call the plumber/ }),
-  ).toBeVisible()
+  await page.goto("/tasks")
+  await expect(taskLine(page, "Water the plants")).toBeVisible()
+  await expect(taskLine(page, "Call the plumber")).toBeVisible()
 })
 
 test("The shortcut never steals a keystroke from a field being typed into", async ({
@@ -291,7 +279,7 @@ test("A subtask is captured inline in its parent's Subtasks section", async ({
     })
   ).json()
 
-  await page.goto(`/tasks?view=table&task=${parent.id}`)
+  await page.goto(`/tasks?task=${parent.id}`)
   const panel = page.getByRole("complementary", { name: "Pack the study" })
   const subtasks = panel.getByRole("region", { name: "Subtasks" })
   const subtaskField = subtasks.getByRole("textbox", { name: "New subtask" })
@@ -367,7 +355,7 @@ test("A refused subtask hands its title back and keeps the field", async ({
       : route.fallback(),
   )
 
-  await page.goto(`/tasks?view=table&task=${parent.id}`)
+  await page.goto(`/tasks?task=${parent.id}`)
   const panel = page.getByRole("complementary", { name: "Pack the study" })
   const field = panel.getByRole("textbox", { name: "New subtask" })
   await field.fill("Empty the desk drawers")
@@ -381,7 +369,7 @@ test("A captured task is one creation entry in the activity log", async ({
   page,
 }) => {
   await newUser(page)
-  await page.goto("/tasks?view=table")
+  await page.goto("/tasks")
 
   await startCapture(page)
   await titleField(page).fill("Return the library books")
@@ -404,7 +392,7 @@ test("A refused creation keeps what was typed and says what failed", async ({
   page,
 }) => {
   await newUser(page)
-  await page.goto("/tasks?view=table")
+  await page.goto("/tasks")
 
   await startCapture(page)
   const tooLong = "x".repeat(300)
@@ -474,7 +462,7 @@ test("Capture opens every property row, no tabs, and sends nothing while filled 
   page,
 }) => {
   await newUser(page)
-  await page.goto("/tasks?view=table")
+  await page.goto("/tasks")
 
   const writes: string[] = []
   page.on("request", (request) => {
@@ -524,7 +512,7 @@ test("Enter creates the whole draft as one task and one log entry", async ({
       data: { name: "Accounts" },
     })
   ).json()
-  await page.goto("/tasks?view=table")
+  await page.goto("/tasks")
 
   await startCapture(page)
   const panel = capturePanel(page)
@@ -584,7 +572,7 @@ test("The chord from the description creates, clears the words and keeps the set
   page,
 }) => {
   await newUser(page)
-  await page.goto("/tasks?view=table")
+  await page.goto("/tasks")
 
   await startCapture(page)
   const panel = capturePanel(page)
@@ -637,10 +625,12 @@ test("The chord from the description creates, clears the words and keeps the set
   await expect(page.locator("[data-record-column]")).toHaveCount(0)
 
   for (const title of ["Buy stamps", "Post the letter"]) {
-    const row = page.getByRole("row", { name: new RegExp(title) })
-    await expect(row).toContainText("P1")
-    await expect(row).toContainText("errands")
-    await expect(row).toContainText("2031")
+    const line = taskLine(page, title)
+    await expect(
+      line.getByRole("checkbox", { name: /priority P1/ }),
+    ).toBeVisible()
+    await expect(line).toContainText("errands")
+    await expect(line).toContainText("2031")
   }
 })
 
@@ -648,7 +638,7 @@ test("A touched draft asks before it goes, however it is closed", async ({
   page,
 }) => {
   await newUser(page)
-  await page.goto("/tasks?view=table")
+  await page.goto("/tasks")
 
   await startCapture(page)
   const panel = capturePanel(page)
@@ -686,7 +676,7 @@ test("A touched draft asks before it goes, however it is closed", async ({
 
 test("A refused create keeps every field of the draft", async ({ page }) => {
   await newUser(page)
-  await page.goto("/tasks?view=table")
+  await page.goto("/tasks")
 
   await startCapture(page)
   const panel = capturePanel(page)
@@ -724,8 +714,8 @@ test.describe("on a phone", () => {
 
   test("Create task is on screen without scrolling", async ({ page }) => {
     await newUser(page)
-    await page.goto("/tasks?view=table")
-    await page.goto("/tasks?view=table&capture=task")
+    await page.goto("/tasks")
+    await page.goto("/tasks?capture=task")
     await expect(titleField(page)).toBeVisible()
     const create = capturePanel(page).getByRole("button", {
       name: "Create task",

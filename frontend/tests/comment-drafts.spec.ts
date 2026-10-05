@@ -9,7 +9,7 @@ test("A comment draft survives following a subtask", async ({ page }) => {
   const task = await api.create("/tasks/", { title: "Move house" })
   await api.create("/tasks/", { title: "Pack the books", parent_id: task.id })
 
-  await page.goto(`/tasks?view=table&task=${task.id}`)
+  await page.goto(`/tasks?task=${task.id}`)
   const panel = page.getByRole("complementary", { name: "Move house" })
   const draft = panel.getByPlaceholder("Write a comment…")
   await draft.fill("Movers booked for the 12th, still need")
@@ -49,7 +49,7 @@ test("Opening a task fetches its files once, with the rest of the task", async (
   page.on("request", (r) => {
     if (r.url().includes("/attachments/")) attachmentRequests.push(r.url())
   })
-  await page.goto(`/tasks?view=table&task=${task.id}`)
+  await page.goto(`/tasks?task=${task.id}`)
   const panel = page.getByRole("complementary", { name: "Move house" })
   await expect(panel.getByRole("region", { name: "Activity" })).toBeVisible()
   await expect(

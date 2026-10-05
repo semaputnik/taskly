@@ -5,7 +5,13 @@ from fastapi.testclient import TestClient
 from sqlmodel import Session
 
 from app.core.config import settings
-from tests.utils.accounts import create_project, create_task_record, my_id
+from tests.utils.accounts import (
+    ALL_PERMISSIONS,
+    create_bot_user,
+    create_project,
+    create_task_record,
+    my_id,
+)
 from tests.utils.user import new_user_headers
 
 TODAY = date.today()
@@ -64,6 +70,53 @@ def test_filter_by_assignee_and_by_being_unassigned(
 
     assert _titles(client, headers, assignee_id=user_id) == ["Mine"]
     assert _titles(client, headers, unassigned=True) == ["Nobody's"]
+
+
+def test_filter_by_being_on_a_bot_user(client: TestClient, db: Session) -> None:
+    """
+    "On bot users" is one question across all of them, so a list can count the
+    work that is on its owner's integrations without asking after each.
+    """
+    headers = new_user_headers(client, db)
+    user_id = my_id(client, headers)
+    project_id = create_project(client, headers)
+    first = create_bot_user(
+        client,
+        headers,
+        project_ids=[project_id],
+        permissions=ALL_PERMISSIONS,
+        name="first-bot",
+    )
+    second = create_bot_user(
+        client,
+        headers,
+        project_ids=[project_id],
+        permissions=ALL_PERMISSIONS,
+        name="second-bot",
+    )
+
+    create_task_record(client, headers, "Mine", assignee_id=user_id)
+    create_task_record(client, headers, "Nobody's")
+    create_task_record(client, headers, "On first", assignee_id=first["id"])
+    create_task_record(client, headers, "On second", assignee_id=second["id"])
+
+    assert sorted(_titles(client, headers, assigned_to_bots=True)) == [
+        "On first",
+        "On second",
+    ]
+
+
+def test_being_on_a_bot_user_and_unassigned_at_once_is_refused(
+    client: TestClient, db: Session
+) -> None:
+    headers = new_user_headers(client, db)
+
+    r = client.get(
+        f"{settings.API_V1_STR}/tasks/",
+        headers=headers,
+        params={"assigned_to_bots": True, "unassigned": True},
+    )
+    assert r.status_code == 422
 
 
 def test_asking_for_an_assignee_and_unassigned_at_once_is_refused(
@@ -306,6 +359,23 @@ def test_sort_by_creation_date_is_newest_first(client: TestClient, db: Session) 
         "Middle",
         "Newest",
     ]
+
+
+def test_the_default_order_is_newest_filed_first(
+    client: TestClient, db: Session
+) -> None:
+    """
+    A request that names no sort gets the created order's natural direction,
+    so the list a person opens is the newest work first rather than the most
+    pressing (FR-06.4). Priority is still one request away.
+    """
+    headers = new_user_headers(client, db)
+    create_task_record(client, headers, "Old and urgent", priority="P1")
+    create_task_record(client, headers, "Middle")
+    create_task_record(client, headers, "New and idle", priority="P4")
+
+    assert _titles(client, headers) == ["New and idle", "Middle", "Old and urgent"]
+    assert _titles(client, headers, sort="priority")[0] == "Old and urgent"
 
 
 def test_the_other_orders_keep_the_direction_they_always_had(

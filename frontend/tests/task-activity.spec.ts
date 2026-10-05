@@ -1,5 +1,6 @@
 import { expect, type Page, test } from "@playwright/test"
 import { newUser, userApi } from "./utils/account"
+import { taskLine } from "./utils/tasks"
 
 test.use({ storageState: { cookies: [], origins: [] } })
 
@@ -43,7 +44,7 @@ async function taskWithBotWork(page: Page) {
 }
 
 const open = async (page: Page, taskId: string, title: string) => {
-  await page.goto(`/tasks?view=table&task=${taskId}`)
+  await page.goto(`/tasks?task=${taskId}`)
   const panel = page.getByRole("complementary", { name: title })
   const activity = panel.getByRole("region", { name: "Activity" })
   await expect(activity).toBeVisible()
@@ -142,9 +143,8 @@ test("An unsent comment survives closing the panel and opening the task again", 
   await expect(page.locator("[data-record-column]")).toHaveCount(0)
   // Opened again from the list, not by reloading the page: the draft is kept
   // for as long as the page is open.
-  await page
-    .getByRole("row", { name: /Fix the stylesheet/ })
-    .getByText("Fix the stylesheet")
+  await taskLine(page, "Fix the stylesheet")
+    .getByRole("link", { name: "Fix the stylesheet" })
     .click()
 
   await expect(

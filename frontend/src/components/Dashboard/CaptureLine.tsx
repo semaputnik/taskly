@@ -1,46 +1,56 @@
+import { useQuery } from "@tanstack/react-query"
 import { Plus } from "lucide-react"
 import { useState } from "react"
 
 import { useRecordPanels } from "@/components/Records/panels"
-import type { CaptureTarget } from "@/components/Tasks/capture"
+import { useCaptureTarget } from "@/components/Tasks/capture"
 import {
   useTaskCapture,
   useUndoCapture,
 } from "@/components/Tasks/useTaskWrites"
+import { projectsQuery } from "@/lib/serverState"
 import { toastCreated } from "@/lib/toasts"
 
-// The line is shown on the day page, which is narrowed to no project, so what
-// it writes lands in the Inbox (FR-05.4). A list narrowed to a project will
-// pass its own target here when the line appears there.
-const INBOX: CaptureTarget = { projectName: "Inbox" }
-
 /**
- * The frameless line at the top of the day page that a task is written
- * into: a plus, the field, and the key cap that does the same from anywhere.
+ * The frameless line at the top of a page that a task is written into: a
+ * plus, the field, and the key cap that does the same from anywhere.
+ *
+ * It writes into the project the page is narrowed to, and says so — "Add a
+ * task to Website relaunch…" — and into the Inbox otherwise (FR-05.4,
+ * FR-06.15). The day page is narrowed to no project, so there it is always
+ * the Inbox.
  *
  * Enter makes the task at once. A title alone is a complete task — Backlog,
- * in the Inbox, nothing else set — and it is one create request, so nothing
- * is held back for a second step (ADR-0005, amended). The line empties for
- * the next thought and a notice names what was made, with Open (its panel)
- * and Undo (which deletes it; the deletion is restorable from the activity
- * log). A task that needs a day, a priority or a project before it exists is
- * written in the full draft, which the `c` key, the navigation entry and the
- * phone's button open.
+ * in the project it is written into, nothing else set — and it is one create
+ * request, so nothing is held back for a second step (ADR-0005, amended). The
+ * line empties for the next thought and a notice names what was made, with
+ * Open (its panel) and Undo (which deletes it; the deletion is restorable
+ * from the activity log). A task that needs a day, a priority or another
+ * project before it exists is written in the full draft, which the `c` key
+ * and the phone's button open.
  */
 export function CaptureLine() {
   const panels = useRecordPanels()
   const undo = useUndoCapture()
   const [title, setTitle] = useState("")
-  const capture = useTaskCapture(INBOX, (task) =>
-    toastCreated(`“${task.title}” created in ${INBOX.projectName}`, {
+  const target = useCaptureTarget()
+  // A page narrowed to a project knows the project's name only once the
+  // projects have come: words committed before then would go to the Inbox
+  // under a line that already says the project's name. The line holds them
+  // until it knows where they go.
+  const { isPending: projectsPending } = useQuery(projectsQuery())
+  const settling = Boolean(panels.filteredProjectId) && projectsPending
+  const capture = useTaskCapture(target, (task) =>
+    toastCreated(`“${task.title}” created in ${target.projectName}`, {
       open: () => panels.openTask(task.id),
       undo: () => void undo(task),
     }),
   )
+  const where = target.projectId ? ` to ${target.projectName}` : ""
 
   const commit = async () => {
     const typed = title.trim()
-    if (!typed) return
+    if (!typed || settling) return
     // The line is free for the next thought while this one is on its way.
     setTitle("")
     // The same title again while it is still being written is the one refusal
@@ -58,8 +68,8 @@ export function CaptureLine() {
       <Plus aria-hidden className="size-4 shrink-0" strokeWidth={1.5} />
       <input
         type="text"
-        aria-label="Add a task"
-        placeholder="Add a task…"
+        aria-label={`Add a task${where}`}
+        placeholder={`Add a task${where}…`}
         value={title}
         onChange={(event) => setTitle(event.target.value)}
         onKeyDown={(event) => {

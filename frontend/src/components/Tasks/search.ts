@@ -50,11 +50,8 @@ export const taskSearchSchema = z.object({
   // The page of results being read. Like the sort, it is not a filter: it is
   // where in the results the reader is.
   page: z.number().int().min(1).optional().catch(undefined),
-  // How the rows are drawn: two-line compact rows, or the table, which is
-  // the one named in the URL since compact is what the list opens in. Neither
-  // a filter nor an order, so switching it keeps the page and the selection's
-  // filters as they are.
-  view: z.literal("table").optional().catch(undefined),
+  // A `view` from the days of the table is not part of this schema: the
+  // object drops what it does not name, so an old address opens the lines.
 })
 
 export type TaskSearch = z.infer<typeof taskSearchSchema>
@@ -119,9 +116,4 @@ export const NATURAL_ORDER: Record<
   due_date: "asc",
   priority: "asc",
   created_at: "desc",
-}
-
-/** Whether the list is in compact rows, which it opens in unless told otherwise. */
-export function isCompact(search: Pick<TaskSearch, "view">): boolean {
-  return search.view !== "table"
 }

@@ -110,6 +110,7 @@ function BotTasks({ bot }: { bot: BotUserPublic }) {
   const query = {
     assignee_id: bot.id,
     status: OPEN_STATUSES,
+    sort: "priority" as const,
     skip: 0,
     limit: PREVIEW,
   }

@@ -1,51 +1,32 @@
 import { useQuery } from "@tanstack/react-query"
 import { createFileRoute, Link as RouterLink } from "@tanstack/react-router"
-import { CheckCheck, CheckSquare, SearchX } from "lucide-react"
-import { useEffect, useRef, useState } from "react"
+import { useEffect } from "react"
 
-import { type TaskPublic, TasksService } from "@/client"
-import { DataTable } from "@/components/Common/DataTable"
-import { EmptyState } from "@/components/Common/EmptyState"
-import { useRecordPanels, withoutPanelState } from "@/components/Records/panels"
+import { CaptureLine } from "@/components/Dashboard/CaptureLine"
+import { textLink } from "@/components/Dashboard/shared"
+import { withoutPanelState } from "@/components/Records/panels"
+import { useRecordList } from "@/components/Records/walk"
 import {
   CompactTaskRow,
   CompactTaskRowPending,
 } from "@/components/Tasks/CompactTaskRow"
-import { getColumns } from "@/components/Tasks/columns"
+import { chooseOrder } from "@/components/Tasks/listWords"
 import {
   clearedFilters,
-  FILTER_KEYS,
   hasActiveFilters,
-  isCompact,
   listedStatuses,
-  NATURAL_ORDER,
   type TaskListSearch,
   type TaskSearch,
   taskSearchSchema,
 } from "@/components/Tasks/search"
-import { TaskBulkActions } from "@/components/Tasks/TaskBulkActions"
+import { TaskCounts } from "@/components/Tasks/TaskCounts"
 import { TaskFilters } from "@/components/Tasks/TaskFilters"
 import { buildTaskTree } from "@/components/Tasks/tree"
-import { Button } from "@/components/ui/button"
 import useAuth from "@/hooks/useAuth"
 import { projectsQuery, tasksQuery } from "@/lib/serverState"
-import { toastError } from "@/lib/toasts"
+import { cn } from "@/lib/utils"
 
 const PAGE_SIZE = 25
-
-// What one batch can carry, matching the API's own limit on a batch's ids.
-const MAX_BATCH = 500
-
-// One empty set, so a cleared selection is the same value every render.
-const EMPTY: ReadonlySet<string> = new Set()
-
-// Which column sorts by what. Only these three order the list; the rest are
-// read, not scanned in order.
-const SORT_FIELDS = {
-  due_date: "due_date",
-  priority: "priority",
-  created_at: "created_at",
-}
 
 /** What the list's filters ask the API for, before any paging. */
 function filtersQuery(search: TaskListSearch, currentUserId?: string) {
@@ -53,11 +34,13 @@ function filtersQuery(search: TaskListSearch, currentUserId?: string) {
     assignee,
     reporter,
     page: _page,
-    view: _view,
     ...filters
   } = withoutPanelState(search)
   return {
     ...filters,
+    // A direction means something only for an order that was named: the
+    // list's own order has none to reverse.
+    order: search.sort ? search.order : undefined,
     // Open work, always: the list holds what is left to do, and finished
     // work is read in the activity log (ADR-0006). A chosen status narrows
     // within that rather than reaching outside it.
@@ -90,39 +73,21 @@ export const Route = createFileRoute("/_layout/tasks")({
 })
 
 /**
- * The task list: the product's triage surface.
+ * The task list: the product's triage surface, as one view of lines.
  *
- * The dashboard answers "what needs me now". This answers the question only a
- * table can — working through many tasks at once — so it pages and sorts on
- * the server, where the truth about "many" lives, and its rows can be selected
- * and acted on as a batch.
+ * The day page answers "what needs me now". This is where everything else is
+ * managed — Backlog, work on bot users, a project's whole list — so it pages
+ * and orders on the server, where the truth about "many" lives. It opens
+ * newest filed first with each subtask under its root task; an order the
+ * reader chooses puts every task at its own place instead (FR-06.4, FR-06.5).
+ * A change to many tasks at once is a bot user's, through the REST API; the
+ * page has no selection.
  */
 function Tasks() {
   const search = Route.useSearch()
   const navigate = Route.useNavigate()
-  const { openTask, capture } = useRecordPanels()
   const { user: currentUser } = useAuth()
   const page = search.page ?? 1
-
-  // Which tasks are selected, gathered across pages of one filter set. A
-  // selection outlives paging, because a batch is often collected page by
-  // page — and it is dropped the moment the filters change, because nobody
-  // should act on tasks they can no longer see (stories 16, 17). The filters
-  // it belongs to are held with it, and compared while rendering, so there is
-  // no window in which the bar offers to act on tasks that are gone.
-  const filterKey = JSON.stringify(FILTER_KEYS.map((key) => search[key]))
-  const [selection, setSelection] = useState({
-    filters: filterKey,
-    ids: new Set<string>(),
-  })
-  const selected = selection.filters === filterKey ? selection.ids : EMPTY
-  const setSelected = (next: (ids: Set<string>) => Set<string>) =>
-    setSelection((previous) => ({
-      filters: filterKey,
-      ids: next(previous.filters === filterKey ? previous.ids : new Set()),
-    }))
-  const clearSelection = () =>
-    setSelection({ filters: filterKey, ids: new Set() })
 
   // Filtering by "me" needs the id to filter on: listing before it arrives
   // would show everything, which is the opposite of what was asked for.
@@ -132,7 +97,7 @@ function Tasks() {
   const { data: tasks, isPending } = useQuery({
     ...tasksQuery({
       ...filters,
-      // The page the reader is on, asked for as such: a table that fetches a
+      // The page the reader is on, asked for as such: a list that fetches a
       // window and then pages it in the browser can only page what it
       // fetched, and would report that window as the total.
       skip: (page - 1) * PAGE_SIZE,
@@ -143,6 +108,7 @@ function Tasks() {
   const { data: projects } = useQuery(projectsQuery())
 
   const count = tasks?.count ?? 0
+  const lastPage = Math.max(1, Math.ceil(count / PAGE_SIZE))
   const noFilters = !hasActiveFilters(search)
   // An empty list is two different things, and only the API can tell them
   // apart: no tasks at all, or nothing left open. The question is asked only
@@ -156,7 +122,7 @@ function Tasks() {
 
   const applyFilters = (next: Partial<TaskSearch>) =>
     // Any change to what is being shown returns to the first page: the page
-    // a reader was on may not exist under the new filters (story 10).
+    // a reader was on may not exist under the new filters.
     navigate({
       search: (previous) => ({ ...previous, ...next, page: undefined }),
     })
@@ -167,30 +133,13 @@ function Tasks() {
         page: next === 1 ? undefined : next,
       }),
     })
-  // The view is how the rows are drawn, so it keeps the page the reader is on.
-  const setView = (view: TaskSearch["view"]) =>
-    navigate({ search: (previous) => ({ ...previous, view }) })
-  const sortBy = (field: string) =>
+  const sortBy = (sort: NonNullable<TaskSearch["sort"]> | undefined) =>
     navigate({
-      search: (previous) => {
-        const sort = field as NonNullable<TaskSearch["sort"]>
-        const natural = NATURAL_ORDER[sort]
-        // The first click on a header gives that order its natural direction;
-        // the same header again reverses it, so direction costs no control of
-        // its own (story 6). Only the reversal is written down.
-        const reversed =
-          previous.sort === sort && (previous.order ?? natural) === natural
-        return {
-          ...previous,
-          sort,
-          order: reversed
-            ? natural === "asc"
-              ? ("desc" as const)
-              : ("asc" as const)
-            : undefined,
-          page: undefined,
-        }
-      },
+      search: (previous) => ({
+        ...previous,
+        ...chooseOrder(previous, sort),
+        page: undefined,
+      }),
     })
 
   // Closing the last task on the last page leaves the reader standing on a
@@ -201,245 +150,181 @@ function Tasks() {
     if (tasks && page > lastPage) goToPage(lastPage)
   })
 
-  // Every task this list has shown, so a batch can be checked against what
-  // the selected tasks are before it is sent — a selection outlives pages.
-  const seen = useRef(new Map<string, TaskPublic>())
-  for (const task of tasks?.data ?? []) seen.current.set(task.id, task)
-
-  const lastPage = Math.max(1, Math.ceil(count / PAGE_SIZE))
   const projectNames = Object.fromEntries(
     (projects?.data ?? []).map((project) => [project.id, project.name]),
   )
   // Nesting subtasks under their parents would reorder what the server just
-  // sorted, so an explicit sort gets a flat list: the reader asked for that
+  // sorted, so a chosen order gets a flat list: the reader asked for that
   // order, not for the tree.
-  const rows: TaskPublic[] = tasks
-    ? search.sort
-      ? tasks.data
-      : buildTaskTree(tasks.data).tasks
-    : []
-  const depths = tasks && !search.sort ? buildTaskTree(tasks.data).depths : {}
-
-  const empty = hasActiveFilters(search) ? (
-    <EmptyState
-      icon={SearchX}
-      title="No tasks match these filters"
-      description="Every filter narrows the list further. Widen one, or start over."
-      action={
-        <Button
-          variant="outline"
-          onClick={() => applyFilters(clearedFilters())}
-        >
-          Clear filters
-        </Button>
-      }
-    />
-  ) : finished && finished.count > 0 ? (
-    // Nothing open, but work has been done: saying "no tasks yet" here would
-    // tell someone who has just cleared their list that they have never had
-    // one. What they finished is in the activity log (ADR-0006).
-    <EmptyState
-      icon={CheckCheck}
-      title="Nothing left open"
-      description="Everything here is done. What you finished is kept in the activity log."
-      action={
-        <div className="flex flex-wrap items-center justify-center gap-2">
-          <Button onClick={() => capture("task")}>Add a task</Button>
-          <Button variant="outline" asChild>
-            <RouterLink to="/activity" search={{ kind: "completed" as const }}>
-              See what you finished
-            </RouterLink>
-          </Button>
-        </div>
-      }
-    />
-  ) : (
-    <EmptyState
-      icon={CheckSquare}
-      title="No tasks yet"
-      description="Writing one down takes a title — or let a bot user file them for you through the REST API."
-      action={
-        <div className="flex flex-wrap items-center justify-center gap-2">
-          <Button onClick={() => capture("task")}>Add a task</Button>
-          <Button variant="outline" asChild>
-            <RouterLink to="/bots">Set up a bot user</RouterLink>
-          </Button>
-        </div>
-      }
-    />
+  const tree = tasks && !search.sort ? buildTaskTree(tasks.data) : undefined
+  const rows = tasks ? (tree?.tasks ?? tasks.data) : []
+  // The column walks the list in the order the lines are drawn in, so Down
+  // from a task opens the line beneath it.
+  useRecordList(
+    0,
+    rows.map((task) => task.id),
   )
+  const pending = isPending || waitingForMe
 
   return (
-    <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Tasks</h1>
-        <p className="text-muted-foreground">Everything you need to get done</p>
+    <div className="max-w-[820px]">
+      <div className="mb-6 md:mb-7">
+        <CaptureLine />
       </div>
+      <h1 className="mb-1 text-[22px] leading-[1.2] font-semibold tracking-[-0.015em]">
+        Tasks
+      </h1>
+      <TaskCounts />
 
-      <TaskFilters
-        search={search}
-        onChange={applyFilters}
-        onViewChange={setView}
-      />
+      <TaskFilters search={search} onChange={applyFilters} onOrder={sortBy} />
 
-      {/* Choosing many is the table's job: compact rows cannot show what is
-          selected, so the bar waits until the table is back. */}
-      {selected.size > 0 && !isCompact(search) && (
-        <TaskBulkActions
-          selected={[...selected]}
-          known={[...selected].flatMap((id) => seen.current.get(id) ?? [])}
-          projects={projects?.data ?? []}
-          onDone={clearSelection}
-          onClear={clearSelection}
-          // "Everything on this page" and "everything that matches" are
-          // different acts, so the bar says which one is in force and offers
-          // the other rather than guessing (story 13).
-          matching={count}
-          pageIsWhollySelected={
-            rows.length > 0 && rows.every((task) => selected.has(task.id))
-          }
-          onSelectAllMatching={async () => {
-            try {
-              const all = await TasksService.readTasks({
-                query: { ...filters, skip: 0, limit: MAX_BATCH },
-              })
-              const matched = all.data?.data ?? []
-              for (const task of matched) seen.current.set(task.id, task)
-              setSelected(() => new Set(matched.map((task) => task.id)))
-            } catch (error) {
-              toastError(error)
-            }
-          }}
-        />
-      )}
-
-      {isCompact(search) ? (
-        <CompactList
-          tasks={rows}
-          projectNames={projectNames}
-          pending={isPending || waitingForMe}
-          pendingRows={Math.min(PAGE_SIZE, Math.max(count, 5)) || 5}
-          empty={empty}
-        />
+      {pending ? (
+        <div aria-hidden>
+          {Array.from({
+            length: Math.min(PAGE_SIZE, Math.max(count, 5)) || 5,
+          }).map((_, index) => (
+            <CompactTaskRowPending key={index} flush />
+          ))}
+        </div>
+      ) : rows.length > 0 ? (
+        // A list, so assistive technology hears how many tasks there are and
+        // where each begins.
+        <ul aria-label="Tasks">
+          {rows.map((task) => (
+            <CompactTaskRow
+              key={task.id}
+              task={task}
+              projectName={projectNames[task.project_id]}
+              depth={tree?.depths[task.id]}
+              receipt
+              flush
+              asItem
+            />
+          ))}
+        </ul>
       ) : (
-        <DataTable
-          scrollLabel="Tasks, scrollable sideways"
-          columns={getColumns(projectNames, depths, { receipt: true })}
-          data={rows}
-          pending={isPending || waitingForMe}
-          pendingRows={Math.min(PAGE_SIZE, Math.max(count, 5)) || 5}
-          rowLabel={(task) => `Open ${task.title}`}
-          opens="task"
-          onRowClick={(task) => openTask(task.id)}
-          selection={{
-            ids: selected,
-            idOf: (task) => task.id,
-            label: (task) => `Select ${task.title}`,
-            onToggle: (id, isSelected) =>
-              setSelected((previous) => {
-                const next = new Set(previous)
-                if (isSelected) next.add(id)
-                else next.delete(id)
-                return next
-              }),
-            onTogglePage: (ids, isSelected) =>
-              setSelected((previous) => {
-                const next = new Set(previous)
-                for (const id of ids) {
-                  if (isSelected) next.add(id)
-                  else next.delete(id)
-                }
-                return next
-              }),
-          }}
-          sorting={{
-            fields: SORT_FIELDS,
-            field: search.sort,
-            descending: search.sort
-              ? (search.order ?? NATURAL_ORDER[search.sort]) === "desc"
-              : false,
-            onSort: sortBy,
-          }}
-          empty={empty}
+        <Empty
+          filtered={hasActiveFilters(search)}
+          finished={(finished?.count ?? 0) > 0}
+          onClear={() => applyFilters(clearedFilters())}
         />
       )}
 
       {count > 0 && (
-        <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="text-ink-3 flex items-center gap-[18px] pt-3.5 text-[13px]">
           {/* The number the server counted under these filters, not the size
-              of the window that was fetched (story 1). */}
-          <p aria-live="polite" className="text-muted-foreground text-sm">
+              of the window that was fetched. */}
+          <p aria-live="polite">
             {count === 1 ? "1 task" : `${count} tasks`}
             {count > PAGE_SIZE && ` · page ${page} of ${lastPage}`}
           </p>
-          {count > PAGE_SIZE && (
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={page <= 1}
-                onClick={() => goToPage(page - 1)}
-              >
-                Previous
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={page >= lastPage}
-                onClick={() => goToPage(page + 1)}
-              >
-                Next
-              </Button>
-            </div>
-          )}
+          <div className="ml-auto flex gap-3.5">
+            <PagerButton
+              disabled={page <= 1}
+              onClick={() => goToPage(page - 1)}
+            >
+              Previous
+            </PagerButton>
+            <PagerButton
+              disabled={page >= lastPage}
+              onClick={() => goToPage(page + 1)}
+            >
+              Next
+            </PagerButton>
+          </div>
         </div>
       )}
     </div>
   )
 }
 
-/**
- * The list as compact rows: the same page, filters and order as the table,
- * in the row the dashboard uses. It reads and closes tasks; choosing many at
- * once is the table's job, so it has no selection of its own.
- */
-function CompactList({
-  tasks,
-  projectNames,
-  pending,
-  pendingRows,
-  empty,
+function PagerButton({
+  disabled,
+  onClick,
+  children,
 }: {
-  tasks: TaskPublic[]
-  projectNames: Record<string, string>
-  pending: boolean
-  pendingRows: number
-  empty: React.ReactNode
+  disabled: boolean
+  onClick: () => void
+  children: React.ReactNode
 }) {
   return (
-    <div className="bg-card overflow-hidden rounded-lg border">
-      {pending ? (
-        Array.from({ length: pendingRows }).map((_, index) => (
-          <CompactTaskRowPending key={index} />
-        ))
-      ) : tasks.length > 0 ? (
-        // A list, so assistive technology hears how many tasks there are and
-        // where each begins. Each row sits alone in its item, so the last
-        // row's rule is taken off here rather than by the row itself.
-        <ul aria-label="Tasks" className="[&>li:last-child>div]:border-b-0">
-          {tasks.map((task) => (
-            <li key={task.id}>
-              <CompactTaskRow
-                task={task}
-                projectName={projectNames[task.project_id]}
-                receipt
-              />
-            </li>
-          ))}
-        </ul>
-      ) : (
-        empty
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      className={cn(
+        textLink,
+        "hover:text-ink focus-visible:text-ink disabled:pointer-events-none disabled:opacity-40",
       )}
+    >
+      {children}
+    </button>
+  )
+}
+
+/**
+ * What the page says when the list is empty, in its own words. Three cases
+ * that need three different sentences: the filters excluded everything, which
+ * calls for a way to undo them; everything is done, which says where the done
+ * work went (ADR-0006); and nothing was ever written down, which says how to
+ * begin.
+ */
+function Empty({
+  filtered,
+  finished,
+  onClear,
+}: {
+  filtered: boolean
+  finished: boolean
+  onClear: () => void
+}) {
+  const [title, body] = filtered
+    ? [
+        "No tasks match these filters",
+        <>
+          Every filter narrows the list further. Widen one, or{" "}
+          <button
+            type="button"
+            onClick={onClear}
+            className={cn(textLink, "text-ink underline")}
+          >
+            clear them all
+          </button>
+          .
+        </>,
+      ]
+    : finished
+      ? [
+          "Nothing left open",
+          <>
+            Everything here is done. What you finished is kept in the{" "}
+            <RouterLink
+              to="/activity"
+              search={{ kind: "completed" as const }}
+              className={cn(textLink, "text-ink underline")}
+            >
+              activity log
+            </RouterLink>
+            .
+          </>,
+        ]
+      : [
+          "No tasks yet",
+          <>
+            Writing one down takes a title: type it in the line above. Or let a
+            bot user file them for you through the REST API.{" "}
+            <RouterLink
+              to="/bots"
+              className={cn(textLink, "text-ink underline")}
+            >
+              Set up a bot user
+            </RouterLink>
+          </>,
+        ]
+  return (
+    <div className="border-rule border-b py-8">
+      <p className="font-medium">{title}</p>
+      <p className="text-ink-3 mt-1 max-w-prose text-pretty">{body}</p>
     </div>
   )
 }

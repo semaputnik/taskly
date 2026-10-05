@@ -1835,6 +1835,10 @@ export type tasksReadTasksData = {
          */
         unassigned?: boolean;
         /**
+         * Assigned To Bots
+         */
+        assigned_to_bots?: boolean;
+        /**
          * Reporter Id
          */
         reporter_id?: string | null;

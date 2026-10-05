@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test"
-import { openCaptured } from "./utils/capture"
+import { openCaptured, openDraft } from "./utils/capture"
 import { randomEmail } from "./utils/random"
+import { chooseFilter, taskLine } from "./utils/tasks"
 import { logInUser } from "./utils/user"
 
 test.use({ storageState: { cookies: [], origins: [] } })
@@ -28,10 +29,10 @@ test("A task is assigned to a bot user from the task form and found by it", asyn
   )
   expect(created.ok()).toBe(true)
 
-  await page.goto("/tasks?view=table")
+  await page.goto("/tasks")
   // Captured in one field, then assigned in the panel that capture leaves
   // open — the same controls that edit a task any other day.
-  await page.getByRole("button", { name: "Add a task" }).first().click()
+  await openDraft(page)
   const title = page.getByRole("textbox", { name: "Task title" })
   await title.fill("Sort the inbox")
   await title.press("Enter")
@@ -44,7 +45,7 @@ test("A task is assigned to a bot user from the task form and found by it", asyn
   )
   await page.keyboard.press("Escape")
 
-  await page.getByRole("button", { name: "Add a task" }).first().click()
+  await openDraft(page)
   await title.fill("Call the bank")
   await title.press("Enter")
   await openCaptured(page)
@@ -52,12 +53,10 @@ test("A task is assigned to a bot user from the task form and found by it", asyn
     page.getByRole("complementary", { name: "Call the bank" }),
   ).toBeVisible()
   await page.keyboard.press("Escape")
-  await expect(page.getByRole("row", { name: /Call the bank/ })).toBeVisible()
+  await expect(taskLine(page, "Call the bank")).toBeVisible()
 
-  await page.getByRole("button", { name: "Filters" }).click()
-  await page.getByRole("combobox", { name: "Assignee" }).click()
-  await page.getByRole("option", { name: "Triage bot" }).click()
+  await chooseFilter(page, "Anyone", "Triage bot")
   await expect(page).toHaveURL(/assignee=/)
-  await expect(page.getByRole("row", { name: /Sort the inbox/ })).toBeVisible()
-  await expect(page.getByRole("row", { name: /Call the bank/ })).toHaveCount(0)
+  await expect(taskLine(page, "Sort the inbox")).toBeVisible()
+  await expect(taskLine(page, "Call the bank")).toHaveCount(0)
 })
