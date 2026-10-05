@@ -108,8 +108,8 @@ for (const [theme, tokens] of Object.entries(themes)) {
   })
 }
 
-test("the teal accent is retired", () => {
-  // Signal Teal sat at hue 182 in OKLCH; no colour of that family remains.
+test("no accent marks location", () => {
+  // Colour is kept for state that asks for action. The previous system's
+  // accent sat at hue 18x in OKLCH; no colour of that family returns.
   expect(css).not.toMatch(/oklch\([^)]*\b18\d(\.\d+)?\s*\)/)
-  expect(css).not.toContain("teal")
 })

@@ -1,457 +1,667 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-09-15T21:45:03.295842Z",
+  "generatedAt": "2026-10-05T02:16:40Z",
   "title": "Design System: Taskly",
   "extensions": {
     "colorMeta": {
-      "ground": {
+      "page": {
         "role": "neutral",
-        "displayName": "Ground",
-        "canonical": "oklch(0.97 0 0)"
-      },
-      "signal-teal": {
-        "role": "primary",
-        "displayName": "Signal Teal",
-        "canonical": "oklch(0.5982 0.10687 182.4689)",
+        "displayName": "Page",
+        "canonical": "#ffffff",
+        "oklch": "oklch(100.0% 0.0000 89.9)",
         "tonalRamp": [
-          "oklch(0.15 0.03742 182.4689)",
-          "oklch(0.27 0.05601 182.4689)",
-          "oklch(0.38 0.07306 182.4689)",
-          "oklch(0.5 0.09165 182.4689)",
-          "oklch(0.6 0.10659 182.4689)",
-          "oklch(0.71 0.08955 182.4689)",
-          "oklch(0.83 0.07095 182.4689)",
-          "oklch(0.95 0.05235 182.4689)"
+          "oklch(15.0% 0.0000 89.9)",
+          "oklch(26.0% 0.0000 89.9)",
+          "oklch(37.0% 0.0000 89.9)",
+          "oklch(48.0% 0.0000 89.9)",
+          "oklch(59.0% 0.0000 89.9)",
+          "oklch(70.0% 0.0000 89.9)",
+          "oklch(82.0% 0.0000 89.9)",
+          "oklch(95.0% 0.0000 89.9)"
         ]
       },
-      "signal-teal-lifted": {
-        "role": "primary",
-        "displayName": "Signal Teal (Dark Calibration)",
-        "canonical": "oklch(0.65 0.10687 182.4689)",
+      "raised": {
+        "role": "neutral",
+        "displayName": "Raised",
+        "canonical": "#ffffff",
+        "oklch": "oklch(100.0% 0.0000 89.9)",
         "tonalRamp": [
-          "oklch(0.15 0.03742 182.4689)",
-          "oklch(0.27 0.05601 182.4689)",
-          "oklch(0.38 0.07306 182.4689)",
-          "oklch(0.5 0.09165 182.4689)",
-          "oklch(0.6 0.10659 182.4689)",
-          "oklch(0.71 0.08955 182.4689)",
-          "oklch(0.83 0.07095 182.4689)",
-          "oklch(0.95 0.05235 182.4689)"
+          "oklch(15.0% 0.0000 89.9)",
+          "oklch(26.0% 0.0000 89.9)",
+          "oklch(37.0% 0.0000 89.9)",
+          "oklch(48.0% 0.0000 89.9)",
+          "oklch(59.0% 0.0000 89.9)",
+          "oklch(70.0% 0.0000 89.9)",
+          "oklch(82.0% 0.0000 89.9)",
+          "oklch(95.0% 0.0000 89.9)"
         ]
       },
-      "alert-red": {
-        "role": "tertiary",
-        "displayName": "Alert Red",
-        "canonical": "oklch(0.577 0.245 27.325)",
+      "hover": {
+        "role": "neutral",
+        "displayName": "Hover",
+        "canonical": "#f3f4f6",
+        "oklch": "oklch(96.7% 0.0029 264.5)",
         "tonalRamp": [
-          "oklch(0.15 0.09331 27.325)",
-          "oklch(0.27 0.13594 27.325)",
-          "oklch(0.38 0.17502 27.325)",
-          "oklch(0.5 0.21765 27.325)",
-          "oklch(0.6 0.23683 27.325)",
-          "oklch(0.71 0.19775 27.325)",
-          "oklch(0.83 0.15512 27.325)",
-          "oklch(0.95 0.11249 27.325)"
-        ]
-      },
-      "alert-red-lifted": {
-        "role": "tertiary",
-        "displayName": "Alert Red (Dark Calibration)",
-        "canonical": "oklch(0.704 0.191 22.216)",
-        "tonalRamp": [
-          "oklch(0.15 0.07271 22.216)",
-          "oklch(0.27 0.10595 22.216)",
-          "oklch(0.38 0.13641 22.216)",
-          "oklch(0.5 0.16965 22.216)",
-          "oklch(0.6 0.18455 22.216)",
-          "oklch(0.71 0.19071 22.216)",
-          "oklch(0.83 0.15471 22.216)",
-          "oklch(0.95 0.11315 22.216)"
+          "oklch(15.0% 0.0029 264.5)",
+          "oklch(26.0% 0.0029 264.5)",
+          "oklch(37.0% 0.0029 264.5)",
+          "oklch(48.0% 0.0029 264.5)",
+          "oklch(59.0% 0.0029 264.5)",
+          "oklch(70.0% 0.0029 264.5)",
+          "oklch(82.0% 0.0029 264.5)",
+          "oklch(95.0% 0.0029 264.5)"
         ]
       },
       "ink": {
-        "role": "neutral",
+        "role": "primary",
         "displayName": "Ink",
-        "canonical": "oklch(0.145 0 0)",
+        "canonical": "#0b0e11",
+        "oklch": "oklch(16.2% 0.0080 248.3)",
         "tonalRamp": [
-          "oklch(0.15 0 0)",
-          "oklch(0.27 0 0)",
-          "oklch(0.38 0 0)",
-          "oklch(0.5 0 0)",
-          "oklch(0.6 0 0)",
-          "oklch(0.71 0 0)",
-          "oklch(0.83 0 0)",
-          "oklch(0.95 0 0)"
+          "oklch(15.0% 0.0080 248.3)",
+          "oklch(26.0% 0.0080 248.3)",
+          "oklch(37.0% 0.0080 248.3)",
+          "oklch(48.0% 0.0080 248.3)",
+          "oklch(59.0% 0.0080 248.3)",
+          "oklch(70.0% 0.0080 248.3)",
+          "oklch(82.0% 0.0080 248.3)",
+          "oklch(95.0% 0.0080 248.3)"
         ]
       },
-      "ink-strong": {
+      "ink-2": {
         "role": "neutral",
-        "displayName": "Ink Strong",
-        "canonical": "oklch(0.205 0 0)"
+        "displayName": "Ink 2",
+        "canonical": "#3d444d",
+        "oklch": "oklch(38.4% 0.0179 254.7)",
+        "tonalRamp": [
+          "oklch(15.0% 0.0179 254.7)",
+          "oklch(26.0% 0.0179 254.7)",
+          "oklch(37.0% 0.0179 254.7)",
+          "oklch(48.0% 0.0179 254.7)",
+          "oklch(59.0% 0.0179 254.7)",
+          "oklch(70.0% 0.0179 254.7)",
+          "oklch(82.0% 0.0179 254.7)",
+          "oklch(95.0% 0.0179 254.7)"
+        ]
       },
-      "ink-muted": {
+      "ink-3": {
         "role": "neutral",
-        "displayName": "Ink Muted",
-        "canonical": "oklch(0.556 0 0)"
+        "displayName": "Ink 3",
+        "canonical": "#656d76",
+        "oklch": "oklch(53.1% 0.0172 251.3)",
+        "tonalRamp": [
+          "oklch(15.0% 0.0172 251.3)",
+          "oklch(26.0% 0.0172 251.3)",
+          "oklch(37.0% 0.0172 251.3)",
+          "oklch(48.0% 0.0172 251.3)",
+          "oklch(59.0% 0.0172 251.3)",
+          "oklch(70.0% 0.0172 251.3)",
+          "oklch(82.0% 0.0172 251.3)",
+          "oklch(95.0% 0.0172 251.3)"
+        ]
       },
-      "paper": {
+      "rule": {
         "role": "neutral",
-        "displayName": "Paper",
-        "canonical": "oklch(1 0 0)"
+        "displayName": "Rule",
+        "canonical": "#e6e8eb",
+        "oklch": "oklch(93.0% 0.0046 258.3)",
+        "tonalRamp": [
+          "oklch(15.0% 0.0046 258.3)",
+          "oklch(26.0% 0.0046 258.3)",
+          "oklch(37.0% 0.0046 258.3)",
+          "oklch(48.0% 0.0046 258.3)",
+          "oklch(59.0% 0.0046 258.3)",
+          "oklch(70.0% 0.0046 258.3)",
+          "oklch(82.0% 0.0046 258.3)",
+          "oklch(95.0% 0.0046 258.3)"
+        ]
       },
-      "panel": {
+      "rule-strong": {
         "role": "neutral",
-        "displayName": "Panel",
-        "canonical": "oklch(0.985 0 0)"
+        "displayName": "Rule Strong",
+        "canonical": "#c9cdd2",
+        "oklch": "oklch(84.7% 0.0082 253.9)",
+        "tonalRamp": [
+          "oklch(15.0% 0.0082 253.9)",
+          "oklch(26.0% 0.0082 253.9)",
+          "oklch(37.0% 0.0082 253.9)",
+          "oklch(48.0% 0.0082 253.9)",
+          "oklch(59.0% 0.0082 253.9)",
+          "oklch(70.0% 0.0082 253.9)",
+          "oklch(82.0% 0.0082 253.9)",
+          "oklch(95.0% 0.0082 253.9)"
+        ]
       },
-      "surface-quiet": {
-        "role": "neutral",
-        "displayName": "Surface Quiet",
-        "canonical": "oklch(0.97 0 0)"
+      "late": {
+        "role": "secondary",
+        "displayName": "Overdue Red",
+        "canonical": "#cf222e",
+        "oklch": "oklch(55.2% 0.2051 24.5)",
+        "tonalRamp": [
+          "oklch(15.0% 0.2051 24.5)",
+          "oklch(26.0% 0.2051 24.5)",
+          "oklch(37.0% 0.2051 24.5)",
+          "oklch(48.0% 0.2051 24.5)",
+          "oklch(59.0% 0.2051 24.5)",
+          "oklch(70.0% 0.2051 24.5)",
+          "oklch(82.0% 0.2051 24.5)",
+          "oklch(95.0% 0.2051 24.5)"
+        ]
       },
-      "hairline": {
-        "role": "neutral",
-        "displayName": "Hairline",
-        "canonical": "oklch(0.922 0 0)"
+      "done": {
+        "role": "secondary",
+        "displayName": "Done Green",
+        "canonical": "#1a7f37",
+        "oklch": "oklch(52.4% 0.1401 148.0)",
+        "tonalRamp": [
+          "oklch(15.0% 0.1401 148.0)",
+          "oklch(26.0% 0.1401 148.0)",
+          "oklch(37.0% 0.1401 148.0)",
+          "oklch(48.0% 0.1401 148.0)",
+          "oklch(59.0% 0.1401 148.0)",
+          "oklch(70.0% 0.1401 148.0)",
+          "oklch(82.0% 0.1401 148.0)",
+          "oklch(95.0% 0.1401 148.0)"
+        ]
       },
-      "focus-ring": {
-        "role": "neutral",
-        "displayName": "Focus Ring",
-        "canonical": "oklch(0.708 0 0)"
+      "priority-p1": {
+        "role": "secondary",
+        "displayName": "Priority P1 (Overdue Red)",
+        "canonical": "#cf222e",
+        "oklch": "oklch(55.2% 0.2051 24.5)",
+        "tonalRamp": [
+          "oklch(15.0% 0.2051 24.5)",
+          "oklch(26.0% 0.2051 24.5)",
+          "oklch(37.0% 0.2051 24.5)",
+          "oklch(48.0% 0.2051 24.5)",
+          "oklch(59.0% 0.2051 24.5)",
+          "oklch(70.0% 0.2051 24.5)",
+          "oklch(82.0% 0.2051 24.5)",
+          "oklch(95.0% 0.2051 24.5)"
+        ]
       },
-      "on-signal": {
-        "role": "neutral",
-        "displayName": "On Signal",
-        "canonical": "oklch(0.985 0 0)"
+      "priority-p2": {
+        "role": "tertiary",
+        "displayName": "Priority Amber",
+        "canonical": "#8a5c00",
+        "oklch": "oklch(51.2% 0.1079 75.1)",
+        "tonalRamp": [
+          "oklch(15.0% 0.1079 75.1)",
+          "oklch(26.0% 0.1079 75.1)",
+          "oklch(37.0% 0.1079 75.1)",
+          "oklch(48.0% 0.1079 75.1)",
+          "oklch(59.0% 0.1079 75.1)",
+          "oklch(70.0% 0.1079 75.1)",
+          "oklch(82.0% 0.1079 75.1)",
+          "oklch(95.0% 0.1079 75.1)"
+        ]
       },
-      "night-ground": {
-        "role": "neutral",
-        "displayName": "Night Ground",
-        "canonical": "oklch(0.145 0 0)"
+      "priority-p3": {
+        "role": "tertiary",
+        "displayName": "Priority Blue",
+        "canonical": "#0969da",
+        "oklch": "oklch(54.0% 0.1906 257.5)",
+        "tonalRamp": [
+          "oklch(15.0% 0.1906 257.5)",
+          "oklch(26.0% 0.1906 257.5)",
+          "oklch(37.0% 0.1906 257.5)",
+          "oklch(48.0% 0.1906 257.5)",
+          "oklch(59.0% 0.1906 257.5)",
+          "oklch(70.0% 0.1906 257.5)",
+          "oklch(82.0% 0.1906 257.5)",
+          "oklch(95.0% 0.1906 257.5)"
+        ]
       },
-      "night-panel": {
+      "scrim": {
         "role": "neutral",
-        "displayName": "Night Panel",
-        "canonical": "oklch(0.205 0 0)"
+        "displayName": "Scrim",
+        "canonical": "rgb(0 0 0 / 50%)"
       },
-      "night-quiet": {
+      "page-dark": {
         "role": "neutral",
-        "displayName": "Night Quiet",
-        "canonical": "oklch(0.269 0 0)"
+        "displayName": "Page (dark)",
+        "canonical": "#0f1115",
+        "oklch": "oklch(17.7% 0.0089 264.3)",
+        "tonalRamp": [
+          "oklch(15.0% 0.0089 264.3)",
+          "oklch(26.0% 0.0089 264.3)",
+          "oklch(37.0% 0.0089 264.3)",
+          "oklch(48.0% 0.0089 264.3)",
+          "oklch(59.0% 0.0089 264.3)",
+          "oklch(70.0% 0.0089 264.3)",
+          "oklch(82.0% 0.0089 264.3)",
+          "oklch(95.0% 0.0089 264.3)"
+        ]
       },
-      "night-ink": {
+      "raised-dark": {
         "role": "neutral",
-        "displayName": "Night Ink",
-        "canonical": "oklch(0.985 0 0)"
+        "displayName": "Raised (dark)",
+        "canonical": "#171a1f",
+        "oklch": "oklch(21.7% 0.0109 260.7)",
+        "tonalRamp": [
+          "oklch(15.0% 0.0109 260.7)",
+          "oklch(26.0% 0.0109 260.7)",
+          "oklch(37.0% 0.0109 260.7)",
+          "oklch(48.0% 0.0109 260.7)",
+          "oklch(59.0% 0.0109 260.7)",
+          "oklch(70.0% 0.0109 260.7)",
+          "oklch(82.0% 0.0109 260.7)",
+          "oklch(95.0% 0.0109 260.7)"
+        ]
       },
-      "night-ink-muted": {
+      "hover-dark": {
         "role": "neutral",
-        "displayName": "Night Ink Muted",
-        "canonical": "oklch(0.708 0 0)"
+        "displayName": "Hover (dark)",
+        "canonical": "#1e2228",
+        "oklch": "oklch(25.0% 0.0128 258.4)",
+        "tonalRamp": [
+          "oklch(15.0% 0.0128 258.4)",
+          "oklch(26.0% 0.0128 258.4)",
+          "oklch(37.0% 0.0128 258.4)",
+          "oklch(48.0% 0.0128 258.4)",
+          "oklch(59.0% 0.0128 258.4)",
+          "oklch(70.0% 0.0128 258.4)",
+          "oklch(82.0% 0.0128 258.4)",
+          "oklch(95.0% 0.0128 258.4)"
+        ]
       },
-      "night-hairline": {
+      "ink-dark": {
+        "role": "primary",
+        "displayName": "Ink (dark)",
+        "canonical": "#e9ecef",
+        "oklch": "oklch(94.2% 0.0052 247.9)",
+        "tonalRamp": [
+          "oklch(15.0% 0.0052 247.9)",
+          "oklch(26.0% 0.0052 247.9)",
+          "oklch(37.0% 0.0052 247.9)",
+          "oklch(48.0% 0.0052 247.9)",
+          "oklch(59.0% 0.0052 247.9)",
+          "oklch(70.0% 0.0052 247.9)",
+          "oklch(82.0% 0.0052 247.9)",
+          "oklch(95.0% 0.0052 247.9)"
+        ]
+      },
+      "ink-2-dark": {
         "role": "neutral",
-        "displayName": "Night Hairline",
-        "canonical": "oklch(1 0 0 / 10%)"
+        "displayName": "Ink 2 (dark)",
+        "canonical": "#c4c9d0",
+        "oklch": "oklch(83.4% 0.0112 256.7)",
+        "tonalRamp": [
+          "oklch(15.0% 0.0112 256.7)",
+          "oklch(26.0% 0.0112 256.7)",
+          "oklch(37.0% 0.0112 256.7)",
+          "oklch(48.0% 0.0112 256.7)",
+          "oklch(59.0% 0.0112 256.7)",
+          "oklch(70.0% 0.0112 256.7)",
+          "oklch(82.0% 0.0112 256.7)",
+          "oklch(95.0% 0.0112 256.7)"
+        ]
+      },
+      "ink-3-dark": {
+        "role": "neutral",
+        "displayName": "Ink 3 (dark)",
+        "canonical": "#8a8f98",
+        "oklch": "oklch(64.9% 0.0146 262.4)",
+        "tonalRamp": [
+          "oklch(15.0% 0.0146 262.4)",
+          "oklch(26.0% 0.0146 262.4)",
+          "oklch(37.0% 0.0146 262.4)",
+          "oklch(48.0% 0.0146 262.4)",
+          "oklch(59.0% 0.0146 262.4)",
+          "oklch(70.0% 0.0146 262.4)",
+          "oklch(82.0% 0.0146 262.4)",
+          "oklch(95.0% 0.0146 262.4)"
+        ]
+      },
+      "rule-dark": {
+        "role": "neutral",
+        "displayName": "Rule (dark)",
+        "canonical": "#23272d",
+        "oklch": "oklch(27.1% 0.0126 258.4)",
+        "tonalRamp": [
+          "oklch(15.0% 0.0126 258.4)",
+          "oklch(26.0% 0.0126 258.4)",
+          "oklch(37.0% 0.0126 258.4)",
+          "oklch(48.0% 0.0126 258.4)",
+          "oklch(59.0% 0.0126 258.4)",
+          "oklch(70.0% 0.0126 258.4)",
+          "oklch(82.0% 0.0126 258.4)",
+          "oklch(95.0% 0.0126 258.4)"
+        ]
+      },
+      "rule-strong-dark": {
+        "role": "neutral",
+        "displayName": "Rule Strong (dark)",
+        "canonical": "#353a42",
+        "oklch": "oklch(34.7% 0.0155 259.8)",
+        "tonalRamp": [
+          "oklch(15.0% 0.0155 259.8)",
+          "oklch(26.0% 0.0155 259.8)",
+          "oklch(37.0% 0.0155 259.8)",
+          "oklch(48.0% 0.0155 259.8)",
+          "oklch(59.0% 0.0155 259.8)",
+          "oklch(70.0% 0.0155 259.8)",
+          "oklch(82.0% 0.0155 259.8)",
+          "oklch(95.0% 0.0155 259.8)"
+        ]
+      },
+      "late-dark": {
+        "role": "secondary",
+        "displayName": "Overdue Red (dark)",
+        "canonical": "#f0616d",
+        "oklch": "oklch(67.7% 0.1762 18.1)",
+        "tonalRamp": [
+          "oklch(15.0% 0.1762 18.1)",
+          "oklch(26.0% 0.1762 18.1)",
+          "oklch(37.0% 0.1762 18.1)",
+          "oklch(48.0% 0.1762 18.1)",
+          "oklch(59.0% 0.1762 18.1)",
+          "oklch(70.0% 0.1762 18.1)",
+          "oklch(82.0% 0.1762 18.1)",
+          "oklch(95.0% 0.1762 18.1)"
+        ]
+      },
+      "done-dark": {
+        "role": "secondary",
+        "displayName": "Done Green (dark)",
+        "canonical": "#3fb950",
+        "oklch": "oklch(69.5% 0.1809 145.6)",
+        "tonalRamp": [
+          "oklch(15.0% 0.1809 145.6)",
+          "oklch(26.0% 0.1809 145.6)",
+          "oklch(37.0% 0.1809 145.6)",
+          "oklch(48.0% 0.1809 145.6)",
+          "oklch(59.0% 0.1809 145.6)",
+          "oklch(70.0% 0.1809 145.6)",
+          "oklch(82.0% 0.1809 145.6)",
+          "oklch(95.0% 0.1809 145.6)"
+        ]
+      },
+      "priority-p1-dark": {
+        "role": "secondary",
+        "displayName": "Priority P1 (Overdue Red) (dark)",
+        "canonical": "#f0616d",
+        "oklch": "oklch(67.7% 0.1762 18.1)",
+        "tonalRamp": [
+          "oklch(15.0% 0.1762 18.1)",
+          "oklch(26.0% 0.1762 18.1)",
+          "oklch(37.0% 0.1762 18.1)",
+          "oklch(48.0% 0.1762 18.1)",
+          "oklch(59.0% 0.1762 18.1)",
+          "oklch(70.0% 0.1762 18.1)",
+          "oklch(82.0% 0.1762 18.1)",
+          "oklch(95.0% 0.1762 18.1)"
+        ]
+      },
+      "priority-p2-dark": {
+        "role": "tertiary",
+        "displayName": "Priority Amber (dark)",
+        "canonical": "#e3a443",
+        "oklch": "oklch(76.2% 0.1335 74.7)",
+        "tonalRamp": [
+          "oklch(15.0% 0.1335 74.7)",
+          "oklch(26.0% 0.1335 74.7)",
+          "oklch(37.0% 0.1335 74.7)",
+          "oklch(48.0% 0.1335 74.7)",
+          "oklch(59.0% 0.1335 74.7)",
+          "oklch(70.0% 0.1335 74.7)",
+          "oklch(82.0% 0.1335 74.7)",
+          "oklch(95.0% 0.1335 74.7)"
+        ]
+      },
+      "priority-p3-dark": {
+        "role": "tertiary",
+        "displayName": "Priority Blue (dark)",
+        "canonical": "#6ea8ff",
+        "oklch": "oklch(72.9% 0.1411 258.3)",
+        "tonalRamp": [
+          "oklch(15.0% 0.1411 258.3)",
+          "oklch(26.0% 0.1411 258.3)",
+          "oklch(37.0% 0.1411 258.3)",
+          "oklch(48.0% 0.1411 258.3)",
+          "oklch(59.0% 0.1411 258.3)",
+          "oklch(70.0% 0.1411 258.3)",
+          "oklch(82.0% 0.1411 258.3)",
+          "oklch(95.0% 0.1411 258.3)"
+        ]
+      },
+      "scrim-dark": {
+        "role": "neutral",
+        "displayName": "Scrim (dark)",
+        "canonical": "rgb(0 0 0 / 80%)"
       }
     },
     "typographyMeta": {
       "display": {
-        "displayName": "Display",
-        "purpose": "The single page title per route, always paired with a muted subtitle."
+        "displayName": "Day Number",
+        "purpose": "The day of the month on the day page; one per screen."
+      },
+      "headline": {
+        "displayName": "Date Line",
+        "purpose": "Weekday, month and year beside the day number, in Ink 2."
       },
       "title": {
-        "displayName": "Title",
-        "purpose": "Dialog titles. Line-height 1 because a dialog title labels the dialog."
+        "displayName": "Task Title",
+        "purpose": "A task's title in its line."
       },
       "body": {
         "displayName": "Body",
-        "purpose": "The default for table cells, menu items, descriptions and helper text."
+        "purpose": "Default text: lede, log lines, capture field, empty-state sentences."
       },
-      "label": {
-        "displayName": "Label",
-        "purpose": "Form labels, button text, sidebar items, and the subject column of a table."
+      "wordmark": {
+        "displayName": "Wordmark",
+        "purpose": "The brand, Taskly, in the navigation and phone top bar; 36px on the auth screens."
       },
-      "micro": {
-        "displayName": "Micro",
-        "purpose": "Uppercase table column headers. The system's one micro-typographic signature."
+      "section-heading": {
+        "displayName": "Band Heading",
+        "purpose": "Overdue, Due today, In my hands, Changes; over a Rule Strong hairline."
+      },
+      "meta": {
+        "displayName": "Meta",
+        "purpose": "Meta line, group labels, hand-off line, text links, account row."
+      },
+      "mono": {
+        "displayName": "Figures",
+        "purpose": "Counts and log times only."
+      },
+      "key-cap": {
+        "displayName": "Key Cap",
+        "purpose": "The outlined C shortcut cap."
       }
     },
     "shadows": [
       {
-        "name": "seat",
-        "value": "0 1px 2px 0 rgb(0 0 0 / 0.05)",
-        "purpose": "Sub-perceptual seat under inputs, checkboxes and outline buttons. Part of the hairline tier, not a depth step."
-      },
-      {
-        "name": "raised",
-        "value": "0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)",
-        "purpose": "The active tab pill. The only in-page shadow, and it marks a selected state rather than a container."
-      },
-      {
-        "name": "menu",
+        "name": "floating",
         "value": "0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)",
-        "purpose": "Dropdown menus and select popovers."
+        "purpose": "Menus, selects, popovers: layers that have left the page."
       },
       {
-        "name": "float",
+        "name": "modal",
         "value": "0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)",
-        "purpose": "Dialogs and sheets \u2014 the top layer of the app, always over a 50% black scrim."
+        "purpose": "Dialogs and record sheets, with the scrim."
+      },
+      {
+        "name": "thumb-button",
+        "value": "0 6px 16px rgb(0 0 0 / 0.18)",
+        "purpose": "The phone Add button floating over scrolling content."
       }
     ],
     "motion": [
       {
-        "name": "ease-standard",
-        "value": "cubic-bezier(0.4, 0, 0.2, 1)",
-        "purpose": "The only easing in the system. Applies to every state transition."
-      },
-      {
-        "name": "duration-state",
-        "value": "150ms",
-        "purpose": "Hover, focus and colour transitions on controls."
-      },
-      {
-        "name": "duration-layer",
-        "value": "200ms",
-        "purpose": "Dialog and sheet enter/exit (fade plus 95%-to-100% zoom), and sidebar width changes."
+        "name": "color-transition",
+        "value": "150ms cubic-bezier(0.4, 0, 0.2, 1)",
+        "purpose": "Hover fills, the capture line's hairline turning ink on focus, the task line's hover tint."
       }
     ],
     "breakpoints": [
       {
         "name": "sm",
-        "value": "640px"
+        "value": "640px",
+        "purpose": "The task list's status menu shows its label from here."
       },
       {
         "name": "md",
-        "value": "768px"
-      },
-      {
-        "name": "lg",
-        "value": "1024px"
-      },
-      {
-        "name": "xl",
-        "value": "1280px"
-      },
-      {
-        "name": "content-max",
-        "value": "1280px"
-      },
-      {
-        "name": "sidebar",
-        "value": "256px"
-      },
-      {
-        "name": "sidebar-icon",
-        "value": "48px"
-      },
-      {
-        "name": "sidebar-mobile",
-        "value": "288px"
+        "value": "768px",
+        "purpose": "The shell switches from the top bar and phone Add button to the 200px navigation column."
       }
     ]
   },
   "components": [
     {
-      "name": "Primary Button",
-      "kind": "button",
-      "refersTo": "button-primary",
-      "description": "The single main action on a screen. Its teal fill is one of the three sanctioned uses of the accent.",
-      "html": "<button class=\"ds-btn-primary\">Add Task</button>",
-      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; height: 2.25rem; padding: 0.5rem 1rem; border: none; border-radius: 0.5rem; background: var(--primary, oklch(0.5982 0.10687 182.4689)); color: var(--primary-foreground, oklch(0.985 0 0)); font: 500 0.875rem/1.4286 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; white-space: nowrap; cursor: pointer; transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1); } .ds-btn-primary:hover { background: color-mix(in oklch, var(--primary, oklch(0.5982 0.10687 182.4689)) 90%, transparent); } .ds-btn-primary:focus-visible { outline: none; box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring, oklch(0.708 0 0)) 50%, transparent); }"
-    },
-    {
-      "name": "Outline Button",
-      "kind": "button",
-      "refersTo": "button-outline",
-      "description": "The default for anything that is not the page's single main action: pagination, sort direction, theme toggle.",
-      "html": "<button class=\"ds-btn-outline\">Clear filters</button>",
-      "css": ".ds-btn-outline { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; height: 2.25rem; padding: 0.5rem 1rem; border: 1px solid var(--border, oklch(0.922 0 0)); border-radius: 0.5rem; background: var(--background, oklch(1 0 0)); color: var(--foreground, oklch(0.145 0 0)); font: 500 0.875rem/1.4286 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05); white-space: nowrap; cursor: pointer; transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1); } .ds-btn-outline:hover { background: var(--accent, oklch(0.97 0 0)); } .ds-btn-outline:focus-visible { outline: none; border-color: var(--ring, oklch(0.708 0 0)); box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring, oklch(0.708 0 0)) 50%, transparent); }"
-    },
-    {
-      "name": "Destructive Button",
-      "kind": "button",
-      "refersTo": "button-destructive",
-      "description": "Confirmation of a delete, revoke or archive. Alert Red is never used for status.",
-      "html": "<button class=\"ds-btn-destructive\">Delete</button>",
-      "css": ".ds-btn-destructive { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; height: 2.25rem; padding: 0.5rem 1rem; border: none; border-radius: 0.5rem; background: var(--destructive, oklch(0.577 0.245 27.325)); color: #fff; font: 500 0.875rem/1.4286 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; white-space: nowrap; cursor: pointer; transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1); } .ds-btn-destructive:hover { background: color-mix(in oklch, var(--destructive, oklch(0.577 0.245 27.325)) 90%, transparent); } .ds-btn-destructive:focus-visible { outline: none; box-shadow: 0 0 0 3px color-mix(in oklch, var(--destructive, oklch(0.577 0.245 27.325)) 20%, transparent); }"
-    },
-    {
-      "name": "Text Input",
-      "kind": "input",
-      "refersTo": "input",
-      "description": "Transparent fill, hairline border, 36px tall. Focus moves the border to the ring colour and adds a 3px halo; only colour and box-shadow transition, so nothing reflows.",
-      "html": "<input class=\"ds-input\" type=\"text\" placeholder=\"user@example.com\" />",
-      "css": ".ds-input { height: 2.25rem; width: 100%; min-width: 0; padding: 0.25rem 0.75rem; border: 1px solid var(--input, oklch(0.922 0 0)); border-radius: 0.5rem; background: transparent; color: var(--foreground, oklch(0.145 0 0)); font: 400 0.875rem/1.4286 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05); outline: none; transition: color 150ms cubic-bezier(0.4, 0, 0.2, 1), box-shadow 150ms cubic-bezier(0.4, 0, 0.2, 1); } .ds-input::placeholder { color: var(--muted-foreground, oklch(0.556 0 0)); } .ds-input:focus-visible { border-color: var(--ring, oklch(0.708 0 0)); box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring, oklch(0.708 0 0)) 50%, transparent); } .ds-input[aria-invalid=\"true\"] { border-color: var(--destructive, oklch(0.577 0.245 27.325)); box-shadow: 0 0 0 3px color-mix(in oklch, var(--destructive, oklch(0.577 0.245 27.325)) 20%, transparent); }"
-    },
-    {
-      "name": "Tag Chip",
-      "kind": "chip",
-      "refersTo": "badge-secondary",
-      "description": "A value attached to a record. Fully round because pills mean data, not actions.",
-      "html": "<span class=\"ds-chip-secondary\">urgent</span>",
-      "css": ".ds-chip-secondary { display: inline-flex; align-items: center; justify-content: center; gap: 0.25rem; width: fit-content; padding: 0.125rem 0.5rem; border: 1px solid transparent; border-radius: 9999px; background: var(--secondary, oklch(0.97 0 0)); color: var(--secondary-foreground, oklch(0.205 0 0)); font: 500 0.75rem/1.333 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; white-space: nowrap; overflow: hidden; }"
-    },
-    {
-      "name": "Metadata Chip",
-      "kind": "chip",
-      "refersTo": "badge-outline",
-      "description": "A property of a record rather than an assignment: priority, recurrence rule. Reads lighter than the tag chip, which is correct.",
-      "html": "<span class=\"ds-chip-outline\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"m17 2 4 4-4 4\"/><path d=\"M3 11v-1a4 4 0 0 1 4-4h14\"/><path d=\"m7 22-4-4 4-4\"/><path d=\"M21 13v1a4 4 0 0 1-4 4H3\"/></svg>Every week</span>",
-      "css": ".ds-chip-outline { display: inline-flex; align-items: center; justify-content: center; gap: 0.25rem; width: fit-content; padding: 0.125rem 0.5rem; border: 1px solid var(--border, oklch(0.922 0 0)); border-radius: 9999px; background: transparent; color: var(--foreground, oklch(0.145 0 0)); font: 500 0.75rem/1.333 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; white-space: nowrap; } .ds-chip-outline svg { width: 0.75rem; height: 0.75rem; flex-shrink: 0; pointer-events: none; }"
-    },
-    {
-      "name": "Task Table",
-      "kind": "custom",
-      "refersTo": "table-head",
-      "description": "The signature component. Uppercase micro headers on a quiet fill, hairline row rules, muted supporting columns, and an italic muted phrase wherever a value is absent.",
-      "html": "<div class=\"ds-table-wrap\"><table class=\"ds-table\"><thead><tr><th>Title</th><th>Project</th><th>Due date</th><th>Priority</th></tr></thead><tbody><tr><td class=\"ds-cell-subject\">Draft the release notes</td><td class=\"ds-cell-muted\">Taskly</td><td class=\"ds-cell-muted\">2026-09-20</td><td class=\"ds-cell-muted\">P2</td></tr><tr><td class=\"ds-cell-subject ds-cell-done\">Ship the migration</td><td class=\"ds-cell-muted\">Taskly</td><td class=\"ds-cell-empty\">No due date</td><td class=\"ds-cell-empty\">No priority</td></tr></tbody></table></div>",
-      "css": ".ds-table-wrap { position: relative; width: 100%; overflow-x: auto; border: 1px solid var(--border, oklch(0.922 0 0)); border-radius: 0.625rem; } .ds-table { width: 100%; border-collapse: collapse; font: 400 0.875rem/1.4286 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: var(--foreground, oklch(0.145 0 0)); } .ds-table thead { background: color-mix(in oklch, var(--muted, oklch(0.97 0 0)) 50%, transparent); } .ds-table th { height: 2.75rem; padding: 0 1rem; text-align: left; vertical-align: middle; white-space: nowrap; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted-foreground, oklch(0.556 0 0)); border-bottom: 1px solid var(--border, oklch(0.922 0 0)); } .ds-table td { padding: 0.75rem 1rem; vertical-align: middle; white-space: nowrap; border-bottom: 1px solid var(--border, oklch(0.922 0 0)); } .ds-table tbody tr:last-child td { border-bottom: 0; } .ds-table tbody tr { transition: background-color 150ms cubic-bezier(0.4, 0, 0.2, 1); } .ds-table tbody tr:hover { background: color-mix(in oklch, var(--muted, oklch(0.97 0 0)) 50%, transparent); } .ds-cell-subject { font-weight: 500; } .ds-cell-done { text-decoration: line-through; color: var(--muted-foreground, oklch(0.556 0 0)); } .ds-cell-muted { color: var(--muted-foreground, oklch(0.556 0 0)); } .ds-cell-empty { color: var(--muted-foreground, oklch(0.556 0 0)); font-style: italic; }"
-    },
-    {
-      "name": "Sidebar Navigation",
+      "name": "Navigation",
       "kind": "nav",
-      "refersTo": "sidebar-item-active",
-      "description": "Panel-filled column with a hairline right border. Active is an exact path match and takes the quiet fill; collapsed items keep their labels as tooltips.",
-      "html": "<nav class=\"ds-nav\"><a class=\"ds-nav-item ds-nav-item--active\" href=\"#\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect width=\"18\" height=\"18\" x=\"3\" y=\"3\" rx=\"2\"/><path d=\"m9 12 2 2 4-4\"/></svg><span>Tasks</span></a><a class=\"ds-nav-item\" href=\"#\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z\"/></svg><span>Projects</span></a><a class=\"ds-nav-item\" href=\"#\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z\"/><circle cx=\"7.5\" cy=\"7.5\" r=\".5\" fill=\"currentColor\"/></svg><span>Tags</span></a></nav>",
-      "css": ".ds-nav { display: flex; flex-direction: column; gap: 0.25rem; width: 16rem; padding: 0.5rem; background: var(--sidebar, oklch(0.985 0 0)); border-right: 1px solid var(--sidebar-border, oklch(0.922 0 0)); } .ds-nav-item { display: flex; align-items: center; gap: 0.5rem; height: 2rem; padding: 0.5rem; border-radius: 0.5rem; color: var(--sidebar-foreground, oklch(0.145 0 0)); font: 400 0.875rem/1.4286 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; text-decoration: none; white-space: nowrap; overflow: hidden; transition: background-color 150ms cubic-bezier(0.4, 0, 0.2, 1), color 150ms cubic-bezier(0.4, 0, 0.2, 1); } .ds-nav-item svg { width: 1rem; height: 1rem; flex-shrink: 0; } .ds-nav-item:hover { background: var(--sidebar-accent, oklch(0.97 0 0)); } .ds-nav-item--active { background: var(--sidebar-accent, oklch(0.97 0 0)); color: var(--sidebar-accent-foreground, oklch(0.205 0 0)); font-weight: 500; } .ds-nav-item:focus-visible { outline: none; box-shadow: 0 0 0 3px color-mix(in oklch, var(--sidebar-ring, oklch(0.708 0 0)) 50%, transparent); }"
+      "refersTo": "nav-item",
+      "description": "The plain text list: wordmark, Add a task with its key cap, screens with mono counts; the current screen is marked by weight alone.",
+      "html": "<nav class=\"ds-nav\"><a class=\"ds-word\" href=\"#\">Taskly</a><button class=\"ds-nav-item ds-add\"><span class=\"ds-row\"><svg viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linecap=\"round\"><path d=\"M12 5v14M5 12h14\"/></svg>Add a task</span><kbd class=\"ds-kcap\">C</kbd></button><ul><li><a class=\"ds-nav-item ds-active\" href=\"#\">Today<span class=\"ds-count\">3</span></a></li><li><a class=\"ds-nav-item\" href=\"#\">Tasks<span class=\"ds-count\">24</span></a></li><li><a class=\"ds-nav-item\" href=\"#\">Projects</a></li><li><a class=\"ds-nav-item\" href=\"#\">Bots</a></li><li><a class=\"ds-nav-item\" href=\"#\">Activity</a></li></ul></nav>",
+      "css": ":host{--page:#ffffff;--hover:#f3f4f6;--ink:#0b0e11;--ink-2:#3d444d;--ink-3:#656d76;--rule:#e6e8eb;--rule-strong:#c9cdd2;--late:#cf222e;--done:#1a7f37;--p2:#8a5c00;--p3:#0969da;font-family:-apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, \"Helvetica Neue\", \"Noto Sans\", Arial, sans-serif;font-size:15px;line-height:1.45;color:var(--ink);} .ds-kcap{color:var(--ink-3);border:1px solid var(--rule-strong);border-radius:4px;padding:0 5px;font:11px/16px ui-monospace, \"SF Mono\", Menlo, Consolas, monospace;} .ds-nav{width:184px;display:flex;flex-direction:column;gap:26px;background:var(--page);padding:8px;} .ds-nav ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px;} .ds-word{font-size:15px;font-weight:600;letter-spacing:-0.01em;color:var(--ink);text-decoration:none;} .ds-nav-item{display:flex;align-items:center;justify-content:space-between;gap:8px;height:30px;margin:0 -8px;padding:0 8px;border-radius:6px;color:var(--ink-2);text-decoration:none;background:none;border:0;font:inherit;width:calc(100% + 16px);cursor:pointer;transition:background-color .15s cubic-bezier(.4,0,.2,1),color .15s cubic-bezier(.4,0,.2,1);} .ds-nav-item:hover{background:var(--hover);color:var(--ink);} .ds-nav-item:focus-visible{outline:2px solid var(--ink);outline-offset:2px;} .ds-active{color:var(--ink);font-weight:600;} .ds-add{color:var(--ink);text-align:left;} .ds-row{display:flex;align-items:center;gap:8px;} .ds-row svg{color:var(--ink-3);} .ds-count{color:var(--ink-3);font:400 12px ui-monospace, \"SF Mono\", Menlo, Consolas, monospace;font-variant-numeric:tabular-nums;}"
     },
     {
-      "name": "Task Checkbox",
+      "name": "Account Row",
+      "kind": "nav",
+      "refersTo": "account-row",
+      "description": "The foot of the navigation: initial avatar, name (or the email's local part), and a settings glyph link.",
+      "html": "<div class=\"ds-acct\"><button class=\"ds-acct-btn\"><span class=\"ds-av\">S</span><span>sam</span></button><a class=\"ds-gear\" href=\"#\" aria-label=\"Settings\"><svg viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"12\" r=\"3\"/><path d=\"M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z\"/></svg></a></div>",
+      "css": ":host{--page:#ffffff;--hover:#f3f4f6;--ink:#0b0e11;--ink-2:#3d444d;--ink-3:#656d76;--rule:#e6e8eb;--rule-strong:#c9cdd2;--late:#cf222e;--done:#1a7f37;--p2:#8a5c00;--p3:#0969da;font-family:-apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, \"Helvetica Neue\", \"Noto Sans\", Arial, sans-serif;font-size:15px;line-height:1.45;color:var(--ink);} .ds-acct{display:flex;align-items:center;gap:4px;width:184px;} .ds-acct-btn{flex:1;display:flex;align-items:center;gap:8px;height:34px;padding:0 8px;border:0;border-radius:6px;background:none;color:var(--ink-2);font-family:inherit;font-size:13px;text-align:left;cursor:pointer;transition:background-color .15s cubic-bezier(.4,0,.2,1),color .15s cubic-bezier(.4,0,.2,1);} .ds-acct-btn:hover{background:var(--hover);color:var(--ink);} .ds-acct-btn:focus-visible,.ds-gear:focus-visible{outline:2px solid var(--ink);outline-offset:2px;} .ds-av{display:grid;place-items:center;width:20px;height:20px;border-radius:9999px;background:var(--ink);color:var(--page);font-size:11px;font-weight:600;} .ds-gear{display:grid;place-items:center;width:30px;height:30px;border-radius:6px;color:var(--ink-3);transition:background-color .15s cubic-bezier(.4,0,.2,1),color .15s cubic-bezier(.4,0,.2,1);} .ds-gear:hover{background:var(--hover);color:var(--ink);}"
+    },
+    {
+      "name": "Capture Line",
+      "kind": "input",
+      "refersTo": "capture-line",
+      "description": "Frameless field at the top of the day page: a plus, the field, the C key cap, and a hairline that turns ink on focus.",
+      "html": "<label class=\"ds-cap\"><svg viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linecap=\"round\"><path d=\"M12 5v14M5 12h14\"/></svg><input placeholder=\"Add a task…\" aria-label=\"Add a task\"><kbd class=\"ds-kcap\">C</kbd></label>",
+      "css": ":host{--page:#ffffff;--hover:#f3f4f6;--ink:#0b0e11;--ink-2:#3d444d;--ink-3:#656d76;--rule:#e6e8eb;--rule-strong:#c9cdd2;--late:#cf222e;--done:#1a7f37;--p2:#8a5c00;--p3:#0969da;font-family:-apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, \"Helvetica Neue\", \"Noto Sans\", Arial, sans-serif;font-size:15px;line-height:1.45;color:var(--ink);} .ds-kcap{color:var(--ink-3);border:1px solid var(--rule-strong);border-radius:4px;padding:0 5px;font:11px/16px ui-monospace, \"SF Mono\", Menlo, Consolas, monospace;} .ds-cap{display:flex;align-items:center;gap:10px;height:40px;width:420px;color:var(--ink-3);border-bottom:1px solid var(--rule-strong);transition:border-color .15s cubic-bezier(.4,0,.2,1);} .ds-cap:focus-within{border-bottom-color:var(--ink);} .ds-cap input{flex:1;min-width:0;height:100%;border:0;background:transparent;outline:none;font-family:inherit;font-size:15px;color:var(--ink);} .ds-cap input::placeholder{color:var(--ink-3);}"
+    },
+    {
+      "name": "Status Marks",
       "kind": "custom",
-      "refersTo": null,
-      "description": "The completion control, and one of the three sanctioned uses of Signal Teal. A hard 4px radius keeps it from reading as a radio button.",
-      "html": "<span class=\"ds-check ds-check--on\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M20 6 9 17l-5-5\"/></svg></span><span class=\"ds-check\"></span>",
-      "css": ".ds-check { display: inline-grid; place-content: center; width: 1rem; height: 1rem; margin-right: 0.5rem; border: 1px solid var(--input, oklch(0.922 0 0)); border-radius: 4px; background: transparent; box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05); cursor: pointer; vertical-align: middle; transition: box-shadow 150ms cubic-bezier(0.4, 0, 0.2, 1); } .ds-check--on { background: var(--primary, oklch(0.5982 0.10687 182.4689)); border-color: var(--primary, oklch(0.5982 0.10687 182.4689)); color: var(--primary-foreground, oklch(0.985 0 0)); } .ds-check svg { width: 0.875rem; height: 0.875rem; } .ds-check:focus-visible { outline: none; box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring, oklch(0.708 0 0)) 50%, transparent); }"
+      "refersTo": "status-mark",
+      "description": "The six 18px stroked marks (The Six-Mark Rule); shape is status, colour is priority.",
+      "html": "<div class=\"ds-marks\"><span class=\"ds-mk\"><svg viewBox=\"0 0 18 18\" width=\"18\" height=\"18\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" style=\"color:var(--ink);flex:none\"><circle cx=\"9\" cy=\"9\" r=\"7\" stroke-dasharray=\"2.6 2.4\"/></svg>Backlog</span><span class=\"ds-mk\"><svg viewBox=\"0 0 18 18\" width=\"18\" height=\"18\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" style=\"color:var(--late);flex:none\"><circle cx=\"9\" cy=\"9\" r=\"7\"/></svg>To do, P1</span><span class=\"ds-mk\"><svg viewBox=\"0 0 18 18\" width=\"18\" height=\"18\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" style=\"color:var(--p2);flex:none\"><circle cx=\"9\" cy=\"9\" r=\"7\"/><path d=\"M9 4.5a4.5 4.5 0 0 1 0 9z\" fill=\"currentColor\" stroke=\"none\"/></svg>In progress, P2</span><span class=\"ds-mk\"><svg viewBox=\"0 0 18 18\" width=\"18\" height=\"18\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" style=\"color:var(--p3);flex:none\"><circle cx=\"9\" cy=\"9\" r=\"7\"/><circle cx=\"9\" cy=\"9\" r=\"2.6\" fill=\"currentColor\" stroke=\"none\"/></svg>Review, P3</span><span class=\"ds-mk\"><svg viewBox=\"0 0 18 18\" width=\"18\" height=\"18\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" style=\"color:var(--ink);flex:none\"><path d=\"M1.8 9c1.9-3.4 4.3-5 7.2-5s5.3 1.6 7.2 5c-1.9 3.4-4.3 5-7.2 5S3.7 12.4 1.8 9z\" stroke-linejoin=\"round\"/><circle cx=\"9\" cy=\"9\" r=\"2.4\"/><circle cx=\"9\" cy=\"9\" r=\".9\" fill=\"currentColor\" stroke=\"none\"/></svg>Waiting</span><span class=\"ds-mk\"><svg viewBox=\"0 0 18 18\" width=\"18\" height=\"18\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" style=\"color:var(--done);flex:none\"><circle cx=\"9\" cy=\"9\" r=\"7\" fill=\"currentColor\" stroke=\"none\"/><path d=\"M5.8 9.3l2.2 2.2 4.3-4.6\" stroke=\"#ffffff\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>Done</span></div>",
+      "css": ":host{--page:#ffffff;--hover:#f3f4f6;--ink:#0b0e11;--ink-2:#3d444d;--ink-3:#656d76;--rule:#e6e8eb;--rule-strong:#c9cdd2;--late:#cf222e;--done:#1a7f37;--p2:#8a5c00;--p3:#0969da;font-family:-apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, \"Helvetica Neue\", \"Noto Sans\", Arial, sans-serif;font-size:15px;line-height:1.45;color:var(--ink);} .ds-marks{display:flex;flex-wrap:wrap;gap:16px 24px;} .ds-mk{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink-2);}"
+    },
+    {
+      "name": "Task Line",
+      "kind": "custom",
+      "refersTo": "task-line",
+      "description": "A band of task lines: mark, title, and the 13px meta line with the project at the far right; hairline-divided, hover tint fading right.",
+      "html": "<div class=\"ds-band\"><h2 class=\"ds-bh ds-late\">Overdue <span class=\"ds-n\">2</span></h2><div class=\"ds-line\"><svg viewBox=\"0 0 18 18\" width=\"18\" height=\"18\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" style=\"color:var(--late);flex:none\"><circle cx=\"9\" cy=\"9\" r=\"7\"/></svg><div class=\"ds-body\"><a class=\"ds-title\" href=\"#\">Renew the domain</a><div class=\"ds-meta\"><span class=\"ds-due\">Yesterday</span><span>infra</span><span class=\"ds-proj\"><span class=\"ds-sq\"></span>Home</span></div></div></div><div class=\"ds-line\"><svg viewBox=\"0 0 18 18\" width=\"18\" height=\"18\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" style=\"color:var(--ink);flex:none\"><circle cx=\"9\" cy=\"9\" r=\"7\"/></svg><div class=\"ds-body\"><a class=\"ds-title\" href=\"#\">Draft the release notes</a><div class=\"ds-meta\"><span>2/5</span><span>Mon</span><span class=\"ds-proj\"><span class=\"ds-sq\"></span>Taskly</span></div></div></div></div>",
+      "css": ":host{--page:#ffffff;--hover:#f3f4f6;--ink:#0b0e11;--ink-2:#3d444d;--ink-3:#656d76;--rule:#e6e8eb;--rule-strong:#c9cdd2;--late:#cf222e;--done:#1a7f37;--p2:#8a5c00;--p3:#0969da;font-family:-apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, \"Helvetica Neue\", \"Noto Sans\", Arial, sans-serif;font-size:15px;line-height:1.45;color:var(--ink);} .ds-band{width:520px;} .ds-bh{display:flex;align-items:baseline;gap:8px;margin:0;padding-bottom:8px;border-bottom:1px solid var(--rule-strong);font-size:13px;font-weight:600;} .ds-late{color:var(--late);} .ds-n{color:var(--ink-3);font:400 12px ui-monospace, \"SF Mono\", Menlo, Consolas, monospace;} .ds-line{display:flex;gap:12px;padding:10px 0;border-bottom:1px solid var(--rule);} .ds-line:last-child{border-bottom:0;} .ds-line:hover{background:linear-gradient(to right,var(--hover),transparent 85%);} .ds-body{flex:1;min-width:0;} .ds-title{color:var(--ink);font-weight:500;line-height:1.375;text-decoration:none;text-underline-offset:4px;border-radius:4px;} .ds-title:hover{text-decoration:underline;} .ds-title:focus-visible{outline:none;box-shadow:0 0 0 3px color-mix(in oklab,var(--ink) 50%,transparent);} .ds-meta{display:flex;gap:12px;margin-top:4px;font-size:13px;line-height:1.25;color:var(--ink-3);font-variant-numeric:tabular-nums;} .ds-due{color:var(--late);font-weight:500;} .ds-proj{margin-left:auto;display:flex;align-items:center;gap:6px;} .ds-sq{width:8px;height:8px;border-radius:2px;background:currentColor;opacity:.55;}"
+    },
+    {
+      "name": "Review Hand-off",
+      "kind": "custom",
+      "refersTo": "close-it",
+      "description": "An agent's finished work in the owner's hands: the agent named, and one green Close it inline.",
+      "html": "<div class=\"ds-ho\"><span><b>release-bot</b> moved this to Review 12 min ago</span><button class=\"ds-close\">Close it</button></div>",
+      "css": ":host{--page:#ffffff;--hover:#f3f4f6;--ink:#0b0e11;--ink-2:#3d444d;--ink-3:#656d76;--rule:#e6e8eb;--rule-strong:#c9cdd2;--late:#cf222e;--done:#1a7f37;--p2:#8a5c00;--p3:#0969da;font-family:-apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, \"Helvetica Neue\", \"Noto Sans\", Arial, sans-serif;font-size:15px;line-height:1.45;color:var(--ink);} .ds-ho{display:flex;flex-wrap:wrap;align-items:center;gap:4px 14px;font-size:13px;line-height:1.25;color:var(--ink-3);} .ds-ho b{color:var(--ink-2);font-weight:500;} .ds-close{border:0;background:none;padding:0;font:inherit;font-weight:500;color:var(--done);cursor:pointer;border-radius:4px;text-underline-offset:3px;} .ds-close:hover{text-decoration:underline;} .ds-close:focus-visible{outline:none;box-shadow:0 0 0 3px color-mix(in oklab,var(--ink) 50%,transparent);}"
+    },
+    {
+      "name": "Log Lines",
+      "kind": "custom",
+      "refersTo": "log-line",
+      "description": "Changes: time / actor / sentence; bot users' lines in ink, the reader's own muted; Restore inline.",
+      "html": "<ul class=\"ds-log\"><li class=\"ds-ll ds-bot\"><time>09:42</time><span class=\"ds-act\">release-bot</span><span>deleted the task Old draft <a href=\"#\" class=\"ds-in\">Restore</a></span></li><li class=\"ds-ll\"><time>08:15</time><span class=\"ds-act\">You</span><span>completed Pay rent</span></li></ul>",
+      "css": ":host{--page:#ffffff;--hover:#f3f4f6;--ink:#0b0e11;--ink-2:#3d444d;--ink-3:#656d76;--rule:#e6e8eb;--rule-strong:#c9cdd2;--late:#cf222e;--done:#1a7f37;--p2:#8a5c00;--p3:#0969da;font-family:-apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, \"Helvetica Neue\", \"Noto Sans\", Arial, sans-serif;font-size:15px;line-height:1.45;color:var(--ink);} .ds-log{list-style:none;margin:0;padding:0;width:560px;} .ds-ll{display:grid;grid-template-columns:8ch 128px minmax(0,1fr);gap:2px 12px;align-items:baseline;padding:8px 0;border-bottom:1px solid var(--rule);color:var(--ink-3);} .ds-ll time{font:12px ui-monospace, \"SF Mono\", Menlo, Consolas, monospace;font-variant-numeric:tabular-nums;color:var(--ink-3);} .ds-bot{color:var(--ink);} .ds-bot .ds-act{font-weight:500;} .ds-in{margin-left:10px;font-size:13px;color:var(--ink);text-decoration:underline;text-decoration-color:var(--rule-strong);text-underline-offset:3px;border-radius:4px;} .ds-in:hover{text-decoration-color:currentColor;} .ds-in:focus-visible{outline:none;box-shadow:0 0 0 3px color-mix(in oklab,var(--ink) 50%,transparent);}"
+    },
+    {
+      "name": "Day Heading",
+      "kind": "custom",
+      "refersTo": "band-heading",
+      "description": "The 56px day number with the weekday and month beside it, then the muted lede of real counts.",
+      "html": "<div><h1 class=\"ds-dh\"><span class=\"ds-day\">5</span><span class=\"ds-rest\">Monday, October 2026</span></h1><p class=\"ds-lede\"><b>2 overdue, 3 due today.</b> Your bots made 7 changes since yesterday.</p></div>",
+      "css": ":host{--page:#ffffff;--hover:#f3f4f6;--ink:#0b0e11;--ink-2:#3d444d;--ink-3:#656d76;--rule:#e6e8eb;--rule-strong:#c9cdd2;--late:#cf222e;--done:#1a7f37;--p2:#8a5c00;--p3:#0969da;font-family:-apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, \"Helvetica Neue\", \"Noto Sans\", Arial, sans-serif;font-size:15px;line-height:1.45;color:var(--ink);} .ds-dh{margin:0 0 6px;line-height:1;display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 14px;} .ds-day{font-size:56px;font-weight:700;letter-spacing:-0.035em;font-variant-numeric:tabular-nums;} .ds-rest{font-size:17px;font-weight:500;color:var(--ink-2);} .ds-lede{margin:0;color:var(--ink-3);} .ds-lede b{color:var(--ink);font-weight:500;}"
+    },
+    {
+      "name": "Phone Add Button",
+      "kind": "button",
+      "refersTo": "add-button-phone",
+      "description": "The primary action under the thumb on a phone: a 52px round ink button on its own shadow.",
+      "html": "<button class=\"ds-fab\" aria-label=\"Add a task\"><svg viewBox=\"0 0 24 24\" width=\"22\" height=\"22\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\"><path d=\"M12 5v14M5 12h14\"/></svg></button>",
+      "css": ":host{--page:#ffffff;--hover:#f3f4f6;--ink:#0b0e11;--ink-2:#3d444d;--ink-3:#656d76;--rule:#e6e8eb;--rule-strong:#c9cdd2;--late:#cf222e;--done:#1a7f37;--p2:#8a5c00;--p3:#0969da;font-family:-apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, \"Helvetica Neue\", \"Noto Sans\", Arial, sans-serif;font-size:15px;line-height:1.45;color:var(--ink);} .ds-fab{display:grid;place-items:center;width:52px;height:52px;border:0;border-radius:9999px;background:var(--ink);color:var(--page);box-shadow:0 6px 16px rgb(0 0 0 / 0.18);cursor:pointer;transition:background-color .15s;} .ds-fab:hover{background:color-mix(in oklab,var(--ink) 90%,transparent);} .ds-fab:focus-visible{outline:none;box-shadow:0 6px 16px rgb(0 0 0 / 0.18),0 0 0 3px color-mix(in oklab,var(--ink) 50%,transparent);}"
     }
   ],
   "narrative": {
-    "northStar": "The Quiet Control Room",
-    "overview": "Taskly is a room full of instruments, not a poster. A person and their bots operate on the same tasks through the same records, and the interface's job is to keep those records legible and never to compete with them. Every surface is neutral grey or white; every control is a fixed-height, unshouting instrument; and exactly one colour \u2014 Signal Teal \u2014 is allowed to glow. When something on screen is teal, it is either the action to take, the place you are, or the field you are in. Nothing else earns it.\n\nThe character is precise, calm, and unobtrusive. Density is moderate: the page breathes at 24\u201332px between sections but stays tight inside a control, so a table of forty tasks reads as one continuous instrument rather than forty cards. Type is the system sans at four working sizes; there is no display face, no decorative weight, no ornament. Hierarchy comes from weight and colour temperature (ink versus muted ink), not from size jumps. The system is dual-theme by construction: light and dark are two calibrations of the same room, not two designs, and every token has a counterpart on the other side.\n\nDepth is the one place the system is deliberately opinionated. Structure is built from ground, hairlines, and tonal steps; a real shadow is reserved for things that have genuinely left the page.",
+    "northStar": "The Changelog",
+    "overview": "Taskly is read the way a project's history is read: one continuous, well-set log on a white page. There are no boxes, no panels and no bezels around the work. Hairline rules and whitespace carry structure; weight and indent carry hierarchy; and every line that records a change names who wrote it, because a person and their bot users act on the same tasks. The register is calm and dense in the way a good release note is dense: everything on the page is a fact, set at a size it can be read at.\n\nThe world is near-monochrome by conviction. Ink and two greys do the reading; two strengths of hairline do the dividing. Colour is held back for state that asks the reader to act (a red for what is late or most urgent, a green for what is done or can be closed) and for the two lower priority hues, which only ever colour a status mark. Nothing coloured marks where the reader is: location is said by weight. Controls are text first: a frameless capture line with a hairline beneath it, text links as actions, a small outlined key cap for the shortcut.\n\nThe brand is the wordmark \"Taskly\", set in the interface's own face. The craft bar is Linear. The category's card grids, chip-filled sidebars and coloured location accents were looked at and rejected: Mission Console and Card Box were turned down after mocks for carrying too many frames and too much chrome.\n\n**Transition note.** Redesign slice 1 shipped the shell (navigation, top bar, capture entry, phone Add button), the day page, the task line and the status marks. The task list, the record panels and capture panel, Bots, Activity, settings and the auth screens are not yet redesigned: they still use the stock component kit, and read as the same world only because its semantic colour names (background, foreground, primary, muted, accent, border, input, ring, destructive) are mapped onto this palette. Their framed inputs, outline buttons with a faint shadow, pill badges and table chrome are inherited, not designed, and are not precedent for new surfaces.",
     "keyCharacteristics": [
-      "One accent, used sparingly: teal marks action, location, and focus \u2014 nothing else.",
-      "Neutral achromatic base (chroma 0) for every surface, border, and text tone.",
-      "Fixed control height of 36px (2.25rem) across buttons, inputs, and selects.",
-      "Tables are the primary content form; cards are not part of the shipped vocabulary.",
-      "10px base radius, stepping to 6px for small controls and full-round for badges.",
-      "Light and dark are mirrored calibrations, never independent designs."
+      "One page, one ground: sections are groups under a hairline heading, never framed containers.",
+      "Ink plus two greys for all reading; colour only for state that asks for action.",
+      "The current screen is marked by weight (600), never by a fill or a colour.",
+      "Every log line leads with its actor; bot users' lines are news (ink), the reader's own are reminders (muted).",
+      "The platform UI sans at 15px; monospace only for times, counts, ids and key caps.",
+      "Six stroked status marks, told apart by shape; priority is the mark's colour."
     ],
     "rules": [
       {
-        "name": "The One Signal Rule",
-        "body": "Teal appears at most a few times per screen and always answers one of three questions: *what do I press*, *where am I*, or *what am I typing in*. A teal fill that answers none of those is decoration and must be removed. Status, category, priority, and tag are communicated with neutrals and shape \u2014 never by spending the accent.",
+        "name": "The Action-Only Colour Rule",
+        "body": "Colour exists only for state that asks for action: red for overdue and P1, green for done and close, amber and blue only for P2 and P3 status marks. No accent marks location, selection, hover or brand; `theme.test.ts` asserts that no accent hue returns. If a new element wants colour, it must name the action the colour asks for.",
         "section": "colors"
       },
       {
-        "name": "The Chroma Zero Rule",
-        "body": "Every structural token \u2014 surface, border, text, skeleton, divider \u2014 has chroma exactly `0`. There are no warm greys and no cool greys. If a neutral in this system carries chroma, it is a bug, not a mood.",
+        "name": "The Priority Hue Rule",
+        "body": "Priority is carried only as the colour of an open task's status mark. P4 and no priority have no hue and stay ink. A closed task's mark is Done Green whatever its priority was.",
         "section": "colors"
       },
       {
         "name": "The Mirrored Theme Rule",
-        "body": "No colour may be introduced in one theme without its counterpart in the other, and the two are tuned for equal apparent weight rather than equal numeric lightness. The teal and the red both lighten in dark mode for exactly this reason.",
+        "body": "Every token exists in both themes and every text/ground pair is checked in both. No colour is introduced in one theme alone, and a changed value is not done until `src/theme.test.ts` passes.",
         "section": "colors"
       },
       {
-        "name": "The Uppercase-Header Rule",
-        "body": "Uppercase with letter-spacing belongs to one job: labelling a band of rows. That covers table column headers and the group headers inside a list sheet \u2014 the dashboard's \"Overdue\" and \"Due today\" bands, and the \"While you were away\" band over its log. Both sit on the same `muted/50` fill, because they are the same device. It is the system's one micro-typographic signature and it holds only while nothing else borrows it: page headings, buttons, tabs, and badges are all sentence case.",
+        "name": "The Mono-Means-Figures Rule",
+        "body": "Monospace is set only for times, counts, ids and key caps. A word in mono is a defect.",
         "section": "typography"
       },
       {
-        "name": "The Two-Weight Rule",
-        "body": "Text is 400 or 500 in the body of the interface; 600 and 700 are reserved for the four headline roles above. A third weight inside a table row or a form is noise.",
+        "name": "The Weight-Not-Case Rule",
+        "body": "Headings and labels are sentence case and step down by size and weight. No uppercase, no letter-spaced labels, no eyebrow above a heading.",
         "section": "typography"
       },
       {
-        "name": "The 24-and-Done Rule",
-        "body": "Sections within a route are separated by 24px. Not 20, not 28, and not a second value introduced for one screen. If two blocks need to feel more related than that, nest them in a bordered container instead of shrinking the gap.",
+        "name": "The No-Frame Rule",
+        "body": "A section is a heading over a hairline and the lines under it. It is never a bordered or filled container, and nothing on the day page sits in a card.",
         "section": "layout"
       },
       {
-        "name": "The token split this depends on",
-        "body": "`--background` is the ground and `--card` is the sheet, and they are never interchangeable. Anything that should read as laid *on* the page takes `bg-card` \u2014 a table container, a filter bar, a settings panel, a dialog, an outline button. Only the page itself takes `bg-background`. Before this split both were pure white in light mode, so every sheet was white on white and held together by its border alone; the tone step is what makes the hairline tier legible.",
-        "section": "elevation"
-      },
-      {
         "name": "The Left-the-Page Rule",
-        "body": "A shadow is permitted only on an element that has left the page plane: dialog, sheet, popover, dropdown, select, toast. Tables, filter bars, headers, sidebars, and content containers are flat and are separated by a hairline and a tonal step. A card-with-shadow is not a Taskly surface.",
+        "body": "A shadow is permitted only on an element that has left the page plane. Lines, bands, headings, the navigation and the capture line are flat.",
         "section": "elevation"
       },
       {
         "name": "The Scrim Rule",
-        "body": "Anything modal brings a `rgb(0 0 0 / 0.5)` overlay with it. A floating layer that traps focus must also visibly demote what it covers.",
+        "body": "Anything modal brings the scrim with it, and the page ground must fall at least 0.06 in OKLab lightness under it: 50% black does this in light (0.40), and dark needs 80% (0.076).",
         "section": "elevation"
       },
       {
-        "name": "The Pill-Means-Data Rule",
-        "body": "Fully-round is reserved for badges \u2014 values attached to a record. If it is pressable and pill-shaped, it is miscommunicating.",
+        "name": "The Six-Mark Rule",
+        "body": "A task's status is one of six 18px stroked marks, told apart by shape alone so they read in greyscale: a dashed ring for Backlog, a solid ring for To do, a half-filled ring for In progress, a dot in a ring for Review, an eye for Waiting, and a filled check for Done. Status is the shape and priority is the colour: an open task's mark takes P1 red, P2 amber or P3 blue, otherwise ink; Done is always the green fill with its check cut out in the page colour; a mark standing for a status alone, as in a menu, is ink. A mark always travels with its label, or with an accessible name stating status and priority. In the task line the mark is itself the control that closes the task.",
         "section": "shapes"
-      },
-      {
-        "name": "The One-Pixel Rule",
-        "body": "Every border in the system is 1px. Emphasis changes colour, never weight.",
-        "section": "shapes"
-      },
-      {
-        "name": "The One Address Rule",
-        "body": "A record has exactly one place to be read and acted on: its panel. Rows carry no menu of their own, and there is no edit screen \u2014 the panel *is* the editor. Reading something must never mean opening four dialogs in turn, and changing a field must never mean opening a form that restates the record you are already looking at.",
-        "section": "components"
-      },
-      {
-        "name": "No overflow menu",
-        "body": "There is no `\u22ee` anywhere on a record. A menu is what a surface reaches for when it has not decided where its actions belong, and every action here has a home: a field is changed in the field, a subtask is added from the Subtasks tab beneath the subtasks, and delete \u2014 the one act with no field and no undo \u2014 is a single destructive icon in the panel's corner, with no neighbours to catch a stray click and no menu to open first.",
-        "section": "components"
-      },
-      {
-        "name": "Edit in place, save per field",
-        "body": "Every property is its own control, and each one saves alone: a select the moment it changes, text when focus leaves it. The request carries only the field that moved. There is no Save button, so there is nothing to forget to press and nothing to discard; Escape returns a text field to its stored value. Success is silent \u2014 the value on screen is the receipt \u2014 and only a failure raises a toast.",
-        "section": "components"
-      },
-      {
-        "name": "Controls rest flat",
-        "body": "A property list rendered as seven bordered inputs reads as a form to fill in; this is a record to read that happens to be editable. Each control drops its border and shadow at rest and takes `bg-accent` on hover, with the focus ring on `:focus-visible` as everywhere else. Fields the record cannot own \u2014 a subtask's project and schedule, which follow its parent \u2014 render as Ink Muted prose saying so, not as a disabled control.",
-        "section": "components"
-      },
-      {
-        "name": "The Real Address Rule",
-        "body": "The open panel lives in the URL (`?task=<id>`), so it can be linked to and Back closes it. Every reference to a record anywhere in the product \u2014 an activity entry, a dashboard row, a breadcrumb \u2014 links to that record, never to the list it lives in. Dropping the reader on an unfiltered table and leaving them to find the thing again is a broken link that happens to return 200. The panel fetches by id rather than reading the loaded table, so a link still opens a record the current filters exclude.",
-        "section": "components"
       },
       {
         "name": "The Stay-Put Rule",
-        "body": "Opening a record never moves the reader to another screen. Every surface that lists tasks carries the panel's parameter and renders the panel itself, so the dashboard and the activity log open a task over themselves \u2014 a link out of a long log must not cost the reader their place in it. Links between records therefore target the current route, not a fixed one.",
-        "section": "components"
-      },
-      {
-        "name": "Keep view state out of the query",
-        "body": "The open panel is view state, not a filter, so it must be stripped before the search object becomes an API query. Leaving it in puts it in the query key, and opening a record silently refetches the list behind the panel and flashes the whole page back to its skeleton.",
+        "body": "Opening a record never moves the reader to another screen. The panel's address belongs to the shell, so every screen opens a task over itself, and capture starts from any of them.",
         "section": "components"
       }
     ],
     "dos": [
-      "Spend Signal Teal on only three things: the primary action, the current location, and the focused field. See The One Signal Rule.",
-      "Keep every structural neutral at chroma `0`.",
-      "Separate in-page surfaces with a 1px hairline and a tonal step, and reserve shadows for layers that have left the page. See The Left-the-Page Rule.",
-      "Give every bordered container on the page `bg-card`. A bordered box left transparent inherits the ground and reads as an outline drawn on nothing.",
-      "Hold controls to the 36px height ladder (32 / 36 / 40) so a row of mixed buttons, inputs, and selects aligns without adjustment.",
-      "Use 24px between the sections of a route. See The 24-and-Done Rule.",
-      "Render an absent value as italic Ink Muted prose (\"No due date\"), never as an empty cell or an em dash.",
-      "Ship every loading state as a structural skeleton that matches the shape of the content it replaces \u2014 real column headers, realistic block widths.",
-      "Pair each page title with a one-line Ink Muted subtitle that says what the screen is for.",
-      "Define both theme values whenever a colour is added, tuned for equal apparent weight rather than equal lightness.",
-      "Give collapsed navigation items tooltips so the icon rail never costs a label."
+      "**Do** separate groups with a hairline and whitespace: Rule between lines, Rule Strong under a heading, 36px between sections.",
+      "**Do** mark the current place by weight (ink, 600), and only by weight.",
+      "**Do** lead every activity line with its actor, and set bot users' lines in ink and the reader's own in Ink 3.",
+      "**Do** make actions text first: a text link, an inline \"Close it\", a frameless capture line with its `C` key cap.",
+      "**Do** use the six status marks at 18px for status, with priority as their colour (The Six-Mark Rule).",
+      "**Do** use monospace only for times, counts, ids and key caps, with tabular figures.",
+      "**Do** check every new text/ground pair in both themes in `src/theme.test.ts` before shipping.",
+      "**Do** say an empty state in one sentence instead of drawing an empty container."
     ],
     "donts": [
-      "Introduce a second accent hue. Status, priority, and category are communicated with neutrals and shape.",
-      "Put a shadow on a table, filter bar, header, sidebar, or content container.",
-      "Reach for the `Card` component. The shipped container vocabulary is the bordered table and the bordered filter bar.",
-      "Use uppercase with letter-spacing for anything but a header over a band of rows. See The Uppercase-Header Rule.",
-      "Use a border wider than 1px. Emphasis changes the border's colour. See The One-Pixel Rule.",
-      "Make a pressable control fully round \u2014 pills mean data, not actions. See The Pill-Means-Data Rule.",
-      "Animate hover with lift, scale, or shadow. State changes are colour and ring only, at 150ms.",
-      "Add a font. The system stack carries every role, and that is the point of the North Star.",
-      "Reintroduce the FastAPI artwork in `public/assets/images`. The mark is now Taskly's own \u2014 the completion check on a Signal Teal tile, drawn inline in `Logo.tsx` so it follows the theme's primary token \u2014 and it appears on the authentication screens only; the app shell leads with the account, not the brand.",
-      "Swap `:focus-visible` for `:focus`. Focus rings appear for keyboard navigation, not on every mouse click."
+      "**Don't** colour location, selection, brand or decoration; colour is for overdue, P1, done, close, and the P2/P3 marks only.",
+      "**Don't** put a section, band or list on a card, a filled panel or a bordered box.",
+      "**Don't** draw a rule between the navigation and the work.",
+      "**Don't** set tags or a project as pills in a task line.",
+      "**Don't** use uppercase, letter-spaced labels or eyebrows above headings.",
+      "**Don't** give a shadow to anything that sits on the page.",
+      "**Don't** let colour alone carry a link; inside a sentence it is underlined at rest.",
+      "**Don't** take the inherited kit's framed inputs, outline buttons or pill badges on not-yet-redesigned screens as precedent for new surfaces."
     ]
   }
 }

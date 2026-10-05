@@ -11,7 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { activityQuery, projectsQuery, tasksQuery } from "@/lib/serverState"
 import { cn } from "@/lib/utils"
 import { dayHeading, lede } from "./day"
-import { PREVIEW_ROWS } from "./sheet"
+import { changesQuery, PREVIEW_ROWS, textLink } from "./shared"
 import { inAWeek, today, tomorrow } from "./when"
 
 /**
@@ -52,6 +52,8 @@ const dayQueries = (since: string | null) =>
     tasksQuery({ ...BANDS.today(), limit: PREVIEW_ROWS }),
     tasksQuery({ ...BANDS.week(), limit: 1 }),
     activityQuery({ by_bots: true, since: since ?? undefined, limit: 1 }),
+    // The log's own request, so the sentence counts what the log counts.
+    changesQuery(since),
     projectsQuery(),
   ] as const
 
@@ -59,7 +61,7 @@ function useDay(since: string | null) {
   // One hook, so the requests run side by side and the page is drawn once
   // they have all answered: a band arriving on its own would push the rest
   // of the page down after first paint.
-  const [overdue, due, week, changes, projects] = useSuspenseQueries({
+  const [overdue, due, week, changes, log, projects] = useSuspenseQueries({
     queries: dayQueries(since),
   })
   return {
@@ -67,6 +69,7 @@ function useDay(since: string | null) {
     due: due.data,
     weekCount: week.data.count,
     changeCount: changes.data.count,
+    logCount: log.data.count,
     projectNames: Object.fromEntries(
       projects.data.data.map((project) => [project.id, project.name]),
     ) as Record<string, string>,
@@ -117,10 +120,12 @@ export function DayPending() {
  * drawing an empty box.
  */
 export function Day({ since }: { since: string | null }) {
-  const { overdue, due, weekCount, changeCount, projectNames } = useDay(since)
+  const { overdue, due, weekCount, changeCount, logCount, projectNames } =
+    useDay(since)
   const sentence = lede({
     needYou: overdue.count + due.count,
     changes: changeCount,
+    total: logCount,
     window: since ? "visit" : "ever",
   })
   const clear = overdue.count === 0 && due.count === 0
@@ -226,9 +231,6 @@ function Lines({
     />
   ))
 }
-
-export const textLink =
-  "focus-visible:ring-ring/50 rounded-sm underline-offset-[3px] outline-none hover:underline focus-visible:ring-[3px]"
 
 /** The link that ends a band too long to show, into the task list. */
 function BandMoreLink({

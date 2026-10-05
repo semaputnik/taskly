@@ -18,39 +18,52 @@ describe("the date at the top of the day page", () => {
 
 describe("the sentence under the date", () => {
   test("counts what needs the reader, in the number it is", () => {
-    expect(lede({ needYou: 0, changes: 0, window: "visit" }).needs).toBe(
-      "Nothing needs you today.",
-    )
-    expect(lede({ needYou: 1, changes: 0, window: "visit" }).needs).toBe(
-      "1 needs you.",
-    )
-    expect(lede({ needYou: 3, changes: 0, window: "visit" }).needs).toBe(
-      "3 need you.",
-    )
+    expect(
+      lede({ needYou: 0, changes: 0, total: 0, window: "visit" }).needs,
+    ).toBe("Nothing needs you today.")
+    expect(
+      lede({ needYou: 1, changes: 0, total: 0, window: "visit" }).needs,
+    ).toBe("1 needs you.")
+    expect(
+      lede({ needYou: 3, changes: 0, total: 0, window: "visit" }).needs,
+    ).toBe("3 need you.")
   })
 
-  test("counts the agents' changes since the last visit", () => {
-    expect(lede({ needYou: 0, changes: 0, window: "visit" }).changes).toBe(
-      "Your agents made no changes since your last visit.",
+  test("counts the bot users' changes since the last visit", () => {
+    const visit = (changes: number, total = changes) =>
+      lede({ needYou: 0, changes, total, window: "visit" }).changes
+    expect(visit(0)).toBe(
+      "Your bot users made no changes since your last visit.",
     )
-    expect(lede({ needYou: 0, changes: 1, window: "visit" }).changes).toBe(
-      "Your agents made 1 change since your last visit.",
-    )
-    expect(lede({ needYou: 0, changes: 6, window: "visit" }).changes).toBe(
-      "Your agents made 6 changes since your last visit.",
+    expect(visit(1)).toBe("Your bot users made 1 change since your last visit.")
+    expect(visit(6)).toBe(
+      "Your bot users made 6 changes since your last visit.",
     )
   })
 
   test("on a first visit there is no last one to count from", () => {
-    expect(lede({ needYou: 0, changes: 0, window: "ever" }).changes).toBe(
-      "Your agents have made no changes yet.",
-    )
-    expect(lede({ needYou: 0, changes: 1, window: "ever" }).changes).toBe(
-      "Your agents have made 1 change so far.",
-    )
-    expect(lede({ needYou: 0, changes: 4, window: "ever" }).changes).toBe(
-      "Your agents have made 4 changes so far.",
-    )
+    const ever = (changes: number, total = changes) =>
+      lede({ needYou: 0, changes, total, window: "ever" }).changes
+    expect(ever(0)).toBe("Your bot users have made no changes yet.")
+    expect(ever(1)).toBe("Your bot users have made 1 change so far.")
+    expect(ever(4)).toBe("Your bot users have made 4 changes so far.")
+  })
+
+  // The Changes log beneath counts the reader's own lines too, so where the
+  // two figures differ the sentence says which share of the log is the bots'.
+  test("names the bot users' share when the log holds the reader's own changes", () => {
+    expect(
+      lede({ needYou: 0, changes: 23, total: 47, window: "ever" }).changes,
+    ).toBe("Your bot users have made 23 of the 47 changes so far.")
+    expect(
+      lede({ needYou: 0, changes: 1, total: 3, window: "visit" }).changes,
+    ).toBe("Your bot users made 1 of the 3 changes since your last visit.")
+    expect(
+      lede({ needYou: 0, changes: 0, total: 5, window: "visit" }).changes,
+    ).toBe("Your bot users made none of the 5 changes since your last visit.")
+    expect(
+      lede({ needYou: 0, changes: 0, total: 2, window: "ever" }).changes,
+    ).toBe("Your bot users have made none of the 2 changes so far.")
   })
 })
 

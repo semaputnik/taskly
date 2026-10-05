@@ -3,11 +3,7 @@ import { createFileRoute } from "@tanstack/react-router"
 import { Suspense, useEffect, useState } from "react"
 
 import { CaptureLine } from "@/components/Dashboard/CaptureLine"
-import {
-  Changes,
-  ChangesPending,
-  changesQuery,
-} from "@/components/Dashboard/Changes"
+import { Changes, ChangesPending } from "@/components/Dashboard/Changes"
 import { Day, DayHeading, DayPending } from "@/components/Dashboard/DayPage"
 import { markSeen, visitSince } from "@/components/Dashboard/day"
 import {
@@ -15,13 +11,15 @@ import {
   MyWorkPending,
   usePrefetchMyWork,
 } from "@/components/Dashboard/MyWork"
+import { Section } from "@/components/Dashboard/Section"
+import { changesQuery } from "@/components/Dashboard/shared"
 
 export const Route = createFileRoute("/_layout/")({
   component: Dashboard,
   head: () => ({
     meta: [
       {
-        title: "Dashboard - Taskly",
+        title: "Today - Taskly",
       },
     ],
   }),
@@ -97,9 +95,15 @@ function Dashboard() {
           </>
         }
       >
-        <Day since={since} />
-        <MyWork />
-        <Changes since={since} />
+        <Section name="Today's tasks">
+          <Day since={since} />
+        </Section>
+        <Section name="Your work">
+          <MyWork />
+        </Section>
+        <Section name="Changes">
+          <Changes since={since} />
+        </Section>
       </Suspense>
     </div>
   )

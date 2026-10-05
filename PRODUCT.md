@@ -48,7 +48,7 @@ Taskly is self-hosted, and the data stays on the owner's own server. That is the
 
 ## Capabilities and Constraints
 
-- **Tasks.** A task has a title, description, due date (date only), priority P1–P4, an optional assignee (the user or one of their bot users), tags, and a recurrence rule (daily, weekly, monthly or every N days). A task is To do, In progress, Waiting or Done; Waiting stays open, and moving a recurring task to Done spawns its next occurrence as a new task.
+- **Tasks.** A task has a title, description, due date (date only), priority P1–P4, an optional assignee (the user or one of their bot users), tags, and a recurrence rule (daily, weekly, monthly or every N days). A task is Backlog, To do, In progress, Waiting, Review or Done; every status but Done is open, and moving a recurring task to Done spawns its next occurrence as a new task.
 - **Subtasks** nest to any depth and are full tasks. A subtask belongs to the project of its root task.
 - **Projects** are flat. Every user has an Inbox that cannot be renamed or deleted. Projects can be archived, which is distinct from deleted: an archived project is read-only for the human and invisible to bots.
 - **Deletion** of tasks and projects is soft and restorable from the activity log. Tag deletes and merges, comment and attachment deletion, and bot-user deletion cannot be undone.
@@ -71,6 +71,7 @@ Taskly is self-hosted, and the data stays on the owner's own server. That is the
   - errors state what failed;
   - an absent value is said in words, never "N/A";
   - confirmations name what is lost and the way back when there is one.
+- **Mark.** The brand is the wordmark *Taskly*, set in the interface's own face. There is no pictorial mark until one is designed inside the visual system.
 - **Visual system.** The visual system is recorded in `frontend/DESIGN.md`, not here.
 
 ## Evidence on Hand

@@ -16,7 +16,7 @@ import { useTaskStatus } from "@/components/Tasks/useTaskWrites"
 import { Skeleton } from "@/components/ui/skeleton"
 import { currentUserQuery, projectsQuery, tasksQuery } from "@/lib/serverState"
 import { cn } from "@/lib/utils"
-import { textLink } from "./DayPage"
+import { textLink } from "./shared"
 import {
   handoverLine,
   MY_WORK_GROUPS,

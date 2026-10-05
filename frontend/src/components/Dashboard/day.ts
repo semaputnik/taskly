@@ -33,14 +33,21 @@ const changesNoun = (count: number) => (count === 1 ? "change" : "changes")
 /**
  * The sentence, in its two halves: what needs the reader today — what is
  * overdue or due today — set in ink, then the bot users' changes, muted.
+ *
+ * `changes` is the bot users' share of the window and `total` every change
+ * in it, the reader's own included: the Changes log beneath counts the
+ * total, so where the two differ the sentence names the share rather than
+ * set a second, unexplained figure beside the log's.
  */
 export function lede({
   needYou,
   changes,
+  total,
   window,
 }: {
   needYou: number
   changes: number
+  total: number
   window: ChangesWindow
 }): { needs: string; changes: string } {
   const needs =
@@ -48,18 +55,23 @@ export function lede({
       ? "Nothing needs you today."
       : `${needYou} ${needYou === 1 ? "needs" : "need"} you.`
 
+  const share = total > changes
+  const counted = share
+    ? `${changes === 0 ? "none" : changes} of the ${total} changes`
+    : `${changes === 0 ? "no" : changes} ${changesNoun(changes)}`
+
   if (window === "ever") {
     return {
       needs,
       changes:
-        changes === 0
-          ? "Your agents have made no changes yet."
-          : `Your agents have made ${changes} ${changesNoun(changes)} so far.`,
+        changes === 0 && !share
+          ? "Your bot users have made no changes yet."
+          : `Your bot users have made ${counted} so far.`,
     }
   }
   return {
     needs,
-    changes: `Your agents made ${changes === 0 ? "no" : changes} ${changesNoun(changes)} since your last visit.`,
+    changes: `Your bot users made ${counted} since your last visit.`,
   }
 }
 
