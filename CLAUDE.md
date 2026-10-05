@@ -15,3 +15,7 @@ The five canonical triage roles, each label named after its role (`needs-triage`
 ### Domain docs
 
 Single-context: `CONTEXT.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
+
+### Subagent batches
+
+Running several issues through implementer subagents: one shared iteration branch, a checklist before launching, and a fixed brief and report format. See `docs/agents/subagent-brief.md`.
