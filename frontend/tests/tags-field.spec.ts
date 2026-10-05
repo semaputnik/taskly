@@ -10,7 +10,7 @@ async function openTask(page: Page, tags: string[] = []) {
   await api.create("/tags/", { name: "deploy" })
   const task = await api.create("/tasks/", { title: "Buy stamps", tags })
   await page.goto(`/tasks?view=table&task=${task.id}`)
-  const panel = page.getByRole("dialog", { name: "Buy stamps" })
+  const panel = page.getByRole("complementary", { name: "Buy stamps" })
   const vocabulary = async () =>
     (await (await api.get("/tags/")).json()).data
       .map((tag: { name: string }) => tag.name)

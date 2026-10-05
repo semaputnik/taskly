@@ -183,7 +183,7 @@ test("The capture line makes the task at once, and the key still opens the draft
   expect(body).not.toHaveProperty("status")
   await expect(notice(page)).toContainText("“Call the bank” created in Inbox")
   // No panel opened, and the line is ready for the next thought.
-  await expect(page.getByRole("dialog")).toHaveCount(0)
+  await expect(page.locator("[data-record-column]")).toHaveCount(0)
   await expect(line).toHaveValue("")
   await expect(line).toBeFocused()
 
@@ -200,7 +200,9 @@ test("The capture line makes the task at once, and the key still opens the draft
   await page.getByRole("heading", { level: 1 }).click()
   await page.keyboard.press("c")
   await expect(
-    page.getByRole("dialog").getByRole("textbox", { name: "Task title" }),
+    page
+      .locator("[data-record-column]")
+      .getByRole("textbox", { name: "Task title" }),
   ).toHaveValue("")
 })
 
@@ -231,7 +233,9 @@ test("The notice's Open lands on the task's panel", async ({ page }) => {
   await notice(page).getByRole("button", { name: "Open" }).click()
 
   await expect(page).toHaveURL(/task=[0-9a-f-]{36}/)
-  await expect(page.getByRole("dialog", { name: "Order milk" })).toBeVisible()
+  await expect(
+    page.getByRole("complementary", { name: "Order milk" }),
+  ).toBeVisible()
 })
 
 test("Undo deletes the task, and the activity log keeps both acts", async ({

@@ -12,7 +12,7 @@ test("A comment draft survives switching tabs and following a subtask", async ({
   await api.create("/tasks/", { title: "Pack the books", parent_id: task.id })
 
   await page.goto(`/tasks?view=table&task=${task.id}`)
-  const panel = page.getByRole("dialog", { name: "Move house" })
+  const panel = page.getByRole("complementary", { name: "Move house" })
   const draft = panel.getByPlaceholder("Add a comment")
   await draft.fill("Movers booked for the 12th, still need")
 
@@ -21,7 +21,7 @@ test("A comment draft survives switching tabs and following a subtask", async ({
   await expect(draft).toHaveCount(0)
   // Nor does opening one and coming back through the breadcrumb.
   await panel.getByRole("button", { name: "Pack the books" }).click()
-  const child = page.getByRole("dialog", { name: "Pack the books" })
+  const child = page.getByRole("complementary", { name: "Pack the books" })
   await expect(child.getByPlaceholder("Add a comment")).toHaveValue("")
   await child.getByRole("button", { name: "Move house" }).click()
 
@@ -58,7 +58,7 @@ test("Only the tab on screen fetches its collection", async ({ page }) => {
     if (r.url().includes("/attachments/")) attachmentRequests.push(r.url())
   })
   await page.goto(`/tasks?view=table&task=${task.id}`)
-  const panel = page.getByRole("dialog", { name: "Move house" })
+  const panel = page.getByRole("complementary", { name: "Move house" })
   await expect(panel.getByText("No comments yet.")).toBeVisible()
   expect(attachmentRequests).toEqual([])
 

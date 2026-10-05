@@ -22,7 +22,9 @@ test("A tag is created, renamed and deleted on the Tags page", async ({
   const newName = page.getByRole("textbox", { name: "Tag name" })
   await newName.fill("errnds")
   await newName.press("Enter")
-  await expect(page.getByRole("dialog", { name: "errnds" })).toBeVisible()
+  await expect(
+    page.getByRole("complementary", { name: "errnds" }),
+  ).toBeVisible()
   await page.keyboard.press("Escape")
   const row = page.getByRole("row", { name: "Open errnds" })
   await expect(row).toContainText("No tasks")
@@ -40,7 +42,7 @@ test("A tag is created, renamed and deleted on the Tags page", async ({
   await expect(row).toContainText("2 tasks")
 
   await row.click()
-  const panel = page.getByRole("dialog", { name: "errnds" })
+  const panel = page.getByRole("complementary", { name: "errnds" })
   const name = panel.getByRole("textbox", { name: "Tag name" })
   await name.fill("errands")
   await name.press("Enter")
@@ -61,7 +63,7 @@ test("A tag is created, renamed and deleted on the Tags page", async ({
   await page.goto("/tags")
   await page.getByRole("row", { name: "Open errands" }).click()
   await page
-    .getByRole("dialog", { name: "errands" })
+    .getByRole("complementary", { name: "errands" })
     .getByRole("button", { name: "Delete tag" })
     .click()
   const deleteDialog = page.getByRole("dialog", {

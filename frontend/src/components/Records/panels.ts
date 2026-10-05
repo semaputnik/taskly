@@ -174,9 +174,10 @@ export function useRecordPanels() {
   }
 
   const go = useCallback(
-    (next: PanelSearch, state?: HistoryState) =>
+    (next: PanelSearch, state?: HistoryState, replace = false) =>
       navigate({
         to: ".",
+        replace,
         search: (previous: Record<string, unknown>) =>
           panelLink(previous, next),
         // Left out unless there is some, so every other panel opens exactly
@@ -198,6 +199,15 @@ export function useRecordPanels() {
     open,
     close: useCallback(() => go({}), [go]),
     openTask: useCallback((id: string) => open("task", id), [open]),
+    /**
+     * Move the open column on to a neighbour in the list. It takes the place
+     * of the record it leaves in the history: walking ten tasks is one
+     * visit to the column, and Back leaves it rather than walking back.
+     */
+    walkTo: useCallback(
+      (id: string) => go(opening("task", id), undefined, true),
+      [go],
+    ),
     openProject: useCallback((id: string) => open("project", id), [open]),
     openTag: useCallback((id: string) => open("tag", id), [open]),
     openBot: useCallback((id: string) => open("bot", id), [open]),
@@ -211,6 +221,14 @@ export function useRecordPanels() {
       [go],
     ),
   }
+}
+
+/** Whether this record is the one open in the column: its line is tinted. */
+export function useIsOpen(kind: RecordKind, id: string): boolean {
+  return useSearch({
+    strict: false,
+    select: (search: PanelSearch) => search[KEYS[kind]] === id,
+  })
 }
 
 /** The title a capture was opened with, typed before its panel was open. */
@@ -305,7 +323,7 @@ export function useRecordPanel<K extends RecordKind>(kind: K) {
 /**
  * Put focus on a capture field as its panel opens.
  *
- * Done here rather than through `autoFocus`, which a sheet's own opening focus
+ * Done here rather than through `autoFocus`, which the column's own opening focus
  * would win against. It is claimed twice: on a phone the navigation is a sheet of
  * its own, and it hands focus back to the button that opened capture as it
  * finishes closing, a moment after this panel arrives.

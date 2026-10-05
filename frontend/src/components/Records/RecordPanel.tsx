@@ -1,21 +1,19 @@
-import { type LucideIcon, Trash2 } from "lucide-react"
+import {
+  ChevronDown,
+  ChevronUp,
+  type LucideIcon,
+  Trash2,
+  X,
+} from "lucide-react"
 import { useEffect, useRef, useState } from "react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Toaster } from "@/components/ui/sonner"
 import { Textarea } from "@/components/ui/textarea"
-import { PANEL_TOASTER_ID, settlePanelNotices } from "@/lib/panelNotices"
 import { cn } from "@/lib/utils"
 import type { RecordLoad } from "./panels"
+import type { Neighbours } from "./walk"
 
 /**
  * The one shape a record is read and acted on in.
@@ -26,6 +24,11 @@ import type { RecordLoad } from "./panels"
  * decided where its actions belong. Here every action has a home: a field is
  * changed in the field, and delete is one destructive control at the foot of
  * the panel, as far from the close control as the panel allows.
+ *
+ * It is a column beside the page, not a sheet over it: the page stays live,
+ * with no scrim and no focus trap, so a reader can read down a list and open
+ * the next line without closing anything. Where there is no room beside the
+ * page — a phone, a narrow window — the column takes the whole screen.
  *
  * Everything that makes a panel a panel lives here, so a record type adopts
  * the pattern rather than reimplementing it (The One Address Rule).
@@ -44,9 +47,6 @@ import type { RecordLoad } from "./panels"
 export const ghost =
   "record-control border-transparent bg-transparent shadow-none hover:bg-accent focus-visible:border-ring dark:bg-transparent dark:hover:bg-accent/50"
 
-/** Where notices are shown, outside any panel. */
-const NOTICES_SELECTOR = "[data-sonner-toaster]"
-
 export function RecordPanel({
   open,
   onClose,
@@ -63,6 +63,9 @@ export function RecordPanel({
   onRetry,
   /** What the record is called in the sentence saying it cannot be shown. */
   kind = "record",
+  /** The records on either side of this one in the list it was opened from. */
+  walk,
+  onWalk,
   children,
 }: {
   open: boolean
@@ -70,99 +73,309 @@ export function RecordPanel({
   name: string
   destructive?: React.ReactNode
   kind?: string
+  walk?: Neighbours | null
+  onWalk?: (id: string) => void
   children?: React.ReactNode
 } & RecordLoad) {
+  // Mounted only while open, so opening and closing are the column's mount
+  // and unmount, and focus follows them.
+  if (!open) return null
   return (
-    <Sheet open={open} onOpenChange={(next) => !next && onClose()}>
-      <SheetContent
-        side="right"
-        className="w-full gap-0 overflow-y-auto p-0 outline-none sm:max-w-xl"
-        // A notice is not the page behind the panel, so touching one never
-        // dismisses it. The notice a capture leaves arrives while the panel
-        // is still sliding out, and its Open opens the new task in this very
-        // panel. Radix delivers an outside press only when the click ends, by
-        // when Open has made the panel open again: without this the panel
-        // closed straight after it opened. Any notice, an error's included.
-        onInteractOutside={(event) => {
-          if ((event.target as Element | null)?.closest(NOTICES_SELECTOR)) {
-            event.preventDefault()
-          }
-        }}
-        // Opening a record puts focus on the panel itself, not on its first
-        // control: that would be the name field, which a reader who only came
-        // to look must not find already in their hands. Tab starts from here,
-        // and capture claims its own field once the panel is open.
-        onOpenAutoFocus={(event) => {
-          event.preventDefault()
-          ;(event.target as HTMLElement).focus({ preventScroll: true })
-        }}
-      >
-        {/* The record the panel is showing, announced on arrival. */}
-        <SheetTitle className="sr-only">{name}</SheetTitle>
-        {failure ? (
-          <div role="alert" className="flex flex-col items-start gap-3 p-6">
-            <p className="font-medium">
-              {failure === "missing"
-                ? `This ${kind} could not be opened`
-                : `This ${kind} could not be loaded`}
-            </p>
-            <p className="text-muted-foreground text-sm text-pretty">
-              {failure === "missing"
-                ? "It may have been deleted, or the link points at something that is not yours. Deleted records can be restored from the activity log."
-                : `The server did not answer this time. Nothing about the ${kind} has changed.`}
-            </p>
-            <div className="flex gap-2">
-              {failure === "unavailable" && onRetry && (
-                <Button size="sm" onClick={onRetry}>
-                  Try again
-                </Button>
-              )}
-              <Button variant="outline" size="sm" onClick={onClose}>
-                Close
+    <Column
+      name={name}
+      kind={kind}
+      onClose={onClose}
+      walk={walk}
+      onWalk={onWalk}
+    >
+      {failure ? (
+        <div role="alert" className="flex flex-col items-start gap-3 p-6">
+          <p className="font-medium">
+            {failure === "missing"
+              ? `This ${kind} could not be opened`
+              : `This ${kind} could not be loaded`}
+          </p>
+          <p className="text-muted-foreground text-sm text-pretty">
+            {failure === "missing"
+              ? "It may have been deleted, or the link points at something that is not yours. Deleted records can be restored from the activity log."
+              : `The server did not answer this time. Nothing about the ${kind} has changed.`}
+          </p>
+          <div className="flex gap-2">
+            {failure === "unavailable" && onRetry && (
+              <Button size="sm" onClick={onRetry}>
+                Try again
               </Button>
-            </div>
-          </div>
-        ) : pending ? (
-          <div className="flex flex-col gap-4 p-6">
-            <Skeleton className="h-4 w-24" />
-            <Skeleton className="h-7 w-3/4" />
-            <Skeleton className="h-40 w-full" />
-          </div>
-        ) : (
-          <>
-            {children}
-            {destructive && (
-              <div className="mt-auto flex flex-wrap gap-2 border-t px-6 py-4">
-                {destructive}
-              </div>
             )}
-          </>
-        )}
-        <PanelNotices />
-      </SheetContent>
-    </Sheet>
+            <Button variant="outline" size="sm" onClick={onClose}>
+              Close
+            </Button>
+          </div>
+        </div>
+      ) : pending ? (
+        <div className="flex flex-col gap-4 p-6">
+          <Skeleton className="h-4 w-24" />
+          <Skeleton className="h-7 w-3/4" />
+          <Skeleton className="h-40 w-full" />
+        </div>
+      ) : (
+        <>
+          {children}
+          {destructive && (
+            <div className="mt-auto flex flex-wrap gap-2 border-t px-6 py-4">
+              {destructive}
+            </div>
+          )}
+        </>
+      )}
+    </Column>
   )
 }
 
 /**
- * The toaster for notices that offer an action, inside the panel where the
- * modal sheet still lets the reader reach them — by pointer, by Tab, and by
- * its Alt+T hotkey.
+ * The column itself: a landmark named for the record, a bar that is always
+ * in reach, and the record scrolling beneath it on its own.
+ *
+ * Beside the page it sits in the shell's third grid track, held in place
+ * while the page scrolls; below 1200px — no room for the navigation (200px),
+ * the column (560px) and a page that can still be read — it is fixed over
+ * everything, which is what "the whole screen" is.
  */
-function PanelNotices() {
-  useEffect(() => settlePanelNotices, [])
-  // No close button: Undo is the first stop inside a notice, and a notice that
-  // is left alone runs out on its own.
+function Column({
+  name,
+  kind,
+  onClose,
+  walk,
+  onWalk,
+  children,
+}: {
+  name: string
+  kind: string
+  onClose: () => void
+  walk?: Neighbours | null
+  onWalk?: (id: string) => void
+  children: React.ReactNode
+}) {
+  const column = useRef<HTMLElement>(null)
+  useColumnFocus(column)
+  useColumnKeys(column, { onClose, walk, onWalk })
+
   return (
-    <Toaster
-      id={PANEL_TOASTER_ID}
-      toastOptions={{
-        classNames: {
-          actionButton: "pointer-coarse:h-11! pointer-coarse:px-4!",
-        },
-      }}
-    />
+    <aside
+      ref={column}
+      aria-label={name}
+      tabIndex={-1}
+      data-record-column
+      className={cn(
+        "bg-page border-rule-strong fixed inset-0 z-50 flex flex-col overflow-y-auto overscroll-contain outline-none",
+        // Written out in full, as Tailwind finds classes by reading them.
+        "min-[1200px]:sticky min-[1200px]:inset-auto min-[1200px]:top-0 min-[1200px]:z-auto min-[1200px]:h-svh min-[1200px]:w-[560px] min-[1200px]:self-start min-[1200px]:border-l",
+      )}
+    >
+      <div className="bg-page sticky top-0 z-10 flex h-14 shrink-0 items-center gap-1 pr-3 pl-6 min-[1200px]:h-[52px]">
+        {walk && (
+          <span className="text-ink-3 font-mono text-xs tabular-nums">
+            {walk.position} of {walk.count}
+          </span>
+        )}
+        <span className="ml-auto flex items-center gap-1">
+          {walk && onWalk && (
+            <>
+              <BarButton
+                label={`Previous ${kind}`}
+                disabled={!walk.previous}
+                onClick={() => walk.previous && onWalk(walk.previous)}
+              >
+                <ChevronUp aria-hidden />
+              </BarButton>
+              <BarButton
+                label={`Next ${kind}`}
+                disabled={!walk.next}
+                onClick={() => walk.next && onWalk(walk.next)}
+              >
+                <ChevronDown aria-hidden />
+              </BarButton>
+            </>
+          )}
+          <BarButton label="Close" onClick={onClose}>
+            <X aria-hidden />
+          </BarButton>
+        </span>
+      </div>
+      {/* The record's name as the heading the sections beneath descend from. */}
+      <h2 className="sr-only">{name}</h2>
+      {children}
+    </aside>
   )
+}
+
+/**
+ * A control in the column's bar: 28px under a mouse, 44px under a thumb. At
+ * the end of the list a walking control says so without leaving, so focus
+ * that is on it stays where it is.
+ */
+function BarButton({
+  label,
+  disabled,
+  onClick,
+  children,
+}: {
+  label: string
+  disabled?: boolean
+  onClick: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      aria-disabled={disabled || undefined}
+      onClick={() => !disabled && onClick()}
+      className={cn(
+        "text-ink-3 focus-visible:ring-ring/50 grid size-7 place-items-center rounded-md outline-none focus-visible:ring-[3px] pointer-coarse:size-11 [&_svg]:size-4",
+        disabled ? "opacity-40" : "hover:bg-hover hover:text-ink",
+      )}
+    >
+      {children}
+    </button>
+  )
+}
+
+// Where focus was when the column opened, to give it back when the column
+// closes. Module state, because switching from one kind of record to another
+// unmounts one column and mounts the next in a single commit, and that is
+// still one visit: the way back is to the line that started it.
+let opener: HTMLElement | null = null
+let closing: ReturnType<typeof setTimeout> | undefined
+
+/**
+ * Opening puts focus on the column itself, not on its first field: that would
+ * be a name the reader who only came to look finds already in their hands.
+ * Tab starts from here, and capture claims its own field once the column is
+ * open. Closing returns focus to the line that opened it — unless the reader
+ * has since put it somewhere of their own on the page.
+ */
+function useColumnFocus(column: React.RefObject<HTMLElement | null>) {
+  useEffect(() => {
+    const element = column.current
+    if (!element) return
+    if (closing !== undefined) {
+      clearTimeout(closing)
+      closing = undefined
+    } else {
+      const active = document.activeElement
+      opener =
+        active instanceof HTMLElement &&
+        active !== document.body &&
+        !element.contains(active)
+          ? active
+          : null
+    }
+    element.focus({ preventScroll: true })
+    return () => {
+      closing = setTimeout(() => {
+        closing = undefined
+        const target = opener
+        opener = null
+        const active = document.activeElement
+        if (target?.isConnected && (!active || active === document.body)) {
+          target.focus({ preventScroll: true })
+        }
+      }, 0)
+    }
+  }, [column])
+}
+
+/** A keyboard that is typing, picking or navigating a widget keeps its keys. */
+const KEEPS_ARROWS = [
+  "input",
+  "textarea",
+  "select",
+  '[contenteditable=""]',
+  '[contenteditable="true"]',
+  "[aria-haspopup]",
+  '[role="menu"]',
+  '[role="listbox"]',
+  '[role="combobox"]',
+  '[role="slider"]',
+  '[role="spinbutton"]',
+  '[role="tablist"]',
+  '[role="radiogroup"]',
+  '[role="textbox"]',
+  '[role="grid"]',
+  '[role="tree"]',
+].join(",")
+
+/** A layer that is open over the page owns the keyboard until it is gone. */
+const OPEN_LAYER = [
+  '[role="dialog"][data-state="open"]',
+  '[role="alertdialog"][data-state="open"]',
+  '[role="menu"][data-state="open"]',
+  '[role="listbox"]',
+].join(",")
+
+/** Where notices are shown, outside any panel. */
+const NOTICES_SELECTOR = "[data-sonner-toaster]"
+
+const EDITABLE =
+  'input, textarea, select, [contenteditable=""], [contenteditable="true"]'
+
+/**
+ * Escape closes the column; ↓ and ↑ walk its list.
+ *
+ * Both give way to anything that has already answered the key — a menu or a
+ * popover has called `preventDefault` by now — and the arrows only act when
+ * focus is not in a text field, a select or an open menu, so they never steal
+ * typing, caret movement or menu navigation.
+ */
+function useColumnKeys(
+  column: React.RefObject<HTMLElement | null>,
+  {
+    onClose,
+    walk,
+    onWalk,
+  }: {
+    onClose: () => void
+    walk?: Neighbours | null
+    onWalk?: (id: string) => void
+  },
+) {
+  // Read at the key press, so the listener is added once and never races a
+  // render.
+  const latest = useRef({ onClose, walk, onWalk })
+  latest.current = { onClose, walk, onWalk }
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.isComposing) return
+      const target = event.target instanceof Element ? event.target : null
+      if (target?.closest(NOTICES_SELECTOR)) return
+
+      if (event.key === "Escape") {
+        // A field on the page beside the column keeps its own Escape.
+        if (target?.matches(EDITABLE) && !column.current?.contains(target)) {
+          return
+        }
+        latest.current.onClose()
+        return
+      }
+
+      if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return
+      if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) {
+        return
+      }
+      const { walk, onWalk } = latest.current
+      if (!walk || !onWalk) return
+      if (target?.closest(KEEPS_ARROWS) || document.querySelector(OPEN_LAYER)) {
+        return
+      }
+      const to = event.key === "ArrowDown" ? walk.next : walk.previous
+      if (!to) return
+      event.preventDefault()
+      onWalk(to)
+    }
+    document.addEventListener("keydown", onKeyDown)
+    return () => document.removeEventListener("keydown", onKeyDown)
+  }, [column])
 }
 
 /**
@@ -203,12 +416,12 @@ export function RecordHeader({
   title?: React.ReactNode
 }) {
   return (
-    <SheetHeader className="gap-3 border-b p-6">
-      <SheetDescription className="flex min-w-0 items-center gap-1 pr-10 text-sm pointer-coarse:pr-14">
+    <header className="flex flex-col gap-3 border-b p-6 pt-2">
+      <p className="text-muted-foreground flex min-w-0 items-center gap-1 text-sm">
         {breadcrumb}
-      </SheetDescription>
+      </p>
       {title}
-    </SheetHeader>
+    </header>
   )
 }
 

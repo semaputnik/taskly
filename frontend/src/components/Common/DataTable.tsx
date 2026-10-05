@@ -12,6 +12,7 @@ import {
   MoveHorizontal,
 } from "lucide-react"
 
+import { type RecordKind, useRecordPanels } from "@/components/Records/panels"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
@@ -62,6 +63,11 @@ interface DataTableProps<TData extends RowData> {
   empty?: React.ReactNode
   /** Makes rows open something. Clicks on a row's own controls are ignored. */
   onRowClick?: (row: TData) => void
+  /**
+   * The kind of record a row opens. The row whose record is open in the
+   * column is tinted, as a line on the day page is.
+   */
+  opens?: RecordKind
   /**
    * What opening a row does, in words. A row that acts is a control, and a
    * control without a name is unusable to anyone not looking at the screen.
@@ -116,6 +122,7 @@ export function DataTable<TData extends RowData>({
   data,
   empty,
   onRowClick,
+  opens,
   rowLabel,
   pending = false,
   pendingRows = 5,
@@ -124,6 +131,8 @@ export function DataTable<TData extends RowData>({
   scrollLabel,
 }: DataTableProps<TData>) {
   const table = useTable({ features, data, columns })
+  const { idOf } = useRecordPanels()
+  const openId = opens ? idOf(opens) : null
   const pageIds = selection ? data.map(selection.idOf) : []
   const wholePage =
     pageIds.length > 0 && pageIds.every((id) => selection?.ids.has(id))
@@ -218,6 +227,12 @@ export function DataTable<TData extends RowData>({
                 <TableRow
                   key={row.id}
                   data-state={selected ? "selected" : undefined}
+                  data-open={
+                    openId !== null &&
+                    (row.original as { id?: string }).id === openId
+                      ? ""
+                      : undefined
+                  }
                   className={
                     onRowClick
                       ? "focus-visible:ring-ring cursor-pointer outline-none focus-visible:ring-2"

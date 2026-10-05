@@ -17,7 +17,7 @@ async function openComment(page: Page, { clock = true } = {}) {
   })
 
   await page.goto(`/tasks?view=table&task=${task.id}`)
-  const panel = page.getByRole("dialog", { name: "Renew the lease" })
+  const panel = page.getByRole("complementary", { name: "Renew the lease" })
   const shown = panel
     .locator("div.rounded-md")
     .filter({ hasText: "Landlord wants it signed by Friday" })
@@ -52,7 +52,7 @@ test("Undo is reachable from the keyboard", async ({ page }) => {
   await page.keyboard.press("Alt+KeyT")
   await expect(page.locator("[data-sonner-toaster]")).toBeFocused()
   await page.keyboard.press("Tab")
-  await expect(page.getByRole("listitem")).toBeFocused()
+  await expect(page.locator("[data-sonner-toast]")).toBeFocused()
   await page.keyboard.press("Tab")
   await expect(page.getByRole("button", { name: "Undo" })).toBeFocused()
   await page.keyboard.press("Enter")
@@ -80,14 +80,36 @@ test("A comment is deleted once the undo window lapses", async ({ page }) => {
   await expect(panel.getByText("No comments yet.")).toBeVisible()
 })
 
-test("Closing the panel lets the deletion go ahead", async ({ page }) => {
+test("Closing the panel leaves the notice, and the deletion waits for its window", async ({
+  page,
+}) => {
   const { shown, stored } = await openComment(page)
 
   await shown.getByRole("button", { name: "Delete comment" }).click()
   await expect(page.getByRole("button", { name: "Undo" })).toBeVisible()
   await page.keyboard.press("Escape")
+  await expect(page.locator("[data-record-column]")).toHaveCount(0)
 
+  // No modal holds the notice back any more, so it outlives the panel it was
+  // raised in, and Undo still returns the very same comment.
+  await expect(page.getByRole("button", { name: "Undo" })).toBeVisible()
+  expect(await stored()).toHaveLength(1)
+  await page.mouse.move(0, 0)
+  await page.clock.fastForward(15_000)
   await expect.poll(stored).toEqual([])
+})
+
+test("Undo after the panel has closed brings the comment back", async ({
+  page,
+}) => {
+  const { shown, stored, comment } = await openComment(page)
+
+  await shown.getByRole("button", { name: "Delete comment" }).click()
+  await page.keyboard.press("Escape")
+  await expect(page.locator("[data-record-column]")).toHaveCount(0)
+  await page.getByRole("button", { name: "Undo" }).click()
+  await page.clock.fastForward(30_000)
+  expect(await stored()).toEqual([comment])
 })
 
 test("A failed deletion brings the comment back and says so", async ({

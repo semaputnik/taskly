@@ -58,7 +58,7 @@ test("A bot user's comment names the bot and offers no edit or delete", async ({
     .click()
 
   // Comments are the panel's first tab.
-  const dialog = page.getByRole("dialog", { name: /Ship 1\.2/ })
+  const dialog = page.getByRole("complementary", { name: /Ship 1\.2/ })
   const botComment = dialog
     .locator("div.rounded-md")
     .filter({ hasText: "Deployed to staging" })

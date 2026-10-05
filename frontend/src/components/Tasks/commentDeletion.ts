@@ -3,7 +3,6 @@ import { useCallback, useSyncExternalStore } from "react"
 import { toast } from "sonner"
 
 import { type CommentPublic, CommentsService } from "@/client"
-import { PANEL_TOASTER_ID, settleWhenPanelCloses } from "@/lib/panelNotices"
 import { commentsQuery, reportChange } from "@/lib/serverState"
 import { toastError } from "@/lib/toasts"
 
@@ -50,23 +49,16 @@ export function useCommentDeletion(taskId: string) {
     (comment: CommentPublic) => {
       setPending((ids) => ids.add(comment.id))
       let settled = false
-      // The panel's closing is a dismissal: the deletion goes ahead.
-      const withdraw = settleWhenPanelCloses(() => {
-        void send()
-        toast.dismiss(notice)
-      })
 
       const undo = () => {
         if (settled) return
         settled = true
-        withdraw()
         setPending((ids) => ids.delete(comment.id))
       }
 
       async function send() {
         if (settled) return
         settled = true
-        withdraw()
         try {
           await CommentsService.deleteComment({
             path: { comment_id: comment.id },
@@ -90,8 +82,11 @@ export function useCommentDeletion(taskId: string) {
         }
       }
 
-      const notice = toast("Comment deleted", {
-        toasterId: PANEL_TOASTER_ID,
+      // Nothing is trapped behind a modal any more, so this is a notice like
+      // any other: it outlives the panel it was raised in, and so does Undo.
+      // No close button: Undo is the first stop inside it.
+      toast("Comment deleted", {
+        closeButton: false,
         description: excerpt(comment.body),
         duration: UNDO_WINDOW_MS,
         action: { label: "Undo", onClick: undo },

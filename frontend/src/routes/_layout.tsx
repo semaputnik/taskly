@@ -79,7 +79,10 @@ function Layout() {
       >
         Skip to content
       </a>
-      <div className="bg-page min-h-svh md:grid md:grid-cols-[200px_minmax(0,1fr)]">
+      {/* A record opens in a third column beside the page, which is why the
+          grid has a track for it: empty, it is no width at all. Below 1200px
+          the column is fixed over the screen and takes no track. */}
+      <div className="group/shell bg-page min-h-svh md:grid md:grid-cols-[200px_minmax(0,1fr)_auto]">
         {/* On a wide screen the navigation is a column of its own, held in
             place while the page scrolls. No rule divides it from the work:
             whitespace does. */}
@@ -95,16 +98,16 @@ function Layout() {
         <main
           id="main"
           tabIndex={-1}
-          className="min-w-0 px-4 pt-5 pb-28 outline-none md:px-12 md:pt-9 md:pb-24"
+          className="min-w-0 px-4 pt-5 pb-28 outline-none md:px-12 md:pt-9 md:pb-24 min-[1200px]:group-has-[[data-record-column]]/shell:px-8"
         >
           <div className="max-w-7xl">
             <Outlet />
           </div>
         </main>
+        {/* Mounted once: a record opens beside whatever screen the reader is
+            on, and capture starts from any of them. */}
+        <RecordPanels />
       </div>
-      {/* Mounted once: a record opens over whatever screen the reader is on,
-          and capture starts from any of them. */}
-      <RecordPanels />
       <AddTaskButton />
     </>
   )

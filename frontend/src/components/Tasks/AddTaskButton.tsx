@@ -10,8 +10,9 @@ import { Button } from "@/components/ui/button"
  * menu sheet: writing a task down would take two taps, the first in the far
  * top corner. This keeps it one tap from every screen, in the corner a thumb
  * rests in. It is the primary action, so it is ink; it floats over the page,
- * so like a popover it lifts by a shadow, here a deeper one. An open panel's scrim covers
- * it: capture is already on screen, or a record is being read.
+ * so like a popover it lifts by a shadow, here a deeper one. An open record's column
+ * takes the whole phone screen and covers it: capture is already on screen,
+ * or a record is being read.
  */
 export function AddTaskButton() {
   const { capture } = useRecordPanels()

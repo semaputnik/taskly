@@ -118,7 +118,7 @@ test("A notice raised from inside a panel is at the top of the screen too", asyn
   await api.create(`/tasks/${task.id}/comments/`, { body: "Sign it by Friday" })
 
   await page.goto(`/tasks?view=table&task=${task.id}`)
-  const panel = page.getByRole("dialog", { name: "Renew the lease" })
+  const panel = page.getByRole("complementary", { name: "Renew the lease" })
   await panel
     .locator("div.rounded-md")
     .filter({ hasText: "Sign it by Friday" })
@@ -129,11 +129,11 @@ test("A notice raised from inside a panel is at the top of the screen too", asyn
     .locator("[data-sonner-toast]")
     .filter({ hasText: "Comment deleted" })
   const place = await box(notice)
-  // The panel is a sheet at the right edge; the notice is still centred on
-  // the screen, not on the sheet it is raised from.
+  // The panel is a column at the right edge; the notice is still centred on
+  // the screen, not on the column it is raised from.
   expect(place.y).toBeLessThan(40)
   expect(Math.abs(place.x + place.width / 2 - 1280 / 2)).toBeLessThan(2)
-  // And its action works inside the modal.
+  // And its action works from there, the column being no modal.
   await notice.getByRole("button", { name: "Undo" }).click()
   await expect(
     panel.getByRole("tabpanel").getByText("Sign it by Friday"),

@@ -45,7 +45,7 @@ test("A project is read, renamed and archived in its own panel", async ({
   await page.goto("/projects")
   await row(page, "Kitchen rebuild").click()
 
-  const panel = page.getByRole("dialog", { name: "Kitchen rebuild" })
+  const panel = page.getByRole("complementary", { name: "Kitchen rebuild" })
   await expect(panel).toBeVisible()
   await expect(page).toHaveURL(new RegExp(`project=${project.id}`))
   await expect(panel.getByRole("link", { name: "1 task" })).toBeVisible()
@@ -60,7 +60,7 @@ test("A project is read, renamed and archived in its own panel", async ({
   // Archiving is a property of the project, read where it is changed.
   await row(page, "Kitchen refit").click()
   await page
-    .getByRole("dialog", { name: "Kitchen refit" })
+    .getByRole("complementary", { name: "Kitchen refit" })
     .getByRole("button", { name: "Archive" })
     .click()
   await expect(page.getByText("moved to the archive")).toBeVisible()
@@ -71,7 +71,7 @@ test("A project is read, renamed and archived in its own panel", async ({
   await expect(row(page, "Kitchen refit")).toBeVisible()
   await row(page, "Kitchen refit").click()
   await page
-    .getByRole("dialog", { name: "Kitchen refit" })
+    .getByRole("complementary", { name: "Kitchen refit" })
     .getByRole("button", { name: "Unarchive" })
     .click()
   await expect(page.getByText("is back in your projects")).toBeVisible()
@@ -98,13 +98,15 @@ test("A panel opens on reload and from a link the list would exclude", async ({
 
   // The live list excludes it; its own address still opens it.
   await page.goto(`/projects?project=${project.id}`)
-  const panel = page.getByRole("dialog", { name: "Old house" })
+  const panel = page.getByRole("complementary", { name: "Old house" })
   await expect(panel).toBeVisible()
   await expect(panel.getByRole("button", { name: "Unarchive" })).toBeVisible()
   await expect(row(page, "Old house")).toHaveCount(0)
 
   await page.reload()
-  await expect(page.getByRole("dialog", { name: "Old house" })).toBeVisible()
+  await expect(
+    page.getByRole("complementary", { name: "Old house" }),
+  ).toBeVisible()
 })
 
 test("The Inbox says what cannot be done to it", async ({ page }) => {
@@ -113,7 +115,7 @@ test("The Inbox says what cannot be done to it", async ({ page }) => {
   await page.goto("/projects")
   await row(page, "Inbox").click()
 
-  const panel = page.getByRole("dialog", { name: "Inbox" })
+  const panel = page.getByRole("complementary", { name: "Inbox" })
   await expect(panel).toContainText(
     "The Inbox is always in use, so it is never archived or renamed",
   )
@@ -135,7 +137,7 @@ test("A tag is renamed and deleted from its panel", async ({ page }) => {
 
   await page.goto("/tags")
   await row(page, "errnds").click()
-  const panel = page.getByRole("dialog", { name: "errnds" })
+  const panel = page.getByRole("complementary", { name: "errnds" })
   const name = panel.getByRole("textbox", { name: "Tag name" })
   await name.fill("errands")
   await name.press("Enter")
@@ -145,7 +147,7 @@ test("A tag is renamed and deleted from its panel", async ({ page }) => {
   // Deleting says what it takes with it, first.
   await row(page, "errands").click()
   await page
-    .getByRole("dialog", { name: "errands" })
+    .getByRole("complementary", { name: "errands" })
     .getByRole("button", { name: "Delete tag" })
     .click()
   const confirm = page.getByRole("dialog", { name: /Delete the tag/ })
@@ -184,7 +186,7 @@ test("A bot user's scope and permissions each save on their own", async ({
 
   await page.goto("/bots")
   await row(page, "Triage agent").click()
-  const panel = page.getByRole("dialog", { name: "Triage agent" })
+  const panel = page.getByRole("complementary", { name: "Triage agent" })
   await expect(panel.getByRole("textbox", { name: "Bot name" })).toHaveValue(
     "Triage agent",
   )
@@ -212,7 +214,7 @@ test("A bot user's scope and permissions each save on their own", async ({
     .toEqual({ projects: [project.id], create: true })
 
   await page.reload()
-  const reopened = page.getByRole("dialog", { name: "Triage agent" })
+  const reopened = page.getByRole("complementary", { name: "Triage agent" })
   await expect(
     reopened.getByRole("checkbox", { name: "Support queue" }),
   ).toBeChecked()
@@ -230,7 +232,10 @@ test("A token is issued and revoked from the bot user's panel", async ({
 
   await page.goto("/bots")
   await row(page, "Nightly sync").click()
-  const panel = page.getByRole("dialog", { name: "Nightly sync", exact: true })
+  const panel = page.getByRole("complementary", {
+    name: "Nightly sync",
+    exact: true,
+  })
   await expect(panel).toContainText("No token")
 
   await panel.getByRole("button", { name: "Issue token" }).click()
@@ -275,7 +280,9 @@ test("Creating a project or a tag opens the new record's panel", async ({
   await expect(projectName).toBeFocused()
   await projectName.fill("Move house")
   await projectName.press("Enter")
-  await expect(page.getByRole("dialog", { name: "Move house" })).toBeVisible()
+  await expect(
+    page.getByRole("complementary", { name: "Move house" }),
+  ).toBeVisible()
   await expect(page).toHaveURL(/project=[0-9a-f-]{36}/)
   await page.keyboard.press("Escape")
   await expect(row(page, "Move house")).toBeVisible()
@@ -285,7 +292,9 @@ test("Creating a project or a tag opens the new record's panel", async ({
   const tagName = page.getByRole("textbox", { name: "Tag name" })
   await tagName.fill("packing")
   await tagName.press("Enter")
-  await expect(page.getByRole("dialog", { name: "packing" })).toBeVisible()
+  await expect(
+    page.getByRole("complementary", { name: "packing" }),
+  ).toBeVisible()
   await expect(page).toHaveURL(/tag_id=[0-9a-f-]{36}/)
 })
 
@@ -340,7 +349,9 @@ test("No record carries a three-dot menu, and rows open from the keyboard", asyn
   await page.goto("/projects")
   await row(page, "Garden").focus()
   await page.keyboard.press("Enter")
-  await expect(page.getByRole("dialog", { name: "Garden" })).toBeVisible()
+  await expect(
+    page.getByRole("complementary", { name: "Garden" }),
+  ).toBeVisible()
 })
 
 test("A refused rename keeps the name that was typed", async ({ page }) => {
@@ -352,7 +363,7 @@ test("A refused rename keeps the name that was typed", async ({ page }) => {
 
   await page.goto("/tags")
   await row(page, "weekend").click()
-  const panel = page.getByRole("dialog", { name: "weekend" })
+  const panel = page.getByRole("complementary", { name: "weekend" })
   const name = panel.getByRole("textbox", { name: "Tag name" })
   await name.fill("errands")
   await name.press("Enter")

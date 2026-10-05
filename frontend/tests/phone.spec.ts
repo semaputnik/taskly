@@ -66,7 +66,7 @@ test("Add a task is one tap from any screen, in the thumb's corner", async ({
   await add.tap()
   await page.getByRole("textbox", { name: "Task title" }).fill("Buy milk")
   await page.getByRole("textbox", { name: "Task title" }).press("Enter")
-  await expect(page.getByRole("dialog")).toHaveCount(0)
+  await expect(page.locator("[data-record-column]")).toHaveCount(0)
   await expect(page.getByText("“Buy milk” created")).toBeVisible()
 })
 
