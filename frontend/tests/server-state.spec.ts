@@ -55,7 +55,7 @@ test("A captured task counts on the Projects list at once", async ({
   await title.press("Enter")
   await openCaptured(page)
   await expect(
-    page.getByRole("dialog", { name: "Prune the roses" }),
+    page.getByRole("complementary", { name: "Prune the roses" }),
   ).toBeVisible()
   await page.keyboard.press("Escape")
 

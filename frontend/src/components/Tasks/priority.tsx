@@ -3,27 +3,7 @@ import { Flag } from "lucide-react"
 import type { TaskPriority } from "@/client"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
-
-/**
- * The priority hues. P4 and no priority have none: they are the ordinary
- * case, and they stay in ink as every task did before priorities had colour.
- */
-export type PriorityTone = "p1" | "p2" | "p3"
-
-export function priorityTone(
-  priority: TaskPriority | null | undefined,
-): PriorityTone | null {
-  switch (priority) {
-    case "P1":
-      return "p1"
-    case "P2":
-      return "p2"
-    case "P3":
-      return "p3"
-    default:
-      return null
-  }
-}
+import { type PriorityTone, priorityTone } from "./priorityTone"
 
 /**
  * The priority hues as classes, written out in full so Tailwind can see them.
@@ -57,6 +37,37 @@ export function PriorityBadge({
     >
       {priority}
     </Badge>
+  )
+}
+
+/**
+ * A priority as the value of its property row: the flag and the label in the
+ * priority's hue, medium weight; P4 stays in ink, and no priority is said in
+ * the quiet grey of every unset value.
+ */
+export function PriorityValue({
+  priority,
+}: {
+  priority: TaskPriority | null | undefined
+}) {
+  if (!priority) {
+    return <span className="text-muted-foreground">No priority</span>
+  }
+  const tone = priorityTone(priority)
+  return (
+    <span
+      className={cn(
+        "flex items-center gap-1.5 font-medium",
+        tone ? PRIORITY_TEXT[tone] : "text-foreground",
+      )}
+    >
+      {/* `text-current` keeps the select trigger's grey off the flag. */}
+      <Flag
+        className="size-3.5 shrink-0 fill-current text-current"
+        aria-hidden
+      />
+      {priority}
+    </span>
   )
 }
 

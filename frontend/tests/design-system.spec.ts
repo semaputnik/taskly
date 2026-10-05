@@ -53,10 +53,13 @@ for (const theme of ["light", "dark"] as const) {
     test("A modal layer visibly demotes the page behind it", async ({
       page,
     }) => {
-      await page.goto("/tasks?view=table")
+      // A record's column is no modal layer, so the one opened here is a
+      // confirmation: the sort a reader must answer before going on.
+      await page.goto("/settings")
+      await page.getByRole("tab", { name: "Danger zone" }).click()
       const ground = await pageGround(page)
-      await page.getByRole("button", { name: "Add a task" }).first().click()
-      const overlay = page.locator("[data-slot=sheet-overlay]")
+      await page.getByRole("button", { name: "Delete Account" }).click()
+      const overlay = page.locator("[data-slot=dialog-overlay]")
       await expect(overlay).toBeVisible()
       await overlay.evaluate((node) =>
         Promise.all(node.getAnimations().map((a) => a.finished)),

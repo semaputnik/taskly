@@ -148,11 +148,11 @@ test("A status is changed from the list column and from the panel", async ({
   await page.getByRole("menuitemradio", { name: "Waiting" }).click()
   await expect(statusTrigger(page, "Call the bank")).toContainText("Waiting")
   // Choosing in the menu did not open the task behind it.
-  await expect(page.getByRole("dialog")).toHaveCount(0)
+  await expect(page.locator("[data-record-column]")).toHaveCount(0)
   await expect(page.getByText("Call the bank moved to Waiting")).toBeAttached()
 
   await row(page, "Call the bank").click()
-  const panel = page.getByRole("dialog", { name: "Call the bank" })
+  const panel = page.getByRole("complementary", { name: "Call the bank" })
   const select = panel.getByRole("combobox", { name: "Status" })
   await expect(select).toContainText("Waiting")
   await select.click()

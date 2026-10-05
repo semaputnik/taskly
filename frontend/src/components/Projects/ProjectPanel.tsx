@@ -1,6 +1,5 @@
 import { useMutation } from "@tanstack/react-query"
 import { Link as RouterLink } from "@tanstack/react-router"
-import { Archive, CheckSquare, Clock } from "lucide-react"
 
 import {
   type ProjectPublic,
@@ -18,14 +17,12 @@ import {
   RecordHeader,
   RecordPanel,
   titleFieldClass,
-  valueInset,
 } from "@/components/Records/RecordPanel"
 import { taskCountLabel } from "@/components/Tags/counts"
 import { LoadingButton } from "@/components/ui/loading-button"
 import { formatDayOf } from "@/lib/dates"
 import { useReportChange } from "@/lib/serverState"
 import { toastError, toastSuccess } from "@/lib/toasts"
-import { cn } from "@/lib/utils"
 import DeleteProject from "./DeleteProject"
 
 /**
@@ -105,12 +102,12 @@ function ProjectRecord({ project }: { project: ProjectPublic }) {
       />
 
       <PropertyList>
-        <PropertyRow icon={CheckSquare} label="Tasks">
+        <PropertyRow label="Tasks">
           {(project.task_count ?? 0) > 0 ? (
             <RouterLink
               to="/tasks"
               search={{ project_id: project.id }}
-              className={cn(valueInset, "underline-offset-4 hover:underline")}
+              className="underline-offset-4 hover:underline"
             >
               {taskCountLabel(project.task_count ?? 0)}
             </RouterLink>
@@ -119,7 +116,7 @@ function ProjectRecord({ project }: { project: ProjectPublic }) {
           )}
         </PropertyRow>
 
-        <PropertyRow icon={Archive} label="Archive">
+        <PropertyRow label="Archive">
           {project.is_inbox ? (
             // The Inbox takes every task created without a project, so an
             // archived, read-only Inbox could no longer do its job (FR-05.4).
@@ -131,7 +128,7 @@ function ProjectRecord({ project }: { project: ProjectPublic }) {
           )}
         </PropertyRow>
 
-        <PropertyRow icon={Clock} label="Created">
+        <PropertyRow label="Created">
           <ReadOnlyValue>
             {project.created_at ? (
               <time dateTime={project.created_at}>
@@ -189,7 +186,7 @@ function ArchiveToggle({ project }: { project: ProjectPublic }) {
   })
 
   return (
-    <div className={cn("flex flex-wrap items-center gap-2", valueInset)}>
+    <div className="flex flex-wrap items-center gap-2">
       <span>
         {project.is_archived
           ? "Archived — read-only until it comes back"

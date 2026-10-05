@@ -1,24 +1,10 @@
 import { Toaster } from "@/components/ui/sonner"
-import { useIsMobile } from "@/hooks/useMobile"
 
 /**
- * Where the Add a task button floats (below `md`), notices sit above it rather
- * than on it: its height and bottom gap, plus the safe area it keeps clear of,
- * plus a gap of their own. Sonner switches offsets at 600px, not at `md`, so
- * the same clearance is given to both of its offsets for the whole range.
+ * The notices of the whole app, wherever they are raised from — a record's
+ * column included, which is no modal and so leaves them within reach. Where
+ * they sit and how they look is the Toaster's.
  */
-const CLEAR_OF_ADD_TASK = {
-  bottom: "calc(5.5rem + env(safe-area-inset-bottom))",
-}
-
 export function AppToaster() {
-  const isMobile = useIsMobile()
-  return (
-    <Toaster
-      richColors
-      closeButton
-      offset={isMobile ? CLEAR_OF_ADD_TASK : undefined}
-      mobileOffset={CLEAR_OF_ADD_TASK}
-    />
-  )
+  return <Toaster closeButton />
 }

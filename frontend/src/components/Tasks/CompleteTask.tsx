@@ -29,6 +29,8 @@ interface CompleteTaskProps {
    */
   receipt?: boolean
   className?: string
+  /** Resizes the drawn mark, for the title that is the status's biggest. */
+  markClassName?: string
 }
 
 /**
@@ -60,6 +62,7 @@ export function CompleteTask({
   asMark = false,
   receipt = false,
   className,
+  markClassName,
 }: CompleteTaskProps) {
   const status = useTaskStatus(task, {
     onCompleted: receipt ? completionReceipt(task) : undefined,
@@ -86,7 +89,11 @@ export function CompleteTask({
             className,
           )}
         >
-          <StatusMark status={task.status} priority={task.priority} />
+          <StatusMark
+            status={task.status}
+            priority={task.priority}
+            className={markClassName}
+          />
         </CheckboxPrimitive.Root>
         {status.prompt}
       </>

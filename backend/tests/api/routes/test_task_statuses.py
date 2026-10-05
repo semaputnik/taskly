@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 from sqlmodel import Session
 
 from app.core.config import settings
-from tests.utils.bot import (
+from tests.utils.accounts import (
     ALL_PERMISSIONS,
     create_project,
     create_user_headers,

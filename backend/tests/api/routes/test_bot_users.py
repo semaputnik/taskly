@@ -10,7 +10,7 @@ from app.core import security
 from app.core.config import settings
 from app.main import app
 from app.models import BotUser
-from tests.utils.bot import (
+from tests.utils.accounts import (
     ALL_PERMISSIONS,
     READ_ONLY,
     create_bot_user,

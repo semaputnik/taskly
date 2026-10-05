@@ -27,7 +27,7 @@ from app.models import (
     TaskCreate,
     UserCreate,
 )
-from tests.utils.bot import API, create_task, create_user_headers
+from tests.utils.accounts import API, create_task, create_user_headers
 from tests.utils.utils import random_email
 
 

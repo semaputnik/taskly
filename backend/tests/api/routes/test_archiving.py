@@ -10,59 +10,21 @@ from fastapi.testclient import TestClient
 from sqlalchemy import event
 from sqlmodel import Session, func, select
 
-from app.api.deps import get_attachment_storage
 from app.core.config import settings
 from app.core.db import engine
-from app.main import app
 from app.models import Deletion, Project
-from tests.api.routes.test_attachments import InMemoryAttachmentStorage
+from tests.utils.accounts import (
+    archive_project,
+    create_project,
+    create_task_record,
+    inbox_project_id,
+    my_id,
+    unarchive_project,
+)
 from tests.utils.user import new_user_headers
 
 API = settings.API_V1_STR
 YESTERDAY = date.today() - timedelta(days=1)
-
-
-@pytest.fixture(autouse=True)
-def storage():
-    fake_storage = InMemoryAttachmentStorage()
-    app.dependency_overrides[get_attachment_storage] = lambda: fake_storage
-    yield fake_storage
-    del app.dependency_overrides[get_attachment_storage]
-
-
-def _me(client: TestClient, headers: dict[str, str]) -> str:
-    return client.get(f"{API}/users/me", headers=headers).json()["id"]
-
-
-def _inbox_id(client: TestClient, headers: dict[str, str]) -> str:
-    r = client.get(f"{API}/projects/", headers=headers)
-    return next(p["id"] for p in r.json()["data"] if p["is_inbox"])
-
-
-def _create_project(client: TestClient, headers: dict[str, str], name: str) -> str:
-    r = client.post(f"{API}/projects/", headers=headers, json={"name": name})
-    assert r.status_code == 200, r.text
-    return r.json()["id"]
-
-
-def _create_task(
-    client: TestClient, headers: dict[str, str], title: str, **fields: object
-) -> dict:
-    r = client.post(f"{API}/tasks/", headers=headers, json={"title": title, **fields})
-    assert r.status_code == 200, r.text
-    return r.json()
-
-
-def _archive(
-    client: TestClient, headers: dict[str, str], project_id: str
-) -> httpx.Response:
-    return client.post(f"{API}/projects/{project_id}/archive", headers=headers)
-
-
-def _unarchive(
-    client: TestClient, headers: dict[str, str], project_id: str
-) -> httpx.Response:
-    return client.post(f"{API}/projects/{project_id}/unarchive", headers=headers)
 
 
 def _project_ids(
@@ -108,7 +70,7 @@ class Account:
 def _fill_project(
     client: TestClient, headers: dict[str, str], project_id: str, prefix: str
 ) -> tuple[dict, dict, dict, dict]:
-    root = _create_task(
+    root = create_task_record(
         client,
         headers,
         f"{prefix} root",
@@ -116,9 +78,11 @@ def _fill_project(
         tags=["focus"],
         priority="P1",
         due_date=YESTERDAY.isoformat(),
-        assignee_id=_me(client, headers),
+        assignee_id=my_id(client, headers),
     )
-    subtask = _create_task(client, headers, f"{prefix} subtask", parent_id=root["id"])
+    subtask = create_task_record(
+        client, headers, f"{prefix} subtask", parent_id=root["id"]
+    )
     r = client.post(
         f"{API}/tasks/{root['id']}/comments/", headers=headers, json={"body": "Note"}
     )
@@ -135,17 +99,17 @@ def _fill_project(
 
 def _account(client: TestClient, db: Session) -> Account:
     headers = new_user_headers(client, db)
-    live = _create_project(client, headers, "Live")
-    archived = _create_project(client, headers, "Shelved")
+    live = create_project(client, headers, "Live")
+    archived = create_project(client, headers, "Shelved")
     _fill_project(client, headers, live, "Live")
     root, subtask, comment, attachment = _fill_project(
         client, headers, archived, "Shelved"
     )
-    r = _archive(client, headers, archived)
+    r = archive_project(client, headers, archived)
     assert r.status_code == 200, r.text
     return Account(
         headers=headers,
-        user_id=_me(client, headers),
+        user_id=my_id(client, headers),
         live_project=live,
         archived_project=archived,
         archived_root=root,
@@ -162,16 +126,16 @@ def test_archive_and_unarchive_a_project_repeatedly(
     client: TestClient, db: Session
 ) -> None:
     headers = new_user_headers(client, db)
-    project_id = _create_project(client, headers, "Side project")
+    project_id = create_project(client, headers, "Side project")
 
     for _ in range(2):
-        r = _archive(client, headers, project_id)
+        r = archive_project(client, headers, project_id)
         assert r.status_code == 200, r.text
         assert r.json()["is_archived"] is True
         assert project_id not in _project_ids(client, headers)
         assert project_id in _project_ids(client, headers, archived=True)
 
-        r = _unarchive(client, headers, project_id)
+        r = unarchive_project(client, headers, project_id)
         assert r.status_code == 200, r.text
         assert r.json()["is_archived"] is False
         assert project_id in _project_ids(client, headers)
@@ -180,24 +144,24 @@ def test_archive_and_unarchive_a_project_repeatedly(
 
 def test_archiving_is_idempotent(client: TestClient, db: Session) -> None:
     headers = new_user_headers(client, db)
-    project_id = _create_project(client, headers, "Side project")
+    project_id = create_project(client, headers, "Side project")
 
-    assert _archive(client, headers, project_id).status_code == 200
-    r = _archive(client, headers, project_id)
+    assert archive_project(client, headers, project_id).status_code == 200
+    r = archive_project(client, headers, project_id)
     assert r.status_code == 200
     assert r.json()["is_archived"] is True
 
-    assert _unarchive(client, headers, project_id).status_code == 200
-    r = _unarchive(client, headers, project_id)
+    assert unarchive_project(client, headers, project_id).status_code == 200
+    r = unarchive_project(client, headers, project_id)
     assert r.status_code == 200
     assert r.json()["is_archived"] is False
 
 
 def test_the_inbox_cannot_be_archived(client: TestClient, db: Session) -> None:
     headers = new_user_headers(client, db)
-    inbox_id = _inbox_id(client, headers)
+    inbox_id = inbox_project_id(client, headers)
 
-    r = _archive(client, headers, inbox_id)
+    r = archive_project(client, headers, inbox_id)
     assert r.status_code == 400
     assert r.json()["detail"] == "The Inbox project cannot be archived"
     assert inbox_id in _project_ids(client, headers)
@@ -208,13 +172,13 @@ def test_another_users_project_cannot_be_archived_or_unarchived(
 ) -> None:
     owner = new_user_headers(client, db)
     stranger = new_user_headers(client, db)
-    project_id = _create_project(client, owner, "Private")
+    project_id = create_project(client, owner, "Private")
 
-    assert _archive(client, stranger, project_id).status_code == 404
+    assert archive_project(client, stranger, project_id).status_code == 404
     assert project_id in _project_ids(client, owner)
 
-    assert _archive(client, owner, project_id).status_code == 200
-    assert _unarchive(client, stranger, project_id).status_code == 404
+    assert archive_project(client, owner, project_id).status_code == 200
+    assert unarchive_project(client, stranger, project_id).status_code == 404
     assert project_id in _project_ids(client, owner, archived=True)
 
 
@@ -240,11 +204,11 @@ def test_archiving_writes_nothing_but_the_project(
     client: TestClient, db: Session
 ) -> None:
     headers = new_user_headers(client, db)
-    project_id = _create_project(client, headers, "Shelved")
-    root = _create_task(client, headers, "Root", project_id=project_id)
-    _create_task(client, headers, "Child", parent_id=root["id"])
+    project_id = create_project(client, headers, "Shelved")
+    root = create_task_record(client, headers, "Root", project_id=project_id)
+    create_task_record(client, headers, "Child", parent_id=root["id"])
 
-    for toggle in (_archive, _unarchive):
+    for toggle in (archive_project, unarchive_project):
         with _statements() as seen:
             assert toggle(client, headers, project_id).status_code == 200
         writes = [
@@ -274,11 +238,11 @@ def test_unarchiving_brings_every_task_back_exactly_as_it_was(
     client: TestClient, db: Session
 ) -> None:
     headers = new_user_headers(client, db)
-    project_id = _create_project(client, headers, "Shelved")
-    root = _create_task(
+    project_id = create_project(client, headers, "Shelved")
+    root = create_task_record(
         client, headers, "Root", project_id=project_id, tags=["a"], priority="P2"
     )
-    child = _create_task(client, headers, "Child", parent_id=root["id"])
+    child = create_task_record(client, headers, "Child", parent_id=root["id"])
     r = client.patch(
         f"{API}/tasks/{child['id']}", headers=headers, json={"status": "done"}
     )
@@ -287,11 +251,11 @@ def test_unarchiving_brings_every_task_back_exactly_as_it_was(
     before = _tasks(client, headers)
     assert before["Child"]["status"] == "done"
 
-    assert _archive(client, headers, project_id).status_code == 200
+    assert archive_project(client, headers, project_id).status_code == 200
     assert _tasks(client, headers) == {}
     assert _tasks(client, headers, archived=True) == before
 
-    assert _unarchive(client, headers, project_id).status_code == 200
+    assert unarchive_project(client, headers, project_id).status_code == 200
     assert _tasks(client, headers) == before
     assert _tasks(client, headers, archived=True) == {}
 
@@ -352,7 +316,7 @@ def _move_task_out(client: TestClient, a: Account) -> httpx.Response:
 
 
 def _move_task_in(client: TestClient, a: Account) -> httpx.Response:
-    task = _create_task(client, a.headers, "Mover", project_id=a.live_project)
+    task = create_task_record(client, a.headers, "Mover", project_id=a.live_project)
     return client.patch(
         f"{API}/tasks/{task['id']}",
         headers=a.headers,
@@ -464,7 +428,7 @@ def test_the_same_writes_succeed_once_unarchived(
     write: Callable[[TestClient, Account], httpx.Response],
 ) -> None:
     account = _account(client, db)
-    r = _unarchive(client, account.headers, account.archived_project)
+    r = unarchive_project(client, account.headers, account.archived_project)
     assert r.status_code == 200, r.text
 
     r = write(client, account)
@@ -585,11 +549,11 @@ def _deletions(db: Session, project_id: str) -> int:
 
 def test_archiving_is_not_a_deletion(client: TestClient, db: Session) -> None:
     headers = new_user_headers(client, db)
-    project_id = _create_project(client, headers, "Shelved")
-    root = _create_task(client, headers, "Root", project_id=project_id)
+    project_id = create_project(client, headers, "Shelved")
+    root = create_task_record(client, headers, "Root", project_id=project_id)
 
-    assert _archive(client, headers, project_id).status_code == 200
-    assert _unarchive(client, headers, project_id).status_code == 200
+    assert archive_project(client, headers, project_id).status_code == 200
+    assert unarchive_project(client, headers, project_id).status_code == 200
 
     assert _deletions(db, project_id) == 0
     project = db.get(Project, uuid.UUID(project_id))
@@ -617,4 +581,4 @@ def test_an_archived_project_can_be_deleted(client: TestClient, db: Session) -> 
     assert project.deletion_id is not None
 
     # A deleted project is gone for the toggle too.
-    assert _unarchive(client, account.headers, project_id).status_code == 404
+    assert unarchive_project(client, account.headers, project_id).status_code == 404

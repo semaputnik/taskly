@@ -9,7 +9,7 @@ const UNKNOWN = "00000000-0000-4000-8000-000000000000"
 
 async function expectCannotOpen(page: Page, route: string, search: string) {
   await page.goto(`${route}?${search}`)
-  const panel = page.getByRole("dialog")
+  const panel = page.locator("[data-record-column]")
   // Said at once, not after a run of retries behind a skeleton.
   await expect(panel).toContainText("could not be opened", { timeout: 2_000 })
   await expect(panel.locator("[data-slot=skeleton]")).toHaveCount(0)
@@ -20,7 +20,7 @@ async function expectCannotOpen(page: Page, route: string, search: string) {
     .getByRole("button", { name: "Close", exact: true })
     .first()
     .click()
-  await expect(page.getByRole("dialog")).toHaveCount(0)
+  await expect(page.locator("[data-record-column]")).toHaveCount(0)
   await expect(page).toHaveURL(new RegExp(`${route}$`))
 }
 
@@ -37,7 +37,7 @@ test("A link to a record that is not there says so, for every panel", async ({
   // behind it simply shows, with nothing left waiting.
   await page.goto("/tasks?view=table&task=not-a-task")
   await expect(page.getByRole("heading", { name: "Tasks" })).toBeVisible()
-  await expect(page.getByRole("dialog")).toHaveCount(0)
+  await expect(page.locator("[data-record-column]")).toHaveCount(0)
 })
 
 test("Another user's record reads exactly like a missing one", async ({
@@ -62,26 +62,47 @@ test("A failure that may pass offers to try again", async ({ page }) => {
     title: "Book the vet",
   })
 
-  let failing = true
-  await page.route(`**/api/v1/tasks/${task.id}`, (route) =>
-    failing
-      ? route.fulfill({ status: 503, body: "unavailable" })
-      : route.fallback(),
+  // The request is let through by the press of Try again and by nothing
+  // else, not by a timer in the test: the query's own retry would load the
+  // task the moment the API answered, and take the button away before it is
+  // pressed. The page marks the press itself, before the button's own handler
+  // asks again.
+  await page.addInitScript(() => {
+    window.addEventListener(
+      "click",
+      (event) => {
+        const target = event.target as Element | null
+        if (target?.closest("button")?.textContent === "Try again") {
+          ;(window as unknown as { pressedTryAgain: boolean }).pressedTryAgain =
+            true
+        }
+      },
+      true,
+    )
+  })
+  const pressed = () =>
+    page
+      .evaluate(
+        () =>
+          (window as unknown as { pressedTryAgain?: boolean }).pressedTryAgain,
+      )
+      // Asked while the page is still loading: not pressed yet.
+      .catch(() => false)
+  await page.route(`**/api/v1/tasks/${task.id}`, async (route) =>
+    (await pressed())
+      ? route.fallback()
+      : route.fulfill({ status: 503, body: "unavailable" }),
   )
   await page.goto(`/tasks?view=table&task=${task.id}`)
-  const panel = page.getByRole("dialog")
+  const panel = page.locator("[data-record-column]")
   // Said after the first failed attempt, while retries carry on behind it.
   await expect(panel).toContainText("could not be loaded", { timeout: 3_000 })
   await expect(panel.locator("[data-slot=skeleton]")).toHaveCount(0)
 
-  // The request is let through only once the button can take the click:
-  // released any earlier, the query's own retry can load the task while the
-  // panel is still sliding in, and the button is gone before it is pressed.
-  const tryAgain = panel.getByRole("button", { name: "Try again" })
-  await tryAgain.click({ trial: true })
-  failing = false
-  await tryAgain.click()
-  await expect(page.getByRole("dialog", { name: "Book the vet" })).toBeVisible()
+  await panel.getByRole("button", { name: "Try again" }).click()
+  await expect(
+    page.getByRole("complementary", { name: "Book the vet" }),
+  ).toBeVisible()
   await expect(page.getByRole("textbox", { name: "Task title" })).toHaveValue(
     "Book the vet",
   )
@@ -103,7 +124,7 @@ test("A task the list filters out still opens from its link", async ({
 
   await page.goto(`/tasks?view=table&project_id=${inbox.id}&task=${task.id}`)
   await expect(
-    page.getByRole("dialog", { name: "Prune the roses" }),
+    page.getByRole("complementary", { name: "Prune the roses" }),
   ).toBeVisible()
   await expect(page.getByRole("row", { name: /Prune the roses/ })).toHaveCount(
     0,

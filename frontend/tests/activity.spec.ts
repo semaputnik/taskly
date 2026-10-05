@@ -18,7 +18,7 @@ test("A user's own changes appear on the Activity page, newest first", async ({
   await title.press("Enter")
   await openCaptured(page)
   await expect(
-    page.getByRole("dialog", { name: "Renew the passport" }),
+    page.getByRole("complementary", { name: "Renew the passport" }),
   ).toBeVisible()
   await page.keyboard.press("Escape")
 
@@ -44,7 +44,7 @@ test("A user's own changes appear on the Activity page, newest first", async ({
   await rows.nth(1).getByRole("link", { name: "Renew the passport" }).click()
   await expect(page).toHaveURL(/\/activity\?task=/)
   await expect(
-    page.getByRole("dialog", { name: /Renew the passport/ }),
+    page.getByRole("complementary", { name: /Renew the passport/ }),
   ).toBeVisible()
 })
 
@@ -61,11 +61,11 @@ test("A deleted task can be restored from the Activity page", async ({
   await title.press("Enter")
   await openCaptured(page)
   await expect(
-    page.getByRole("dialog", { name: "Cancel the gym" }),
+    page.getByRole("complementary", { name: "Cancel the gym" }),
   ).toBeVisible()
   await page.keyboard.press("Escape")
   // Gone before the row behind it is clicked, not still fading out over it.
-  await expect(page.getByRole("dialog")).toHaveCount(0)
+  await expect(page.locator("[data-record-column]")).toHaveCount(0)
 
   const taskRow = page.getByRole("row", { name: /Cancel the gym/ })
   await taskRow.getByText("Cancel the gym").click()

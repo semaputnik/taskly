@@ -40,7 +40,7 @@ test("A refused title keeps what was typed, and leaving again retries", async ({
   await title.press("Enter")
   await expect.poll(() => patches.length).toBe(2)
   await expect(
-    page.getByRole("dialog", { name: "Book the vet for Friday" }),
+    page.getByRole("complementary", { name: "Book the vet for Friday" }),
   ).toBeVisible()
   await page.reload()
   await expect(page.getByRole("textbox", { name: "Task title" })).toHaveValue(

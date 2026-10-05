@@ -79,7 +79,7 @@ test("A bot user's panel shows what that bot did, and not what the user did", as
 
   await page.goto("/bots")
   await openBot(page, "Triage agent")
-  const panel = page.getByRole("dialog", { name: "Triage agent" })
+  const panel = page.getByRole("complementary", { name: "Triage agent" })
 
   const feed = panel.getByRole("list", {
     name: "Recent activity by Triage agent",
@@ -104,7 +104,7 @@ test("A bot user's panel lists the tasks it is on, and opens them", async ({
 
   await page.goto("/bots")
   await openBot(page, "Triage agent")
-  const panel = page.getByRole("dialog", { name: "Triage agent" })
+  const panel = page.getByRole("complementary", { name: "Triage agent" })
   await panel.getByRole("tab", { name: "Tasks" }).click()
 
   const assigned = panel.getByRole("list", {
@@ -116,10 +116,12 @@ test("A bot user's panel lists the tasks it is on, and opens them", async ({
   // one Back away.
   await assigned.getByRole("button", { name: "Escalate the outage" }).click()
   await expect(
-    page.getByRole("dialog", { name: "Escalate the outage" }),
+    page.getByRole("complementary", { name: "Escalate the outage" }),
   ).toBeVisible()
   await page.goBack()
-  await expect(page.getByRole("dialog", { name: "Triage agent" })).toBeVisible()
+  await expect(
+    page.getByRole("complementary", { name: "Triage agent" }),
+  ).toBeVisible()
 })
 
 test("A bot user that has done nothing says what would appear", async ({
@@ -130,7 +132,7 @@ test("A bot user that has done nothing says what would appear", async ({
 
   await page.goto("/bots")
   await openBot(page, "Quiet agent")
-  const panel = page.getByRole("dialog", { name: "Quiet agent" })
+  const panel = page.getByRole("complementary", { name: "Quiet agent" })
 
   await expect(panel).toContainText("Every change this bot user makes")
   await panel.getByRole("tab", { name: "Tasks" }).click()
@@ -156,7 +158,7 @@ test("Token health is stated in words, not in timestamps", async ({ page }) => {
   await expect(liveness("Tokenless agent")).toHaveText("Never used · no token")
 
   await openBot(page, "Tokenless agent")
-  const tokenless = page.getByRole("dialog", { name: "Tokenless agent" })
+  const tokenless = page.getByRole("complementary", { name: "Tokenless agent" })
   await expect(tokenless).toContainText(
     "No token — this bot user cannot reach the API",
   )
@@ -166,7 +168,7 @@ test("Token health is stated in words, not in timestamps", async ({ page }) => {
   await page.keyboard.press("Escape")
 
   await openBot(page, "Unused agent")
-  const unused = page.getByRole("dialog", { name: "Unused agent" })
+  const unused = page.getByRole("complementary", { name: "Unused agent" })
   await expect(unused).toContainText("Working")
   await expect(unused).toContainText("Never used")
 })
@@ -191,7 +193,7 @@ test("An activity entry opens the bot user that made it, and the feed hands off"
     .getByRole("link", { name: "Triage agent" })
     .click()
   await expect(page).toHaveURL(/\/activity\?.*bot=/)
-  const panel = page.getByRole("dialog", { name: "Triage agent" })
+  const panel = page.getByRole("complementary", { name: "Triage agent" })
   await expect(panel).toBeVisible()
 
   // The preview is bounded, and says where the rest is.
@@ -225,7 +227,7 @@ test("The assigned tasks hand off to the task list filtered to the bot", async (
 
   await page.goto("/bots")
   await openBot(page, "Triage agent")
-  const panel = page.getByRole("dialog", { name: "Triage agent" })
+  const panel = page.getByRole("complementary", { name: "Triage agent" })
   await panel.getByRole("tab", { name: "Tasks" }).click()
   await panel
     .getByText(/more task in the task list|more tasks in the task list/)
@@ -259,7 +261,7 @@ test("A deleted bot user still reads, and says it is gone", async ({
   ).toHaveCount(0)
 
   await page.goto(`/bots?bot=${bot.id}`)
-  const panel = page.getByRole("dialog", { name: "Retired agent" })
+  const panel = page.getByRole("complementary", { name: "Retired agent" })
   await expect(panel).toContainText("This bot user was deleted")
   await expect(panel).toContainText("cannot be undone")
   await expect(

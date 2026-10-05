@@ -1,12 +1,4 @@
 import { useMutation, useQuery } from "@tanstack/react-query"
-import {
-  Activity,
-  CalendarClock,
-  Clock,
-  FolderKanban,
-  KeyRound,
-  ShieldCheck,
-} from "lucide-react"
 import { useEffect, useState } from "react"
 
 import { type BotScope, BotsService, type BotUserPublic } from "@/client"
@@ -19,14 +11,12 @@ import {
   RecordHeader,
   RecordPanel,
   titleFieldClass,
-  valueInset,
 } from "@/components/Records/RecordPanel"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { formatDateTime, formatDayOf } from "@/lib/dates"
 import { scopeProjectsQuery, useReportChange } from "@/lib/serverState"
 import { toastError } from "@/lib/toasts"
-import { cn } from "@/lib/utils"
 import { BotConsole } from "./BotConsole"
 import DeleteBotUser from "./DeleteBotUser"
 import { ago, until } from "./health"
@@ -140,8 +130,8 @@ function BotRecord({ bot }: { bot: BotUserPublic }) {
       )}
 
       <PropertyList>
-        <PropertyRow icon={KeyRound} label="Token">
-          <div className={cn("flex flex-wrap items-center gap-2", valueInset)}>
+        <PropertyRow label="Token">
+          <div className="flex flex-wrap items-center gap-2">
             <span>{STATUS_TEXT[status]}</span>
             {/* Issuing keeps its dialog: the token is shown once and cannot be
                 read back, so it is a deliberate step, not a click (FR-08.13). */}
@@ -153,7 +143,7 @@ function BotRecord({ bot }: { bot: BotUserPublic }) {
           </div>
         </PropertyRow>
 
-        <PropertyRow icon={CalendarClock} label="Expires">
+        <PropertyRow label="Expires">
           <ReadOnlyValue>
             {/* Only a token that still works has an expiry worth counting
                 down to; a revoked one stopped before its date, and an expired
@@ -168,7 +158,7 @@ function BotRecord({ bot }: { bot: BotUserPublic }) {
           </ReadOnlyValue>
         </PropertyRow>
 
-        <PropertyRow icon={Activity} label="Last used">
+        <PropertyRow label="Last used">
           {/* An empty timestamp and a never-used integration are different
               facts, so the second one is said in words. */}
           <ReadOnlyValue>
@@ -186,8 +176,8 @@ function BotRecord({ bot }: { bot: BotUserPublic }) {
           </ReadOnlyValue>
         </PropertyRow>
 
-        <PropertyRow icon={FolderKanban} label="Projects">
-          <div className={cn("flex flex-col gap-2 py-1", valueInset)}>
+        <PropertyRow label="Projects">
+          <div className="flex flex-col gap-2 py-1">
             {(projects ?? []).map((project) => {
               const id = `scope-${bot.id}-${project.id}`
               return (
@@ -219,8 +209,8 @@ function BotRecord({ bot }: { bot: BotUserPublic }) {
           </div>
         </PropertyRow>
 
-        <PropertyRow icon={ShieldCheck} label="Permissions">
-          <div className={cn("flex flex-col gap-3 py-1", valueInset)}>
+        <PropertyRow label="Permissions">
+          <div className="flex flex-col gap-3 py-1">
             {PERMISSION_GROUPS.map((group) => (
               <fieldset key={group.title} className="flex flex-col gap-2">
                 <legend className="text-muted-foreground text-xs">
@@ -255,7 +245,7 @@ function BotRecord({ bot }: { bot: BotUserPublic }) {
           </div>
         </PropertyRow>
 
-        <PropertyRow icon={Clock} label="Created">
+        <PropertyRow label="Created">
           <ReadOnlyValue>
             {bot.created_at ? formatDayOf(bot.created_at) : "Unknown"}
           </ReadOnlyValue>

@@ -37,6 +37,7 @@ function TagsTableContent({
       columns={columns}
       data={tags.data}
       rowLabel={(tag) => `Open ${tag.name}`}
+      opens="tag"
       onRowClick={(tag) => onOpen(tag.id)}
       empty={
         <EmptyState

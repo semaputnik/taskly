@@ -1,21 +1,13 @@
-import { type LucideIcon, Trash2 } from "lucide-react"
-import { useEffect, useRef, useState } from "react"
+import { ChevronDown, ChevronUp, Trash2, X } from "lucide-react"
+import { useEffect, useId, useRef, useState } from "react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Toaster } from "@/components/ui/sonner"
 import { Textarea } from "@/components/ui/textarea"
-import { PANEL_TOASTER_ID, settlePanelNotices } from "@/lib/panelNotices"
 import { cn } from "@/lib/utils"
 import type { RecordLoad } from "./panels"
+import type { Neighbours } from "./walk"
 
 /**
  * The one shape a record is read and acted on in.
@@ -26,6 +18,11 @@ import type { RecordLoad } from "./panels"
  * decided where its actions belong. Here every action has a home: a field is
  * changed in the field, and delete is one destructive control at the foot of
  * the panel, as far from the close control as the panel allows.
+ *
+ * It is a column beside the page, not a sheet over it: the page stays live,
+ * with no scrim and no focus trap, so a reader can read down a list and open
+ * the next line without closing anything. Where there is no room beside the
+ * page — a phone, a narrow window — the column takes the whole screen.
  *
  * Everything that makes a panel a panel lives here, so a record type adopts
  * the pattern rather than reimplementing it (The One Address Rule).
@@ -44,6 +41,22 @@ import type { RecordLoad } from "./panels"
 export const ghost =
   "record-control border-transparent bg-transparent shadow-none hover:bg-accent focus-visible:border-ring dark:bg-transparent dark:hover:bg-accent/50"
 
+/**
+ * The column's side gutters: 36px beside the page, 16px on a phone, so the bar,
+ * the title, the properties and every section start on one edge.
+ */
+export const gutter = "px-4 md:px-9"
+
+/**
+ * A property's value as a text button: 30px tall, flat at rest, tinted on
+ * hover, with its chevron shown only then, and always, a little quieter,
+ * under a thumb, which has no hover. Written for a select's trigger (the
+ * chevron is its last child); the margin pulls the text back onto the label
+ * column's edge, so the tint reaches past the text and the text does not move.
+ */
+export const quiet =
+  "record-control data-[size=default]:h-[30px] data-[size=default]:pointer-coarse:h-11 w-fit max-w-full -ml-2 gap-1.5 border-transparent bg-transparent px-2 py-0 text-[15px] shadow-none hover:bg-hover focus-visible:border-ring dark:bg-transparent dark:hover:bg-hover [&>svg:last-child]:size-3 [&>svg:last-child]:opacity-0 hover:[&>svg:last-child]:opacity-100 focus-visible:[&>svg:last-child]:opacity-100 data-[state=open]:[&>svg:last-child]:opacity-100 pointer-coarse:[&>svg:last-child]:opacity-60"
+
 export function RecordPanel({
   open,
   onClose,
@@ -60,6 +73,11 @@ export function RecordPanel({
   onRetry,
   /** What the record is called in the sentence saying it cannot be shown. */
   kind = "record",
+  /** The records on either side of this one in the list it was opened from. */
+  walk,
+  onWalk,
+  /** Where the record sits and who opened it, at the left of the bar. */
+  bar,
   children,
 }: {
   open: boolean
@@ -67,88 +85,334 @@ export function RecordPanel({
   name: string
   destructive?: React.ReactNode
   kind?: string
+  walk?: Neighbours | null
+  onWalk?: (id: string) => void
+  bar?: React.ReactNode
   children?: React.ReactNode
 } & RecordLoad) {
+  // Mounted only while open, so opening and closing are the column's mount
+  // and unmount, and focus follows them.
+  if (!open) return null
   return (
-    <Sheet open={open} onOpenChange={(next) => !next && onClose()}>
-      <SheetContent
-        side="right"
-        className="w-full gap-0 overflow-y-auto p-0 outline-none sm:max-w-xl"
-        // Opening a record puts focus on the panel itself, not on its first
-        // control: that would be the name field, which a reader who only came
-        // to look must not find already in their hands. Tab starts from here,
-        // and capture claims its own field once the panel is open.
-        onOpenAutoFocus={(event) => {
-          event.preventDefault()
-          ;(event.target as HTMLElement).focus({ preventScroll: true })
-        }}
-      >
-        {/* The record the panel is showing, announced on arrival. */}
-        <SheetTitle className="sr-only">{name}</SheetTitle>
-        {failure ? (
-          <div role="alert" className="flex flex-col items-start gap-3 p-6">
-            <p className="font-medium">
-              {failure === "missing"
-                ? `This ${kind} could not be opened`
-                : `This ${kind} could not be loaded`}
-            </p>
-            <p className="text-muted-foreground text-sm text-pretty">
-              {failure === "missing"
-                ? "It may have been deleted, or the link points at something that is not yours. Deleted records can be restored from the activity log."
-                : `The server did not answer this time. Nothing about the ${kind} has changed.`}
-            </p>
-            <div className="flex gap-2">
-              {failure === "unavailable" && onRetry && (
-                <Button size="sm" onClick={onRetry}>
-                  Try again
-                </Button>
-              )}
-              <Button variant="outline" size="sm" onClick={onClose}>
-                Close
+    <Column
+      name={name}
+      kind={kind}
+      onClose={onClose}
+      walk={walk}
+      onWalk={onWalk}
+      bar={bar}
+    >
+      {failure ? (
+        <div role="alert" className="flex flex-col items-start gap-3 p-6">
+          <p className="font-medium">
+            {failure === "missing"
+              ? `This ${kind} could not be opened`
+              : `This ${kind} could not be loaded`}
+          </p>
+          <p className="text-muted-foreground text-sm text-pretty">
+            {failure === "missing"
+              ? "It may have been deleted, or the link points at something that is not yours. Deleted records can be restored from the activity log."
+              : `The server did not answer this time. Nothing about the ${kind} has changed.`}
+          </p>
+          <div className="flex gap-2">
+            {failure === "unavailable" && onRetry && (
+              <Button size="sm" onClick={onRetry}>
+                Try again
               </Button>
-            </div>
+            )}
+            <Button variant="outline" size="sm" onClick={onClose}>
+              Close
+            </Button>
           </div>
-        ) : pending ? (
-          <div className="flex flex-col gap-4 p-6">
-            <Skeleton className="h-4 w-24" />
-            <Skeleton className="h-7 w-3/4" />
-            <Skeleton className="h-40 w-full" />
-          </div>
-        ) : (
-          <>
-            {children}
-            {destructive && (
-              <div className="mt-auto flex flex-wrap gap-2 border-t px-6 py-4">
+        </div>
+      ) : pending ? (
+        <div className="flex flex-col gap-4 p-6">
+          <Skeleton className="h-4 w-24" />
+          <Skeleton className="h-7 w-3/4" />
+          <Skeleton className="h-40 w-full" />
+        </div>
+      ) : (
+        <>
+          {children}
+          {destructive && (
+            <div className={cn("mt-auto", gutter)}>
+              <div className="flex flex-wrap gap-2 border-t py-4">
                 {destructive}
               </div>
-            )}
-          </>
-        )}
-        <PanelNotices />
-      </SheetContent>
-    </Sheet>
+            </div>
+          )}
+        </>
+      )}
+    </Column>
   )
 }
 
 /**
- * The toaster for notices that offer an action, inside the panel where the
- * modal sheet still lets the reader reach them — by pointer, by Tab, and by
- * its Alt+T hotkey.
+ * The column itself: a landmark named for the record, a bar that is always
+ * in reach, and the record scrolling beneath it on its own.
+ *
+ * Beside the page it sits in the shell's third grid track, held in place
+ * while the page scrolls; below 1200px — no room for the navigation (200px),
+ * the column (560px) and a page that can still be read — it is fixed over
+ * everything, which is what "the whole screen" is.
  */
-function PanelNotices() {
-  useEffect(() => settlePanelNotices, [])
-  // No close button: Undo is the first stop inside a notice, and a notice that
-  // is left alone runs out on its own.
+function Column({
+  name,
+  kind,
+  onClose,
+  walk,
+  onWalk,
+  bar,
+  children,
+}: {
+  name: string
+  kind: string
+  onClose: () => void
+  walk?: Neighbours | null
+  onWalk?: (id: string) => void
+  bar?: React.ReactNode
+  children: React.ReactNode
+}) {
+  const column = useRef<HTMLElement>(null)
+  useColumnFocus(column, name)
+  useColumnKeys(column, { onClose, walk, onWalk })
+
   return (
-    <Toaster
-      id={PANEL_TOASTER_ID}
-      toastOptions={{
-        classNames: {
-          actionButton: "pointer-coarse:h-11! pointer-coarse:px-4!",
-        },
-      }}
-    />
+    <aside
+      ref={column}
+      aria-label={name}
+      tabIndex={-1}
+      data-record-column
+      className={cn(
+        "bg-page border-rule-strong fixed inset-0 z-50 flex flex-col overflow-y-auto overscroll-contain outline-none",
+        // Written out in full, as Tailwind finds classes by reading them.
+        "min-[1200px]:sticky min-[1200px]:inset-auto min-[1200px]:top-0 min-[1200px]:z-auto min-[1200px]:h-svh min-[1200px]:w-[560px] min-[1200px]:self-start min-[1200px]:border-l",
+      )}
+    >
+      <div className="bg-page sticky top-0 z-10 flex h-14 shrink-0 items-center gap-3 pr-3 pl-4 md:pr-[29px] md:pl-9 min-[1200px]:h-[52px]">
+        {/* One bar: where the record sits, then the controls that act on the
+            column. The context truncates; the controls never move. */}
+        <div className="text-ink-3 flex min-w-0 flex-1 items-center gap-1.5 text-[13px]">
+          {bar}
+        </div>
+        <span className="flex shrink-0 items-center gap-1">
+          {walk && (
+            <span className="text-ink-3 mr-1 font-mono text-xs tabular-nums">
+              {walk.position} of {walk.count}
+            </span>
+          )}
+          {walk && onWalk && (
+            <>
+              <BarButton
+                label={`Previous ${kind}`}
+                disabled={!walk.previous}
+                onClick={() => walk.previous && onWalk(walk.previous)}
+              >
+                <ChevronUp aria-hidden />
+              </BarButton>
+              <BarButton
+                label={`Next ${kind}`}
+                disabled={!walk.next}
+                onClick={() => walk.next && onWalk(walk.next)}
+              >
+                <ChevronDown aria-hidden />
+              </BarButton>
+            </>
+          )}
+          <BarButton label="Close" onClick={onClose}>
+            <X aria-hidden />
+          </BarButton>
+        </span>
+      </div>
+      {/* The record's name as the heading the sections beneath descend from. */}
+      <h2 className="sr-only">{name}</h2>
+      {children}
+    </aside>
   )
+}
+
+/**
+ * A control in the column's bar: 28px under a mouse, 44px under a thumb. At
+ * the end of the list a walking control says so without leaving, so focus
+ * that is on it stays where it is.
+ */
+function BarButton({
+  label,
+  disabled,
+  onClick,
+  children,
+}: {
+  label: string
+  disabled?: boolean
+  onClick: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      aria-disabled={disabled || undefined}
+      onClick={() => !disabled && onClick()}
+      className={cn(
+        "text-ink-3 focus-visible:ring-ring/50 grid size-7 place-items-center rounded-md outline-none focus-visible:ring-[3px] pointer-coarse:size-11 [&_svg]:size-4",
+        disabled ? "opacity-40" : "hover:bg-hover hover:text-ink",
+      )}
+    >
+      {children}
+    </button>
+  )
+}
+
+// Where focus was when the column opened, to give it back when the column
+// closes. Module state, because switching from one kind of record to another
+// unmounts one column and mounts the next in a single commit, and that is
+// still one visit: the way back is to the line that started it.
+let opener: HTMLElement | null = null
+let closing: ReturnType<typeof setTimeout> | undefined
+
+/**
+ * Opening puts focus on the column itself, not on its first field: that would
+ * be a name the reader who only came to look finds already in their hands.
+ * Tab starts from here, and capture claims its own field once the column is
+ * open. Closing returns focus to the line that opened it — unless the reader
+ * has since put it somewhere of their own on the page.
+ */
+function useColumnFocus(
+  column: React.RefObject<HTMLElement | null>,
+  name: string,
+) {
+  useEffect(() => {
+    const element = column.current
+    if (!element) return
+    if (closing !== undefined) {
+      clearTimeout(closing)
+      closing = undefined
+    } else {
+      const active = document.activeElement
+      opener =
+        active instanceof HTMLElement &&
+        active !== document.body &&
+        !element.contains(active)
+          ? active
+          : null
+    }
+    element.focus({ preventScroll: true })
+    return () => {
+      closing = setTimeout(() => {
+        closing = undefined
+        const target = opener
+        opener = null
+        const active = document.activeElement
+        if (target?.isConnected && (!active || active === document.body)) {
+          target.focus({ preventScroll: true })
+        }
+      }, 0)
+    }
+  }, [column])
+
+  // The line that is open is where focus belongs on closing: after a walk, or
+  // when a click left focus on nothing, it is not the first opener. The
+  // router marks the open task's link, so that is where to look.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `name` is how a walk is noticed
+  useEffect(() => {
+    const line = document.querySelector<HTMLElement>(
+      'main a[aria-current="page"]',
+    )
+    if (line) opener = line
+  }, [name])
+}
+
+/** A keyboard that is typing, picking or navigating a widget keeps its keys. */
+const KEEPS_ARROWS = [
+  "input",
+  "textarea",
+  "select",
+  '[contenteditable=""]',
+  '[contenteditable="true"]',
+  "[aria-haspopup]",
+  '[role="menu"]',
+  '[role="listbox"]',
+  '[role="combobox"]',
+  '[role="slider"]',
+  '[role="spinbutton"]',
+  '[role="tablist"]',
+  '[role="radiogroup"]',
+  '[role="textbox"]',
+  '[role="grid"]',
+  '[role="tree"]',
+].join(",")
+
+/** A layer that is open over the page owns the keyboard until it is gone. */
+const OPEN_LAYER = [
+  '[role="dialog"][data-state="open"]',
+  '[role="alertdialog"][data-state="open"]',
+  '[role="menu"][data-state="open"]',
+  '[role="listbox"]',
+].join(",")
+
+/** Where notices are shown. */
+const NOTICES_SELECTOR = "[data-sonner-toaster]"
+
+const EDITABLE =
+  'input, textarea, select, [contenteditable=""], [contenteditable="true"]'
+
+/**
+ * Escape closes the column; ↓ and ↑ walk its list.
+ *
+ * Both give way to anything that has already answered the key — a menu or a
+ * popover has called `preventDefault` by now — and the arrows only act when
+ * focus is not in a text field, a select or an open menu, so they never steal
+ * typing, caret movement or menu navigation.
+ */
+function useColumnKeys(
+  column: React.RefObject<HTMLElement | null>,
+  {
+    onClose,
+    walk,
+    onWalk,
+  }: {
+    onClose: () => void
+    walk?: Neighbours | null
+    onWalk?: (id: string) => void
+  },
+) {
+  // Read at the key press, so the listener is added once and never races a
+  // render.
+  const latest = useRef({ onClose, walk, onWalk })
+  latest.current = { onClose, walk, onWalk }
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.isComposing) return
+      const target = event.target instanceof Element ? event.target : null
+      if (target?.closest(NOTICES_SELECTOR)) return
+
+      if (event.key === "Escape") {
+        // A field on the page beside the column keeps its own Escape.
+        if (target?.matches(EDITABLE) && !column.current?.contains(target)) {
+          return
+        }
+        latest.current.onClose()
+        return
+      }
+
+      if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return
+      if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) {
+        return
+      }
+      const { walk, onWalk } = latest.current
+      if (!walk || !onWalk) return
+      if (target?.closest(KEEPS_ARROWS) || document.querySelector(OPEN_LAYER)) {
+        return
+      }
+      const to = event.key === "ArrowDown" ? walk.next : walk.previous
+      if (!to) return
+      event.preventDefault()
+      onWalk(to)
+    }
+    document.addEventListener("keydown", onKeyDown)
+    return () => document.removeEventListener("keydown", onKeyDown)
+  }, [column])
 }
 
 /**
@@ -189,88 +453,144 @@ export function RecordHeader({
   title?: React.ReactNode
 }) {
   return (
-    <SheetHeader className="gap-3 border-b p-6">
-      <SheetDescription className="flex min-w-0 items-center gap-1 pr-10 text-sm pointer-coarse:pr-14">
+    <header className={cn("flex flex-col gap-3 border-b py-6 pt-2", gutter)}>
+      <p className="text-muted-foreground flex min-w-0 items-center gap-1 text-sm">
         {breadcrumb}
-      </SheetDescription>
+      </p>
       {title}
-    </SheetHeader>
+    </header>
   )
 }
 
 /**
- * One property: an icon and its label in a column, the value beside it.
+ * One property: its label in a 96px column, ink-3, and the value beside it.
  *
- * The label column is proportional until there is room for a fixed one — on a
- * phone, 8rem of label leaves a third of the screen for the value it labels.
- *
- * The label sits beside the value's first line, not the middle of it: a value
- * that wraps — a task's tags — keeps its label where the eye expects it. Both
- * sides are at least one control tall, so a single-line row is centred as it
- * always was.
+ * The label names its value. Where the value is one control, the label is that
+ * control's `<label>`; where it is several (tags) or none (a read-only date),
+ * the value is a group the label names. Both sides are 30px tall, so a
+ * single-line row is centred; a value that wraps keeps its label on the first
+ * line.
  */
 export function PropertyRow({
-  icon: Icon,
   label,
   htmlFor,
   children,
 }: {
-  icon: LucideIcon
   label: string
   htmlFor?: string
   children: React.ReactNode
 }) {
+  const labelId = useId()
+  const text =
+    "text-ink-3 flex h-[30px] items-center text-[13px] pointer-coarse:h-11"
+  const value =
+    "flex min-h-[30px] min-w-0 items-center gap-2 pointer-coarse:min-h-11"
   return (
-    <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,3fr)] items-start gap-2 py-1 md:grid-cols-[8rem_1fr]">
-      <label
-        htmlFor={htmlFor}
-        className="text-muted-foreground flex min-h-9 items-center gap-2 text-sm pointer-coarse:min-h-11"
-      >
-        <Icon className="size-4 shrink-0" aria-hidden />
-        {label}
-      </label>
-      <div className="grid min-h-9 min-w-0 items-center text-sm pointer-coarse:min-h-11">
+    <div className="grid grid-cols-[88px_minmax(0,1fr)] items-start gap-x-4 md:grid-cols-[96px_minmax(0,1fr)]">
+      {htmlFor ? (
+        <>
+          <label htmlFor={htmlFor} className={text}>
+            {label}
+          </label>
+          <div className={value}>{children}</div>
+        </>
+      ) : (
+        <>
+          <span id={labelId} className={text}>
+            {label}
+          </span>
+          <fieldset
+            aria-labelledby={labelId}
+            className={`${value} m-0 border-0 p-0`}
+          >
+            {children}
+          </fieldset>
+        </>
+      )}
+    </div>
+  )
+}
+
+/** The property list of a record: a hairline above, a lighter one below. */
+export function PropertyList({ children }: { children: React.ReactNode }) {
+  return (
+    // The rule sits on an inner box, so it runs between the gutters like every
+    // other rule in the column.
+    <div className={gutter}>
+      <div className="border-rule-strong flex flex-col gap-0.5 border-t pt-2.5 pb-3.5">
         {children}
       </div>
     </div>
   )
 }
 
-/** The property list of a record: hairline-separated rows. */
-export function PropertyList({ children }: { children: React.ReactNode }) {
-  return <div className="divide-y px-6 py-2">{children}</div>
-}
-
 /**
  * A value the record cannot change, said in words rather than shown as a
- * disabled control — a control that cannot be used still asks to be tried.
+ * disabled control: a control that cannot be used still asks to be tried.
  */
 export function ReadOnlyValue({ children }: { children: React.ReactNode }) {
+  return <span className="text-ink-3 text-sm">{children}</span>
+}
+
+/** A section heading: 13px, 600, over a hairline. */
+export function SectionHeading({
+  children,
+  count,
+  action,
+}: {
+  children: React.ReactNode
+  count?: React.ReactNode
+  action?: React.ReactNode
+}) {
   return (
-    <span className={cn("text-muted-foreground", valueInset)}>{children}</span>
+    <h3 className="border-rule-strong flex items-baseline gap-2 border-b pb-2 text-[13px] font-semibold">
+      {children}
+      {count !== undefined && (
+        <span className="text-ink-3 font-mono text-xs font-normal tabular-nums">
+          {count}
+        </span>
+      )}
+      {action && <span className="ml-auto font-normal">{action}</span>}
+    </h3>
   )
 }
 
 /**
- * Where a value's text starts in a property row: a control's padding plus its
- * border, so a read-only value or a link lines up with the select above it
- * rather than a few pixels short of it.
+ * One section of a record: a heading over a hairline with its count in mono
+ * and, at the right, the section's own action. The section is a named region,
+ * so a screen reader can jump to it and a spec can find it.
  */
-export const valueInset = "px-[calc(--spacing(3)+1px)]"
+export function RecordSection({
+  title,
+  count,
+  action,
+  children,
+}: {
+  title: string
+  count?: React.ReactNode
+  action?: React.ReactNode
+  children: React.ReactNode
+}) {
+  return (
+    <section aria-label={title} className={cn("pt-[18px] pb-1", gutter)}>
+      <SectionHeading count={count} action={action}>
+        {title}
+      </SectionHeading>
+      {children}
+    </section>
+  )
+}
 
-/** The banded section a record's description sits in, on a record and a draft. */
+/** The section a record's description sits in, on a record and a draft. */
 export function DescriptionSection({
   children,
 }: {
   children: React.ReactNode
 }) {
   return (
-    <div className="border-t px-6 py-5">
-      <h3 className={cn("mb-2 text-sm font-medium", valueInset)}>
-        Description
-      </h3>
-      {children}
-    </div>
+    <RecordSection title="Description">
+      <div className="pt-2">{children}</div>
+    </RecordSection>
   )
 }
 
@@ -279,6 +599,7 @@ export function EditableText({
   value,
   onCommit,
   multiline,
+  wrap,
   className,
   placeholder,
   id,
@@ -293,6 +614,11 @@ export function EditableText({
    */
   onCommit: (next: string) => undefined | Promise<boolean>
   multiline?: boolean
+  /**
+   * One line of text that wraps when it is long, as a title does: Enter saves
+   * it rather than breaking the line, and a pasted break becomes a space.
+   */
+  wrap?: boolean
   className?: string
   placeholder?: string
   id?: string
@@ -340,6 +666,23 @@ export function EditableText({
     className: cn(ghost, className),
   }
 
+  if (wrap) {
+    return (
+      <Textarea
+        {...shared}
+        rows={1}
+        onChange={(e) => type(e.target.value.replace(/\s*\n\s*/g, " "))}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+            e.preventDefault()
+            e.currentTarget.blur()
+          }
+          if (e.key === "Escape") abandon()
+        }}
+      />
+    )
+  }
+
   return multiline ? (
     <Textarea
       {...shared}
@@ -364,3 +707,36 @@ export function EditableText({
 /** The panel's own heading for a record's title, when it is a control. */
 export const titleFieldClass =
   "h-auto px-2 py-1.5 text-xl leading-snug font-semibold md:text-xl"
+
+/**
+ * A task's title: 22px, 600, wrapping rather than scrolling, flat until it is
+ * reached for. For a textarea one row tall that grows with its text; the
+ * margin puts its text on the gutter's edge.
+ */
+export const taskTitleClass =
+  "min-h-0 resize-none -ml-2 px-2 py-1 text-[22px] leading-[1.25] font-semibold tracking-[-0.015em] md:text-[22px]"
+
+/**
+ * The line a task opens with: its status mark, which is the control that
+ * closes it, and its title beside it. The draft has no mark yet.
+ */
+export function TitleRow({
+  mark,
+  children,
+}: {
+  mark?: React.ReactNode
+  children: React.ReactNode
+}) {
+  return (
+    <div
+      className={cn(
+        "grid items-start gap-3 pt-2 pb-[18px]",
+        mark ? "grid-cols-[22px_minmax(0,1fr)]" : "grid-cols-1",
+        gutter,
+      )}
+    >
+      {mark && <span className="mt-[7px] flex">{mark}</span>}
+      {children}
+    </div>
+  )
+}

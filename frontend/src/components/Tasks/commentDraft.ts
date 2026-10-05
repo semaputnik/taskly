@@ -6,11 +6,10 @@ interface Draft {
   caret: number
 }
 
-// Unsent comments, by task. The thread is unmounted whenever its tab is not
-// the one on screen — that is what keeps the other tabs from fetching — so a
-// draft kept in the thread would go with it. Held here, a half-written note
-// survives a look at the subtasks, a visit to one of them, and closing the
-// panel, for as long as the page is open.
+// Unsent comments, by task. The thread is remounted whenever the panel moves
+// to another task, or closes, so a draft kept in the thread would go with it.
+// Held here, a half-written note survives a visit to a subtask and the way
+// back, and closing the panel, for as long as the page is open.
 const drafts = new Map<string, Draft>()
 
 /**

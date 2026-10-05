@@ -13,7 +13,10 @@ async function revealToken(page: Page) {
     scope: { project_ids: [], permissions: {} },
   })
   await page.goto(`/bots?bot=${bot.id}`)
-  const panel = page.getByRole("dialog", { name: "Nightly sync", exact: true })
+  const panel = page.getByRole("complementary", {
+    name: "Nightly sync",
+    exact: true,
+  })
   await panel.getByRole("button", { name: "Issue token" }).click()
   await page
     .getByRole("dialog", { name: /Issue token for Nightly sync/ })

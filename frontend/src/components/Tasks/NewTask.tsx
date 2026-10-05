@@ -3,12 +3,13 @@ import { useBlocker } from "@tanstack/react-router"
 import { useEffect, useRef, useState } from "react"
 
 import type { TaskPublic } from "@/client"
-import { useCaptureFocus, useCaptureTitle } from "@/components/Records/panels"
+import { useCaptureFocus } from "@/components/Records/panels"
 import {
   DescriptionSection,
   ghost,
-  RecordHeader,
-  titleFieldClass,
+  gutter,
+  TitleRow,
+  taskTitleClass,
 } from "@/components/Records/RecordPanel"
 import { Button } from "@/components/ui/button"
 import {
@@ -19,13 +20,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { projectsQuery } from "@/lib/serverState"
 import { cn } from "@/lib/utils"
 import type { CaptureTarget } from "./capture"
 import { carryOver, emptyDraft, isTouched, type TaskFields } from "./draft"
-import { TaskPropertyRows } from "./TaskProperties"
+import { descriptionClass, TaskPropertyRows } from "./TaskProperties"
 import { useTaskCapture } from "./useTaskWrites"
 
 // The commit chord, named the way the reader's keyboard names it.
@@ -61,15 +61,9 @@ export function NewTask({
 }) {
   const capture = useTaskCapture(target, onCreated)
   const [defaults, setDefaults] = useState(() => emptyDraft(target))
-  // A title typed before the panel opened is the reader's own words, so the
-  // draft holds it from the first frame and closing it asks first.
-  const typedTitle = useCaptureTitle()
-  const [draft, setDraft] = useState(() => ({
-    ...defaults,
-    title: typedTitle ?? "",
-  }))
+  const [draft, setDraft] = useState(defaults)
   const touched = isTouched(draft, defaults)
-  const titleRef = useCaptureFocus<HTMLInputElement>()
+  const titleRef = useCaptureFocus<HTMLTextAreaElement>()
   // Set while a commit is taking the reader onto the new record, which is a
   // way of leaving the draft that loses nothing.
   const leaving = useRef(false)
@@ -179,40 +173,40 @@ export function NewTask({
 
   return (
     <div ref={panel} className="flex min-h-full flex-1 flex-col">
-      <RecordHeader
-        breadcrumb={
-          <>
-            <span className="shrink-0">New task</span>
-            <span aria-hidden>·</span>
-            <span className="truncate">Not saved yet</span>
-          </>
-        }
-        title={
-          <Input
-            ref={titleRef}
-            aria-label="Task title"
-            placeholder="What needs doing?"
-            value={draft.title}
-            onChange={(event) =>
-              setDraft((previous) => ({
-                ...previous,
-                title: event.target.value,
-              }))
+      {/* The panel's bar says "New task, not saved yet"; here the title sits
+          where the record's will, without a status mark: it has no status
+          until it is created. */}
+      <TitleRow>
+        <Textarea
+          ref={titleRef}
+          rows={1}
+          aria-label="Task title"
+          placeholder="What needs doing?"
+          value={draft.title}
+          onChange={(event) =>
+            setDraft((previous) => ({
+              ...previous,
+              title: event.target.value.replace(/\s*\n\s*/g, " "),
+            }))
+          }
+          onKeyDown={(event) => {
+            if (
+              event.key !== "Enter" ||
+              event.metaKey ||
+              event.ctrlKey ||
+              event.nativeEvent.isComposing
+            ) {
+              return
             }
-            onKeyDown={(event) => {
-              if (event.key !== "Enter" || event.metaKey || event.ctrlKey) {
-                return
-              }
-              event.preventDefault()
-              void commit(false)
-            }}
-            className={cn(
-              "border-transparent bg-transparent shadow-none dark:bg-transparent",
-              titleFieldClass,
-            )}
-          />
-        }
-      />
+            event.preventDefault()
+            void commit(false)
+          }}
+          className={cn(
+            "border-transparent bg-transparent shadow-none dark:bg-transparent",
+            taskTitleClass,
+          )}
+        />
+      </TitleRow>
 
       <TaskPropertyRows
         fields={draft}
@@ -233,13 +227,20 @@ export function NewTask({
               description: event.target.value,
             }))
           }
-          className={ghost}
+          // The same field the task's own description is, so nothing moves
+          // when the task is created.
+          className={cn(ghost, descriptionClass)}
         />
       </DescriptionSection>
 
       {/* The one commit, pinned where a thumb reaches it. */}
-      <div className="bg-card sticky bottom-0 mt-auto flex items-center justify-end gap-3 border-t px-6 py-3">
-        <span className="text-muted-foreground text-xs">
+      <div
+        className={cn(
+          "bg-page border-rule-strong sticky bottom-0 mt-auto flex items-center justify-end gap-3 border-t py-3",
+          gutter,
+        )}
+      >
+        <span className="text-ink-3 text-xs">
           <kbd className="font-sans">{CHORD}</kbd> creates and starts another
         </span>
         <Button

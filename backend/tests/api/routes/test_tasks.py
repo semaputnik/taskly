@@ -4,28 +4,15 @@ from fastapi.testclient import TestClient
 from sqlmodel import Session
 
 from app.core.config import settings
+from tests.utils.accounts import create_project, inbox_project_id
 from tests.utils.user import new_user_headers
-
-
-def _inbox_id(client: TestClient, headers: dict[str, str]) -> str:
-    r = client.get(f"{settings.API_V1_STR}/projects/", headers=headers)
-    return next(p["id"] for p in r.json()["data"] if p["is_inbox"])
-
-
-def _create_project(client: TestClient, headers: dict[str, str], name: str) -> str:
-    r = client.post(
-        f"{settings.API_V1_STR}/projects/",
-        headers=headers,
-        json={"name": name},
-    )
-    return r.json()["id"]
 
 
 def test_create_task_without_project_lands_in_inbox(
     client: TestClient, db: Session
 ) -> None:
     headers = new_user_headers(client, db)
-    inbox_id = _inbox_id(client, headers)
+    inbox_id = inbox_project_id(client, headers)
 
     r = client.post(
         f"{settings.API_V1_STR}/tasks/",
@@ -43,7 +30,7 @@ def test_create_task_without_project_lands_in_inbox(
 
 def test_create_task_in_explicit_project(client: TestClient, db: Session) -> None:
     headers = new_user_headers(client, db)
-    project_id = _create_project(client, headers, "Groceries")
+    project_id = create_project(client, headers, "Groceries")
 
     r = client.post(
         f"{settings.API_V1_STR}/tasks/",
@@ -145,7 +132,7 @@ def test_complete_and_return_to_not_completed(client: TestClient, db: Session) -
 
 def test_move_task_between_projects(client: TestClient, db: Session) -> None:
     headers = new_user_headers(client, db)
-    other_project_id = _create_project(client, headers, "Work")
+    other_project_id = create_project(client, headers, "Work")
 
     create_r = client.post(
         f"{settings.API_V1_STR}/tasks/",
@@ -166,7 +153,7 @@ def test_move_task_between_projects(client: TestClient, db: Session) -> None:
 def test_cannot_move_task_to_project_not_owned(client: TestClient, db: Session) -> None:
     headers_a = new_user_headers(client, db)
     headers_b = new_user_headers(client, db)
-    other_project_id = _create_project(client, headers_b, "B's project")
+    other_project_id = create_project(client, headers_b, "B's project")
 
     create_r = client.post(
         f"{settings.API_V1_STR}/tasks/",

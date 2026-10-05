@@ -3,41 +3,13 @@ from fastapi.testclient import TestClient
 from sqlmodel import Session, col, select
 
 from app import activity, crud
-from app.api.deps import get_attachment_storage
 from app.core.config import settings
-from app.main import app
 from app.models import ActivityEntry, TaskCreate, UserCreate
-from tests.api.routes.test_attachments import InMemoryAttachmentStorage
+from tests.utils.accounts import create_project_record, create_task_record, my_id
 from tests.utils.user import new_user_headers
 from tests.utils.utils import random_email
 
 API = settings.API_V1_STR
-
-
-@pytest.fixture(autouse=True)
-def storage():
-    fake_storage = InMemoryAttachmentStorage()
-    app.dependency_overrides[get_attachment_storage] = lambda: fake_storage
-    yield fake_storage
-    del app.dependency_overrides[get_attachment_storage]
-
-
-def _me(client: TestClient, headers: dict[str, str]) -> str:
-    return client.get(f"{API}/users/me", headers=headers).json()["id"]
-
-
-def _create_project(client: TestClient, headers: dict[str, str], name: str) -> dict:
-    r = client.post(f"{API}/projects/", headers=headers, json={"name": name})
-    assert r.status_code == 200, r.text
-    return r.json()
-
-
-def _create_task(
-    client: TestClient, headers: dict[str, str], title: str, **fields: object
-) -> dict:
-    r = client.post(f"{API}/tasks/", headers=headers, json={"title": title, **fields})
-    assert r.status_code == 200, r.text
-    return r.json()
 
 
 def _patch(
@@ -67,9 +39,9 @@ def _log_after(
 
 def test_creating_a_task_is_logged(client: TestClient, db: Session) -> None:
     headers = new_user_headers(client, db)
-    project = _create_project(client, headers, "Home")
+    project = create_project_record(client, headers, "Home")
 
-    task = _create_task(
+    task = create_task_record(
         client,
         headers,
         "Fix the tap",
@@ -82,7 +54,7 @@ def test_creating_a_task_is_logged(client: TestClient, db: Session) -> None:
     assert entry["action"] == "task_created"
     assert entry["entity_type"] == "task"
     assert entry["entity_id"] == task["id"]
-    assert entry["actor_id"] == _me(client, headers)
+    assert entry["actor_id"] == my_id(client, headers)
     assert entry["created_at"] is not None
     assert entry["details"]["title"] == "Fix the tap"
     snapshot = entry["details"]["task"]
@@ -96,7 +68,7 @@ def test_changing_a_task_is_logged_with_what_changed(
     client: TestClient, db: Session
 ) -> None:
     headers = new_user_headers(client, db)
-    task = _create_task(client, headers, "Fix the tap", tags=["home"])
+    task = create_task_record(client, headers, "Fix the tap", tags=["home"])
     seen = _log(client, headers)
 
     _patch(
@@ -128,7 +100,7 @@ def test_changing_a_task_is_logged_with_what_changed(
 
 def test_changing_how_a_task_recurs_is_logged(client: TestClient, db: Session) -> None:
     headers = new_user_headers(client, db)
-    task = _create_task(client, headers, "Water plants", due_date="2026-03-02")
+    task = create_task_record(client, headers, "Water plants", due_date="2026-03-02")
     seen = _log(client, headers)
 
     _patch(client, headers, task["id"], recurrence={"frequency": "weekly"})
@@ -147,9 +119,11 @@ def test_moving_a_task_is_logged_with_both_projects(
     client: TestClient, db: Session
 ) -> None:
     headers = new_user_headers(client, db)
-    home = _create_project(client, headers, "Home")
-    work = _create_project(client, headers, "Work")
-    task = _create_task(client, headers, "Print the report", project_id=home["id"])
+    home = create_project_record(client, headers, "Home")
+    work = create_project_record(client, headers, "Work")
+    task = create_task_record(
+        client, headers, "Print the report", project_id=home["id"]
+    )
     seen = _log(client, headers)
 
     _patch(client, headers, task["id"], project_id=work["id"])
@@ -164,8 +138,8 @@ def test_setting_and_removing_an_assignee_are_logged(
     client: TestClient, db: Session
 ) -> None:
     headers = new_user_headers(client, db)
-    me = _me(client, headers)
-    task = _create_task(client, headers, "Call the bank")
+    me = my_id(client, headers)
+    task = create_task_record(client, headers, "Call the bank")
     seen = _log(client, headers)
 
     _patch(client, headers, task["id"], assignee_id=me)
@@ -182,7 +156,7 @@ def test_completing_and_reopening_a_task_are_logged(
     client: TestClient, db: Session
 ) -> None:
     headers = new_user_headers(client, db)
-    task = _create_task(client, headers, "Call the bank")
+    task = create_task_record(client, headers, "Call the bank")
     seen = _log(client, headers)
 
     _patch(client, headers, task["id"], status="done")
@@ -196,10 +170,10 @@ def test_deleting_a_task_is_one_entry_for_the_whole_deletion(
     client: TestClient, db: Session
 ) -> None:
     headers = new_user_headers(client, db)
-    project = _create_project(client, headers, "Home")
-    root = _create_task(client, headers, "Move house", project_id=project["id"])
-    child = _create_task(client, headers, "Pack", parent_id=root["id"])
-    _create_task(client, headers, "Books", parent_id=child["id"])
+    project = create_project_record(client, headers, "Home")
+    root = create_task_record(client, headers, "Move house", project_id=project["id"])
+    child = create_task_record(client, headers, "Pack", parent_id=root["id"])
+    create_task_record(client, headers, "Books", parent_id=child["id"])
     seen = _log(client, headers)
 
     r = client.delete(
@@ -244,7 +218,7 @@ def test_creating_a_project_is_logged(client: TestClient, db: Session) -> None:
     assert entry["action"] == "project_created"
     assert entry["entity_type"] == "project"
     assert entry["entity_id"] == project["id"]
-    assert entry["actor_id"] == _me(client, headers)
+    assert entry["actor_id"] == my_id(client, headers)
     assert entry["details"] == {"name": "Home", "description": "Around the flat"}
     assert entry["entity_exists"] is True
     assert entry["entity_project_id"] == project["id"]
@@ -254,7 +228,7 @@ def test_changing_a_project_is_logged_with_what_changed(
     client: TestClient, db: Session
 ) -> None:
     headers = new_user_headers(client, db)
-    project = _create_project(client, headers, "Home")
+    project = create_project_record(client, headers, "Home")
     seen = _log(client, headers)
 
     r = client.patch(
@@ -277,10 +251,12 @@ def test_deleting_a_project_is_one_entry_for_the_whole_deletion(
     client: TestClient, db: Session
 ) -> None:
     headers = new_user_headers(client, db)
-    project = _create_project(client, headers, "Someday")
-    root = _create_task(client, headers, "Learn the cello", project_id=project["id"])
-    _create_task(client, headers, "Find a teacher", parent_id=root["id"])
-    _create_task(client, headers, "Read more", project_id=project["id"])
+    project = create_project_record(client, headers, "Someday")
+    root = create_task_record(
+        client, headers, "Learn the cello", project_id=project["id"]
+    )
+    create_task_record(client, headers, "Find a teacher", parent_id=root["id"])
+    create_task_record(client, headers, "Read more", project_id=project["id"])
     seen = _log(client, headers)
 
     r = client.delete(f"{API}/projects/{project['id']}", headers=headers)
@@ -298,8 +274,8 @@ def test_adding_editing_and_deleting_a_comment_are_logged(
     client: TestClient, db: Session
 ) -> None:
     headers = new_user_headers(client, db)
-    project = _create_project(client, headers, "Home")
-    task = _create_task(client, headers, "Fix the tap", project_id=project["id"])
+    project = create_project_record(client, headers, "Home")
+    task = create_task_record(client, headers, "Fix the tap", project_id=project["id"])
     seen = _log(client, headers)
 
     r = client.post(
@@ -334,8 +310,8 @@ def test_a_comment_entry_links_to_its_task_while_both_exist(
     client: TestClient, db: Session
 ) -> None:
     headers = new_user_headers(client, db)
-    project = _create_project(client, headers, "Home")
-    task = _create_task(client, headers, "Fix the tap", project_id=project["id"])
+    project = create_project_record(client, headers, "Home")
+    task = create_task_record(client, headers, "Fix the tap", project_id=project["id"])
     client.post(
         f"{API}/tasks/{task['id']}/comments/", headers=headers, json={"body": "Drips"}
     )
@@ -354,7 +330,7 @@ def test_adding_and_deleting_an_attachment_are_logged(
     client: TestClient, db: Session
 ) -> None:
     headers = new_user_headers(client, db)
-    task = _create_task(client, headers, "Fix the tap")
+    task = create_task_record(client, headers, "Fix the tap")
     seen = _log(client, headers)
 
     r = client.post(
@@ -385,7 +361,7 @@ def test_a_refused_upload_writes_nothing(
     client: TestClient, db: Session, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     headers = new_user_headers(client, db)
-    task = _create_task(client, headers, "Fix the tap")
+    task = create_task_record(client, headers, "Fix the tap")
     seen = _log(client, headers)
     monkeypatch.setattr(settings, "ATTACHMENT_MAX_SIZE_BYTES", 4)
 
@@ -406,8 +382,8 @@ def test_one_request_with_several_changes_writes_an_entry_for_each(
     client: TestClient, db: Session
 ) -> None:
     headers = new_user_headers(client, db)
-    work = _create_project(client, headers, "Work")
-    task = _create_task(client, headers, "Print the report")
+    work = create_project_record(client, headers, "Work")
+    task = create_task_record(client, headers, "Print the report")
     seen = _log(client, headers)
 
     _patch(
@@ -416,7 +392,7 @@ def test_one_request_with_several_changes_writes_an_entry_for_each(
         task["id"],
         title="Print the quarterly report",
         project_id=work["id"],
-        assignee_id=_me(client, headers),
+        assignee_id=my_id(client, headers),
         status="done",
     )
 
@@ -433,7 +409,7 @@ def test_resending_unchanged_fields_writes_nothing(
     client: TestClient, db: Session
 ) -> None:
     headers = new_user_headers(client, db)
-    task = _create_task(client, headers, "Call the bank", tags=["money"])
+    task = create_task_record(client, headers, "Call the bank", tags=["money"])
     seen = _log(client, headers)
 
     _patch(
@@ -453,9 +429,9 @@ def test_completing_subtasks_along_with_their_parent_logs_each_completion(
     client: TestClient, db: Session
 ) -> None:
     headers = new_user_headers(client, db)
-    root = _create_task(client, headers, "Move house")
-    child = _create_task(client, headers, "Pack", parent_id=root["id"])
-    grandchild = _create_task(client, headers, "Books", parent_id=child["id"])
+    root = create_task_record(client, headers, "Move house")
+    child = create_task_record(client, headers, "Pack", parent_id=root["id"])
+    grandchild = create_task_record(client, headers, "Books", parent_id=child["id"])
     seen = _log(client, headers)
 
     _patch(client, headers, root["id"], status="done", subtasks="complete")
@@ -472,7 +448,7 @@ def test_completing_a_recurring_task_logs_the_next_occurrence(
     client: TestClient, db: Session
 ) -> None:
     headers = new_user_headers(client, db)
-    task = _create_task(
+    task = create_task_record(
         client,
         headers,
         "Water plants",
@@ -493,8 +469,8 @@ def test_completing_a_recurring_task_logs_the_next_occurrence(
 
 def test_archiving_a_project_is_not_logged(client: TestClient, db: Session) -> None:
     headers = new_user_headers(client, db)
-    project = _create_project(client, headers, "Someday")
-    _create_task(client, headers, "Learn the cello", project_id=project["id"])
+    project = create_project_record(client, headers, "Someday")
+    create_task_record(client, headers, "Learn the cello", project_id=project["id"])
     seen = _log(client, headers)
 
     for toggle in ("archive", "unarchive"):
@@ -506,8 +482,8 @@ def test_archiving_a_project_is_not_logged(client: TestClient, db: Session) -> N
 
 def test_a_refused_change_writes_nothing(client: TestClient, db: Session) -> None:
     headers = new_user_headers(client, db)
-    root = _create_task(client, headers, "Move house")
-    _create_task(client, headers, "Pack", parent_id=root["id"])
+    root = create_task_record(client, headers, "Move house")
+    create_task_record(client, headers, "Pack", parent_id=root["id"])
     seen = _log(client, headers)
 
     r = client.patch(
@@ -524,7 +500,7 @@ def test_a_change_and_its_entry_commit_together(
     client: TestClient, db: Session, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     headers = new_user_headers(client, db)
-    task = _create_task(client, headers, "Call the bank")
+    task = create_task_record(client, headers, "Call the bank")
     seen = _log(client, headers)
 
     def fail(*_args: object, **_kwargs: object) -> None:
@@ -546,7 +522,7 @@ def test_entries_stay_readable_after_the_task_is_deleted(
     client: TestClient, db: Session
 ) -> None:
     headers = new_user_headers(client, db)
-    task = _create_task(client, headers, "Old title")
+    task = create_task_record(client, headers, "Old title")
     _patch(client, headers, task["id"], title="New title")
     r = client.delete(f"{API}/tasks/{task['id']}", headers=headers)
     assert r.status_code == 200
@@ -565,9 +541,9 @@ def test_an_entry_says_where_its_task_can_still_be_opened(
     client: TestClient, db: Session
 ) -> None:
     headers = new_user_headers(client, db)
-    project = _create_project(client, headers, "Home")
-    root = _create_task(client, headers, "Move house", project_id=project["id"])
-    _create_task(client, headers, "Pack", parent_id=root["id"])
+    project = create_project_record(client, headers, "Home")
+    root = create_task_record(client, headers, "Move house", project_id=project["id"])
+    create_task_record(client, headers, "Pack", parent_id=root["id"])
 
     for entry in _log(client, headers):
         assert entry["entity_exists"] is True
@@ -580,7 +556,7 @@ def test_an_entry_says_where_its_task_can_still_be_opened(
 def test_the_log_is_newest_first_and_pages(client: TestClient, db: Session) -> None:
     headers = new_user_headers(client, db)
     for title in ("First", "Second", "Third"):
-        _create_task(client, headers, title)
+        create_task_record(client, headers, title)
 
     r = client.get(f"{API}/activity-log/", headers=headers)
     body = r.json()
@@ -602,8 +578,8 @@ def test_the_log_is_newest_first_and_pages(client: TestClient, db: Session) -> N
 def test_a_user_sees_only_their_own_log(client: TestClient, db: Session) -> None:
     mine = new_user_headers(client, db)
     theirs = new_user_headers(client, db)
-    _create_task(client, mine, "Mine")
-    _create_task(client, theirs, "Theirs")
+    create_task_record(client, mine, "Mine")
+    create_task_record(client, theirs, "Theirs")
 
     assert [e["details"]["title"] for e in _log(client, mine)] == ["Mine"]
     assert [e["details"]["title"] for e in _log(client, theirs)] == ["Theirs"]
@@ -613,11 +589,11 @@ def test_the_superuser_sees_only_their_own_log(
     client: TestClient, db: Session, superuser_token_headers: dict[str, str]
 ) -> None:
     other = new_user_headers(client, db)
-    other_task = _create_task(client, other, "Someone else's secret")
-    _create_task(client, superuser_token_headers, "Superuser's own")
+    other_task = create_task_record(client, other, "Someone else's secret")
+    create_task_record(client, superuser_token_headers, "Superuser's own")
 
     entries = _log(client, superuser_token_headers, limit=200)
-    superuser_id = _me(client, superuser_token_headers)
+    superuser_id = my_id(client, superuser_token_headers)
     assert all(e["actor_id"] == superuser_id for e in entries)
     assert other_task["id"] not in {e["entity_id"] for e in entries}
     assert "Superuser's own" in {e["details"]["title"] for e in entries}

@@ -7,6 +7,7 @@ import {
 import { Link as RouterLink } from "@tanstack/react-router"
 
 import type { TaskHandover, TaskPublic } from "@/client"
+import { useRecordList } from "@/components/Records/walk"
 import {
   CompactTaskRow,
   CompactTaskRowPending,
@@ -91,6 +92,11 @@ export function MyWork() {
     projects.data.data.map((project) => [project.id, project.name]),
   )
   const total = groups.reduce((sum, group) => sum + group.data.count, 0)
+  // After the date bands, group by group as drawn.
+  useRecordList(
+    1,
+    groups.flatMap((group) => group.data.data.map((task) => task.id)),
+  )
 
   return (
     <section className="mb-9">

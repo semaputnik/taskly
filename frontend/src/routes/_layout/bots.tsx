@@ -36,6 +36,7 @@ function BotsTableContent({ onOpen }: { onOpen: (botId: string) => void }) {
       columns={getColumns(projectsById)}
       data={bots.data}
       rowLabel={(bot) => `Open ${bot.name}`}
+      opens="bot"
       onRowClick={(bot) => onOpen(bot.id)}
       empty={
         <EmptyState

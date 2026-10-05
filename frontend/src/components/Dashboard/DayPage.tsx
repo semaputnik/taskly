@@ -3,6 +3,7 @@ import { Link as RouterLink } from "@tanstack/react-router"
 import { ErrorBoundary } from "react-error-boundary"
 
 import type { TaskPublic } from "@/client"
+import { useRecordList } from "@/components/Records/walk"
 import {
   CompactTaskRow,
   CompactTaskRowPending,
@@ -145,6 +146,11 @@ export function Day({ since }: { since: string | null }) {
     window: "visit",
   })
   const clear = overdue.count === 0 && due.count === 0
+  // The column walks the bands in the order they are read: first.
+  useRecordList(
+    0,
+    [...overdue.data, ...due.data].map((task) => task.id),
+  )
 
   return (
     <>

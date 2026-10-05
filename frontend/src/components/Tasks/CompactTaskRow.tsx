@@ -9,7 +9,7 @@ import {
 } from "lucide-react"
 
 import type { TaskPublic } from "@/client"
-import { recordLink } from "@/components/Records/panels"
+import { recordLink, useIsOpen } from "@/components/Records/panels"
 import { Skeleton } from "@/components/ui/skeleton"
 import { isoDay } from "@/lib/dates"
 import { cn } from "@/lib/utils"
@@ -74,6 +74,10 @@ export function CompactTaskRow({
   children?: React.ReactNode
 }) {
   const done = task.status === "done"
+  // The line whose task is open in the column is tinted, as one under the
+  // pointer is. A reader who cannot see the tint has the link's own
+  // aria-current, which the router sets on the link to where they are.
+  const open = useIsOpen("task", task.id)
   const { facts, project } = metaLine(task, {
     today: isoDay(new Date()),
     projectName,
@@ -82,7 +86,8 @@ export function CompactTaskRow({
   return (
     <div
       className={cn(
-        "hover:from-hover border-rule flex gap-3 border-b py-2.5 transition-colors last:border-b-0 hover:bg-linear-to-r hover:to-transparent hover:to-85%",
+        "border-rule hover:row-tint flex gap-3 border-b py-2.5 transition-colors last:border-b-0",
+        open && "row-tint",
         flush ? "px-0" : "px-4",
       )}
     >

@@ -18,7 +18,7 @@ test("A bot user is created on the Bots page and its token is shown once", async
   await projectName.fill("Support queue")
   await projectName.press("Enter")
   await expect(
-    page.getByRole("dialog", { name: "Support queue" }),
+    page.getByRole("complementary", { name: "Support queue" }),
   ).toBeVisible()
   await page.keyboard.press("Escape")
 
@@ -61,7 +61,10 @@ test("A bot user is created on the Bots page and its token is shown once", async
   // above used it, which the bot user's panel reports.
   await page.reload()
   await row.click()
-  const panel = page.getByRole("dialog", { name: "Triage agent", exact: true })
+  const panel = page.getByRole("complementary", {
+    name: "Triage agent",
+    exact: true,
+  })
   await expect(panel).toContainText("Never — it works until revoked")
   await expect(panel).not.toContainText("Never used")
   expect(await page.content()).not.toContain(token)
@@ -89,7 +92,10 @@ test("A token is revoked and a new one issued with an expiry", async ({
 
   const row = page.getByRole("row", { name: "Open Nightly sync" })
   await row.click()
-  const panel = page.getByRole("dialog", { name: "Nightly sync", exact: true })
+  const panel = page.getByRole("complementary", {
+    name: "Nightly sync",
+    exact: true,
+  })
   await panel.getByRole("button", { name: "Revoke" }).click()
   await page
     .getByRole("dialog", { name: "Revoke the token for Nightly sync?" })
@@ -146,9 +152,9 @@ test("A bot's scope is narrowed and the bot is deleted from the Bots page", asyn
     const field = page.getByRole("textbox", { name: "Project name" })
     await field.fill(name)
     await field.press("Enter")
-    await expect(page.getByRole("dialog", { name })).toBeVisible()
+    await expect(page.getByRole("complementary", { name })).toBeVisible()
     await page.keyboard.press("Escape")
-    await expect(page.getByRole("dialog")).toBeHidden()
+    await expect(page.locator("[data-record-column]")).toBeHidden()
   }
 
   await page.goto("/bots")
@@ -184,7 +190,7 @@ test("A bot's scope is narrowed and the bot is deleted from the Bots page", asyn
   // Narrowed to Docs, renamed, and able to create nothing any more — each
   // change saving on its own, in the panel.
   await page.getByRole("row", { name: "Open Changelog agent" }).click()
-  const panel = page.getByRole("dialog", { name: "Changelog agent" })
+  const panel = page.getByRole("complementary", { name: "Changelog agent" })
   const billingBox = panel.getByRole("checkbox", { name: "Billing" })
   await expect(billingBox).toBeChecked()
   await billingBox.click()
@@ -214,7 +220,7 @@ test("A bot's scope is narrowed and the bot is deleted from the Bots page", asyn
 
   await row.click()
   await page
-    .getByRole("dialog", { name: "Docs agent", exact: true })
+    .getByRole("complementary", { name: "Docs agent", exact: true })
     .getByRole("button", { name: "Delete bot user" })
     .click()
   await page

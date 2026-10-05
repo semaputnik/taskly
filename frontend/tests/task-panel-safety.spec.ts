@@ -25,7 +25,7 @@ async function openTaskWithSubtask(page: Page) {
   const task = await api.create("/tasks/", { title: "Plan the trip" })
   await api.create("/tasks/", { title: "Book the train", parent_id: task.id })
   await page.goto(`/tasks?view=table&task=${task.id}`)
-  const panel = page.getByRole("dialog", { name: "Plan the trip" })
+  const panel = page.getByRole("complementary", { name: "Plan the trip" })
   await expect(panel).toBeVisible()
   return panel
 }

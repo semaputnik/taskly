@@ -6,7 +6,7 @@ Each endpoint needs one permission, and the matrix runs every endpoint through
 the same four ways a bot is let in or turned away, on a task and a subtask.
 """
 
-from collections.abc import Callable, Generator
+from collections.abc import Callable
 from typing import Any
 
 import pytest
@@ -14,11 +14,8 @@ from fastapi.testclient import TestClient
 from httpx import Response
 from sqlmodel import Session
 
-from app.api.deps import get_attachment_storage
 from app.core.config import settings
-from app.main import app
-from tests.api.routes.test_attachments import InMemoryAttachmentStorage
-from tests.utils.bot import (
+from tests.utils.accounts import (
     ALL_PERMISSIONS,
     create_bot_user,
     create_project,
@@ -32,14 +29,6 @@ from tests.utils.bot import (
 API = settings.API_V1_STR
 
 Headers = dict[str, str]
-
-
-@pytest.fixture(autouse=True)
-def storage() -> Generator[InMemoryAttachmentStorage]:
-    fake_storage = InMemoryAttachmentStorage()
-    app.dependency_overrides[get_attachment_storage] = lambda: fake_storage
-    yield fake_storage
-    del app.dependency_overrides[get_attachment_storage]
 
 
 def _comment(client: TestClient, headers: Headers, task_id: str, body: str) -> str:

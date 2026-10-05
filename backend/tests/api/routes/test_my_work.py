@@ -11,10 +11,11 @@ from fastapi.testclient import TestClient
 from sqlmodel import Session
 
 from app.core.config import settings
-from tests.utils.bot import (
+from tests.utils.accounts import (
     create_bot_user,
     create_project,
     create_user_headers,
+    my_id,
     token_headers,
 )
 
@@ -27,11 +28,6 @@ Headers = dict[str, str]
 @pytest.fixture
 def owner(client: TestClient, db: Session) -> Headers:
     return create_user_headers(client, db)
-
-
-def _me(client: TestClient, headers: Headers) -> str:
-    me: str = client.get(f"{API}/users/me", headers=headers).json()["id"]
-    return me
 
 
 def _create(client: TestClient, headers: Headers, **fields: Any) -> dict[str, Any]:
@@ -86,7 +82,7 @@ def agent(client: TestClient, owner: Headers) -> dict[str, Any]:
 def test_my_work_lists_only_what_is_on_the_user_most_pressing_first(
     client: TestClient, owner: Headers, agent: dict[str, Any]
 ) -> None:
-    me = _me(client, owner)
+    me = my_id(client, owner)
     _create(
         client, owner, title="Mine, P3", assignee_id=me, status="todo", priority="P3"
     )
@@ -213,7 +209,7 @@ def test_a_task_out_of_review_has_no_hand_over(
 def test_other_changes_after_the_hand_over_keep_it(
     client: TestClient, owner: Headers, agent: dict[str, Any]
 ) -> None:
-    me = _me(client, owner)
+    me = my_id(client, owner)
     task = _create(client, owner, project_id=agent["project_id"], status="in_progress")
     _move(client, agent["headers"], task["id"], "review")
     r = client.patch(

@@ -27,7 +27,7 @@ async function api(page: Page) {
 }
 
 const capturePanel = (page: Page) =>
-  page.getByRole("dialog", { name: "New task" })
+  page.getByRole("complementary", { name: "New task" })
 
 const titleField = (page: Page) =>
   page.getByRole("textbox", { name: "Task title" })
@@ -50,7 +50,7 @@ test("Capture creates a task from one field, closes, and offers the way to it", 
 
   // A single capture is done: the panel closes on the list it opened over,
   // and the list holds the task.
-  await expect(page.getByRole("dialog")).toHaveCount(0)
+  await expect(page.locator("[data-record-column]")).toHaveCount(0)
   await expect(page).not.toHaveURL(/capture=|task=/)
   await expect(
     page.getByRole("row", { name: /Book the dentist/ }),
@@ -61,7 +61,7 @@ test("Capture creates a task from one field, closes, and offers the way to it", 
   await expect(notice).toBeVisible()
   await page.getByRole("button", { name: "Open" }).click()
   await expect(page).toHaveURL(/task=[0-9a-f-]{36}/)
-  const panel = page.getByRole("dialog", { name: "Book the dentist" })
+  const panel = page.getByRole("complementary", { name: "Book the dentist" })
   await expect(panel).toBeVisible()
   await expect(panel.getByRole("combobox", { name: "Project" })).toContainText(
     "Inbox",
@@ -109,11 +109,11 @@ test("Closing the panel after the title is committed leaves the task in place", 
   await titleField(page).press("Enter")
   await openCaptured(page)
   await expect(
-    page.getByRole("dialog", { name: "Renew the passport" }),
+    page.getByRole("complementary", { name: "Renew the passport" }),
   ).toBeVisible()
 
   await page.keyboard.press("Escape")
-  await expect(page.getByRole("dialog")).toBeHidden()
+  await expect(page.locator("[data-record-column]")).toBeHidden()
   await expect(page).not.toHaveURL(/task=/)
   await expect(
     page.getByRole("row", { name: /Renew the passport/ }),
@@ -131,7 +131,7 @@ test("A property set straight after capture persists with no Save", async ({
   await titleField(page).press("Enter")
   await openCaptured(page)
 
-  const panel = page.getByRole("dialog", { name: "File the tax return" })
+  const panel = page.getByRole("complementary", { name: "File the tax return" })
   await panel.getByRole("combobox", { name: "Priority" }).click()
   // No Save: choosing is the write. It is waited for, not raced by the reload.
   const saved = page.waitForResponse(
@@ -143,7 +143,7 @@ test("A property set straight after capture persists with no Save", async ({
   await page.reload()
   await expect(
     page
-      .getByRole("dialog", { name: "File the tax return" })
+      .getByRole("complementary", { name: "File the tax return" })
       .getByRole("combobox", { name: "Priority" }),
   ).toContainText("P1")
 })
@@ -174,7 +174,7 @@ test("Capture lands in the project the list is filtered to, and in Inbox otherwi
   await openCaptured(page)
   await expect(
     page
-      .getByRole("dialog", { name: "Measure the alcove" })
+      .getByRole("complementary", { name: "Measure the alcove" })
       .getByRole("combobox", { name: "Project" }),
   ).toContainText("Kitchen rebuild")
 
@@ -187,7 +187,7 @@ test("Capture lands in the project the list is filtered to, and in Inbox otherwi
   await openCaptured(page)
   await expect(
     page
-      .getByRole("dialog", { name: "Pick up the parcel" })
+      .getByRole("complementary", { name: "Pick up the parcel" })
       .getByRole("combobox", { name: "Project" }),
   ).toContainText("Inbox")
 })
@@ -217,7 +217,7 @@ test("An archived project is never a capture context", async ({ page }) => {
   await openCaptured(page)
   await expect(
     page
-      .getByRole("dialog", { name: "Sort the loft" })
+      .getByRole("complementary", { name: "Sort the loft" })
       .getByRole("combobox", { name: "Project" }),
   ).toContainText("Inbox")
 })
@@ -246,7 +246,7 @@ test("The keyboard opens capture, and a run of them costs one gesture each", asy
   await openCaptured(page)
 
   await expect(
-    page.getByRole("dialog", { name: "Call the plumber" }),
+    page.getByRole("complementary", { name: "Call the plumber" }),
   ).toBeVisible()
   await page.goto("/tasks?view=table")
   await expect(
@@ -273,7 +273,7 @@ test("The shortcut never steals a keystroke from a field being typed into", asyn
   await expect(name).toHaveValue("Coastal routec")
 })
 
-test("A subtask is captured from its parent's Subtasks tab", async ({
+test("A subtask is captured inline in its parent's Subtasks section", async ({
   page,
 }) => {
   await newUser(page)
@@ -292,9 +292,16 @@ test("A subtask is captured from its parent's Subtasks tab", async ({
   ).json()
 
   await page.goto(`/tasks?view=table&task=${parent.id}`)
-  const panel = page.getByRole("dialog", { name: "Pack the study" })
-  await panel.getByRole("tab", { name: "Subtasks" }).click()
-  const subtaskField = panel.getByRole("textbox", { name: "Subtask title" })
+  const panel = page.getByRole("complementary", { name: "Pack the study" })
+  const subtasks = panel.getByRole("region", { name: "Subtasks" })
+  const subtaskField = subtasks.getByRole("textbox", { name: "New subtask" })
+  await expect(subtaskField).toHaveAttribute("placeholder", "Add a subtask…")
+  const creates: Record<string, unknown>[] = []
+  page.on("request", (r) => {
+    if (r.method() === "POST" && r.url().endsWith("/tasks/")) {
+      creates.push(r.postDataJSON())
+    }
+  })
   await subtaskField.fill("Empty the desk drawers")
   await subtaskField.press("Enter")
 
@@ -304,14 +311,70 @@ test("A subtask is captured from its parent's Subtasks tab", async ({
   ).toBeVisible()
   await expect(subtaskField).toHaveValue("")
   await expect(page).toHaveURL(new RegExp(`task=${parent.id}`))
+  // One request, with defaults: the title, the parent, nothing else.
+  expect(creates).toHaveLength(1)
+  expect(creates[0]).toMatchObject({
+    title: "Empty the desk drawers",
+    parent_id: parent.id,
+    due_date: null,
+    priority: null,
+  })
+  expect(creates[0].status).toBeUndefined()
+  // The heading counts progress, and the field stays for the next one.
+  await expect(
+    subtasks.getByRole("heading", { name: /Subtasks\s*0\/1/ }),
+  ).toBeVisible()
+  await expect(subtaskField).toBeFocused()
+
+  // Closing the line moves the count and strikes the title.
+  await subtasks.getByRole("checkbox", { name: /Mark as done/ }).click()
+  await expect(
+    subtasks.getByRole("heading", { name: /Subtasks\s*1\/1/ }),
+  ).toBeVisible()
 
   // The child follows its parent's project rather than owning one.
   await panel.getByRole("button", { name: "Empty the desk drawers" }).click()
-  const child = page.getByRole("dialog", { name: "Empty the desk drawers" })
+  const child = page.getByRole("complementary", {
+    name: "Empty the desk drawers",
+  })
   await expect(child).toContainText("Follows its parent task")
+  await expect(child.getByRole("combobox", { name: "Status" })).toContainText(
+    "Done",
+  )
   await expect(child).toContainText(
     "Only a task at the top of its tree can repeat",
   )
+})
+
+test("A refused subtask hands its title back and keeps the field", async ({
+  page,
+}) => {
+  await newUser(page)
+  const { url, headers } = await api(page)
+  const parent = await (
+    await page.request.post(`${url}/tasks/`, {
+      headers,
+      data: { title: "Pack the study" },
+    })
+  ).json()
+  await page.route("**/api/v1/tasks/", (route) =>
+    route.request().method() === "POST"
+      ? route.fulfill({
+          status: 503,
+          contentType: "application/json",
+          body: JSON.stringify({ detail: "The server is busy" }),
+        })
+      : route.fallback(),
+  )
+
+  await page.goto(`/tasks?view=table&task=${parent.id}`)
+  const panel = page.getByRole("complementary", { name: "Pack the study" })
+  const field = panel.getByRole("textbox", { name: "New subtask" })
+  await field.fill("Empty the desk drawers")
+  await field.press("Enter")
+
+  await expect(page.getByText("The server is busy")).toBeVisible()
+  await expect(field).toHaveValue("Empty the desk drawers")
 })
 
 test("A captured task is one creation entry in the activity log", async ({
@@ -325,7 +388,7 @@ test("A captured task is one creation entry in the activity log", async ({
   await titleField(page).press("Enter")
   await openCaptured(page)
   await expect(
-    page.getByRole("dialog", { name: "Return the library books" }),
+    page.getByRole("complementary", { name: "Return the library books" }),
   ).toBeVisible()
 
   await page.goto("/activity")
@@ -489,7 +552,7 @@ test("Enter creates the whole draft as one task and one log entry", async ({
   await titleField(page).press("Enter")
   await openCaptured(page)
 
-  const record = page.getByRole("dialog", { name: "Send the invoice" })
+  const record = page.getByRole("complementary", { name: "Send the invoice" })
   await expect(record).toBeVisible()
   await expect(record.getByRole("combobox", { name: "Project" })).toContainText(
     "Accounts",
@@ -501,7 +564,8 @@ test("Enter creates the whole draft as one task and one log entry", async ({
     record.getByRole("button", { name: "Remove tag finance" }),
   ).toBeVisible()
   // What only a record has joins it.
-  await expect(record.getByRole("tab", { name: "Comments" })).toBeVisible()
+  await expect(record.getByRole("region", { name: "Activity" })).toBeVisible()
+  await expect(record.getByRole("tab")).toHaveCount(0)
   await expect(record.getByRole("combobox", { name: "Status" })).toBeVisible()
   expect(creates).toHaveLength(1)
   expect(creates[0]).toMatchObject({
@@ -536,6 +600,12 @@ test("The chord from the description creates, clears the words and keeps the set
   ).toBeVisible()
   await page.keyboard.press("Enter")
   await page.keyboard.press("Escape")
+  // Closed means gone, not on its way out: a popover that is still sliding
+  // away is still the topmost layer, and takes the Escape that closes the
+  // panel at the end of this test.
+  await expect(
+    page.getByRole("combobox", { name: "Search or create a tag" }),
+  ).toBeHidden()
 
   await titleField(page).fill("Buy stamps")
   const description = panel.getByRole("textbox", { name: "Task description" })
@@ -564,7 +634,7 @@ test("The chord from the description creates, clears the words and keeps the set
   // Closing after the run asks nothing: the carried values are the defaults.
   await page.keyboard.press("Escape")
   await expect(capturePanel(page)).toBeHidden()
-  await expect(page.getByRole("dialog")).toHaveCount(0)
+  await expect(page.locator("[data-record-column]")).toHaveCount(0)
 
   for (const title of ["Buy stamps", "Post the letter"]) {
     const row = page.getByRole("row", { name: new RegExp(title) })
