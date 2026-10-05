@@ -6,7 +6,7 @@ from collections.abc import Collection, Iterable, Sequence
 from datetime import UTC, date, datetime, timedelta
 from typing import Any, NamedTuple
 
-from sqlalchemy import and_, case, nullslast, or_
+from sqlalchemy import ARRAY, Text, and_, case, literal, nullslast, or_
 from sqlalchemy.orm import aliased
 from sqlmodel import Session, col, func, select
 
@@ -1573,4 +1573,98 @@ def get_bot_user_refs(
     return {
         bot.id: BotUserRef(id=bot.id, name=bot.name, deleted=bot.deleted_at is not None)
         for bot in bots
+    }
+
+
+class ReviewMove(NamedTuple):
+    """The bot user that moved a task into Review, and when."""
+
+    bot_user_id: uuid.UUID
+    at: datetime
+
+
+# Every entry that names one task and can say its status: a task filed in
+# one, a move between open statuses, and a move into or out of done. A plain
+# edit, an assignment or a restore leaves the status where it was, so it says
+# nothing about how the task got there. Batches name their tasks in their
+# details instead, and are matched there.
+_STATUS_ACTIONS = (
+    ActivityAction.TASK_CREATED,
+    ActivityAction.TASK_STATUS_CHANGED,
+    ActivityAction.TASK_REOPENED,
+    ActivityAction.TASK_COMPLETED,
+)
+
+
+def _status_after(entry: ActivityEntry) -> str | None:
+    """The status `entry` left its task or tasks in, or None if it set none."""
+    details = entry.details
+    match entry.action:
+        case ActivityAction.TASK_CREATED:
+            status = details.get("task", {}).get("status")
+        case ActivityAction.TASKS_BULK_CHANGED:
+            status = details.get("changes", {}).get("status")
+        case ActivityAction.TASK_COMPLETED:
+            status = TaskStatus.DONE
+        case _:
+            status = details.get("to")
+    return str(status) if status is not None else None
+
+
+def get_review_moves(
+    *, session: Session, owner_id: uuid.UUID, task_ids: Collection[uuid.UUID]
+) -> dict[uuid.UUID, ReviewMove]:
+    """
+    The hand-overs among the given tasks, keyed by task id: the bot user whose
+    move put each one in Review, read off the activity log (ADR-0008). Pass
+    only tasks that are in Review now.
+
+    Only the latest move counts, so a task the owner moved out of Review and
+    back again is the owner's, and one the owner moved there was handed over
+    by nobody. A batch is always the owner's (the bulk endpoint is
+    human-only), but it still counts as the latest move.
+    """
+    if not task_ids:
+        return {}
+    wanted = {str(task_id) for task_id in task_ids}
+    statement = (
+        select(ActivityEntry)
+        .where(
+            ActivityEntry.owner_id == owner_id,
+            ActivityEntry.entity_type == ActivityEntityType.TASK,
+            or_(
+                and_(
+                    col(ActivityEntry.action).in_(_STATUS_ACTIONS),
+                    col(ActivityEntry.entity_id).in_(task_ids),
+                ),
+                and_(
+                    col(ActivityEntry.action) == ActivityAction.TASKS_BULK_CHANGED,
+                    col(ActivityEntry.details)["task_ids"].has_any(
+                        literal(sorted(wanted), ARRAY(Text))
+                    ),
+                ),
+            ),
+        )
+        .order_by(col(ActivityEntry.position).desc())
+    )
+    latest: dict[str, ActivityEntry] = {}
+    for entry in session.exec(statement).all():
+        if _status_after(entry) is None:
+            # A batch that changed something other than the status.
+            continue
+        named = (
+            entry.details.get("task_ids", [])
+            if entry.action == ActivityAction.TASKS_BULK_CHANGED
+            else [str(entry.entity_id)]
+        )
+        for task_id in named:
+            if task_id in wanted:
+                latest.setdefault(task_id, entry)
+
+    return {
+        uuid.UUID(task_id): ReviewMove(entry.actor_bot_user_id, entry.created_at)
+        for task_id, entry in latest.items()
+        if _status_after(entry) == TaskStatus.REVIEW
+        and entry.actor_bot_user_id is not None
+        and entry.created_at is not None
     }

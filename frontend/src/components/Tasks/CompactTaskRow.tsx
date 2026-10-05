@@ -55,6 +55,7 @@ export function CompactTaskRow({
   projectName,
   receipt = false,
   flush = false,
+  children,
 }: {
   task: TaskPublic
   /** Set at the far right of the meta line. */
@@ -69,6 +70,8 @@ export function CompactTaskRow({
    * the line runs to the column's edges, as the rules between lines do.
    */
   flush?: boolean
+  /** Set under the meta line, in the title's column: a line about the task. */
+  children?: React.ReactNode
 }) {
   const done = task.status === "done"
   const { facts, project } = metaLine(task, {
@@ -136,6 +139,7 @@ export function CompactTaskRow({
             )}
           </div>
         )}
+        {children}
       </div>
     </div>
   )

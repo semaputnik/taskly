@@ -6,10 +6,10 @@ import { CaptureLine } from "@/components/Dashboard/CaptureLine"
 import { Day, DayHeading, DayPending } from "@/components/Dashboard/DayPage"
 import { markSeen, visitSince } from "@/components/Dashboard/day"
 import {
-  InProgress,
-  InProgressPending,
-  inProgressQuery,
-} from "@/components/Dashboard/InProgress"
+  MyWork,
+  MyWorkPending,
+  usePrefetchMyWork,
+} from "@/components/Dashboard/MyWork"
 import {
   recentActivityQuery,
   WhileYouWereAway,
@@ -76,7 +76,7 @@ function Dashboard() {
   // bands have suspended and resumed: the sections below them are not
   // rendered until they resume.
   usePrefetchQuery(recentActivityQuery())
-  usePrefetchQuery(inProgressQuery())
+  usePrefetchMyWork()
 
   return (
     <div className="max-w-[820px]">
@@ -87,22 +87,22 @@ function Dashboard() {
       <DayHeading />
 
       {/* One boundary: every section appears in the same frame, so none
-          moves another once it is drawn. The two panels below keep their
-          old form until their own slices replace them. */}
+          moves another once it is drawn. The panel below keeps its old
+          form until its own slice replaces it. */}
       <Suspense
         fallback={
           <>
             <DayPending />
+            <MyWorkPending />
             <div className="flex flex-col gap-6">
-              <InProgressPending />
               <WhileYouWereAwayPending />
             </div>
           </>
         }
       >
         <Day since={since} />
+        <MyWork />
         <div className="flex flex-col gap-6">
-          <InProgress />
           <WhileYouWereAway />
         </div>
       </Suspense>
