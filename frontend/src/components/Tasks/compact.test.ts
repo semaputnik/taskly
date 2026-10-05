@@ -192,7 +192,7 @@ describe("the meta line", () => {
     const assignee = (line: ReturnType<typeof metaLine>) =>
       line.facts.find((fact) => fact.kind === "assignee")
 
-    test("says \"you\" for a task assigned to the owner", () => {
+    test('says "you" for a task assigned to the owner', () => {
       const line = metaLine(
         { ...bare, assignee_id: "u1", assignee_bot_user: null },
         { today: TODAY },
@@ -229,7 +229,7 @@ describe("the meta line", () => {
       expect(assignee(line)?.text).toBe("release-bot")
     })
 
-    test("says the bot user, an arrow and \"you\" for a task handed over in Review", () => {
+    test('says the bot user, an arrow and "you" for a task handed over in Review', () => {
       const line = metaLine(
         {
           ...bare,
@@ -264,7 +264,7 @@ describe("the meta line", () => {
       expect(assignee(line)?.text).toBe("release-bot → you")
     })
 
-    test("is plain \"you\" in Review when nobody handed it over", () => {
+    test('is plain "you" in Review when nobody handed it over', () => {
       const line = metaLine(
         {
           ...bare,
