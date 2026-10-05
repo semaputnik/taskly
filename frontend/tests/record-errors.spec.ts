@@ -62,11 +62,36 @@ test("A failure that may pass offers to try again", async ({ page }) => {
     title: "Book the vet",
   })
 
-  let failing = true
-  await page.route(`**/api/v1/tasks/${task.id}`, (route) =>
-    failing
-      ? route.fulfill({ status: 503, body: "unavailable" })
-      : route.fallback(),
+  // The request is let through by the press of Try again and by nothing
+  // else, not by a timer in the test: the query's own retry would load the
+  // task the moment the API answered, and take the button away before it is
+  // pressed. The page marks the press itself, before the button's own handler
+  // asks again.
+  await page.addInitScript(() => {
+    window.addEventListener(
+      "click",
+      (event) => {
+        const target = event.target as Element | null
+        if (target?.closest("button")?.textContent === "Try again") {
+          ;(window as unknown as { pressedTryAgain: boolean }).pressedTryAgain =
+            true
+        }
+      },
+      true,
+    )
+  })
+  const pressed = () =>
+    page
+      .evaluate(
+        () =>
+          (window as unknown as { pressedTryAgain?: boolean }).pressedTryAgain,
+      )
+      // Asked while the page is still loading: not pressed yet.
+      .catch(() => false)
+  await page.route(`**/api/v1/tasks/${task.id}`, async (route) =>
+    (await pressed())
+      ? route.fallback()
+      : route.fulfill({ status: 503, body: "unavailable" }),
   )
   await page.goto(`/tasks?view=table&task=${task.id}`)
   const panel = page.getByRole("dialog")
@@ -74,13 +99,7 @@ test("A failure that may pass offers to try again", async ({ page }) => {
   await expect(panel).toContainText("could not be loaded", { timeout: 3_000 })
   await expect(panel.locator("[data-slot=skeleton]")).toHaveCount(0)
 
-  // The request is let through only once the button can take the click:
-  // released any earlier, the query's own retry can load the task while the
-  // panel is still sliding in, and the button is gone before it is pressed.
-  const tryAgain = panel.getByRole("button", { name: "Try again" })
-  await tryAgain.click({ trial: true })
-  failing = false
-  await tryAgain.click()
+  await panel.getByRole("button", { name: "Try again" }).click()
   await expect(page.getByRole("dialog", { name: "Book the vet" })).toBeVisible()
   await expect(page.getByRole("textbox", { name: "Task title" })).toHaveValue(
     "Book the vet",
