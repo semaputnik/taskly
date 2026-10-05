@@ -1,5 +1,10 @@
 import { type UseQueryOptions, useQuery } from "@tanstack/react-query"
-import { useNavigate, useSearch } from "@tanstack/react-router"
+import {
+  type HistoryState,
+  useLocation,
+  useNavigate,
+  useSearch,
+} from "@tanstack/react-router"
 import { useCallback, useEffect, useRef } from "react"
 import { z } from "zod"
 
@@ -29,6 +34,17 @@ interface Records {
   project: ProjectPublic
   tag: TagPublic
   bot: BotUserPublic
+}
+
+declare module "@tanstack/history" {
+  interface HistoryState {
+    /**
+     * The title a capture opens with, typed before its panel was open. Held
+     * in the history entry rather than the address: it is the reader's words,
+     * not where they are, and Back and Forward still bring it along.
+     */
+    captureTitle?: string
+  }
 }
 
 /** The record types that have a panel of their own. */
@@ -158,11 +174,12 @@ export function useRecordPanels() {
   }
 
   const go = useCallback(
-    (next: PanelSearch) =>
+    (next: PanelSearch, state?: HistoryState) =>
       navigate({
         to: ".",
         search: (previous: Record<string, unknown>) =>
           panelLink(previous, next),
+        state,
       }),
     [navigate],
   )
@@ -182,9 +199,21 @@ export function useRecordPanels() {
     openProject: useCallback((id: string) => open("project", id), [open]),
     openTag: useCallback((id: string) => open("tag", id), [open]),
     openBot: useCallback((id: string) => open("bot", id), [open]),
-    /** Open a panel on a record that does not exist yet. */
-    capture: useCallback((kind: CaptureKind) => go({ capture: kind }), [go]),
+    /**
+     * Open a panel on a record that does not exist yet, with its title
+     * already written if the reader typed one first.
+     */
+    capture: useCallback(
+      (kind: CaptureKind, title?: string) =>
+        go({ capture: kind }, title ? { captureTitle: title } : undefined),
+      [go],
+    ),
   }
+}
+
+/** The title a capture was opened with, typed before its panel was open. */
+export function useCaptureTitle(): string | undefined {
+  return useLocation({ select: (location) => location.state.captureTitle })
 }
 
 /** How far a panel has got with reading its record. */

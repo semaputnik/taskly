@@ -837,6 +837,11 @@ export class ActivityService {
      * two narrowings are independent and combine: what this integration
      * finished is both of them at once.
      *
+     * `by_bots` keeps the changes any of the user's bot users made, and `since`
+     * the entries written after a moment. Together they are what the dashboard
+     * counts when it says how many changes the user's agents made since their
+     * last visit (FR-06.12). A moment without an offset is read as UTC.
+     *
      * Always the requesting user's own entries and nothing wider: there is no
      * parameter or role that reaches another user's log, the superuser's
      * included (FR-10.7). Narrowing by a bot user somebody else owns is

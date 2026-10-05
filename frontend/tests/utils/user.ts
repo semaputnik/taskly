@@ -23,9 +23,7 @@ export async function logInUser(page: Page, email: string, password: string) {
   await page.getByTestId("password-input").fill(password)
   await page.getByRole("button", { name: "Log In" }).click()
   await page.waitForURL("/")
-  await expect(
-    page.getByText("What needs you now, and what changed without you"),
-  ).toBeVisible()
+  await expect(page.getByRole("textbox", { name: "Add a task" })).toBeVisible()
 }
 
 export async function logOutUser(page: Page) {
