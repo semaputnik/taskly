@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Taskly · task panel (slice 2 mock)</title>
+<style>
+  :root { color-scheme: light; --page:#ffffff; --ink:#0b0e11; --ink-2:#3d444d; --ink-3:#656d76; --rule:#e6e8eb; --rule-strong:#c9cdd2; --hover:#f3f4f6; --done:#1a7f37; --late:#cf222e; --p2:#8a5c00; --p3:#0969da;
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", "Noto Sans", Arial, sans-serif; --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+  [data-theme="dark"] { color-scheme: dark; --page:#0f1115; --ink:#e9ecef; --ink-2:#c4c9d0; --ink-3:#8a8f98; --rule:#23272d; --rule-strong:#353a42; --hover:#1e2228; --done:#3fb950; --late:#f0616d; --p2:#e3a443; --p3:#6ea8ff; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--page); color:var(--ink); font-family:var(--font); font-size:15px; line-height:1.45; -webkit-font-smoothing:antialiased; }
+  a { color:inherit; text-decoration:none; } a:hover { text-decoration:underline; text-underline-offset:3px; }
+  button { font:inherit; color:inherit; background:none; border:0; padding:0; cursor:pointer; }
+  :focus-visible { outline:2px solid var(--ink); outline-offset:2px; border-radius:2px; }
+  .mono { font-family:var(--mono); font-size:12px; font-variant-numeric:tabular-nums; }
+
+  .app { display:grid; grid-template-columns:200px minmax(0,1fr) 560px; min-height:100vh; }
+  .nav { padding:28px 20px 28px 28px; display:flex; flex-direction:column; gap:26px; position:sticky; top:0; height:100vh; }
+  .wordmark { font-weight:600; letter-spacing:-.01em; }
+  .nav ul { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:2px; }
+  .nav li a { display:flex; justify-content:space-between; align-items:center; height:30px; padding:0 8px; margin:0 -8px; border-radius:6px; color:var(--ink-2); }
+  .nav li a[aria-current] { color:var(--ink); font-weight:600; }
+  .nav li a .n { font-family:var(--mono); font-size:12px; color:var(--ink-3); }
+  .nav .add { display:flex; align-items:center; gap:8px; color:var(--ink-2); }
+  .nav .add kbd { font-family:var(--mono); font-size:11px; border:1px solid var(--rule-strong); border-radius:4px; padding:0 5px; color:var(--ink-3); margin-left:auto; }
+  .nav .foot { margin-top:auto; display:flex; align-items:center; gap:8px; font-size:13px; color:var(--ink-2); }
+  .nav .foot .av { width:20px; height:20px; border-radius:50%; background:var(--ink); color:var(--page); font-size:11px; font-weight:600; display:grid; place-items:center; }
+
+  /* the page behind: stays live, just narrower */
+  main { padding:36px 40px 96px; max-width:720px; min-width:0; }
+  .capture { display:flex; align-items:center; gap:10px; height:40px; border-bottom:1px solid var(--rule-strong); margin-bottom:36px; color:var(--ink-3); }
+  .capture span { flex:1; }
+  .capture kbd { font-family:var(--mono); font-size:11px; border:1px solid var(--rule-strong); border-radius:4px; padding:0 5px; }
+  h1 { margin:0 0 6px; line-height:1; display:flex; align-items:baseline; gap:14px; }
+  h1 .d { font-size:56px; font-weight:700; letter-spacing:-.035em; font-variant-numeric:tabular-nums; }
+  h1 .w { font-size:17px; font-weight:500; color:var(--ink-2); }
+  .lede { margin:0 0 32px; color:var(--ink-3); } .lede b { color:var(--ink); font-weight:500; }
+  h2 { font-size:13px; font-weight:600; margin:0; padding:0 0 8px; display:flex; align-items:baseline; gap:8px; border-bottom:1px solid var(--rule-strong); }
+  h2 .n { font-family:var(--mono); font-weight:400; font-size:12px; color:var(--ink-3); }
+  h2.late { color:var(--late); }
+  .task { display:grid; grid-template-columns:18px minmax(0,1fr); gap:12px; align-items:start; padding:9px 0; border-bottom:1px solid var(--rule); }
+  .task.open { background:linear-gradient(to right, var(--hover), transparent 90%); margin:0 -8px; padding-left:8px; padding-right:8px; }
+  .mark { width:18px; height:18px; color:var(--ink-2); margin-top:1px; display:block; } .mark svg { width:18px; height:18px; display:block; }
+  .mark.p1 { color:var(--late); } .mark.p2 { color:var(--p2); } .mark.p3 { color:var(--p3); }
+  .task .t { font-weight:500; line-height:1.35; }
+  .meta { display:flex; align-items:center; gap:12px; color:var(--ink-3); font-size:12.5px; margin-top:3px; font-variant-numeric:tabular-nums; }
+  .meta span { display:inline-flex; align-items:center; gap:4px; white-space:nowrap; } .meta svg { width:13px; height:13px; }
+  .meta .late { color:var(--late); font-weight:500; } .meta .today { color:var(--ink); font-weight:500; }
+  .meta .proj { margin-left:auto; } .meta .proj i { width:8px; height:8px; border-radius:2px; background:currentColor; opacity:.55; }
+  section { margin-bottom:36px; }
+
+  /* ---------- the panel: a column, not a sheet ---------- */
+  .panel { border-left:1px solid var(--rule-strong); position:sticky; top:0; height:100vh; overflow-y:auto; padding:0 36px 48px; }
+  .panel .bar { display:flex; align-items:center; gap:12px; height:52px; color:var(--ink-3); font-size:13px; position:sticky; top:0; background:var(--page); z-index:1; }
+  .panel .bar .crumb { display:flex; gap:6px; align-items:center; min-width:0; }
+  .panel .bar .crumb b { font-weight:500; color:var(--ink-2); }
+  .panel .bar .right { margin-left:auto; display:flex; gap:4px; }
+  .panel .bar .ib { width:28px; height:28px; display:grid; place-items:center; border-radius:6px; color:var(--ink-3); }
+  .panel .bar .ib:hover { background:var(--hover); color:var(--ink); }
+  .title { display:grid; grid-template-columns:22px 1fr; gap:12px; align-items:start; padding:8px 0 18px; }
+  .title .mark { width:22px; height:22px; margin-top:4px; } .title .mark svg { width:22px; height:22px; }
+  .title h3 { margin:0; font-size:22px; font-weight:600; letter-spacing:-.015em; line-height:1.25; }
+
+  .props { display:grid; grid-template-columns:96px 1fr; row-gap:2px; column-gap:16px; padding:10px 0 14px; border-top:1px solid var(--rule-strong); border-bottom:1px solid var(--rule); }
+  .props dt { color:var(--ink-3); font-size:13px; height:30px; display:flex; align-items:center; margin:0; }
+  .props dd { margin:0; min-width:0; }
+  .props .v { display:inline-flex; align-items:center; gap:6px; height:30px; padding:0 8px; margin-left:-8px; border-radius:6px; max-width:100%; }
+  .props .v:hover { background:var(--hover); }
+  .props .v .ch { color:var(--ink-3); opacity:0; width:12px; height:12px; } .props .v:hover .ch { opacity:1; }
+  .props .v .mark { width:16px; height:16px; margin:0; } .props .v .mark svg { width:16px; height:16px; }
+  .props .v.unset { color:var(--ink-3); }
+  .props .v.late { color:var(--late); font-weight:500; }
+  .props .v.pri { font-weight:500; } .props .v.pri .flag { width:14px; height:14px; }
+  .props .v.pri.p1 { color:var(--late); } .props .v.pri.p2 { color:var(--p2); } .props .v.pri.p3 { color:var(--p3); }
+  .props .ro { height:30px; display:flex; align-items:center; color:var(--ink-3); font-size:14px; }
+  .props .tag { display:inline-flex; align-items:center; gap:4px; }
+  .props .tag svg { width:13px; height:13px; color:var(--ink-3); }
+
+  .sec { padding:18px 0 4px; }
+  .sec h4 { margin:0 0 8px; font-size:13px; font-weight:600; display:flex; align-items:baseline; gap:8px; border-bottom:1px solid var(--rule-strong); padding-bottom:8px; }
+  .sec h4 .n { font-family:var(--mono); font-weight:400; font-size:12px; color:var(--ink-3); }
+  .sec h4 .act { margin-left:auto; font-weight:400; font-size:13px; color:var(--ink-3); }
+  .sec h4 .act:hover { color:var(--ink); }
+  .desc { color:var(--ink-2); line-height:1.5; }
+  .desc.empty { color:var(--ink-3); }
+  .sub { display:grid; grid-template-columns:18px 1fr auto; gap:12px; align-items:center; min-height:36px; border-bottom:1px solid var(--rule); }
+  .sub .t { font-weight:500; } .sub .t.done { color:var(--ink-3); text-decoration:line-through; }
+  .sub .r { font-size:12.5px; color:var(--ink-3); }
+  .addline { display:flex; align-items:center; gap:10px; height:36px; color:var(--ink-3); font-size:14px; }
+  .addline { display:grid; grid-template-columns:18px 1fr auto; gap:12px; border-bottom:1px solid var(--rule); }
+  .addline .field { color:var(--ink-3); } .addline .hint { font-size:12px; color:var(--ink-3); opacity:.8; }
+  .file { display:grid; grid-template-columns:1fr auto; gap:12px; align-items:center; min-height:36px; border-bottom:1px solid var(--rule); }
+  .file .nm { font-weight:500; } .file .nm span { font-weight:400; color:var(--ink-3); font-size:12.5px; margin-left:8px; }
+  .file .r { font-size:13px; color:var(--ink-3); display:flex; gap:12px; }
+
+  .tl { list-style:none; margin:0; padding:0; }
+  .tl li { display:grid; grid-template-columns:52px 1fr; gap:12px; padding:9px 0; border-bottom:1px solid var(--rule); align-items:baseline; }
+  .tl time { font-family:var(--mono); font-size:12px; color:var(--ink-3); font-variant-numeric:tabular-nums; }
+  .tl .ev { color:var(--ink-3); font-size:13.5px; } .tl .ev b { font-weight:500; color:var(--ink-2); }
+  .tl .cm .who { font-weight:500; display:flex; gap:8px; align-items:baseline; }
+  .tl .cm .who.you { color:var(--ink-3); }
+  .tl .cm .who small { font-weight:400; color:var(--ink-3); font-size:12px; }
+  .tl .cm .body { margin-top:3px; color:var(--ink-2); line-height:1.5; white-space:pre-wrap; }
+  .tl .cm .ops { margin-top:4px; font-size:12.5px; color:var(--ink-3); display:flex; gap:12px; opacity:0; } .tl li:hover .ops { opacity:1; }
+  .tl .day { grid-column:1 / -1; font-size:12.5px; color:var(--ink-3); padding-top:10px; border-bottom:0; }
+  .compose { margin-top:14px; border-top:1px solid var(--rule-strong); padding-top:10px; }
+  .compose .ta { color:var(--ink-3); min-height:44px; padding:6px 0; }
+  .compose .row { display:flex; align-items:center; gap:14px; font-size:13px; color:var(--ink-3); }
+  .compose .row .go { margin-left:auto; font-weight:500; color:var(--ink); }
+  .compose kbd { font-family:var(--mono); font-size:11px; border:1px solid var(--rule-strong); border-radius:4px; padding:0 5px; }
+  .foot { margin-top:36px; padding-top:14px; border-top:1px solid var(--rule); font-size:13px; color:var(--ink-3); display:flex; gap:16px; }
+  .foot a:hover { color:var(--late); }
+
+  .notice { position:fixed; top:12px; left:50%; transform:translateX(-50%); z-index:5; display:flex; align-items:center; gap:16px; background:var(--page); border:1px solid var(--rule-strong); border-radius:8px; padding:8px 14px; font-size:13.5px; box-shadow:0 10px 24px -8px rgba(0,0,0,.25), 0 2px 6px rgba(0,0,0,.08); white-space:nowrap; }
+  .notice a { font-weight:500; } .notice a:last-child { color:var(--ink-3); }
+  @media (max-width: 1100px) {
+    .app { grid-template-columns:1fr; }
+    .nav { display:none; }
+    main { display:none; }
+    .panel { border-left:0; height:auto; position:static; padding:0 16px 96px; }
+    .props { grid-template-columns:88px 1fr; }
+    .notice { left:16px; right:16px; transform:none; justify-content:space-between; }
+  }
+</style>
+</head>
+<body>
+<div class="notice" role="status"><span>“Order milk” created in Inbox</span><a href="#">Open</a><a href="#">Undo</a></div>
+<div class="app">
+  <nav class="nav" aria-label="Main">
+    <div class="wordmark">Taskly</div>
+    <div class="add">+ Add a task <kbd>C</kbd></div>
+    <ul><li><a href="#" aria-current="page">Today</a></li><li><a href="#">Tasks <span class="n">8</span></a></li><li><a href="#">Projects <span class="n">4</span></a></li><li><a href="#">Tags</a></li><li><a href="#">Bots <span class="n">4</span></a></li><li><a href="#">Activity</a></li><li><a href="#">Archive</a></li></ul>
+    <div class="foot"><span class="av">S</span> Sam</div>
+  </nav>
+
+  <main>
+    <div class="capture"><span>＋&nbsp; Add a task…</span><kbd>C</kbd></div>
+    <h1><span class="d">05</span><span class="w">Monday, October 2026</span></h1>
+    <p class="lede"><b>3 need you.</b> Your bot users made 6 changes since yesterday evening.</p>
+    <section><h2 class="late">Overdue <span class="n">1</span></h2>
+      <div class="task"><span class="mark p1"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M1.8 9c1.9-3.4 4.3-5 7.2-5s5.3 1.6 7.2 5c-1.9 3.4-4.3 5-7.2 5S3.7 12.4 1.8 9z"/><circle cx="9" cy="9" r="2.4"/><circle cx="9" cy="9" r=".9" fill="currentColor" stroke="none"/></svg></span><div><div class="t">Renew the domain</div><div class="meta"><span class="late">2 days late</span><span>blocked</span><span class="proj"><i></i>Inbox</span></div></div></div>
+    </section>
+    <section><h2>Due today <span class="n">2</span></h2>
+      <div class="task"><span class="mark p2"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="9" cy="9" r="7"/><path d="M9 4.5a4.5 4.5 0 0 1 0 9z" fill="currentColor" stroke="none"/></svg></span><div><div class="t">Shortlist the trackers</div><div class="meta"><span class="today">Today</span><span class="proj"><i></i>Research</span></div></div></div>
+      <div class="task"><span class="mark"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="9" cy="9" r="7"/></svg></span><div><div class="t">Order groceries</div><div class="meta"><span class="today">Today</span><span class="proj"><i></i>Home</span></div></div></div>
+    </section>
+    <section><h2>In my hands <span class="n">7</span></h2>
+      <div class="task open"><span class="mark p2"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="9" cy="9" r="7"/><path d="M9 4.5a4.5 4.5 0 0 1 0 9z" fill="currentColor" stroke="none"/></svg></span><div><div class="t">Migrate the marketing pages</div><div class="meta"><span>2/5</span><span>Wed</span><span class="proj"><i></i>Website relaunch</span></div></div></div>
+      <div class="task"><span class="mark p2"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="9" cy="9" r="7"/><path d="M9 4.5a4.5 4.5 0 0 1 0 9z" fill="currentColor" stroke="none"/></svg></span><div><div class="t">Shortlist the trackers</div><div class="meta"><span class="today">Today</span><span class="proj"><i></i>Research</span></div></div></div>
+      <div class="task"><span class="mark p2"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="9" cy="9" r="7"/><circle cx="9" cy="9" r="2.6" fill="currentColor" stroke="none"/></svg></span><div><div class="t">Summarise the three trackers</div><div class="meta"><span>3/3</span><span class="proj"><i></i>Research</span></div></div></div>
+    </section>
+  </main>
+
+  <aside class="panel" aria-label="Task">
+    <div class="bar">
+      <div class="crumb"><b>Website relaunch</b><span>·</span><span>opened by you, 24 Sept</span></div>
+      <div class="right">
+        <button class="ib" aria-label="Previous task"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 2l5 5-5 5"/></svg></button>
+        <button class="ib" aria-label="Close"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 2l10 10M12 2L2 12"/></svg></button>
+      </div>
+    </div>
+
+    <div class="title"><span class="mark p2"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="9" cy="9" r="7"/><path d="M9 4.5a4.5 4.5 0 0 1 0 9z" fill="currentColor" stroke="none"/></svg></span><h3>Migrate the marketing pages</h3></div>
+
+    <dl class="props">
+      <dt>Status</dt><dd><button class="v"><span class="mark p2"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="9" cy="9" r="7"/><path d="M9 4.5a4.5 4.5 0 0 1 0 9z" fill="currentColor" stroke="none"/></svg></span>In progress<svg class="ch" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 4.5l3 3 3-3"/></svg></button></dd>
+      <dt>Project</dt><dd><button class="v">Website relaunch<svg class="ch" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 4.5l3 3 3-3"/></svg></button></dd>
+      <dt>Due</dt><dd><button class="v">Wed 7 Oct<svg class="ch" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 4.5l3 3 3-3"/></svg></button></dd>
+      <dt>Priority</dt><dd><button class="v pri p2"><svg class="flag" viewBox="0 0 16 16" fill="currentColor"><path d="M3 1.5v13M3 2h8.5l-2 2.75 2 2.75H3z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" fill="currentColor"/></svg>P2<svg class="ch" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 4.5l3 3 3-3"/></svg></button></dd>
+      <dt>Assignee</dt><dd><button class="v">You<svg class="ch" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 4.5l3 3 3-3"/></svg></button></dd>
+      <dt>Tags</dt><dd><button class="v"><span class="tag"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M2.5 2.5h5l6 6-5 5-6-6z"/><circle cx="5.5" cy="5.5" r=".9" fill="currentColor"/></svg>copy</span><span class="tag"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M2.5 2.5h5l6 6-5 5-6-6z"/><circle cx="5.5" cy="5.5" r=".9" fill="currentColor"/></svg>website</span><span style="color:var(--ink-3)">+</span></button></dd>
+      <dt>Repeat</dt><dd><button class="v unset">Does not repeat<svg class="ch" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 4.5l3 3 3-3"/></svg></button></dd>
+      <dt>Created</dt><dd><div class="ro">24 Sept 2026, 16:54 · by you</div></dd>
+    </dl>
+
+    <div class="sec"><h4>Description</h4>
+      <div class="desc">Move the four marketing pages off the old template. Pricing copy is a separate task; the stylesheet swap is the blocker for the rest.</div>
+    </div>
+
+    <div class="sec"><h4>Subtasks <span class="n">2/5</span></h4>
+      <div class="sub"><span class="mark" style="color:var(--done)"><svg viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="7.75" fill="currentColor"/><path d="M5.8 9.3l2.2 2.2 4.3-4.6" stroke="#fff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="t done">Inventory the pages</span><span class="r"></span></div>
+      <div class="sub"><span class="mark" style="color:var(--done)"><svg viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="7.75" fill="currentColor"/><path d="M5.8 9.3l2.2 2.2 4.3-4.6" stroke="#fff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="t done">Swap the stylesheet</span><span class="r"></span></div>
+      <div class="sub"><span class="mark p2"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="9" cy="9" r="7"/><path d="M9 4.5a4.5 4.5 0 0 1 0 9z" fill="currentColor" stroke="none"/></svg></span><span class="t">Move the home page</span><span class="r">Wed</span></div>
+      <div class="sub"><span class="mark"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="9" cy="9" r="7"/></svg></span><span class="t">Move the features page</span><span class="r"></span></div>
+      <div class="sub"><span class="mark"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="9" cy="9" r="7"/></svg></span><span class="t">Redirect the old URLs</span><span class="r">release-bot</span></div>
+      <div class="addline"><span class="mark" style="color:var(--rule-strong)"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="9" cy="9" r="7"/></svg></span><span class="field">Add a subtask…</span><span class="hint">Enter creates it here</span></div>
+    </div>
+
+    <div class="sec"><h4>Files <span class="n">1</span><a href="#" class="act">Attach a file</a></h4>
+      <div class="file"><div class="nm">page-inventory.pdf<span>84 KB · kept in Paperless</span></div><div class="r"><a href="#">Download</a><a href="#">Remove</a></div></div>
+    </div>
+
+    <div class="sec"><h4>Activity <span class="n">5</span></h4>
+      <ul class="tl">
+        <li class="day">24 Sept</li>
+        <li><time>16:54</time><div class="ev"><b>You</b> created this in Website relaunch</div></li>
+        <li><time>16:07</time><div class="ev"><b>inbox-triage</b> moved it to In progress</div></li>
+        <li><time>16:54</time><div class="cm"><div class="who">inbox-triage <small>bot user</small></div><div class="body">Two of the marketing pages still point at the old stylesheet. Raising this to P2 so it is not found during the release.</div></div></li>
+        <li class="day">Today</li>
+        <li><time>09:12</time><div class="ev"><b>You</b> set the due date to Wed 7 Oct</div></li>
+        <li><time>09:14</time><div class="cm"><div class="who you">You</div><div class="body">Stylesheet is swapped; moving the pages one by one this week.</div><div class="ops"><a href="#">Edit</a><a href="#">Delete</a></div></div></li>
+      </ul>
+      <div class="compose"><div class="ta">Write a comment…</div><div class="row"><span><kbd>⌘ Enter</kbd> to post</span><a href="#" class="go">Comment</a></div></div>
+    </div>
+
+    <div class="foot"><a href="#">Delete task</a></div>
+  </aside>
+</div>
+</body>
+</html>
