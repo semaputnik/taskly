@@ -159,30 +159,103 @@ test("The next visit counts the bot users' changes since the last one", async ({
   ).toBeVisible()
 })
 
-test("The capture line opens capture with what was typed", async ({ page }) => {
+const notice = (page: Page) =>
+  page.locator("[data-sonner-toast]").filter({ hasText: "created" })
+
+test("The capture line makes the task at once, and the key still opens the draft", async ({
+  page,
+}) => {
   await newUser(page)
   await page.goto("/")
 
   const line = page.getByRole("textbox", { name: "Add a task" })
+  const sent = page.waitForRequest(
+    (request) =>
+      request.method() === "POST" && /\/tasks\/$/.test(request.url()),
+  )
   await line.fill("Call the bank")
   await line.press("Enter")
 
-  const panel = page.getByRole("dialog")
-  await expect(panel).toBeVisible()
-  await expect(panel.getByRole("textbox", { name: "Task title" })).toHaveValue(
-    "Call the bank",
-  )
-  await panel.getByRole("button", { name: "Create task" }).click()
-  await expect(page.getByText("“Call the bank” created")).toBeVisible()
-  // Read once the panel has closed: while it is open the page is inert.
+  // One request carrying the title and nothing the reader did not choose.
+  const body = (await sent).postDataJSON()
+  expect(body.title).toBe("Call the bank")
+  expect(body).not.toHaveProperty("project_id")
+  expect(body).not.toHaveProperty("status")
+  await expect(notice(page)).toContainText("“Call the bank” created in Inbox")
+  // No panel opened, and the line is ready for the next thought.
+  await expect(page.getByRole("dialog")).toHaveCount(0)
   await expect(line).toHaveValue("")
+  await expect(line).toBeFocused()
 
-  // The key still opens an empty capture from the page.
+  const api = await userApi(page)
+  const tasks = (await (await api.get("/tasks/")).json()).data
+  expect(tasks).toHaveLength(1)
+  expect(tasks[0]).toMatchObject({ title: "Call the bank", status: "backlog" })
+  const projects = (await (await api.get("/projects/")).json()).data
+  expect(tasks[0].project_id).toBe(
+    projects.find((project: { is_inbox: boolean }) => project.is_inbox).id,
+  )
+
+  // The key still opens the full draft, empty.
   await page.getByRole("heading", { level: 1 }).click()
   await page.keyboard.press("c")
   await expect(
     page.getByRole("dialog").getByRole("textbox", { name: "Task title" }),
   ).toHaveValue("")
+})
+
+test("An empty line makes nothing", async ({ page }) => {
+  await newUser(page)
+  await page.goto("/")
+
+  const requests: string[] = []
+  page.on("request", (request) => {
+    if (request.method() === "POST") requests.push(request.url())
+  })
+  const line = page.getByRole("textbox", { name: "Add a task" })
+  await line.press("Enter")
+  await line.fill("   ")
+  await line.press("Enter")
+  await expect(line).toBeFocused()
+  await expect(page.locator("[data-sonner-toast]")).toHaveCount(0)
+  expect(requests).toEqual([])
+})
+
+test("The notice's Open lands on the task's panel", async ({ page }) => {
+  await newUser(page)
+  await page.goto("/")
+
+  const line = page.getByRole("textbox", { name: "Add a task" })
+  await line.fill("Order milk")
+  await line.press("Enter")
+  await notice(page).getByRole("button", { name: "Open" }).click()
+
+  await expect(page).toHaveURL(/task=[0-9a-f-]{36}/)
+  await expect(page.getByRole("dialog", { name: "Order milk" })).toBeVisible()
+})
+
+test("Undo deletes the task, and the activity log keeps both acts", async ({
+  page,
+}) => {
+  await newUser(page)
+  await page.goto("/")
+
+  const line = page.getByRole("textbox", { name: "Add a task" })
+  await line.fill("Order milk")
+  await line.press("Enter")
+  await notice(page).getByRole("button", { name: "Undo" }).click()
+  await expect(notice(page)).toHaveCount(0)
+
+  const api = await userApi(page)
+  await expect
+    .poll(async () => (await (await api.get("/tasks/")).json()).count)
+    .toBe(0)
+
+  await page.goto("/activity")
+  const rows = page.getByRole("row").filter({ hasText: "Order milk" })
+  await expect(rows).toHaveCount(2)
+  await expect(rows.nth(0)).toContainText("Deleted Order milk")
+  await expect(rows.nth(1)).toContainText("Created Order milk in Inbox")
 })
 
 const changesLog = (page: Page) => band(page, /^Changes/)

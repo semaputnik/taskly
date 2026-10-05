@@ -311,6 +311,17 @@ export function useTaskCapture(
 }
 
 /**
+ * Taking back a task a line just made. It has no subtasks yet, so there is no
+ * cascade to confirm; the deletion is a soft one and can be restored from the
+ * activity log like any other. Resolves to whether the task is gone.
+ */
+export function useUndoCapture() {
+  const { run } = useWrites()
+  return async (task: TaskPublic) =>
+    (await run((report) => deleteTask(report, task, false))).saved
+}
+
+/**
  * Deleting one task. A task with subtasks is refused until the cascade is
  * confirmed: `remove` resolves to "has subtasks" for the caller to warn.
  */

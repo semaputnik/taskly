@@ -313,7 +313,7 @@ The status marks are the system's signature geometry: drawn on an 18-unit grid w
 - **Phone Add button:** a 52px round ink button with a 22px plus, bottom-right, floating on the thumb shadow; hidden at `md` and up, and covered by an open panel's scrim.
 
 ### Inputs / Fields
-- **Capture line:** frameless and 40px tall: a 16px plus in Ink 3, the field in 15px ink with an Ink 3 placeholder ("Add a task…"), and the `C` key cap at the right end. A 1px Rule Strong hairline sits beneath it and turns ink while the field has focus. The key cap is dropped on coarse pointers, which have no keyboard. Enter opens the capture panel with the typed title as the draft.
+- **Capture line:** frameless and 40px tall: a 16px plus in Ink 3, the field in 15px ink with an Ink 3 placeholder ("Add a task…"), and the `C` key cap at the right end. A 1px Rule Strong hairline sits beneath it and turns ink while the field has focus. The key cap is dropped on coarse pointers, which have no keyboard. Enter creates the task at once and raises a notice with Open and Undo (ADR-0005, amended); the `c` key opens the full draft.
 - **Key cap:** 11px mono in a 1px Rule Strong outline, 4px corners, 5px side padding.
 - Framed inputs elsewhere are the inherited kit (see the transition note).
 

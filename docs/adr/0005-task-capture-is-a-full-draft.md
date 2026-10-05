@@ -35,3 +35,19 @@ URL and the question is asked when the URL would change.
 Projects and tags keep one-field capture: a name is all they have at creation.
 A subtask added from its parent's Subtasks tab also stays one field, because
 the reader is working through a list there, not describing one task.
+
+## Amendment (2026-10-05): a title alone is a complete task
+
+A task needs only a title; every other property has a default (Backlog, the
+Inbox, no day, no priority). So the day page's **Add a task…** line commits
+without a draft: Enter sends one create request with the typed title and
+nothing else, the line empties for the next thought, and a notice names the
+task with **Open** and **Undo**. Undo deletes the task, a soft delete that the
+activity log records and can restore like any other. This is still one request
+and one creation entry, and a bot user still never sees a half-written task,
+because the line holds nothing back: the title is the whole task.
+
+The full draft above is unchanged. It stays the one capture with an explicit
+commit, for a task whose day, priority, project or tags are known at the moment
+of writing it down, and it is what the `c` key, the navigation's **Add a task**
+entry and the phone's floating button open.
