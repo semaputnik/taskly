@@ -1,6 +1,5 @@
 import { useMutation } from "@tanstack/react-query"
 import { Link as RouterLink } from "@tanstack/react-router"
-import { Archive, CheckSquare, Clock } from "lucide-react"
 
 import {
   type ProjectPublic,
@@ -105,7 +104,7 @@ function ProjectRecord({ project }: { project: ProjectPublic }) {
       />
 
       <PropertyList>
-        <PropertyRow icon={CheckSquare} label="Tasks">
+        <PropertyRow label="Tasks">
           {(project.task_count ?? 0) > 0 ? (
             <RouterLink
               to="/tasks"
@@ -119,7 +118,7 @@ function ProjectRecord({ project }: { project: ProjectPublic }) {
           )}
         </PropertyRow>
 
-        <PropertyRow icon={Archive} label="Archive">
+        <PropertyRow label="Archive">
           {project.is_inbox ? (
             // The Inbox takes every task created without a project, so an
             // archived, read-only Inbox could no longer do its job (FR-05.4).
@@ -131,7 +130,7 @@ function ProjectRecord({ project }: { project: ProjectPublic }) {
           )}
         </PropertyRow>
 
-        <PropertyRow icon={Clock} label="Created">
+        <PropertyRow label="Created">
           <ReadOnlyValue>
             {project.created_at ? (
               <time dateTime={project.created_at}>

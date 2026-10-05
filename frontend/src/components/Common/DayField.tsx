@@ -69,10 +69,10 @@ export function DayField({
   }
 
   return (
-    <div className="flex items-center gap-1">
+    <div className="group/day flex max-w-full items-center gap-1">
       {/* Button and field share a box of their own, so the field covers the
           button and never the clear control beside it. */}
-      <div className="relative min-w-0 flex-1">
+      <div className="relative min-w-0">
         <button
           id={id}
           type="button"
@@ -85,7 +85,7 @@ export function DayField({
             className,
           )}
         >
-          <span className={cn(!value && "text-muted-foreground italic")}>
+          <span className={cn(!value && "text-muted-foreground")}>
             {value ? formatDay(value) : "Not set"}
           </span>
           <CalendarDays className="text-muted-foreground size-4 shrink-0" />
@@ -110,7 +110,7 @@ export function DayField({
           variant="ghost"
           size="icon-sm"
           aria-label={`Clear the ${label.toLowerCase()}`}
-          className="text-muted-foreground shrink-0 pointer-coarse:size-11"
+          className="text-muted-foreground shrink-0 opacity-0 group-focus-within/day:opacity-100 group-hover/day:opacity-100 pointer-coarse:size-11 pointer-coarse:opacity-100"
           onClick={() => onChange(null)}
         >
           <X />

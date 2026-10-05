@@ -1,16 +1,5 @@
 import { useQuery } from "@tanstack/react-query"
-import {
-  Bot,
-  Calendar,
-  CalendarPlus,
-  Flag,
-  FolderKanban,
-  ListTodo,
-  PenLine,
-  Repeat,
-  Tag,
-  User as UserIcon,
-} from "lucide-react"
+import { Bot } from "lucide-react"
 import { useId } from "react"
 
 import type {
@@ -28,6 +17,7 @@ import {
   ghost,
   PropertyList,
   PropertyRow,
+  quiet,
   ReadOnlyValue,
 } from "@/components/Records/RecordPanel"
 import {
@@ -43,7 +33,7 @@ import { projectsQuery } from "@/lib/serverState"
 import { cn } from "@/lib/utils"
 import { AssigneeSelect, assigneeFormValue, toAssigneeId } from "./assignee"
 import type { TaskFields } from "./draft"
-import { PriorityOption } from "./priority"
+import { PriorityOption, PriorityValue } from "./priority"
 import {
   IntervalDaysField,
   MIN_INTERVAL_DAYS,
@@ -56,12 +46,26 @@ import { PRIORITIES } from "./writes"
 
 const NO_PRIORITY = "none"
 
+/** The description reads as text in the column and is a field when reached. */
+export const descriptionClass =
+  "-ml-2 w-[calc(100%+1rem)] resize-none px-2 py-1.5 text-[15px] leading-normal text-ink-2 md:text-[15px]"
+
+/**
+ * The due date's button, flat like the selects beside it. The picker's
+ * calendar glyph stands where a select has its chevron: shown on reaching for
+ * the value.
+ */
+const dueClass = cn(
+  quiet,
+  "h-[30px] justify-start pointer-coarse:h-11 md:text-[15px] [&_svg]:size-3 [&_svg]:opacity-0 hover:[&_svg]:opacity-100 focus-visible:[&_svg]:opacity-100 pointer-coarse:[&_svg]:opacity-60",
+)
+
 /**
  * The property rows a task has from the moment it is written down: project,
  * due date, priority, assignee, tags and repeat.
  *
- * They render against a source rather than a record — the current values, and
- * a way to change some of them — so the task's panel and the draft in capture
+ * They render against a source rather than a record: the current values, and
+ * a way to change some of them, so the task's panel and the draft in capture
  * are one set of rows. A record saves each change as it is made; a draft holds
  * it until the task is created. Rows only a record has go in `before` and
  * `after`.
@@ -102,11 +106,7 @@ export function TaskPropertyRows({
     <PropertyList>
       {before}
 
-      <PropertyRow
-        icon={FolderKanban}
-        label="Project"
-        htmlFor={`${ids}-project`}
-      >
+      <PropertyRow label="Project" htmlFor={`${ids}-project`}>
         {isSubtask ? (
           <ReadOnlyValue>Follows its parent task</ReadOnlyValue>
         ) : (
@@ -116,10 +116,7 @@ export function TaskPropertyRows({
             value={fields.project_id ?? inbox?.id ?? ""}
             onValueChange={(project_id) => onChange({ project_id })}
           >
-            <SelectTrigger
-              id={`${ids}-project`}
-              className={cn(ghost, "w-full")}
-            >
+            <SelectTrigger id={`${ids}-project`} className={quiet}>
               <SelectValue placeholder={defaultProjectName} />
             </SelectTrigger>
             <SelectContent>
@@ -133,17 +130,17 @@ export function TaskPropertyRows({
         )}
       </PropertyRow>
 
-      <PropertyRow icon={Calendar} label="Due date" htmlFor={`${ids}-due`}>
+      <PropertyRow label="Due" htmlFor={`${ids}-due`}>
         <DayField
           id={`${ids}-due`}
           label="Due date"
           value={fields.due_date}
           onChange={(due_date) => onChange({ due_date })}
-          className={ghost}
+          className={dueClass}
         />
       </PropertyRow>
 
-      <PropertyRow icon={Flag} label="Priority" htmlFor={`${ids}-priority`}>
+      <PropertyRow label="Priority" htmlFor={`${ids}-priority`}>
         <Select
           value={fields.priority ?? NO_PRIORITY}
           onValueChange={(value) =>
@@ -152,8 +149,10 @@ export function TaskPropertyRows({
             })
           }
         >
-          <SelectTrigger id={`${ids}-priority`} className={cn(ghost, "w-full")}>
-            <SelectValue />
+          <SelectTrigger id={`${ids}-priority`} className={quiet}>
+            <SelectValue>
+              <PriorityValue priority={fields.priority} />
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value={NO_PRIORITY}>No priority</SelectItem>
@@ -166,30 +165,31 @@ export function TaskPropertyRows({
         </Select>
       </PropertyRow>
 
-      <PropertyRow icon={UserIcon} label="Assignee">
+      <PropertyRow label="Assignee" htmlFor={`${ids}-assignee`}>
         <AssigneeSelect
+          id={`${ids}-assignee`}
           value={fields.assignee}
           onChange={(assignee) => onChange({ assignee })}
           currentUserEmail={currentUser?.email}
           current={currentBot ?? undefined}
-          className={ghost}
+          className={quiet}
         />
       </PropertyRow>
 
-      <PropertyRow icon={Tag} label="Tags">
+      <PropertyRow label="Tags">
         <TagPicker
           value={fields.tags}
           onChange={(tags) => onChange({ tags })}
         />
       </PropertyRow>
 
-      <PropertyRow icon={Repeat} label="Repeat" htmlFor={`${ids}-repeat`}>
+      <PropertyRow label="Repeat" htmlFor={`${ids}-repeat`}>
         {isSubtask ? (
           <ReadOnlyValue>
             Only a task at the top of its tree can repeat
           </ReadOnlyValue>
         ) : (
-          <div className="flex items-center gap-2">
+          <>
             <Select
               value={fields.recurrence?.frequency ?? NO_RECURRENCE}
               onValueChange={(value) =>
@@ -212,7 +212,10 @@ export function TaskPropertyRows({
             >
               <SelectTrigger
                 id={`${ids}-repeat`}
-                className={cn(ghost, "w-full")}
+                className={cn(
+                  quiet,
+                  !fields.recurrence && "text-muted-foreground",
+                )}
               >
                 <SelectValue />
               </SelectTrigger>
@@ -232,10 +235,13 @@ export function TaskPropertyRows({
                     recurrence: { frequency: "every_n_days", interval_days },
                   })
                 }
-                className={cn(ghost, "w-20 shrink-0")}
+                className={cn(
+                  ghost,
+                  "h-[30px] w-16 shrink-0 text-[15px] md:text-[15px]",
+                )}
               />
             )}
-          </div>
+          </>
         )}
       </PropertyRow>
 
@@ -245,33 +251,33 @@ export function TaskPropertyRows({
 }
 
 /**
- * Who filed the task: you, or the bot user that did — named with the same
- * glyph the assignee row gives a bot, so the two rows read as one question
- * asked twice. A bot user deleted since keeps its place on what it filed
- * (FR-08.19) and says so.
+ * Who filed the task, said after the moment it was filed: you, or the bot user
+ * that did, named with the same glyph the assignee row gives a bot. A bot user
+ * deleted since keeps its place on what it filed (FR-08.19) and says so.
+ *
+ * Tasks filed before the reporter was recorded name nobody at all, rather than
+ * claiming an author the database never held.
  */
-function ReporterValue({
-  task,
-  currentUserEmail,
-}: {
-  task: TaskPublic
-  currentUserEmail?: string
-}) {
+export function reporterName(task: TaskPublic): string | null {
   const bot = task.reporter_bot_user
-  if (bot) {
-    return (
-      <span className="flex min-w-0 items-center gap-1.5">
-        <Bot className="text-muted-foreground size-4 shrink-0" aria-hidden />
-        <span className="truncate">
-          {bot.deleted ? `${bot.name} (deleted)` : bot.name}
-        </span>
-      </span>
-    )
-  }
-  // Tasks filed before the reporter was recorded name nobody at all, rather
-  // than claiming an author the database never held.
-  if (!task.reporter_id) return <>Unknown</>
-  return <>{currentUserEmail ? `You (${currentUserEmail})` : "You"}</>
+  if (bot) return bot.deleted ? `${bot.name} (deleted)` : bot.name
+  return task.reporter_id ? "you" : null
+}
+
+function Reporter({ task }: { task: TaskPublic }) {
+  const name = reporterName(task)
+  if (!name) return null
+  return (
+    <>
+      <span aria-hidden> · </span>
+      <span className="sr-only">, </span>
+      by{" "}
+      {task.reporter_bot_user && (
+        <Bot className="mr-1 inline size-3.5 align-[-2px]" aria-hidden />
+      )}
+      {name}
+    </>
+  )
 }
 
 /**
@@ -279,7 +285,7 @@ function ReporterValue({
  *
  * There is no separate edit screen: a form that restates the record you are
  * already looking at makes you read it twice and choose between them. Each
- * field saves on its own — a select when it changes, text when you leave it —
+ * field saves on its own: a select when it changes, text when you leave it,
  * so there is nothing to submit and nothing to discard.
  */
 export function TaskProperties({ task }: { task: TaskPublic }) {
@@ -315,19 +321,23 @@ export function TaskProperties({ task }: { task: TaskPublic }) {
         isSubtask={Boolean(task.parent_id)}
         currentBot={task.assignee_bot_user}
         before={
-          // The row's icon is fixed like every other row's; the value carries
-          // the status's own mark.
-          <PropertyRow icon={ListTodo} label="Status" htmlFor={`${ids}-status`}>
+          // The value carries the status's own mark, in the priority's colour
+          // as everywhere else the mark is drawn.
+          <PropertyRow label="Status" htmlFor={`${ids}-status`}>
             <Select
               value={task.status}
               onValueChange={(value) => status.change(value as TaskStatus)}
               disabled={status.isPending}
             >
-              <SelectTrigger
-                id={`${ids}-status`}
-                className={cn(ghost, "w-full")}
-              >
-                <SelectValue />
+              <SelectTrigger id={`${ids}-status`} className={quiet}>
+                <SelectValue>
+                  <StatusMark
+                    status={task.status}
+                    priority={task.priority}
+                    className="size-4"
+                  />
+                  {STATUS_LABELS[task.status]}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {STATUSES.map((value) => (
@@ -341,37 +351,28 @@ export function TaskProperties({ task }: { task: TaskPublic }) {
           </PropertyRow>
         }
         after={
-          <>
-            <PropertyRow icon={CalendarPlus} label="Created">
-              <ReadOnlyValue>
-                {task.created_at ? (
-                  <time dateTime={task.created_at}>
-                    {formatDateTime(task.created_at)}
-                  </time>
-                ) : (
-                  "Unknown"
-                )}
-              </ReadOnlyValue>
-            </PropertyRow>
-            {/* Beside the moment it was filed, the hand that filed it. Read
-                only, and not because it is awkward to edit: it records who
-                made the request that created the task, which no later request
-                gets to revise (FR-01.29). */}
-            <PropertyRow icon={PenLine} label="Created by">
-              <ReadOnlyValue>
-                <ReporterValue
-                  task={task}
-                  currentUserEmail={currentUser?.email}
-                />
-              </ReadOnlyValue>
-            </PropertyRow>
-          </>
+          // Read only, and not because it is awkward to edit: it records when
+          // and by whom the task was requested, which no later request gets
+          // to revise (FR-01.29).
+          <PropertyRow label="Created">
+            <ReadOnlyValue>
+              {task.created_at ? (
+                <time dateTime={task.created_at}>
+                  {formatDateTime(task.created_at)}
+                </time>
+              ) : (
+                "Unknown"
+              )}
+              <Reporter task={task} />
+            </ReadOnlyValue>
+          </PropertyRow>
         }
       />
 
       <DescriptionSection>
         <EditableText
           multiline
+          className={descriptionClass}
           value={task.description ?? ""}
           placeholder="Add a description"
           ariaLabel="Task description"
