@@ -144,7 +144,7 @@ test("A bot user's hand-over is named, and Close it closes the task with an Undo
 
   const review = group(page, "Review")
   await expect(review).toContainText(
-    /research-agent finished this at \d\d:\d\d and handed it to you/,
+    /research-agent finished this at \d{1,2}:\d\d(\s?[AP]M)? and handed it to you/i,
   )
   await review
     .getByRole("button", { name: "Close it: Summarise the trackers" })

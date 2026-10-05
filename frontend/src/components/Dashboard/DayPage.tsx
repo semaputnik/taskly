@@ -227,7 +227,7 @@ function Lines({
   ))
 }
 
-const textLink =
+export const textLink =
   "focus-visible:ring-ring/50 rounded-sm underline-offset-[3px] outline-none hover:underline focus-visible:ring-[3px]"
 
 /** The link that ends a band too long to show, into the task list. */

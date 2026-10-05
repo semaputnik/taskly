@@ -16,6 +16,7 @@ import { useTaskStatus } from "@/components/Tasks/useTaskWrites"
 import { Skeleton } from "@/components/ui/skeleton"
 import { currentUserQuery, projectsQuery, tasksQuery } from "@/lib/serverState"
 import { cn } from "@/lib/utils"
+import { textLink } from "./DayPage"
 import {
   handoverLine,
   MY_WORK_GROUPS,
@@ -51,9 +52,6 @@ export function usePrefetchMyWork() {
   const { data: user } = useQuery(currentUserQuery())
   useQueries({ queries: user ? myWorkQueries(user.id) : [] })
 }
-
-const textLink =
-  "focus-visible:ring-ring/50 rounded-sm underline-offset-[3px] outline-none hover:underline focus-visible:ring-[3px]"
 
 function Heading({ count }: { count: number | null }) {
   return (

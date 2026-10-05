@@ -178,6 +178,125 @@ test("The capture line opens capture with what was typed", async ({ page }) => {
   ).toHaveValue("")
 })
 
+const changesLog = (page: Page) => band(page, /^Changes/)
+
+/** A bot user of the reader's with every task permission in one project. */
+async function botWithProject(page: Page, name: string) {
+  const api = await userApi(page)
+  const project = await api.create("/projects/", { name: "Support queue" })
+  const bot = await api.create("/bot-users/", {
+    name,
+    scope: {
+      project_ids: [project.id],
+      permissions: {
+        create_tasks: true,
+        read_tasks: true,
+        update_tasks: true,
+        delete_tasks: true,
+      },
+    },
+  })
+  const { token } = await api.create(`/bot-users/${bot.id}/token`)
+  const headers = { Authorization: `Bearer ${token}` }
+  return {
+    file: async (title: string): Promise<{ id: string }> => {
+      const response = await page.request.post(`${api.url}/tasks/`, {
+        headers,
+        data: { title, project_id: project.id },
+      })
+      expect(response.ok()).toBe(true)
+      return response.json()
+    },
+    remove: async (id: string) => {
+      const response = await page.request.delete(`${api.url}/tasks/${id}`, {
+        headers,
+      })
+      expect(response.ok()).toBe(true)
+    },
+  }
+}
+
+test("Changes reads the reader's and the bot users' entries newest first, with Restore on deletions", async ({
+  page,
+}) => {
+  await newUser(page)
+  const api = await userApi(page)
+  const mine = await api.create("/tasks/", { title: "Renew the domain" })
+  const bot = await botWithProject(page, "Triage agent")
+  const banner = await bot.file("Old staging banner")
+  await bot.file("Migrate the marketing pages")
+  await bot.remove(banner.id)
+  expect((await api.delete(`/tasks/${mine.id}`)).ok()).toBe(true)
+  await page.goto("/")
+
+  const log = changesLog(page)
+  // A first visit has no last one: the window is everything so far.
+  await expect(log.getByRole("heading", { level: 2 })).toHaveText(
+    /^Changes\s*6\s*so far$/,
+  )
+  const lines = log.getByRole("listitem")
+  // The actor first, then what they did, newest first.
+  await expect(lines).toHaveText([
+    /You\s*deleted Renew the domain\s*Restore$/i,
+    /Triage agent\s*deleted Old staging banner\s*Restore$/i,
+    /Triage agent\s*created Migrate the marketing pages/i,
+    /Triage agent\s*created Old staging banner/i,
+    /You\s*created the project Support queue/i,
+    /You\s*created Renew the domain/i,
+  ])
+  await expect(log.getByRole("button", { name: /^Restore/ })).toHaveCount(2)
+  await expect(
+    log.getByRole("link", { name: "Migrate the marketing pages" }),
+  ).toBeVisible()
+
+  // The reader's own lines are muted; a bot user's are in full ink.
+  const sentenceColour = (line: Locator) =>
+    line.evaluate((node) =>
+      node.lastElementChild
+        ? getComputedStyle(node.lastElementChild).color
+        : null,
+    )
+  expect(await sentenceColour(lines.nth(0))).not.toBe(
+    await sentenceColour(lines.nth(1)),
+  )
+  // In the dark theme too. A reload is the same visit, so the log holds.
+  await page.evaluate(() => localStorage.setItem("vite-ui-theme", "dark"))
+  await page.reload()
+  await expect(lines).toHaveCount(6)
+  expect(
+    await page.evaluate(
+      () => getComputedStyle(document.documentElement).colorScheme,
+    ),
+  ).toBe("dark")
+  expect(await sentenceColour(lines.nth(0))).not.toBe(
+    await sentenceColour(lines.nth(1)),
+  )
+
+  // Restore is inline: no dialog between the line and what it brings back.
+  await lines
+    .nth(1)
+    .getByRole("button", { name: "Restore Old staging banner" })
+    .click()
+  await expect(page.getByText("“Old staging banner” restored")).toBeVisible()
+  await expect(lines.first()).toHaveText(/You\s*restored Old staging banner/i)
+  await expect(log.getByRole("button", { name: /^Restore/ })).toHaveCount(1)
+
+  await log.getByRole("link", { name: "Full log" }).click()
+  await expect(page).toHaveURL(/\/activity/)
+})
+
+test("An empty Changes log says so and points at bot users", async ({
+  page,
+}) => {
+  await newUser(page)
+  await page.goto("/")
+  const log = changesLog(page)
+  await expect(log).toContainText("Nothing has happened yet.")
+  await expect(log.getByRole("link", { name: "Full log" })).toBeVisible()
+  await log.getByRole("link", { name: "bot users", exact: true }).click()
+  await expect(page).toHaveURL(/\/bots/)
+})
+
 test.describe("on a phone", () => {
   test.use({
     viewport: { width: 375, height: 812 },
@@ -197,6 +316,9 @@ test.describe("on a phone", () => {
       { title: "Due now", due_date: day(0) },
     ])
     await page.goto("/")
+    // Measured once the bands have arrived: their skeleton draws the same
+    // headings, and a box read off it is gone by the next assertion.
+    await expect(page.getByRole("link", { name: "Due now" })).toBeVisible()
 
     const top = async (locator: Locator) =>
       (await locator.boundingBox())?.y ?? Number.NaN
@@ -214,5 +336,33 @@ test.describe("on a phone", () => {
         document.documentElement.clientWidth,
     )
     expect(overflow).toBeLessThanOrEqual(0)
+  })
+
+  test("A Changes line keeps time and actor on one line, the sentence beneath", async ({
+    page,
+  }) => {
+    await newUser(page)
+    const bot = await botWithProject(page, "Research agent")
+    const title =
+      "Summarise the three trackers and the long discussion that followed"
+    await bot.file(title)
+    await page.goto("/")
+
+    const line = changesLog(page).getByRole("listitem").first()
+    const box = async (locator: Locator) => {
+      const found = await locator.boundingBox()
+      if (!found) throw new Error("not laid out")
+      return found
+    }
+    const time = await box(line.locator("time"))
+    const actor = await box(line.getByRole("link", { name: "Research agent" }))
+    const task = await box(line.getByRole("link", { name: title }))
+    expect(Math.abs(time.y - actor.y)).toBeLessThan(8)
+    expect(task.y).toBeGreaterThanOrEqual(actor.y + actor.height - 1)
+    // The task's name wraps whole onto the next line rather than being cut.
+    await expect(line).toContainText(title)
+    expect(
+      await line.evaluate((node) => node.scrollWidth <= node.clientWidth),
+    ).toBe(true)
   })
 })

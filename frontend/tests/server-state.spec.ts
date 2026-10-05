@@ -17,7 +17,7 @@ const today = () => {
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
 }
 
-test("An edit shows in While you were away without a reload", async ({
+test("An edit shows in the day page's Changes without a reload", async ({
   page,
 }) => {
   await newUser(page)

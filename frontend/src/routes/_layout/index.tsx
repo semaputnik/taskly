@@ -3,6 +3,11 @@ import { createFileRoute } from "@tanstack/react-router"
 import { Suspense, useEffect, useState } from "react"
 
 import { CaptureLine } from "@/components/Dashboard/CaptureLine"
+import {
+  Changes,
+  ChangesPending,
+  changesQuery,
+} from "@/components/Dashboard/Changes"
 import { Day, DayHeading, DayPending } from "@/components/Dashboard/DayPage"
 import { markSeen, visitSince } from "@/components/Dashboard/day"
 import {
@@ -10,11 +15,6 @@ import {
   MyWorkPending,
   usePrefetchMyWork,
 } from "@/components/Dashboard/MyWork"
-import {
-  recentActivityQuery,
-  WhileYouWereAway,
-  WhileYouWereAwayPending,
-} from "@/components/Dashboard/WhileYouWereAway"
 
 export const Route = createFileRoute("/_layout/")({
   component: Dashboard,
@@ -68,14 +68,14 @@ function useVisitSince(): string | null {
 /**
  * The day page: today read as one column. The capture line first, then the
  * date and one sentence of what needs the reader, then the date bands, and
- * beneath them what is under way and what changed.
+ * beneath them what is in the reader's hands and what changed.
  */
 function Dashboard() {
   const since = useVisitSince()
   // Started here, beside the bands' own requests, rather than after the
   // bands have suspended and resumed: the sections below them are not
   // rendered until they resume.
-  usePrefetchQuery(recentActivityQuery())
+  usePrefetchQuery(changesQuery(since))
   usePrefetchMyWork()
 
   return (
@@ -87,24 +87,19 @@ function Dashboard() {
       <DayHeading />
 
       {/* One boundary: every section appears in the same frame, so none
-          moves another once it is drawn. The panel below keeps its old
-          form until its own slice replaces it. */}
+          moves another once it is drawn. */}
       <Suspense
         fallback={
           <>
             <DayPending />
             <MyWorkPending />
-            <div className="flex flex-col gap-6">
-              <WhileYouWereAwayPending />
-            </div>
+            <ChangesPending />
           </>
         }
       >
         <Day since={since} />
         <MyWork />
-        <div className="flex flex-col gap-6">
-          <WhileYouWereAway />
-        </div>
+        <Changes since={since} />
       </Suspense>
     </div>
   )
