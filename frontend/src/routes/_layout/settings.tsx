@@ -10,6 +10,7 @@ import { Users } from "@/components/Settings/Users"
 import useAuth from "@/hooks/useAuth"
 import {
   currentUserQuery,
+  paperlessQuery,
   passkeysQuery,
   usersQuery,
   warmQuery,
@@ -29,6 +30,7 @@ export const Route = createFileRoute("/_layout/settings")({
   loader: ({ context }) => {
     const { queryClient } = context
     void warmQuery(queryClient, passkeysQuery())
+    void warmQuery(queryClient, paperlessQuery())
     void warmQuery(queryClient, currentUserQuery()).then((user) => {
       if (user?.is_superuser) void warmQuery(queryClient, usersQuery())
     })
@@ -67,7 +69,6 @@ function Settings() {
       <Profile />
       <Passkeys recovered={recovered} />
       <Sessions />
-      {/* Reserved for the Paperless connection (#211). */}
       <PaperlessSection />
       <Users />
       <Account />

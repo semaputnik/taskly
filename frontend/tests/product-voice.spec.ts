@@ -161,9 +161,9 @@ test("Heading levels descend without skipping on every screen", async ({
     if (index > 0) expect(level).toBeLessThanOrEqual(inPanel[index - 1] + 1)
   })
 
-  // Settings is one document: the heading, then Profile, Passkeys, Sessions
-  // and Account (this account is not the superuser's, so no Users).
+  // Settings is one document: the heading, then Profile, Passkeys, Sessions,
+  // Paperless and Account (this account is not the superuser's, so no Users).
   await page.goto("/settings")
   await expect(page.getByRole("heading", { name: "Account" })).toBeVisible()
-  expect(await outline()).toEqual([1, 2, 2, 2, 2])
+  expect(await outline()).toEqual([1, 2, 2, 2, 2, 2])
 })

@@ -77,7 +77,7 @@ test("A file says what it is, where it is kept, and downloads", async ({
   // No tabs: the files are a section of the task, with their count.
   await expect(panel.getByRole("tab")).toHaveCount(0)
   await expect(files.getByRole("heading", { name: /Files\s*1/ })).toBeVisible()
-  await expect(files).toContainText("8 B · kept in Taskly")
+  await expect(files).toContainText("8 B · kept here")
 
   const downloading = page.waitForEvent("download")
   await files
