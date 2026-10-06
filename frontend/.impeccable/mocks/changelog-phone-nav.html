@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Taskly · bottom navigation on iPhone 16 (slice 4 mock)</title>
+<style>
+  :root { --page:#ffffff; --ink:#0b0e11; --ink-2:#3d444d; --ink-3:#656d76; --rule:#e6e8eb; --rule-strong:#c9cdd2; --hover:#f3f4f6; --done:#1a7f37; --late:#cf222e; --p2:#8a5c00;
+    --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif; --mono: ui-monospace, "SF Mono", Menlo, monospace; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:#dcdfe3; font-family:var(--font); color:var(--ink); -webkit-font-smoothing:antialiased; }
+  .stage { display:flex; gap:40px; justify-content:center; align-items:flex-start; padding:40px 24px 60px; flex-wrap:wrap; }
+  .label { text-align:center; font-size:13px; color:#555; margin-top:14px; max-width:393px; }
+  .phone { width:393px; height:852px; border-radius:55px; background:#0b0e11; position:relative; box-shadow:0 30px 60px -20px rgba(0,0,0,.45), 0 0 0 10px #1c1f22, 0 0 0 12px #3a3d41; overflow:hidden; }
+  .screen { position:absolute; inset:0; background:var(--page); border-radius:55px; overflow:hidden; display:flex; flex-direction:column; }
+  .island { position:absolute; top:11px; left:50%; transform:translateX(-50%); width:126px; height:37px; background:#000; border-radius:20px; z-index:10; }
+  .status { height:59px; display:flex; justify-content:space-between; align-items:flex-end; padding:0 36px 12px 42px; font-size:16px; font-weight:600; }
+  .status .r { display:flex; gap:6px; align-items:center; font-size:12px; }
+  .status .batt { width:26px; height:12px; border:1.5px solid var(--ink); border-radius:4px; position:relative; } .status .batt::after { content:""; position:absolute; left:1.5px; top:1.5px; bottom:1.5px; width:18px; background:var(--ink); border-radius:2px; }
+  .app { flex:1; overflow:hidden; display:flex; flex-direction:column; position:relative; }
+  .top { display:flex; align-items:center; justify-content:space-between; height:44px; padding:0 16px; }
+  .wordmark { font-weight:600; font-size:15px; letter-spacing:-.01em; }
+  .top .av { width:26px; height:26px; border-radius:50%; background:var(--ink); color:var(--page); font-size:12px; font-weight:600; display:grid; place-items:center; }
+  .scroll { flex:1; overflow:hidden; padding:8px 16px 0; }
+  h1 { margin:0 0 6px; line-height:1; display:flex; align-items:baseline; gap:12px; } h1 .d { font-size:48px; font-weight:700; letter-spacing:-.035em; } h1 .w { font-size:16px; font-weight:500; color:var(--ink-2); }
+  h1.plain { font-size:22px; font-weight:600; letter-spacing:-.015em; line-height:1.2; margin:0 0 4px; display:block; }
+  .lede { margin:0 0 18px; color:var(--ink-3); font-size:15px; } .lede b { color:var(--ink); font-weight:500; }
+  h2 { font-size:13px; font-weight:600; margin:0; padding:0 0 8px; display:flex; align-items:baseline; gap:8px; border-bottom:1px solid var(--rule-strong); }
+  h2 .n { font-family:var(--mono); font-weight:400; font-size:12px; color:var(--ink-3); } h2.late { color:var(--late); }
+  section { margin-bottom:24px; }
+  .task { display:grid; grid-template-columns:18px minmax(0,1fr); gap:0 12px; align-items:start; padding:9px 0; border-bottom:1px solid var(--rule); }
+  .mark { width:18px; height:18px; color:var(--ink-2); margin-top:1px; display:block; } .mark svg { width:18px; height:18px; display:block; } .mark.p1 { color:var(--late); } .mark.p2 { color:var(--p2); }
+  .task .t { font-weight:500; font-size:15px; line-height:1.35; }
+  .meta { display:flex; align-items:center; gap:12px; color:var(--ink-3); font-size:12.5px; margin-top:3px; } .meta .late { color:var(--late); font-weight:500; } .meta .today { color:var(--ink); font-weight:500; }
+  .meta .proj { margin-left:auto; display:inline-flex; align-items:center; gap:4px; } .meta .proj i { width:8px; height:8px; border-radius:2px; background:currentColor; opacity:.55; }
+  .bot { display:grid; grid-template-columns:26px minmax(0,1fr); gap:0 12px; align-items:start; padding:10px 0; border-bottom:1px solid var(--rule); }
+  .plate { width:26px; height:26px; border-radius:6px; background:var(--ink); color:var(--page); font-family:var(--mono); font-size:11px; font-weight:600; display:grid; place-items:center; margin-top:1px; } .plate.off { background:var(--rule-strong); color:var(--ink-2); }
+  .bot .t { font-weight:500; } .bot .meta { flex-wrap:wrap; gap:6px 12px; }
+  .bot .meta .ok::before { content:""; display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--done); margin-right:6px; vertical-align:1px; }
+  .bot .meta .no::before { content:""; display:inline-block; width:7px; height:7px; border-radius:50%; border:1.5px solid var(--ink-3); margin-right:6px; vertical-align:1px; }
+
+  /* the bottom navigation: five items, the middle one is capture */
+  .tabs { display:grid; grid-template-columns:repeat(5, 1fr); height:56px; border-top:1px solid var(--rule-strong); background:var(--page); align-items:stretch; }
+  .tab { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; font-size:10.5px; color:var(--ink-3); font-weight:500; }
+  .tab svg { width:22px; height:22px; } .tab.on { color:var(--ink); font-weight:600; }
+  .tab.add { color:var(--page); } .tab.add span { width:40px; height:40px; border-radius:50%; background:var(--ink); display:grid; place-items:center; } .tab.add svg { width:22px; height:22px; }
+  .safari { height:83px; background:#f4f4f6; border-top:1px solid #d4d4d8; padding:8px 16px 0; position:relative; }
+  .url { height:44px; background:#fff; border-radius:12px; display:flex; align-items:center; justify-content:center; gap:6px; font-size:16px; color:#111; box-shadow:0 1px 2px rgba(0,0,0,.08); position:relative; }
+  .url small { position:absolute; left:14px; font-size:13px; color:#888; } .url .reload { position:absolute; right:14px; color:#555; }
+  .safari .tools { display:flex; justify-content:space-between; padding:10px 10px 0; color:#0a84ff; font-size:18px; }
+  .home { position:absolute; left:50%; bottom:8px; transform:translateX(-50%); width:139px; height:5px; border-radius:3px; background:#111; }
+  .safari.kb { height:43px; } .safari.kb .url, .safari.kb .tools { display:none; }
+
+  /* capture sheet above the keyboard */
+  .dim { position:absolute; inset:0; background:rgba(0,0,0,.18); }
+  .sheet { position:absolute; left:0; right:0; bottom:0; background:var(--page); border-radius:14px 14px 0 0; box-shadow:0 -10px 30px rgba(0,0,0,.15); padding:10px 16px 8px; }
+  .grab { width:36px; height:4px; border-radius:2px; background:var(--rule-strong); margin:0 auto 10px; }
+  .matches .mh { font-size:12.5px; color:var(--ink-3); padding:4px 0; }
+  .m { display:grid; grid-template-columns:18px minmax(0,1fr); gap:12px; align-items:center; padding:10px 0; font-size:15px; border-bottom:1px solid var(--rule); }
+  .m .mt { font-weight:500; } .m .mt b { font-weight:700; } .m .mp { font-size:12.5px; color:var(--ink-3); margin-left:8px; font-weight:400; }
+  .capture { display:flex; align-items:center; gap:10px; height:52px; font-size:16px; color:var(--ink); }
+  .capture span { flex:1; } .caret { display:inline-block; width:1.5px; height:18px; background:var(--ink); vertical-align:-3px; margin-left:1px; }
+  .capture span.go { flex:none; width:32px; height:32px; border-radius:50%; background:var(--ink); color:var(--page); display:grid; place-items:center; }
+  .hint { font-size:12px; color:var(--ink-3); padding:0 0 4px; }
+  .keyboard { height:291px; background:#d1d4d9; padding:8px 4px; display:flex; flex-direction:column; gap:10px; }
+  .row { display:flex; gap:6px; justify-content:center; }
+  .k { width:33px; height:42px; background:#fff; border-radius:6px; box-shadow:0 1px 0 #898a8d; display:grid; place-items:center; font-size:20px; }
+  .k.w { width:52px; background:#adb3bc; } .k.sp { width:190px; } .k.ret { width:90px; background:#0a84ff; color:#fff; font-size:15px; font-weight:500; }
+  .kbar { display:flex; justify-content:space-between; padding:4px 8px 0; font-size:17px; color:#0a84ff; }
+</style>
+</head>
+<body>
+<div class="stage">
+
+  <div>
+    <div class="phone"><div class="island"></div><div class="screen">
+      <div class="status"><span>9:41</span><span class="r">●●●● <span style="font-size:11px">5G</span> <span class="batt"></span></span></div>
+      <div class="app">
+        <div class="top"><span class="wordmark">Taskly</span><span class="av">S</span></div>
+        <div class="scroll">
+          <h1><span class="d">06</span><span class="w">Tuesday, October 2026</span></h1>
+          <p class="lede"><b>3 need you.</b> Your bot users made 6 changes since yesterday evening.</p>
+          <section><h2 class="late">Overdue <span class="n">1</span></h2>
+            <div class="task"><span class="mark p1"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M1.8 9c1.9-3.4 4.3-5 7.2-5s5.3 1.6 7.2 5c-1.9 3.4-4.3 5-7.2 5S3.7 12.4 1.8 9z"/><circle cx="9" cy="9" r="2.4"/><circle cx="9" cy="9" r=".9" fill="currentColor" stroke="none"/></svg></span><div><div class="t">Renew the domain</div><div class="meta"><span class="late">3 days late</span><span>blocked</span><span class="proj"><i></i>Inbox</span></div></div></div>
+          </section>
+          <section><h2>Due today <span class="n">2</span></h2>
+            <div class="task"><span class="mark p2"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="9" cy="9" r="7"/><path d="M9 4.5a4.5 4.5 0 0 1 0 9z" fill="currentColor" stroke="none"/></svg></span><div><div class="t">Shortlist the trackers</div><div class="meta"><span class="today">Today</span><span class="proj"><i></i>Research</span></div></div></div>
+            <div class="task"><span class="mark"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="9" cy="9" r="7"/></svg></span><div><div class="t">Order groceries</div><div class="meta"><span class="today">Today</span><span class="proj"><i></i>Home</span></div></div></div>
+          </section>
+          <section><h2>In my hands <span class="n">7</span></h2>
+            <div class="task"><span class="mark p2"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="9" cy="9" r="7"/><path d="M9 4.5a4.5 4.5 0 0 1 0 9z" fill="currentColor" stroke="none"/></svg></span><div><div class="t">Migrate the marketing pages</div><div class="meta"><span>2/5</span><span>Wed</span><span class="proj"><i></i>Website relaunch</span></div></div></div>
+            <div class="task"><span class="mark"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="9" cy="9" r="7"/><circle cx="9" cy="9" r="2.6" fill="currentColor" stroke="none"/></svg></span><div><div class="t">Summarise the three trackers</div><div class="meta"><span>3/3</span><span class="proj"><i></i>Research</span></div></div></div>
+          </section>
+        </div>
+        <nav class="tabs" aria-label="Main">
+          <a href="#" class="tab on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>Today</a>
+          <a href="#" class="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="6" cy="7" r="2"/><circle cx="6" cy="17" r="2"/><path d="M11 7h10M11 17h10"/></svg>Tasks</a>
+          <a href="#" class="tab add" aria-label="Add a task"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg></span></a>
+          <a href="#" class="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="7" width="16" height="12" rx="3"/><path d="M12 3v4M8 12h.01M16 12h.01M9 16h6"/></svg>Bots</a>
+          <a href="#" class="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Activity</a>
+        </nav>
+      </div>
+      <div class="safari"><div class="url"><small>AA</small>taskly.local<span class="reload">↻</span></div><div class="tools"><span>‹</span><span>›</span><span>⇧</span><span>☐</span><span>⧉</span></div><div class="home"></div></div>
+    </div></div>
+    <div class="label">Today: five tabs at the bottom, the middle one is capture. Projects, Tags, Archive, Settings sit behind the avatar at the top.</div>
+  </div>
+
+  <div>
+    <div class="phone"><div class="island"></div><div class="screen">
+      <div class="status"><span>9:41</span><span class="r">●●●● <span style="font-size:11px">5G</span> <span class="batt"></span></span></div>
+      <div class="app">
+        <div class="top"><span class="wordmark">Taskly</span><span class="av">S</span></div>
+        <div class="scroll">
+          <h1 class="plain">Bots</h1>
+          <p class="lede"><b>4 bot users.</b> 3 working, 1 without a token.</p>
+          <div class="bot"><span class="plate">IT</span><div><div class="t">inbox-triage</div><div class="meta"><span class="ok">Working</span><span>used 2 hours ago</span><span>Inbox, Website relaunch</span></div></div></div>
+          <div class="bot"><span class="plate">RA</span><div><div class="t">research-agent</div><div class="meta"><span class="ok">Working</span><span>used yesterday</span><span>Research</span></div></div></div>
+          <div class="bot"><span class="plate">RB</span><div><div class="t">release-bot</div><div class="meta"><span class="ok">Working</span><span>used 10 days ago</span><span style="color:var(--late);font-weight:500">last delivery failed</span></div></div></div>
+          <div class="bot"><span class="plate off">CS</span><div><div class="t">calendar-sync</div><div class="meta"><span class="no">No token</span><span>Home</span></div></div></div>
+        </div>
+        <div class="dim"></div>
+        <div class="sheet">
+          <div class="grab"></div>
+          <div class="matches"><div class="mh">Open tasks matching “redirect”</div>
+            <div class="m"><span class="mark"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="9" cy="9" r="7"/><circle cx="9" cy="9" r="2.6" fill="currentColor" stroke="none"/></svg></span><span class="mt">Check the <b>redirect</b> map<span class="mp">Website relaunch</span></span></div>
+            <div class="m"><span class="mark"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="9" cy="9" r="7"/></svg></span><span class="mt"><b>Redirect</b> the old URLs<span class="mp">Website relaunch</span></span></div>
+          </div>
+          <div class="capture"><svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 3v10M3 8h10"/></svg><span>redirect<i class="caret"></i></span><span class="go"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M7 12V2M3 6l4-4 4 4"/></svg></span></div>
+          <div class="hint">Return creates “redirect” in Inbox · tap a match to open it · More options…</div>
+        </div>
+      </div>
+      <div class="keyboard">
+        <div class="kbar"><span>⌃ ⌄</span><span>Done</span></div>
+        <div class="row"><span class="k">q</span><span class="k">w</span><span class="k">e</span><span class="k">r</span><span class="k">t</span><span class="k">y</span><span class="k">u</span><span class="k">i</span><span class="k">o</span><span class="k">p</span></div>
+        <div class="row"><span class="k">a</span><span class="k">s</span><span class="k">d</span><span class="k">f</span><span class="k">g</span><span class="k">h</span><span class="k">j</span><span class="k">k</span><span class="k">l</span></div>
+        <div class="row"><span class="k w">⇧</span><span class="k">z</span><span class="k">x</span><span class="k">c</span><span class="k">v</span><span class="k">b</span><span class="k">n</span><span class="k">m</span><span class="k w">⌫</span></div>
+        <div class="row"><span class="k w">123</span><span class="k sp">space</span><span class="k ret">return</span></div>
+      </div>
+      <div class="safari kb"><div class="home"></div></div>
+    </div></div>
+    <div class="label">The + tab on any page: a capture sheet rises above the keyboard with the same line and search. “More options…” opens the full draft.</div>
+  </div>
+
+</div>
+</body>
+</html>

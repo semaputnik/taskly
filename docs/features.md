@@ -1,7 +1,7 @@
 # Taskly — Feature Requirements
 
 **Status:** Draft
-**Last updated:** 2026-10-05
+**Last updated:** 2026-10-06
 
 This document lists the features Taskly must provide. It records confirmed
 requirements only. Anything not yet decided is listed under
@@ -377,17 +377,16 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
   open a match instead. The REST API's task list accepts the same title
   filter. Nothing is searched while the line is empty, and nothing beyond
   open tasks' titles is searched (descriptions and comments are not).
-- **FR-06.15** The capture line is at the top of the page on a desktop and
-  pinned to the bottom of the screen on a phone, above the browser's own
-  bar and above the keyboard while one is up, with its matches opening
-  upward, and out of the way while a record's column covers the screen; there is no floating button and no
-  "Add a task" entry in the navigation. The `c` key still opens the full
-  draft from any screen.
-  On a phone the filter row keeps the project, assignee and status filters
-  and the order, and folds the priority, tag and time filters behind "More",
-  which opens a sheet; a filter that is set stays on the row whichever group
-  it belongs to. Menus open as bottom sheets with rows at least 44px tall,
-  and the list never scrolls sideways.
+- **FR-06.15** The capture line is at the top of the page on a desktop,
+  with its matches opening downward; there is no floating button and no
+  "Add a task" entry in the desktop navigation, and the `c` key opens the
+  full draft from any screen. On a phone the navigation is a bar at the
+  bottom of the screen with Today, Tasks, a central add control, Bots and
+  Activity; Projects, Tags, Archive, Settings, appearance and signing out
+  are reached from the account control in the top bar. The add control, on
+  any screen, raises a capture sheet above the keyboard carrying the same
+  line and its matches, and a way into the full draft; the day page and the
+  task list carry no capture line of their own on a phone.
 
 ### F-07. REST API
 
@@ -534,6 +533,9 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
   (FR-10.7).
 - **FR-10.9** One act over many tasks is one log entry naming what the act
   did, not one entry per task it touched.
+- **FR-10.10** The log reads newest first, and can be turned to oldest
+  first; the order lives in the URL beside the narrowings and the page, and
+  the REST API's log accepts it.
 
 ### F-11. Webhooks
 

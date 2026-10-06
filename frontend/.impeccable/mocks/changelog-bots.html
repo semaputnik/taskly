@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Taskly · Bots (slice 4 mock)</title>
+<style>
+  :root { color-scheme: light; --page:#ffffff; --ink:#0b0e11; --ink-2:#3d444d; --ink-3:#656d76; --rule:#e6e8eb; --rule-strong:#c9cdd2; --hover:#f3f4f6; --done:#1a7f37; --late:#cf222e; --p2:#8a5c00;
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", "Noto Sans", Arial, sans-serif; --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--page); color:var(--ink); font-family:var(--font); font-size:15px; line-height:1.45; -webkit-font-smoothing:antialiased; }
+  a { color:inherit; text-decoration:none; } a:hover { text-decoration:underline; text-underline-offset:3px; }
+  button { font:inherit; color:inherit; background:none; border:0; padding:0; cursor:pointer; }
+  .mono { font-family:var(--mono); font-size:12px; font-variant-numeric:tabular-nums; }
+  .app { display:grid; grid-template-columns:200px minmax(0,1fr) 560px; min-height:100vh; }
+  .nav { padding:28px 20px 28px 28px; display:flex; flex-direction:column; gap:26px; position:sticky; top:0; height:100vh; }
+  .wordmark { font-weight:600; letter-spacing:-.01em; }
+  .nav ul { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:2px; }
+  .nav li a { display:flex; justify-content:space-between; align-items:center; height:30px; padding:0 8px; margin:0 -8px; border-radius:6px; color:var(--ink-2); }
+  .nav li a[aria-current] { color:var(--ink); font-weight:600; }
+  .nav li a .n { font-family:var(--mono); font-size:12px; color:var(--ink-3); }
+  .nav .foot { margin-top:auto; display:flex; align-items:center; gap:8px; font-size:13px; color:var(--ink-2); }
+  .nav .foot .av { width:20px; height:20px; border-radius:50%; background:var(--ink); color:var(--page); font-size:11px; font-weight:600; display:grid; place-items:center; }
+
+  main { padding:36px 32px 96px; max-width:760px; min-width:0; }
+  h1 { margin:0 0 4px; font-size:22px; font-weight:600; letter-spacing:-.015em; line-height:1.2; display:flex; align-items:baseline; gap:16px; }
+  h1 .act { margin-left:auto; font-size:13.5px; font-weight:500; color:var(--ink-2); }
+  .lede { margin:0 0 24px; color:var(--ink-3); } .lede b { color:var(--ink); font-weight:500; }
+  h2 { font-size:13px; font-weight:600; margin:0; padding:0 0 8px; border-bottom:1px solid var(--rule-strong); display:flex; gap:8px; }
+  h2 .n { font-family:var(--mono); font-weight:400; font-size:12px; color:var(--ink-3); }
+  .bot { display:grid; grid-template-columns:26px minmax(0,1fr) auto; gap:0 12px; align-items:start; padding:10px 0; border-bottom:1px solid var(--rule); }
+  .bot.open { background:var(--hover); margin:0 -12px; padding-left:12px; padding-right:12px; }
+  .plate { width:26px; height:26px; border-radius:6px; background:var(--ink); color:var(--page); font-family:var(--mono); font-size:11px; font-weight:600; display:grid; place-items:center; margin-top:1px; }
+  .plate.off { background:var(--rule-strong); color:var(--ink-2); }
+  .bot .t { font-weight:500; }
+  .bot .meta { display:flex; align-items:center; gap:12px; color:var(--ink-3); font-size:12.5px; margin-top:3px; flex-wrap:wrap; }
+  .bot .meta .late { color:var(--late); font-weight:500; }
+  .bot .meta .ok::before { content:""; display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--done); margin-right:6px; vertical-align:1px; }
+  .bot .meta .no::before { content:""; display:inline-block; width:7px; height:7px; border-radius:50%; border:1.5px solid var(--ink-3); margin-right:6px; vertical-align:1px; }
+  .bot .r { font-size:12.5px; color:var(--ink-3); white-space:nowrap; text-align:right; }
+
+  .panel { border-left:1px solid var(--rule-strong); position:sticky; top:0; height:100vh; overflow-y:auto; padding:0 36px 48px; }
+  .bar { display:flex; align-items:center; gap:12px; height:52px; color:var(--ink-3); font-size:13px; position:sticky; top:0; background:var(--page); z-index:1; }
+  .bar .right { margin-left:auto; display:flex; gap:4px; }
+  .bar .ib { width:28px; height:28px; display:grid; place-items:center; border-radius:6px; color:var(--ink-3); }
+  .title { display:grid; grid-template-columns:28px 1fr; gap:12px; align-items:center; padding:8px 0 18px; }
+  .title h3 { margin:0; font-size:22px; font-weight:600; letter-spacing:-.015em; line-height:1.25; }
+  .title .plate { width:28px; height:28px; font-size:12px; margin:0; }
+  .props { display:grid; grid-template-columns:96px 1fr; row-gap:2px; column-gap:16px; padding:10px 0 14px; border-top:1px solid var(--rule-strong); border-bottom:1px solid var(--rule); }
+  .props dt { color:var(--ink-3); font-size:13px; min-height:30px; display:flex; align-items:center; margin:0; }
+  .props dd { margin:0; min-width:0; min-height:30px; display:flex; align-items:center; flex-wrap:wrap; gap:4px 14px; }
+  .props .ro { color:var(--ink-2); font-size:14px; }
+  .props .act { font-size:13.5px; font-weight:500; }
+  .props .act.danger:hover { color:var(--late); }
+  .ok { color:var(--done); font-weight:500; }
+  .sec { padding:18px 0 4px; }
+  .sec h4 { margin:0 0 8px; font-size:13px; font-weight:600; display:flex; align-items:baseline; gap:8px; border-bottom:1px solid var(--rule-strong); padding-bottom:8px; }
+  .sec h4 .n { font-family:var(--mono); font-weight:400; font-size:12px; color:var(--ink-3); } .sec h4 .act { margin-left:auto; font-weight:400; font-size:13px; color:var(--ink-3); }
+  .chk { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:6px 16px; }
+  .chk label { display:flex; align-items:center; gap:10px; min-height:30px; font-size:14px; }
+  .chk .box { width:16px; height:16px; border:1.5px solid var(--rule-strong); border-radius:4px; position:relative; background:var(--page); }
+  .chk .box.on { background:var(--ink); border-color:var(--ink); } .chk .box.on::after { content:""; position:absolute; left:4.5px; top:1.5px; width:4px; height:8px; border:solid var(--page); border-width:0 1.5px 1.5px 0; transform:rotate(45deg); }
+  .chk .never { color:var(--ink-3); } .chk .never .box { border-style:dashed; }
+  .chk small { color:var(--ink-3); font-size:12px; margin-left:4px; }
+  .hook { display:grid; grid-template-columns:96px 1fr; column-gap:16px; row-gap:4px; padding:8px 0; border-bottom:1px solid var(--rule); }
+  .hook dt { color:var(--ink-3); font-size:13px; padding-top:4px; }
+  .hook .url { font-family:var(--mono); font-size:12.5px; color:var(--ink); word-break:break-all; }
+  .hook .url.empty { font-family:var(--font); font-size:14px; color:var(--ink-3); }
+  .hook .last { font-size:12.5px; color:var(--ink-3); display:flex; gap:12px; flex-wrap:wrap; }
+  .hook .last .ok { font-weight:500; } .hook .last .fail { color:var(--late); font-weight:500; }
+  .hook .acts { display:flex; gap:14px; font-size:13px; }
+  .tl { list-style:none; margin:0; padding:0; }
+  .tl li { display:grid; grid-template-columns:52px 1fr; gap:12px; padding:8px 0; border-bottom:1px solid var(--rule); align-items:baseline; }
+  .tl time { font-family:var(--mono); font-size:12px; color:var(--ink-3); }
+  .tl .ev { color:var(--ink-2); font-size:14px; } .tl .ev b { font-weight:500; color:var(--ink); }
+  .tl .day { grid-column:1 / -1; font-size:12.5px; color:var(--ink-3); padding-top:10px; border-bottom:0; }
+  .task { display:grid; grid-template-columns:18px minmax(0,1fr); gap:0 12px; align-items:start; padding:8px 0; border-bottom:1px solid var(--rule); }
+  .mark { width:18px; height:18px; color:var(--ink-2); margin-top:1px; display:block; } .mark svg { width:18px; height:18px; display:block; } .mark.p2 { color:var(--p2); }
+  .task .t { font-weight:500; font-size:14px; } .task .meta { display:flex; gap:12px; color:var(--ink-3); font-size:12.5px; margin-top:2px; } .task .meta .proj { margin-left:auto; }
+  .more { font-size:13px; color:var(--ink-3); padding-top:8px; display:inline-block; }
+  .foot { margin-top:36px; padding-top:14px; border-top:1px solid var(--rule); font-size:13px; color:var(--ink-3); display:flex; gap:16px; }
+  .foot a:hover { color:var(--late); }
+</style>
+</head>
+<body>
+<div class="app">
+  <nav class="nav" aria-label="Main">
+    <div class="wordmark">Taskly</div>
+    <ul><li><a href="#">Today</a></li><li><a href="#">Tasks <span class="n">23</span></a></li><li><a href="#">Projects <span class="n">4</span></a></li><li><a href="#">Tags</a></li><li><a href="#" aria-current="page">Bots <span class="n">4</span></a></li><li><a href="#">Activity</a></li><li><a href="#">Archive</a></li></ul>
+    <div class="foot"><span class="av">S</span> Sam</div>
+  </nav>
+
+  <main>
+    <h1>Bots <a href="#" class="act">+ New bot user</a></h1>
+    <p class="lede"><b>4 bot users.</b> 3 working, 1 without a token. They made 20 changes this week.</p>
+
+    <h2>Bot users <span class="n">4</span></h2>
+    <div class="bot open"><span class="plate">IT</span><div><div class="t">inbox-triage</div><div class="meta"><span class="ok">Working</span><span>Inbox, Website relaunch</span><span>reads, updates, comments, tags</span><span>task webhook set</span></div></div><div class="r">used 2 hours ago</div></div>
+    <div class="bot"><span class="plate">RA</span><div><div class="t">research-agent</div><div class="meta"><span class="ok">Working</span><span>Research</span><span>reads, creates, updates, comments, tags</span></div></div><div class="r">used yesterday</div></div>
+    <div class="bot"><span class="plate">RB</span><div><div class="t">release-bot</div><div class="meta"><span class="ok">Working</span><span>Website relaunch</span><span>reads, creates, updates, deletes, comments</span><span>both webhooks set</span><span class="late">last delivery failed</span></div></div><div class="r">used 10 days ago</div></div>
+    <div class="bot"><span class="plate off">CS</span><div><div class="t">calendar-sync</div><div class="meta"><span class="no">No token</span><span>Home</span><span>reads, creates, updates</span></div></div><div class="r">never used</div></div>
+
+    <div class="sec" style="margin-top:28px"><h4>Deleted <span class="n">1</span></h4>
+      <div class="bot"><span class="plate off">OB</span><div><div class="t" style="color:var(--ink-3)">old-backup</div><div class="meta"><span>deleted 12 Sept</span><span>still named on 3 tasks and in the log</span></div></div><div class="r"></div></div>
+    </div>
+  </main>
+
+  <aside class="panel" aria-label="Bot user">
+    <div class="bar"><span>Bot user · created 24 Sept</span><div class="right"><button class="ib" aria-label="Next"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 2l5 5-5 5"/></svg></button><button class="ib" aria-label="Close"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 2l10 10M12 2L2 12"/></svg></button></div></div>
+    <div class="title"><span class="plate">IT</span><h3>inbox-triage</h3></div>
+
+    <dl class="props">
+      <dt>Token</dt><dd><span class="ok">Working</span><span class="ro">expires 1 Jan 2027</span><a href="#" class="act danger">Revoke</a></dd>
+      <dt>Last used</dt><dd><span class="ro">2 hours ago · today 07:41</span></dd>
+      <dt>Reach</dt><dd><span class="ro">Inbox, Website relaunch · reads, updates, comments, creates tags</span></dd>
+    </dl>
+
+    <div class="sec"><h4>Projects <span class="n">2 of 4</span></h4>
+      <div class="chk">
+        <label><span class="box on"></span>Inbox</label>
+        <label><span class="box on"></span>Website relaunch</label>
+        <label><span class="box"></span>Research</label>
+        <label><span class="box"></span>Home</label>
+      </div>
+      <p style="margin:8px 0 0;font-size:12.5px;color:var(--ink-3)">A bot user reaches only the projects ticked here, and never an archived one.</p>
+    </div>
+
+    <div class="sec"><h4>Permissions</h4>
+      <div class="chk">
+        <label><span class="box on"></span>Read tasks</label>
+        <label><span class="box"></span>Create tasks</label>
+        <label><span class="box on"></span>Update tasks</label>
+        <label><span class="box"></span>Delete tasks</label>
+        <label><span class="box on"></span>Add comments <small>append-only</small></label>
+        <label><span class="box on"></span>Create tags</label>
+        <label class="never"><span class="box"></span>Read tags <small>always</small></label>
+        <label class="never"><span class="box"></span>Rename or delete tags <small>never</small></label>
+      </div>
+    </div>
+
+    <div class="sec"><h4>Webhooks <a href="#" class="act">Regenerate secret</a></h4>
+      <dl class="hook">
+        <dt>Task ready</dt>
+        <dd><div class="url">https://agents.sam.dev/hooks/inbox-triage/ready</div>
+          <div class="last"><span class="ok">Delivered</span><span>today 07:41 · 200 in 0.3 s</span></div>
+          <div class="acts"><a href="#">Send a test</a><a href="#">Change</a><a href="#">Clear</a></div></dd>
+      </dl>
+      <dl class="hook">
+        <dt>Comment</dt>
+        <dd><div class="url empty">Not set · this bot user is not told about comments</div>
+          <div class="acts"><a href="#">Set a URL</a></div></dd>
+      </dl>
+      <p style="margin:8px 0 0;font-size:12.5px;color:var(--ink-3)">Every delivery is signed with this bot user's secret, shown once when it was set on 24 Sept.</p>
+    </div>
+
+    <div class="sec"><h4>On its plate <span class="n">3</span></h4>
+      <div class="task"><span class="mark p2"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="9" cy="9" r="7"/><path d="M9 4.5a4.5 4.5 0 0 1 0 9z" fill="currentColor" stroke="none"/></svg></span><div><div class="t">Migrate the marketing pages</div><div class="meta"><span>Wed</span><span class="proj">Website relaunch</span></div></div></div>
+      <div class="task"><span class="mark"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="9" cy="9" r="7"/></svg></span><div><div class="t">Sort the week's inbox</div><div class="meta"><span>Today</span><span class="proj">Inbox</span></div></div></div>
+      <div class="task"><span class="mark"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="9" cy="9" r="7" stroke-dasharray="2.6 2.4"/></svg></span><div><div class="t">Summarise last week's support threads</div><div class="meta"><span>Backlog</span><span class="proj">Inbox</span></div></div></div>
+      <a href="#" class="more">All its tasks →</a>
+    </div>
+
+    <div class="sec"><h4>Activity <span class="n">12</span></h4>
+      <ul class="tl">
+        <li class="day">Today</li>
+        <li><time>07:41</time><div class="ev">moved <b>Migrate the marketing pages</b> to In progress</div></li>
+        <li><time>07:40</time><div class="ev">commented on <b>Migrate the marketing pages</b></div></li>
+        <li class="day">Yesterday</li>
+        <li><time>18:02</time><div class="ev">changed the tags, priority of <b>Rewrite the pricing copy</b></div></li>
+        <li><time>09:15</time><div class="ev">created the tag <b>copy</b></div></li>
+      </ul>
+      <a href="#" class="more">Everything it did →</a>
+    </div>
+
+    <div class="foot"><a href="#">Delete bot user</a></div>
+  </aside>
+</div>
+</body>
+</html>

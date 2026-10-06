@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Taskly · Activity (slice 4 mock)</title>
+<style>
+  :root { color-scheme: light; --page:#ffffff; --ink:#0b0e11; --ink-2:#3d444d; --ink-3:#656d76; --rule:#e6e8eb; --rule-strong:#c9cdd2; --hover:#f3f4f6; --done:#1a7f37; --late:#cf222e;
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", "Noto Sans", Arial, sans-serif; --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--page); color:var(--ink); font-family:var(--font); font-size:15px; line-height:1.45; -webkit-font-smoothing:antialiased; }
+  a { color:inherit; text-decoration:none; } a:hover { text-decoration:underline; text-underline-offset:3px; }
+  .app { display:grid; grid-template-columns:200px minmax(0,1fr); min-height:100vh; }
+  .nav { padding:28px 20px 28px 28px; display:flex; flex-direction:column; gap:26px; position:sticky; top:0; height:100vh; }
+  .wordmark { font-weight:600; letter-spacing:-.01em; }
+  .nav ul { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:2px; }
+  .nav li a { display:flex; justify-content:space-between; align-items:center; height:30px; padding:0 8px; margin:0 -8px; border-radius:6px; color:var(--ink-2); }
+  .nav li a[aria-current] { color:var(--ink); font-weight:600; }
+  .nav li a .n { font-family:var(--mono); font-size:12px; color:var(--ink-3); }
+  .nav .foot { margin-top:auto; display:flex; align-items:center; gap:8px; font-size:13px; color:var(--ink-2); }
+  .nav .foot .av { width:20px; height:20px; border-radius:50%; background:var(--ink); color:var(--page); font-size:11px; font-weight:600; display:grid; place-items:center; }
+  main { padding:36px 48px 96px; max-width:900px; min-width:0; }
+  h1 { margin:0 0 4px; font-size:22px; font-weight:600; letter-spacing:-.015em; line-height:1.2; }
+  .lede { margin:0 0 20px; color:var(--ink-3); } .lede b { color:var(--ink); font-weight:500; }
+  .filters { display:flex; align-items:center; gap:4px 12px; flex-wrap:wrap; font-size:13.5px; color:var(--ink-3); padding:0 0 10px; border-bottom:1px solid var(--rule-strong); margin-left:-6px; }
+  .f { display:inline-flex; align-items:center; gap:5px; height:28px; padding:0 6px; border-radius:6px; white-space:nowrap; } .f:hover { background:var(--hover); color:var(--ink); } .f.set { color:var(--ink); font-weight:500; }
+  .f .ch { width:10px; height:10px; opacity:.7; } .f .x { color:var(--ink-3); margin-left:2px; }
+  .filters .right { margin-left:auto; display:flex; gap:12px; }
+  .day { font-size:13px; font-weight:600; padding:22px 0 6px; border-bottom:1px solid var(--rule-strong); display:flex; gap:8px; align-items:baseline; }
+  .day .n { font-family:var(--mono); font-weight:400; font-size:12px; color:var(--ink-3); }
+  .log { list-style:none; margin:0; padding:0; }
+  .log li { display:grid; grid-template-columns:52px 136px minmax(0,1fr) auto; gap:12px; padding:9px 0; border-bottom:1px solid var(--rule); align-items:baseline; }
+  .log time { font-family:var(--mono); font-size:12px; color:var(--ink-3); font-variant-numeric:tabular-nums; }
+  .log .who { font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; } .log .who.you { color:var(--ink-3); font-weight:400; }
+  .log .what b { font-weight:500; } .log li.you .what { color:var(--ink-3); }
+  .log .what .arrow { color:var(--ink-3); }
+  .log .r { font-size:13px; color:var(--ink-3); } .log .r a { color:var(--ink); text-decoration:underline; text-underline-offset:3px; }
+  .log .what .gone { color:var(--ink-3); text-decoration:line-through; }
+  .pager { display:flex; align-items:center; gap:18px; padding-top:14px; font-size:13px; color:var(--ink-3); } .pager .right { margin-left:auto; display:flex; gap:14px; }
+  @media (max-width: 760px) {
+    .app { grid-template-columns:1fr; } .nav { display:none; } main { padding:20px 16px 96px; }
+    .log li { grid-template-columns:44px minmax(0,1fr); } .log .what { grid-column:2; } .log .r { grid-column:2; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <nav class="nav" aria-label="Main">
+    <div class="wordmark">Taskly</div>
+    <ul><li><a href="#">Today</a></li><li><a href="#">Tasks <span class="n">23</span></a></li><li><a href="#">Projects <span class="n">4</span></a></li><li><a href="#">Tags</a></li><li><a href="#">Bots <span class="n">4</span></a></li><li><a href="#" aria-current="page">Activity</a></li><li><a href="#">Archive</a></li></ul>
+    <div class="foot"><span class="av">S</span> Sam</div>
+  </nav>
+
+  <main>
+    <h1>Activity</h1>
+    <p class="lede"><b>Every change in your account</b>, newest first. 29 entries, 20 of them by your bot users.</p>
+
+    <div class="filters">
+      <a href="#" class="f">Anything that happened <svg class="ch" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 3.5l3 3 3-3"/></svg></a>
+      <a href="#" class="f">By anyone <svg class="ch" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 3.5l3 3 3-3"/></svg></a>
+      <div class="right"><a href="#" class="f">Newest first <svg class="ch" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 3.5l3 3 3-3"/></svg></a></div>
+    </div>
+
+    <div class="day">Today <span class="n">5</span></div>
+    <ul class="log">
+      <li><time>07:41</time><span class="who">inbox-triage</span><span class="what">moved <b>Migrate the marketing pages</b> <span class="arrow">→</span> In progress</span><span class="r"></span></li>
+      <li><time>07:40</time><span class="who">inbox-triage</span><span class="what">commented on <b>Migrate the marketing pages</b></span><span class="r"></span></li>
+      <li><time>06:12</time><span class="who">release-bot</span><span class="what">deleted <b class="gone">Old staging banner</b></span><span class="r"><a href="#">Restore</a></span></li>
+      <li class="you"><time>00:18</time><span class="who you">You</span><span class="what">completed <b>Summarise the three trackers</b></span><span class="r"></span></li>
+      <li class="you"><time>00:05</time><span class="who you">You</span><span class="what">created <b>Order milk</b> in Inbox</span><span class="r"></span></li>
+    </ul>
+
+    <div class="day">Yesterday <span class="n">9</span></div>
+    <ul class="log">
+      <li><time>18:02</time><span class="who">inbox-triage</span><span class="what">changed the tags, priority of <b>Rewrite the pricing copy</b></span><span class="r"></span></li>
+      <li><time>14:33</time><span class="who">calendar-sync</span><span class="what">moved <b>Dentist, Thursday 09:00</b> <span class="arrow">→</span> Waiting</span><span class="r"></span></li>
+      <li><time>13:46</time><span class="who">research-agent</span><span class="what">put <b>Summarise the three trackers</b> in Review and handed it to you</span><span class="r"></span></li>
+      <li><time>12:41</time><span class="who">release-bot</span><span class="what">completed <b>Cut release 1.4.0</b></span><span class="r"></span></li>
+      <li class="you"><time>11:54</time><span class="who you">You</span><span class="what">deleted the project <b class="gone">Garage sale</b> with 4 tasks</span><span class="r"><a href="#">Restore</a></span></li>
+      <li><time>09:15</time><span class="who">inbox-triage</span><span class="what">created the tag <b>copy</b></span><span class="r"></span></li>
+      <li class="you"><time>08:28</time><span class="who you">You</span><span class="what">renamed the tag <b>urgent</b> to <b>blocked</b></span><span class="r"></span></li>
+    </ul>
+
+    <div class="day">24 Sept <span class="n">15</span></div>
+    <ul class="log">
+      <li class="you"><time>16:54</time><span class="who you">You</span><span class="what">commented on <b>Renew the domain</b></span><span class="r"></span></li>
+      <li><time>16:07</time><span class="who">inbox-triage</span><span class="what">moved <b>Migrate the marketing pages</b> <span class="arrow">→</span> In progress</span><span class="r"></span></li>
+      <li class="you"><time>15:20</time><span class="who you">You</span><span class="what">completed 6 tasks in Website relaunch</span><span class="r"></span></li>
+    </ul>
+
+    <div class="pager"><span>29 entries · page 1 of 2</span><div class="right"><a href="#">Older →</a></div></div>
+  </main>
+</div>
+</body>
+</html>
