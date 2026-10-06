@@ -6,6 +6,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Annotated
 
+import httpx
 import jwt
 from fastapi import Depends, Header, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -14,7 +15,7 @@ from pydantic import ValidationError
 from sqlalchemy import or_, update
 from sqlmodel import Session, col, select
 
-from app import activity
+from app import activity, webhooks
 from app.core import security
 from app.core.config import settings
 from app.core.db import engine
@@ -218,3 +219,16 @@ def get_attachment_storage() -> AttachmentStorage:
 
 
 AttachmentStorageDep = Annotated[AttachmentStorage, Depends(get_attachment_storage)]
+
+
+@lru_cache
+def _webhook_client() -> httpx.Client:
+    return webhooks.make_client()
+
+
+def get_webhook_client() -> httpx.Client:
+    """What the test endpoint sends with; tests swap it for a mock transport."""
+    return _webhook_client()
+
+
+WebhookClientDep = Annotated[httpx.Client, Depends(get_webhook_client)]

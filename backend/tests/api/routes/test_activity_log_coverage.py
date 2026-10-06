@@ -84,6 +84,19 @@ NOT_LOGGED = {
     f"DELETE {API}/bot-users/{{bot_user_id}}/token": (
         "Revoking a token is a credential, not a change to tasks or projects"
     ),
+    f"PUT {API}/bot-users/{{bot_user_id}}/webhooks/{{kind}}": (
+        "A webhook is configuration of a bot user, like its scope; deliveries "
+        "are not logged either (FR-11.14)"
+    ),
+    f"DELETE {API}/bot-users/{{bot_user_id}}/webhooks/{{kind}}": (
+        "A webhook is configuration of a bot user, like its scope (FR-11.14)"
+    ),
+    f"POST {API}/bot-users/{{bot_user_id}}/webhook-secret": (
+        "The webhook secret is a credential, like the token"
+    ),
+    f"POST {API}/bot-users/{{bot_user_id}}/webhooks/{{kind}}/test": (
+        "Sends a test event; deliveries are not logged (FR-11.14)"
+    ),
     f"POST {API}/utils/test-email/": "Sends an email; changes nothing",
     f"POST {API}/private/users/": "Local development helper for test accounts",
     f"POST {API}/private/recovery-code": "Local development helper for test accounts",

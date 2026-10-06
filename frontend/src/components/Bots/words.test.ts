@@ -25,6 +25,7 @@ const bot = (patch: Partial<BotUserPublic> = {}): BotUserPublic => ({
   name: "inbox-triage",
   scope: { project_ids: [], permissions: NONE },
   has_token: true,
+  webhooks: { task: {}, comment: {}, has_secret: false },
   ...patch,
 })
 

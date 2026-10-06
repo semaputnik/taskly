@@ -36,6 +36,7 @@ x-taskly: &taskly
     DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:?Variable not set}@db:5432/app
     SENTRY_DSN: ${SENTRY_DSN:-}
     ATTACHMENTS_DIR: /data/attachments
+    OUTBOUND_ALLOW_PRIVATE_ADDRESSES: ${OUTBOUND_ALLOW_PRIVATE_ADDRESSES:-false}
     FRONTEND_HOST: https://${DOMAIN:?Variable not set}
   volumes:
     - attachments-data:/data/attachments
