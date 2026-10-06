@@ -29,6 +29,9 @@ Method: finish review (read-only reviewer over source, the surface brief, the ap
 
 **Total: 29/40** (slice 2: 30/40 on a different surface; slice 1: 27/40). Verdict: ships. Faithful to the approved mocks, no P0 or P1 left.
 
+## Verification
+Touched specs (task-list, task-line-assignee, capture-search, phone) and the design-system (contrast, both themes), product-voice, my-work, compact-rows, day-page and notices specs ran green at --workers=1 on an isolated stack; the full suite was too slow locally and is left to CI.
+
 ## Fixed after the finish review (before scoring)
 - [P1] A failed task fetch rendered as "No tasks yet": the page now shows an alert, "The tasks could not be loaded", with Try again; covered by a spec.
 - [P2] The capture-match footer clipped the destination project on a phone: it wraps, and only the typed title is clamped.
@@ -41,6 +44,8 @@ Method: finish review (read-only reviewer over source, the surface brief, the ap
 - [P3] DESIGN.md still described the floating Add button and the navigation entry: rewritten from the shipped code.
 
 ## Priority issues (open)
+Deferred with reasons to semaputnik/taskly#182 (phone capture elsewhere) and #183 (the rest); each needs a product choice the brief does not settle.
+
 - [P2] The capture line exists only on Today and Tasks. On Projects, Tags, Bots, Activity and Archive a phone has no way to add a task (the `c` key needs a keyboard). Needs a product decision: mount the line in the layout, or link to Tasks.
 - [P2] The approved mock prints status words ("Backlog", "blocked") in the meta line; the build has the glyph and its accessible name only. Needs a decision: ship as is, or add a word for Backlog and Waiting.
 - [P3] "Newest first" (nested) and "Filed, newest first" (flat) differ only by nesting and nothing says so.
