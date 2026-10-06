@@ -551,6 +551,12 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
 - **FR-10.10** The log reads newest first, and can be turned to oldest
   first; the order lives in the URL beside the narrowings and the page, and
   the REST API's log accepts it.
+- **FR-10.11** The log can be narrowed to one project's chronology: entries
+  about the project itself, about a task in it, about a comment or file on
+  such a task, and the deletion or restore of one of its tasks. The narrowing
+  lives in the URL beside the others, the REST API's log accepts it
+  (`project_id`), it combines with them, and it never widens the log past the
+  reader's own entries (FR-10.7).
 
 ### F-11. Webhooks
 

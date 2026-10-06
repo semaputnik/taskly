@@ -3,12 +3,13 @@ import { useState } from "react"
 
 import { type TagPublic, TagsService } from "@/client"
 import { ListHeading } from "@/components/Common/ListHeading"
+import { nameList } from "@/components/Common/words"
 import { textLink } from "@/components/Dashboard/shared"
 import { useReportChange } from "@/lib/serverState"
 import { toastError } from "@/lib/toasts"
 import { cn } from "@/lib/utils"
 import { MergeTags } from "./MergeTags"
-import { groupCounts, nameList, suggestedSurvivor } from "./words"
+import { groupCounts, suggestedSurvivor } from "./words"
 
 const act = cn(
   textLink,

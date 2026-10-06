@@ -20,7 +20,6 @@
   --radius-xl: calc(var(--radius) + 4px);
   /* The Changelog palette, by its own names. */
   --color-page: var(--page);
-  --color-raised: var(--raised);
   --color-ink: var(--ink);
   --color-ink-2: var(--ink-2);
   --color-ink-3: var(--ink-3);
@@ -43,7 +42,6 @@
   --color-scrim: var(--scrim);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
-  --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);

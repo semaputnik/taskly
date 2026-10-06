@@ -1,4 +1,5 @@
 import type { TagPublic } from "@/client"
+import { archivedProjects } from "@/components/Common/words"
 
 /** How many tasks something reaches, live and archived apart. */
 export type TaskCounts = Pick<TagPublic, "task_count" | "archived_task_count">
@@ -27,7 +28,7 @@ export function taskReach(counts: TaskCounts): [string, string | null] {
   const archived = counts.archived_task_count ?? 0
   const total = totalTasks(counts)
   if (archived === 0) return [taskCountLabel(total), null]
-  const where = archived === 1 ? "an archived project" : "archived projects"
+  const where = archivedProjects(archived)
   if (total === 1) return ["1 task", `in ${where}`]
   return [
     taskCountLabel(total),

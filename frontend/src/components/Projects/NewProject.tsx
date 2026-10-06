@@ -35,24 +35,34 @@ export function NewProject() {
   const [announcement, setAnnouncement] = useState("")
 
   const mutation = useMutation({
-    mutationFn: () =>
-      ProjectsService.createProject({
-        body: {
-          name: name.trim(),
-          description: description.trim() || null,
-        },
-      }),
+    // What was typed rides with the call: text typed an instant before Enter
+    // must be what is sent, not what an earlier render of this hook closed
+    // over.
+    mutationFn: (typed: { name: string; description: string | null }) =>
+      ProjectsService.createProject({ body: typed }),
     onSuccess: ({ data }) => {
       setAnnouncement("Project created")
       panels.openProject(data.id)
     },
-    onError: (error) => toastError(error),
+    onError: (error) => {
+      setSending(false)
+      toastError(error)
+    },
     onSettled: () => reportChange({ type: "project created" }),
   })
 
+  // The request is out from the moment it is made until it is answered. The
+  // mutation's own pending state also covers the refresh that follows, which
+  // would swallow a retry typed straight after a refusal.
+  const [sending, setSending] = useState(false)
   const ready = name.trim() !== ""
   const create = () => {
-    if (ready && !mutation.isPending) mutation.mutate()
+    if (!ready || sending) return
+    setSending(true)
+    mutation.mutate({
+      name: name.trim(),
+      description: description.trim() || null,
+    })
   }
 
   return (
@@ -103,7 +113,7 @@ export function NewProject() {
         </span>
         <LoadingButton
           disabled={!ready}
-          loading={mutation.isPending}
+          loading={sending}
           onClick={create}
           className="pointer-coarse:h-11"
         >

@@ -7,6 +7,8 @@ import {
   AuthLinks,
   AuthScreen,
   authAction,
+  FieldLine,
+  fieldInput,
   PasskeysUnsupported,
 } from "@/components/Auth/AuthScreen"
 import { LoadingButton } from "@/components/ui/loading-button"
@@ -41,7 +43,7 @@ function Login() {
   return (
     <AuthScreen
       heading="Sign in"
-      lede="Your browser will offer the passkeys it holds for this installation. Nothing to type."
+      lede="Your browser will offer the passkeys it holds for this installation, in the email field or by the button."
     >
       {supported ? <PasskeySignIn /> : <PasskeysUnsupported />}
       <AuthLinks>
@@ -82,19 +84,22 @@ function PasskeySignIn() {
 
   return (
     <form onSubmit={signIn}>
-      {/* The browser's passkey suggestions attach to an email field, and the
-          screen asks for nothing typed: the field is the autofill ceremony's
-          anchor and is left out of sight and out of the tab order. */}
-      <input
-        data-testid="email-input"
-        name="email"
-        type="email"
-        // "webauthn" puts the passkeys among the field's suggestions.
-        autoComplete="username webauthn"
-        tabIndex={-1}
-        aria-hidden="true"
-        className="sr-only"
-      />
+      {/* The browser's passkey suggestions attach to an email field (FR-12.3).
+          Nothing typed here is read: the ceremony finds the account from the
+          passkey, so the field is where the suggestions are offered and the
+          button below is the same sign-in asked for by hand. */}
+      <FieldLine label="Email" htmlFor="email">
+        <input
+          id="email"
+          data-testid="email-input"
+          name="email"
+          type="email"
+          // "webauthn" puts the passkeys among the field's suggestions.
+          autoComplete="username webauthn"
+          placeholder="Pick a passkey here"
+          className={fieldInput}
+        />
+      </FieldLine>
       <LoadingButton
         type="submit"
         className={authAction}

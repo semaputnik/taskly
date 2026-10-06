@@ -1,11 +1,12 @@
 import { describe, expect, test } from "bun:test"
 
+import { nameList } from "@/components/Common/words"
+
 import {
   counts,
   createdBy,
   deletionReach,
   groupCounts,
-  nameList,
   suggestedSurvivor,
   tasksInWords,
 } from "./words"

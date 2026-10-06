@@ -92,7 +92,9 @@ test("Signing in as someone else in the same tab shows none of the first account
   await page.waitForURL("/")
 
   await goVia(page, "Projects")
-  await expect(page.getByRole("heading", { name: "Projects" })).toBeVisible()
+  await expect(
+    page.getByRole("heading", { name: "Projects", exact: true }),
+  ).toBeVisible()
   await expect(
     page.getByRole("main").getByRole("link", { name: "Inbox", exact: true }),
   ).toBeVisible()

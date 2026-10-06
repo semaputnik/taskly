@@ -1,4 +1,5 @@
 import type { TagPublic } from "@/client"
+import { archivedProjects, nameList, plural } from "@/components/Common/words"
 import { allTasks, totalTasks } from "./counts"
 
 /**
@@ -6,15 +7,6 @@ import { allTasks, totalTasks } from "./counts"
  * a tag, a look-alike group's line and what deleting costs. Plain functions,
  * so the wording can be read and tested apart from the page.
  */
-
-const plural = (count: number, one: string, many = `${one}s`) =>
-  `${count} ${count === 1 ? one : many}`
-
-/** "urgent", "urgent and Urgent", "a, b and c". */
-export function nameList(names: string[]): string {
-  if (names.length < 2) return names.join("")
-  return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`
-}
 
 /**
  * The sentence under the heading. `lead` is set in ink, `rest` in grey.
@@ -65,9 +57,7 @@ export function tasksInWords(
   const parts = [`${tag.task_count ?? 0} open`]
   const archived = tag.archived_task_count ?? 0
   if (archived > 0) {
-    parts.push(
-      `${archived} in ${archived === 1 ? "an archived project" : "archived projects"}`,
-    )
+    parts.push(`${archived} in ${archivedProjects(archived)}`)
   }
   return parts.join(" · ")
 }

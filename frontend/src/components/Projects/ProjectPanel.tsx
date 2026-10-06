@@ -6,7 +6,7 @@ import {
   ProjectsService,
   type ProjectUpdate,
 } from "@/client"
-import { textLink } from "@/components/Dashboard/shared"
+import { act } from "@/components/Common/RecordWork"
 import { useRecordPanel } from "@/components/Records/panels"
 import {
   DescriptionSection,
@@ -27,12 +27,6 @@ import DeleteProject from "./DeleteProject"
 import { NewProject } from "./NewProject"
 import { KeptTasks, OpenTasks, ProjectActivity } from "./ProjectWork"
 import { botsIn, tasksInWords } from "./words"
-
-/** A property's action, in words, as the mock sets it: ink, 13.5px, medium. */
-const act = cn(
-  textLink,
-  "text-ink text-[13.5px] font-medium disabled:opacity-50 pointer-coarse:-my-3 pointer-coarse:py-3",
-)
 
 /**
  * A project as one document: what it holds and who works in it, whether it is
