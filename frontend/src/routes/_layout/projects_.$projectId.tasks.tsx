@@ -69,7 +69,10 @@ function KeptTasks() {
       <p className="mb-3 text-[13px]">
         <RouterLink
           to="/projects"
-          className={cn(textLink, "text-ink-3 hover:text-ink")}
+          className={cn(
+            textLink,
+            "text-ink-3 hover:text-ink pointer-coarse:-my-3 pointer-coarse:py-3",
+          )}
         >
           <span aria-hidden>← </span>Projects
         </RouterLink>

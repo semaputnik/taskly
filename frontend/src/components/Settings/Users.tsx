@@ -1,5 +1,9 @@
-import { useSuspenseQuery } from "@tanstack/react-query"
+import {
+  QueryErrorResetBoundary,
+  useSuspenseQuery,
+} from "@tanstack/react-query"
 import { Suspense } from "react"
+import { ErrorBoundary } from "react-error-boundary"
 
 import type { UserListed } from "@/client"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -8,7 +12,7 @@ import { formatDayOf } from "@/lib/dates"
 import { usersQuery } from "@/lib/serverState"
 import { cn } from "@/lib/utils"
 import { IssueRecoveryCode } from "./IssueRecoveryCode"
-import { Note, SettingsSection } from "./Section"
+import { act, Note, SettingsSection } from "./Section"
 
 /**
  * Every account on this installation, for the superuser only (FR-09.2): who,
@@ -21,9 +25,33 @@ export function Users() {
   if (!user?.is_superuser) return null
 
   return (
-    <Suspense fallback={<UsersPending />}>
-      <UserLines currentId={user.id} />
-    </Suspense>
+    // A list that does not answer costs this section only, said in a
+    // sentence under its heading; the rest of the document stands.
+    <QueryErrorResetBoundary>
+      {({ reset }) => (
+        <ErrorBoundary
+          onReset={reset}
+          fallbackRender={({ resetErrorBoundary }) => (
+            <SettingsSection id="users" title="Users">
+              <p role="alert" className="text-ink-2 text-sm">
+                The users could not be loaded.{" "}
+                <button
+                  type="button"
+                  onClick={resetErrorBoundary}
+                  className={act}
+                >
+                  Try again
+                </button>
+              </p>
+            </SettingsSection>
+          )}
+        >
+          <Suspense fallback={<UsersPending />}>
+            <UserLines currentId={user.id} />
+          </Suspense>
+        </ErrorBoundary>
+      )}
+    </QueryErrorResetBoundary>
   )
 }
 

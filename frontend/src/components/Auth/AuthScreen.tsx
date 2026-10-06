@@ -26,7 +26,9 @@ export function AuthScreen({
   return (
     <main className="bg-page text-ink mx-auto flex min-h-svh w-full max-w-[420px] flex-col px-4 pt-8 pb-6 sm:px-0 sm:pt-10 sm:pb-8">
       <Wordmark asLink={false} />
-      <div className="flex flex-1 flex-col justify-center gap-3 py-10">
+      {/* The heading stands at one offset on every screen, so moving between
+          sign in, sign up and recovery does not move it. */}
+      <div className="flex flex-1 flex-col gap-3 pt-[clamp(40px,16vh,140px)] pb-10">
         <h1 className="text-[26px] leading-tight font-semibold tracking-[-0.02em]">
           {heading}
         </h1>

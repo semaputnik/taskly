@@ -92,6 +92,12 @@ typography:
     fontFamily: "-apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, \"Helvetica Neue\", \"Noto Sans\", Arial, sans-serif"
     fontSize: "11px"
     fontWeight: 500
+  auth-heading:
+    fontFamily: "-apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, \"Helvetica Neue\", \"Noto Sans\", Arial, sans-serif"
+    fontSize: "26px"
+    fontWeight: 600
+    lineHeight: 1.25
+    letterSpacing: "-0.02em"
 rounded:
   mark: "2px"
   sm: "4px"
@@ -116,6 +122,9 @@ spacing:
   property-label: "96px"
   notice-max: "420px"
   page-column: "820px"
+  auth-column: "420px"
+  auth-offset: "clamp(40px, 16vh, 140px)"
+  settings-section: "22px"
 components:
   nav-item:
     textColor: "{colors.ink-2}"
@@ -352,6 +361,73 @@ components:
   webhook-url:
     textColor: "{colors.ink}"
     typography: "{typography.mono}"
+  project-line:
+    textColor: "{colors.ink}"
+    typography: "{typography.title}"
+    padding: "10px 0"
+  project-line-archived:
+    textColor: "{colors.ink-3}"
+    typography: "{typography.title}"
+    padding: "10px 0"
+  count-link:
+    textColor: "{colors.ink}"
+    rounded: "{rounded.md}"
+    padding: "4px 8px"
+  look-alike-line:
+    textColor: "{colors.ink}"
+    typography: "{typography.body}"
+    padding: "10px 0"
+  list-heading:
+    textColor: "{colors.ink}"
+    typography: "{typography.section-heading}"
+    padding: "0 0 8px"
+  settings-section:
+    textColor: "{colors.ink}"
+    padding: "22px 0 6px"
+  line-input:
+    textColor: "{colors.ink}"
+    height: "30px"
+    padding: "0"
+  edit-action:
+    textColor: "{colors.ink}"
+    typography: "{typography.record-line}"
+    height: "30px"
+  edit-action-quiet:
+    textColor: "{colors.ink-3}"
+  passkey-line:
+    textColor: "{colors.ink}"
+    typography: "{typography.body}"
+    padding: "6px 0"
+    height: "38px"
+  user-initial:
+    backgroundColor: "{colors.rule-strong}"
+    textColor: "{colors.ink-2}"
+    rounded: "{rounded.full}"
+    size: "26px"
+  user-initial-you:
+    backgroundColor: "{colors.ink}"
+    textColor: "{colors.page}"
+  auth-column:
+    backgroundColor: "{colors.page}"
+    textColor: "{colors.ink}"
+    width: "{spacing.auth-column}"
+  auth-heading:
+    textColor: "{colors.ink}"
+    typography: "{typography.auth-heading}"
+  auth-lede:
+    textColor: "{colors.ink-3}"
+    typography: "{typography.body}"
+  field-line:
+    textColor: "{colors.ink}"
+    height: "44px"
+  auth-action:
+    backgroundColor: "{colors.ink}"
+    textColor: "{colors.page}"
+    rounded: "{rounded.lg}"
+    height: "44px"
+  auth-foot:
+    textColor: "{colors.ink-3}"
+    typography: "{typography.meta}"
 ---
 
 # Design System: Taskly
@@ -366,7 +442,7 @@ The world is near-monochrome by conviction. Ink and two greys do the reading; tw
 
 The brand is the wordmark "Taskly", set in the interface's own face. The craft bar is Linear. The category's card grids, chip-filled sidebars and coloured location accents were looked at and rejected: Mission Console and Card Box were turned down after mocks for carrying too many frames and too much chrome.
 
-**Transition note.** Redesign slice 1 shipped the shell (navigation, top bar), the day page, the task line and the status marks. Slice 2 shipped the record column the shell holds for every record, the task panel and its capture draft, the capture line's create-at-once behaviour, and the notices at the top. Slice 3 shipped the task list (the Tasks page: its filter row, order menu, pager and empty states), the capture line's match search and the assignee on the task line. Slice 4 shipped the Bots page and the bot user's column (its token, scope, webhooks, the one-time secret reveal, its work and its log), the Activity page as day groups of lines, the phone navigation (a tab bar of five, an account menu in the top bar, and a capture sheet raised by the add control, which replaced the capture line pinned to the bottom), and the filter row as one shared piece used by the Tasks and Activity pages. The Projects, Tags, Archive and Admin screens, settings and the auth screens are not yet redesigned: they still use the stock component kit (`DataTable` remains only on the archive, Projects, Tags and Admin; the Bots and Activity tables are gone), and read as the same world only because its semantic colour names (background, foreground, primary, muted, accent, border, input, ring, destructive) are mapped onto this palette. Their framed inputs, outline buttons with a faint shadow, pill badges and table chrome are inherited, not designed, and are not precedent for new surfaces. The same is true of a few pieces inside the redesigned screens: the dialogs (the webhook confirmations, the secret reveal, Restore's confirmation), the webhook URL field and its ghost buttons, and the Create and issue token button are the inherited kit set on this palette.
+**Transition note.** The redesign is complete: slice 1 shipped the shell (navigation, top bar), the day page, the task line and the status marks; slice 2 the record column and the task panel with its capture draft, the create-at-once capture line and the notices; slice 3 the Tasks page, the capture line's match search and the assignee on the task line; slice 4 the Bots page and the bot user's column, the Activity page, the phone navigation and the shared filter row; slice 5 the Projects page and the project column (the Archive is a section of it, FR-05.14, and `/archive` redirects to `/projects`), the Tags page and the tag column, Settings as one document (the Users list is a section of it for the superuser, and `/admin` redirects to `/settings#users`), and the sign-in, sign-up and recovery screens. Archive and Admin are not screens. Every page is a column held to the one 820px page-column utility, and no table remains (`DataTable` is gone from the source). The old world is gone: the shadcn names in `src/index.css` (background, foreground, card, popover, primary, secondary, accent, destructive, border, input, ring and the rest) survive only as the mapping the kit reads, set onto this palette; `--color-raised` and `--color-muted` are no longer mapped. **A known, honest gap:** the dialogs (the webhook confirmations, the secret reveal, Restore's confirmation, the merge, delete and disconnect confirmations), the menus, selects and popovers, the date field and the webhook URL field, the Create buttons in the project and tag drafts and the outline Cancel and filled destructive buttons in dialogs are still the inherited shadcn kit, mapped onto the palette: framed inputs, outline buttons with a faint shadow and the kit's own proportions. They read as this world through the palette alone, they are not designed to it, and they are not precedent for new surfaces.
 
 **Key Characteristics:**
 - One page, one ground: sections are groups under a hairline heading, never framed containers.
@@ -389,7 +465,7 @@ A white page with near-black ink, two greys and two hairlines, and four action c
 
 ### Secondary
 - **Overdue Red** (`late`, `late-dark`): the Overdue band's heading, a missed due day in the meta line (set a weight up), a P1 status mark, the flag and label of a P1 Priority row, an error notice's icon, a bot user's expired token, its "last delivery failed" and a failed webhook delivery, a webhook field's refusal, and destructive fills. P1 shares it on purpose: urgent and late both ask for action now.
-- **Done Green** (`done`, `done-dark`): the filled Done check and the "Close it" action on a Review hand-off. A success notice's icon. The palette's only green.
+- **Done Green** (`done`, `done-dark`): the filled Done check and the "Close it" action on a Review hand-off. A success notice's icon. The palette's only green. The build also sets it on a working token's dot and word, on "Connected" in the Paperless line and on a passing connection test (see Components); those uses sit outside The Action-Only Colour Rule and are not precedent.
 
 ### Tertiary
 - **Priority Amber** (`priority-p2`, `priority-p2-dark`): a P2 status mark and the flag and label of a P2 Priority row, and nothing else.
@@ -433,7 +509,8 @@ A white page with near-black ink, two greys and two hairlines, and four action c
 - **Mono** (400, 12px, tabular figures): counts in the navigation and headings, times in the log and in a record's activity, the "3 of 12" in the column bar; a webhook's URL (12.5px) and a secret or token in its reveal (12px, 16px on a phone).
 - **Key cap** (400, 11px mono, 16px line): the outlined `C`, and the outlined `⌘ Enter` or `Ctrl Enter` under a comment.
 - **Tab label** (500, 11px, 600 for the current tab): the word under each icon in a phone's tab bar.
-- **Wordmark** (600, 15px, -0.01em): "Taskly" at the head of the navigation and in the phone top bar; 36px on the auth screens.
+- **Wordmark** (600, 15px, -0.01em): "Taskly" at the head of the navigation, in the phone top bar and at the top of every sign-in screen.
+- **Auth heading** (600, 26px, line-height 1.25, -0.02em): the one heading of a sign-in, sign-up or recovery screen ("Sign in", "Create an account", "Recover your account"). It is used on no other screen; every other page heading is the 22px Record title step.
 
 ### Named Rules
 
@@ -445,7 +522,7 @@ A white page with near-black ink, two greys and two hairlines, and four action c
 
 The shell is a two-column grid at `md` (768px) and up: a 200px navigation column, sticky to the viewport height, then the work. **No rule divides the navigation from the work; whitespace does.** The navigation column is padded 28px top and left and 20px right; within it, the wordmark, the screen list and the account row are spaced 26px apart, and the account row is pushed to the foot. Navigation items are 30px tall, 2px apart.
 
-The main area is padded 48px left and right and 36px on top at desk width; Today, Tasks, Bots and Activity are each a single column held to one measure, 820px (`page-column`, one shared utility, so the four cannot drift apart). **While no record is open the column is centred in the main area**, with equal space at its left and right and no stretch; where the main area is narrower than 820px it simply fills it. When a record opens (from 1200px, where the record column is a third track) the main area narrows by the column's 560px and the column moves to the left edge of what is left, beside the record. The move is one 260ms ease-out motion (exponential), the third track growing while the page's offset runs from centre to nothing, and it is instant under reduced motion; closing the record reverses it. Walking with ↓ and ↑ opens no record and moves nothing. Below 1200px the record is the whole screen, so the centring applies to the page alone; below `md` the column is the full width between the 16px gutters. The day page's rhythm: the capture line, then 36px; the day heading, 6px; the lede, 32px; then bands, each followed by 36px. Inside My work, status groups sit 22px apart, and their labels and "more" links are indented 30px so they align with the task title past its 18px mark and 12px gap. A task line is 10px top and bottom with a 4px gap to its meta line. A log line on the day page is 8px top and bottom on a grid of an 8ch time column, a 128px actor column and the sentence; on a phone the sentence drops under the time and actor.
+The main area is padded 48px left and right and 36px on top at desk width; every page (Today, Tasks, Bots, Activity, Projects, a project's kept tasks, Tags and Settings) is a single column held to one measure, 820px (`page-column`, one shared utility, so no page can drift in width or position). **While no record is open the column is centred in the main area**, with equal space at its left and right and no stretch; where the main area is narrower than 820px it simply fills it. When a record opens (from 1200px, where the record column is a third track) the main area narrows by the column's 560px and the column moves to the left edge of what is left, beside the record. The move is one 260ms ease-out motion (exponential), the third track growing while the page's offset runs from centre to nothing, and it is instant under reduced motion; closing the record reverses it. Walking with ↓ and ↑ opens no record and moves nothing. Below 1200px the record is the whole screen, so the centring applies to the page alone; below `md` the column is the full width between the 16px gutters. The day page's rhythm: the capture line, then 36px; the day heading, 6px; the lede, 32px; then bands, each followed by 36px. Inside My work, status groups sit 22px apart, and their labels and "more" links are indented 30px so they align with the task title past its 18px mark and 12px gap. A task line is 10px top and bottom with a 4px gap to its meta line. A log line on the day page is 8px top and bottom on a grid of an 8ch time column, a 128px actor column and the sentence; on a phone the sentence drops under the time and actor.
 
 Below `md` the navigation becomes two bars. A 44px sticky top bar (the page ground over a Rule hairline) holds the wordmark and, at the right, the account control. A 56px tab bar is fixed to the foot of the screen, with the home-indicator inset below it (see Navigation). The main area is padded 16px at the sides and 20px on top, with 80px clear at the foot, plus the inset (96px from `md` up), so the last line can always be scrolled out from under the tab bar.
 
@@ -454,6 +531,12 @@ Below `md` the navigation becomes two bars. A 44px sticky top bar (the page grou
 **The Activity page.** One column held to the page measure (820px, centred while no record is open): the "Activity" heading (22px/600, -0.015em, 4px beneath), the counts sentence (20px beneath), the filter row, the day groups, then the pager line 14px under the last line, 18px between its count and its buttons. A day group opens 22px above its heading, which sits 6px over its Rule Strong hairline; a line is 9px top and bottom.
 
 **The Bots page.** One column held to the same 820px: the "Bots" heading (22px/600) with "+ New bot user" at the right of the same line, baseline-aligned (the heading row sits 4px above what follows), the counts sentence (24px beneath), then the "Bot users" group and, 28px below it, the "Deleted" group, each a heading with a mono count over a Rule Strong hairline and then lines. A bot line is 10px top and bottom on a grid of a 26px plate, the text and the last-use column, 12px apart.
+
+**The Projects and Tags pages.** One column on the page measure: the heading (22px/600, -0.015em) with "+ New project" or "+ New tag" at its right on the same baseline (4px above what follows), the counts sentence (24px beneath), then groups: on Projects the "Projects" group and, 28px below it and only when there are any, "Archived"; on Tags the Look alike group (when there is one) and, 28px below it, the "Tags" group. A group is a 13px/600 heading over a Rule Strong hairline with its mono count (Archived also carries "Read-only until unarchived" at the right in 13px Ink 3), then lines divided by Rule. A project's kept-tasks page (`/projects/:id/tasks`) is the same column: a 13px "← Projects" text link, 12px above the 22px/600 project name, then a sentence 24px above the lines.
+
+**Settings.** One column on the page measure: the "Settings" heading (22px/600), one Ink 3 sentence under it, then sections in a fixed order: Profile, Passkeys, Sessions, Paperless, Users (the superuser's only), Account. A section sits 22px below the one above, a heading over a Rule Strong hairline with its content 6px under it; an address such as `#users` lands on it with 24px clear above.
+
+**The sign-in screens.** A single centred column of at most 420px on the page ground, with 16px side padding on a phone and none from `sm`; the wordmark sits at its top (32px from the top, 40px from `sm`) and the foot at the bottom (24px, 32px from `sm`). The heading is anchored at one fixed offset below the wordmark, `clamp(40px, 16vh, 140px)`, on every screen, so moving between sign in, sign up and recovery does not move it; under it, 12px apart, come the one Ink 3 sentence and what is to be done. No card, no split, no illustration.
 
 **The record column.** A record opens in a third track of the shell grid (200px navigation, the work, then the column), which is no width at all while empty. From 1200px the column is 560px wide with a 1px Rule Strong hairline on its left, sticky to the full viewport height and scrolling on its own, and the work beside it narrows its side padding from 48px to 32px. Below 1200px, where there is no room for the navigation, a 560px column and a page that can still be read, the column is fixed over the whole screen. Its side gutter is 36px beside the page and 16px on a phone (`record-gutter`; the class is `gutter` in `RecordPanel.tsx`, not the 12px `gutter` spacing token above), and the bar, the title, the property list and every section start on that one edge. The bar is 52px tall from 1200px and 56px below it. Inside, the rhythm is: bar; title row (8px above, 18px below); property list (a hairline above, 10px, rows 2px apart, 14px below); then sections, each 18px below the one above and 4px under its last line; delete at the foot. Controls grow to 44px under a coarse pointer, and rows with them.
 
@@ -505,7 +588,10 @@ The status marks are the system's signature geometry: drawn on an 18-unit grid w
 - **Capture line:** frameless and 40px tall: a 16px plus in Ink 3, the field in 15px ink with an Ink 3 placeholder ("Add a task…"), and the `C` key cap at the right end. A 1px Rule Strong hairline sits beneath it and turns ink while the field has focus. The key cap is dropped on coarse pointers, which have no keyboard. A phone's pages carry no line; its capture sheet carries it (see Capture line). Enter creates the task at once and raises a notice with Open and Undo (ADR-0005, amended); the `c` key opens the full draft.
 - **Key cap:** 11px mono in a 1px Rule Strong outline, 4px corners, 5px side padding.
 - **Webhook URL field:** the inherited framed input, 36px tall, its text in mono (12.5px; 16px on a phone, where a smaller field is zoomed), placeholder "https://". A refusal is said under the field in 12.5px Overdue Red as an alert, the field marked invalid and described by it, and what was typed is kept for correcting.
-- Framed inputs elsewhere are the inherited kit (see the transition note).
+- **Line input (Settings, edit in place):** frameless, 30px tall (44px under a coarse pointer): no frame and no fill, a 1px Rule Strong hairline beneath, 16px text under a coarse pointer so a phone does not zoom and 14px from `md`. Under focus the hairline turns ink and is doubled by a 1px ink shadow beneath it; an invalid field draws the same line in Overdue Red, with its reason under it in 12.5px Overdue Red as an alert. It is the field of every value edited in place; the sign-in screens' field line is the same mark at a larger size.
+- **Edit actions:** a field's commit and way out as text, 30px tall (44px coarse): Save (or Connect) in ink at 13.5px/500, any further action of the form between them (Test, quiet), and Cancel quiet in Ink 3. Escape leaves the edit.
+- **Field line (sign-in):** a field set as a line 44px tall: a 12.5px Ink 3 label in a 76px column at the left, the value beside it at 16px in ink, one Rule Strong hairline beneath that turns ink and doubles under focus (`focus-within`). The input inside it has no frame of its own and an Ink 3 placeholder.
+- Other framed inputs are the inherited kit (see the transition note's known gap).
 
 ### Navigation
 - **Style:** a plain text list. The wordmark, then the screens — Today, Tasks, Projects, Tags, Bots, Activity — each with its count in 12px mono Ink 3 where a count means something.
@@ -631,7 +717,7 @@ One chronology in a record, oldest first, with the composer at its end. Days are
 - "Show earlier activity" is a text link above the first day; an empty history is one sentence.
 
 ### Open line tint
-`row-tint`: the Hover ground as a left-to-right gradient that fades out over the last 15% of the row (`linear-gradient(to right, var(--hover), transparent 85%)`). One utility for a hovered task line, a hovered bot line, and the line that is open in the record column, so the reader sees which line the column belongs to without any colour or mark and a list line and a table row cannot drift apart. A task line and a bot line take it on hover and when open; a row of the inherited table (Projects, Tags, Admin and Archive) takes the plain muted fill on hover and, as `row-tint`, when open.
+`row-tint`: the Hover ground as a left-to-right gradient that fades out over the last 15% of the row (`linear-gradient(to right, var(--hover), transparent 85%)`). One utility for a hovered task line, a hovered bot line, and the line that is open in the record column, so the reader sees which line the column belongs to without any colour or mark and a list line and a table row cannot drift apart. A task line, a bot line, a project line, an archived project line and a tag line all take it on hover and when open; no table remains.
 
 ### Capture line
 The frameless line is the whole of quick capture: a 16px plus (1.5 stroke) in Ink 3, the field (15px ink), and the `C` key cap (dropped on coarse pointers), 40px tall over a Rule Strong hairline that turns ink on focus. The placeholder says where the task goes: "Add a task…", and "Add a task to <project>…" on a page narrowed to a project; Enter writes the task at once into that project, else the Inbox, and raises a notice; the line empties for the next thought. From `md` up the day page and the Tasks page both carry it at their head (`PageCaptureLine` mounts it only off a phone); a phone's pages have none, and its capture sheet carries the same line. The full draft opens in the record column from the `c` key, or from "More options…" in the capture sheet: the title row, the property rows, a Description section, and a foot pinned to the column's bottom with "Create task" (the ordinary primary button) and the chord that creates and starts another.
@@ -649,6 +735,61 @@ A notice is a line of the log that has left the page: the page ground with a Rul
 - **Actions:** text, not buttons: ink, 13.5px/500, underlined on hover ("Open", "Undo"); 44px tall under a coarse pointer.
 - **Close:** a quiet 24px control inside the notice at its right (Ink 3, Hover tint, 44px coarse), never sonner's chip hanging off the corner.
 
+### Record work (shared)
+`Common/RecordWork.tsx` holds the small parts the work sections of the project and tag columns share, and `Common/words.ts` the wording (`plural`, `nameList`, `archivedProjects`) the Projects and Tags sentences are built from, so the two pages cannot drift apart.
+- **more:** "N more in the list →" under a preview that stops at five lines: 13px Ink 3, turning ink and underlined on hover, 8px under the last line.
+- **act:** a property's or section's action in words: ink, 13.5px/500, no wrapping, underlined on hover, a 3px soft ring on focus, a thumb-sized target under a coarse pointer ("Open the list →", "Archive", "Unarchive").
+- **Empty:** one Ink 3 sentence at 14px under a section's heading. **Pending:** three grey skeleton bars, 32px tall.
+
+### Projects page
+The live projects as lines, the sentence of counts above them, and the archived ones after them. The page is drawn once the projects, the archived projects and the bot users have all come, with a skeleton sentence and four skeleton lines of the line's shape until then.
+- **Counts sentence:** Ink 3 at body size, 24px under the heading. The lead, "N projects, N open tasks." ("1 project", "1 open task"), is ink at 500; after it, "Nothing is overdue." or "N is overdue, in <names>." ("N are overdue, in a, b and c."). It counts the live projects only.
+- **Project line:** a grid of a marker, the text and the count at the right, 12px apart, 10px top and bottom over a Rule hairline, the last without one; hover and the open line take the row tint. The marker is the neutral 10px square with a 2px corner (Ink 2 at 55%). The name is 15px/500 and is the link that opens the column (only the name, as only a task's title opens a task), underlined on hover, truncating. Under it, the description at 13.5px Ink 3 (two lines at most), then one row of facts, 13px Ink 3, 12px apart: "N overdue" first, in Overdue Red at 500; then "N in Backlog", "N in Review", and "<bot> works here" or "<a>, <b> work here" for the bot users whose scope names the project. A zero is left out, and a project with no fact has no row.
+- **Open count:** at the right, "N open →" as a link into the task list narrowed to the project (FR-05.15), 13.5px/500 with a 12px arrow, tinted with the Rule fill on reach and a 6px corner, its target grown under a coarse pointer; its name says the count and the project. With none open it is the Ink 3 words "No open tasks", not a link.
+- **Archived section:** the same grid, quieter: the marker at 25% opacity, the name in Ink 3, and beneath it "N tasks kept with it" ("No tasks kept with it") in 13px Ink 3. At the right, "N tasks →" in Ink 3 (ink on hover) is the way into the read-only page of its kept tasks, `/projects/:id/tasks`; a project with none kept has no link. The name still opens the column, where it is unarchived.
+- **Kept-tasks page:** a view of its own rather than a filter on the task list, so archived work never mixes into daily views (FR-05.14). The project name as a 22px/600 heading, the sentence "N tasks kept." (ink at 500) "Archived, so read-only until it is unarchived." and an underlined "Open the project" link, then the compact task lines, read-only and flush to the column's edges, subtasks indented under their root; the first 100 at most, with "Showing the first 100 of N." under them. An empty one says "Nothing is kept with this project." on a Rule hairline; a missing one is an alert, "This project could not be opened". A live project's address redirects to the task list narrowed to it.
+
+### Project column
+A project opens in the record column as one document, with no tabs and no Save: the name in place, a property list, then sections under hairline headings, as a task's column reads. Every change saves as it is made. It is fetched by id, since a link may point at an archived project the page behind does not list.
+- **Bar:** "Project · created 24.09.2026" ("New project · Not saved yet" for a draft); on a phone the word "Project" is left for a screen reader so the date has the room.
+- **Name and description:** the name is the 22px/600 flat field, saved on Enter or on leaving it, and refused when empty. The Inbox's name and an archived project's whole record are plain text, because the Inbox cannot be renamed, archived or deleted (FR-05.6) and an archived project is frozen (FR-05.12). The Description section is a flat field, "Add a description".
+- **Property list:** Tasks says "9 open · 1 overdue · 6 done" ("N kept" once archived) with "Open the list →" beside it ("Read the kept tasks →" when archived); Bot users names those that have it in scope, or "No bot user has it in scope"; State says "Active" with Archive beside it, or "Archived — read-only until it comes back" with Unarchive, one control both ways; for the Inbox it says "Always in use" and why.
+- **Sections:** Open tasks (the count, a capture line that files into this project, up to five task lines by priority, then "N more in the list →"; empty says "No open tasks. Write one above and it lands in this project."), or Kept tasks once archived (a sentence and "Read the kept tasks →"); then Activity (the latest five lines by day, then "Everything in this project →"). A failed fetch is an alert sentence with Try again.
+- **Delete:** the destructive text button at the foot, behind a dialog that says what goes with the project (its tasks, counted) and that it can be restored from the activity log.
+- **New-project draft:** the same column before the project exists: the name field "Name the project" and a Description section, "What is it for? (optional)", both editable from the first frame. The foot is pinned to the column's bottom on the page ground over a Rule Strong hairline: "It opens here, ready for its first task." in 12px Ink 3 and the primary "Create project" (44px coarse); Enter in the name does the same, and nothing is written until then. Creating opens the project in the same column.
+
+### Tags page
+The sentence of counts, the groups that look alike, and every tag as a line. Both requests are read together, so suggestions never land after the lines and push them down.
+- **Counts sentence:** Ink 3, 24px under the heading. The lead, "N tags." ("1 tag."), is ink at 500; after it "None look alike." or "N look alike." and "Tags are created by typing them onto a task, too." With none it says "No tags yet." and "Type one onto a task, or start with New tag."
+- **Look alike:** a group at the top, its heading over a Rule Strong hairline with the mono count of the tags in the groups, drawn only when there is one. A line per group, 10px top and bottom over a Rule hairline: the names joined in words at 500 ("urgent and Urgent"), the open counts in 13px Ink 3 ("3 and 1 tasks"), and at the right two text actions at 13.5px: "Merge into <the most used spelling>" in ink at 500 and "Keep apart" in Ink 3 at 400. A group is only a suggestion: Merge into opens the one merge confirmation with that spelling suggested and the reader free to pick another; Keep apart stops offering the group until one of its tags is renamed or another spelling joins it.
+- **Tag line:** the same grid as a project line with a 14px tag glyph (1.4 stroke, Ink 3) in place of the marker. The name is 15px/500 and opens the column; under it "created by you" or "created by <bot user>" ("(deleted)" after a deleted one) and, when archived projects hold some, a note of them, in 12.5px Ink 3. At the right the open count, "N open →", is the link into the task list narrowed to the tag, the same count the list shows (FR-01.26); with none, "No open tasks". Tags have a glyph, never a pill.
+
+### Tag column
+A tag opens as a short document: the name in place, a property list, its open tasks, and at the foot the one way to make it go.
+- **Bar:** "Tag · created 24.09.2026" with " by <bot user>" when one made it; "New tag · Not saved yet" for a draft.
+- **Name:** the 22px/600 flat field, saved on Enter or on leaving it. A refusal (empty, or a name in use) is said under it in 13px Overdue Red as an alert and the typed words stay; a name in use also opens the merge confirmation with that name kept, because putting two spellings together is a separate, confirmed act and never done by the rename (FR-01.22).
+- **Property list:** Tasks says "4 open · 2 in archived projects" with "Open the list →" while any are open. Merge says "Fold another tag into this one:" and a quiet select reading "choose a tag…"; choosing is the first step, not the merge, and opens the confirmation. With no other tag it says so in Ink 3.
+- **Merge confirmation:** the inherited dialog: "Merge into <name>?", a "Keep the name" radio group listing each tag with its open count, a select to add another tag, and a sentence naming the tags removed, how many tasks change (archived ones included) and that it cannot be undone, then Cancel and the destructive "Merge into <name>".
+- **Open tasks:** a count, up to five task lines, "N more in the list →"; empty says what that means.
+- **Delete tag:** the destructive text button at the foot with a 13px Ink 3 sentence beside it saying what deleting takes ("Deleting takes it off 3 tasks. This can't be undone."), behind a confirmation that says the same.
+- **New-tag draft:** the name field "What does it gather?" (50 characters at most), a 14px Ink 3 sentence that a tag means the same thing across every project and stays until deleted, and the foot pinned as the project draft's: "It opens here once it exists." and "Create tag". A refused name stays in the field with its reason beneath.
+
+### Settings document
+Sections under hairline headings, each saving in place, with no tabs. A row is a property row (a 96px Ink 3 label and its value); a section's own action sits at the right of its heading as a text action; a section's closing note is 12.5px Ink 3, 8px under its content.
+- **Profile:** Name and Email each said as a value (14px ink; "Not set" in Ink 3 when empty) with Change beside it. Change turns that one row into a line input with Save and Cancel; Save sends only that field, validates on blur (the name at most 30 characters, the email as an address) and puts the value back. Appearance is the third row: System, Light and Dark as one radio group of text choices, the chosen one in ink at 600 and the rest Ink 3, the arrow keys walking them; it is the same control the sign-in foot uses and both write the one stored theme.
+- **Passkeys:** the heading carries the mono count and "Add a passkey" as its action. Each passkey is a line at least 38px tall over a Rule hairline: its name at 500 and, under it, "added <date> · last used <date>" or "never used" in 12.5px Ink 3; at the right Rename (ink) and Remove (Ink 3), Remove disabled on the only passkey. Rename turns the line into a line input with Save and Cancel. After a recovery code was spent (`?recovered`) a plain ink sentence heads the list, "You're back in." at 600 and then the instruction to remove any passkey not recognised: no banner, no fill, no icon. The note says what adding and removing ask for and what a lost passkey needs.
+- **Sessions:** one row, "Signed in: every device you have signed in on" with "Sign out everywhere".
+- **Paperless:** states, each in words. Not connected: the Connection row says "Not connected" in Ink 3 with "Connect Paperless"; when PDFs are kept there, a "Kept there" row says "N PDFs" with "out of reach until Paperless is connected again". Connected: the Connection row says "Connected" in Done Green at 500, the address in 12.5px mono, and Test, Change and Disconnect as text actions (Disconnect turns Overdue Red on hover); under it, the result of a test in 12.5px, announced politely, "Paperless answered and accepted the token." in Done Green or the failure in Overdue Red. The Token row says "set, never shown again" in Ink 3 with Replace; "Kept there" says "N PDFs" or "No PDFs yet" with a 13px Ink 3 sentence on where PDFs go. Connect, Change and Replace open their row as a form in place: the Address row (a line input, mono at 12.5px, placeholder "https://") and the Token row ("New API token", with a 12.5px Ink 3 hint that it is never shown again, or that leaving it empty keeps the stored one while the address is unchanged), then Save or Connect with Test between and Cancel; a refusal is said under its field in 12.5px Overdue Red. Disconnect asks first in a dialog that says how many PDFs would be out of reach.
+- **Users (superuser only):** drawn for no one else, and its list is not asked for. The heading carries the mono count and "You are the superuser" in Ink 3. A line per account over a Rule hairline, 10px top and bottom, on a grid of a 26px initial, the text and the action: the initial is an ink disc with a page-coloured letter for the reader's own account and a Rule Strong disc with an Ink 2 letter for the others; the name at 14px/500 (the email's local part when there is none); under it, 12.5px Ink 3, the email, "superuser · you", the passkey count ("no passkeys" in Overdue Red at 500 when none) and "last signed in <date>" or "never signed in"; at the right, 13px, "Issue a recovery code" ("Issue another" after one) opens the shared secret reveal, and the reader's own line says "Recovery: not for your own account". The section has its own error boundary: a list that does not answer is a sentence with Try again under its heading and the rest of the document stands. The note says a code is shown once, works for 24 hours and burns after five wrong tries.
+- **Account:** one row, Delete, an ink text action turning Overdue Red on hover, with a sentence of what goes with the account; it asks again in a dialog that says everything.
+
+### Sign-in screens
+Sign in, create an account and recover your account share one screen: the wordmark, the Auth heading, one Ink 3 sentence at body size, then what is to be done, and a foot. The foot is 12.5px Ink 3: "Self-hosted at <host>" at the left (the page's own host, the address every passkey is bound to, FR-12.4) and "Appearance" with the same System, Light, Dark radio group at the right, since no account exists yet to keep a preference on.
+- **One filled action:** the ink button, the full width of the column, 44px tall (48px coarse), 8px corners, 15px/500, 12px above it ("Sign in with a passkey" with a key icon, "Create a passkey and sign in", "Create a new passkey"). It is the only filled thing on a screen. Beneath it, text links at 13.5px Ink 3, 6px apart, the next step in ink at 500 and underlined ("Lost every passkey? Use a recovery code", "New here? Create an account", "Already have an account? Sign in", "Back to sign in"). A refusal is a sentence in 13.5px Overdue Red at 500 above the action.
+- **Sign in (decision, issue #212):** the screen carries one visible frameless email field above "Sign in with a passkey", id and test id `email-input`, `autocomplete="username webauthn"`, placeholder "Pick a passkey here", set as a field line labelled "Email". It is there so that the browser's passkey autofill (FR-12.3) is reachable from the field; the button stays for asking by hand. Nothing typed in it is read: the ceremony finds the account from the passkey. This is a deliberate deviation from the approved mock's "one action, no fields", made with the user, and the only field the sign-in screen shows. A browser without passkey support gets a sentence in place of the action, on a Rule hairline, saying so plainly (FR-12.12) and offering no other way.
+- **Sign up:** Email (placeholder "user@example.com") and an optional Name (placeholder "Optional", 30 characters at most) as field lines. The ceremony takes an email alone (FR-12.2), so the name is set by a PATCH of the account (`/users/me`) after the sign-in; if that fails it can be set in Settings.
+- **Recovery:** Email and the recovery code as field lines; the code is set in mono with 0.12em letter-spacing (placeholder "XXXX-XXXX-XXXX-XXXX"), since it is read and copied character by character. A refused code is said in the API's words, which read the same for a wrong, a spent and an expired code, and **does not name how many tries are left** (FR-12.18): the approved brief's "tries left" was not built, so none is drawn.
+
 ### Shell behaviour
 
 **The Stay-Put Rule.** Opening a record never moves the reader to another screen. The panel's address belongs to the shell, so every screen opens a task beside itself, and capture starts from any of them.
@@ -663,7 +804,7 @@ A notice is a line of the log that has left the page: the page ground with a Rul
 - **Do** use the six status marks at 18px for status (22px as the title row's closing control), with priority as their colour (The Six-Mark Rule).
 - **Do** keep a record's controls flat at rest, tint them Hover on reach, grow them to 44px under a coarse pointer, and start every edge of the column on the one gutter (36px, 16px on a phone).
 - **Do** open records in the column beside the page with no scrim and no focus trap, and raise every notice at the top with text actions and severity as the icon's colour.
-- **Do** show the line that is open with the `row-tint` ground, in lists and tables alike.
+- **Do** show the line that is open with the `row-tint` ground, on every list line: task, bot, project and tag.
 - **Do** use monospace only for times, counts, key caps, ids, URLs and secrets, with tabular figures, and never for a word.
 - **Do** check every new text/ground pair in both themes in `src/theme.test.ts` before shipping.
 - **Do** say an empty state in one sentence instead of drawing an empty container, and say a failed fetch as its own state with a retry, never as an empty one.
@@ -673,6 +814,10 @@ A notice is a line of the log that has left the page: the page ground with a Rul
 - **Do** say a bot user's state in words on its line and in its column (token, reach, webhooks), and answer a refused address in the field it concerns.
 - **Do** say what is lost before the button of an irreversible step, and show a value that cannot be read back once, in a dialog that Escape and an outside click leave open.
 - **Do** grow a text control's target under a coarse pointer without moving anything on the line, as the pager and the × do.
+- **Do** hold every page to the one `page-column` measure (820px, centred while no record is open) and set a settings-like page as one document: sections under a hairline heading, each saving in place.
+- **Do** edit a value in place with a line input (a hairline beneath, an ink focus mark) and commit with text actions, Save in ink and Cancel quiet.
+- **Do** make the way into a list one click from where its count is said: the open count on a project or tag line is the link into the task list narrowed to it.
+- **Do** keep a sign-in screen to one centred 420px column with one filled action, its heading at the same fixed offset on every screen.
 
 ### Don't:
 - **Don't** colour location, selection, brand or decoration; colour is for overdue, P1, done, close, the P2/P3 marks, the Priority row, and the icon of a success or error notice only.
@@ -687,4 +832,7 @@ A notice is a line of the log that has left the page: the page ground with a Rul
 - **Don't** add a floating button or a navigation entry for a new task: the `c` key opens the full draft on a keyboard, and on a phone the one add control in the tab bar raises the capture sheet.
 - **Don't** set a word, a name or a sentence in monospace: URLs, secrets and ids are the addresses a reader copies, not text to be read.
 - **Don't** hide a set filter behind a closed control or a fold: it stays on the row.
-- **Don't** take the inherited kit's framed inputs, outline buttons or pill badges on not-yet-redesigned screens as precedent for new surfaces.
+- **Don't** take the inherited shadcn kit (the dialogs, menus, selects, date field and webhook URL field, with their framed inputs, outline buttons and faint shadows) as precedent for a new surface; it is a known gap set on the palette, not a design.
+- **Don't** draw a table, a card or a tab set for a page of records or settings: lines under a heading, sections in one document.
+- **Don't** show a count that is not the list's own: a line's open count must equal what its link opens.
+- **Don't** add a field to the sign-in screen beyond the one recorded here; the passkey is the credential, and what is typed in the email field is never read.

@@ -66,10 +66,12 @@ test.describe("Edit user profile", () => {
     const updatedName = "Test User 2"
 
     await page.getByRole("button", { name: "Change name" }).click()
+    // The field is where the reader is: focused as it opens.
+    await expect(page.getByLabel("Name", { exact: true })).toBeFocused()
     await page.getByLabel("Name", { exact: true }).fill(updatedName)
     await page.getByRole("button", { name: "Save" }).click()
 
-    await expect(page.getByText("User updated successfully")).toBeVisible()
+    await expect(page.getByText("Name changed")).toBeVisible()
     await expect(
       main(page).getByText(updatedName, { exact: true }),
     ).toBeVisible()
@@ -105,7 +107,7 @@ test.describe("Edit user email", () => {
     await page.getByLabel("Email").fill(updatedEmail)
     await page.getByRole("button", { name: "Save" }).click()
 
-    await expect(page.getByText("User updated successfully")).toBeVisible()
+    await expect(page.getByText("Email changed")).toBeVisible()
     await expect(
       main(page).getByText(updatedEmail, { exact: true }),
     ).toBeVisible()

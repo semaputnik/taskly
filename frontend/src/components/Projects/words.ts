@@ -1,4 +1,5 @@
 import type { BotUserPublic, ProjectPublic } from "@/client"
+import { nameList, plural } from "@/components/Common/words"
 import { taskCountLabel } from "@/components/Tags/counts"
 
 /**
@@ -11,15 +12,6 @@ type Counted = Pick<
   ProjectPublic,
   "open_count" | "overdue_count" | "backlog_count" | "review_count" | "name"
 >
-
-const plural = (count: number, one: string, many = `${one}s`) =>
-  `${count} ${count === 1 ? one : many}`
-
-/** "Inbox", "Inbox and Website", "Inbox, Website and Home". */
-function listed(names: string[]): string {
-  if (names.length < 2) return names.join("")
-  return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`
-}
 
 /**
  * The sentence under the heading: how many projects and open tasks, then
@@ -34,7 +26,7 @@ export function counts(projects: Counted[]): { lead: string; rest: string } {
     rest:
       overdue === 0
         ? "Nothing is overdue."
-        : `${overdue} ${overdue === 1 ? "is" : "are"} overdue, in ${listed(late.map((p) => p.name))}.`,
+        : `${overdue} ${overdue === 1 ? "is" : "are"} overdue, in ${nameList(late.map((p) => p.name))}.`,
   }
 }
 

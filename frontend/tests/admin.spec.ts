@@ -121,3 +121,24 @@ test.describe("Users access control", () => {
     await holder.close()
   })
 })
+
+test("A users' list that does not answer costs the Users section only", async ({
+  page,
+}) => {
+  await page.route("**/api/v1/users/?*", (route) =>
+    route.fulfill({ status: 500, body: "{}" }),
+  )
+
+  await page.goto("/settings")
+  // The rest of the document stands; the section says what failed.
+  await expect(page.getByRole("heading", { name: "Passkeys" })).toBeVisible()
+  // The request is retried with a backoff before it counts as failed.
+  await expect(usersOf(page)).toContainText("The users could not be loaded.", {
+    timeout: 20_000,
+  })
+
+  // Once the server answers, trying again fills the section.
+  await page.unroute("**/api/v1/users/?*")
+  await usersOf(page).getByRole("button", { name: "Try again" }).click()
+  await expect(usersOf(page).getByRole("listitem").first()).toBeVisible()
+})

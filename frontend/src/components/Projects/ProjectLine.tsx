@@ -52,7 +52,7 @@ export function ProjectLine({
       <div className="min-w-0">
         <RouterLink
           {...recordLink("project", project.id)}
-          className="focus-visible:ring-ring/50 block truncate rounded-sm leading-snug font-medium underline-offset-4 outline-none hover:underline focus-visible:ring-[3px]"
+          className="focus-visible:ring-ring/50 block truncate rounded-sm leading-snug font-medium underline-offset-4 outline-none hover:underline focus-visible:ring-[3px] pointer-coarse:-my-3 pointer-coarse:py-3"
         >
           {project.name}
         </RouterLink>
@@ -112,7 +112,7 @@ export function ArchivedProjectLine({ project }: { project: ProjectPublic }) {
       <div className="min-w-0">
         <RouterLink
           {...recordLink("project", project.id)}
-          className="text-ink-3 focus-visible:ring-ring/50 block truncate rounded-sm leading-snug font-medium underline-offset-4 outline-none hover:underline focus-visible:ring-[3px]"
+          className="text-ink-3 focus-visible:ring-ring/50 block truncate rounded-sm leading-snug font-medium underline-offset-4 outline-none hover:underline focus-visible:ring-[3px] pointer-coarse:-my-3 pointer-coarse:py-3"
         >
           {project.name}
         </RouterLink>

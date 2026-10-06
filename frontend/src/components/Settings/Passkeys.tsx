@@ -1,12 +1,7 @@
 import { useMutation, useQuery } from "@tanstack/react-query"
-import { ShieldAlert } from "lucide-react"
 import { useId, useState } from "react"
 
 import { type PasskeyPublic, UsersService } from "@/client"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { LoadingButton } from "@/components/ui/loading-button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { formatDateTime } from "@/lib/dates"
 import {
@@ -16,7 +11,16 @@ import {
 } from "@/lib/passkeys"
 import { passkeysQuery, useReportChange } from "@/lib/serverState"
 import { toastError, toastSuccess } from "@/lib/toasts"
-import { act, actQuiet, Note, SettingsSection } from "./Section"
+import { cn } from "@/lib/utils"
+import {
+  act,
+  actQuiet,
+  EditActions,
+  focusOnMount,
+  lineInput,
+  Note,
+  SettingsSection,
+} from "./Section"
 
 /**
  * The account's passkeys as lines, and the way to add one (FR-12.6–FR-12.9).
@@ -52,14 +56,11 @@ export function Passkeys({ recovered = false }: { recovered?: boolean }) {
       }
     >
       {recovered && (
-        <Alert data-testid="recovered-notice" className="my-3">
-          <ShieldAlert />
-          <AlertTitle>You're back in</AlertTitle>
-          <AlertDescription>
-            Your new passkey is the last one in the list. Remove any passkey you
-            don't recognise.
-          </AlertDescription>
-        </Alert>
+        <p data-testid="recovered-notice" className="text-ink my-3 text-sm">
+          <span className="font-semibold">You're back in.</span> Your new
+          passkey is the last one in the list. Remove any passkey you don't
+          recognise.
+        </p>
       )}
       <ul data-testid="passkey-list">
         {isPending && <PendingPasskey />}
@@ -137,31 +138,22 @@ function PasskeyLine({
           <label htmlFor={id} className="sr-only">
             Name of this passkey
           </label>
-          <Input
+          <input
+            ref={focusOnMount}
             id={id}
             value={draft}
-            autoFocus
             maxLength={255}
-            className="h-[30px] min-w-0 flex-1 basis-56 md:text-sm"
+            className={cn(lineInput, "flex-1 basis-56")}
             onChange={(event) => setDraft(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === "Escape") setRenaming(false)
             }}
           />
-          <div className="flex items-center gap-3">
-            <LoadingButton type="submit" size="sm" loading={rename.isPending}>
-              Save
-            </LoadingButton>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              disabled={rename.isPending}
-              onClick={() => setRenaming(false)}
-            >
-              Cancel
-            </Button>
-          </div>
+          <EditActions
+            save="Save"
+            pending={rename.isPending}
+            onCancel={() => setRenaming(false)}
+          />
         </form>
       ) : (
         <>

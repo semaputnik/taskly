@@ -51,7 +51,9 @@ test("The Projects page counts, and its open count is one click into the project
   const { website } = await scene(page)
 
   await page.goto("/projects")
-  await expect(page.getByRole("heading", { name: "Projects" })).toBeVisible()
+  await expect(
+    page.getByRole("heading", { name: "Projects", exact: true }),
+  ).toBeVisible()
   await expect(page.getByRole("main")).toContainText(
     "3 projects, 4 open tasks. 1 is overdue, in Website relaunch.",
   )
@@ -116,7 +118,9 @@ test("The old Archive address lands on Projects, and the navigation no longer li
 
   await page.goto("/archive")
   await expect(page).toHaveURL(/\/projects$/)
-  await expect(page.getByRole("heading", { name: "Projects" })).toBeVisible()
+  await expect(
+    page.getByRole("heading", { name: "Projects", exact: true }),
+  ).toBeVisible()
   await expect(
     page.getByRole("navigation", { name: "Main" }).getByRole("link", {
       name: "Archive",
@@ -250,4 +254,35 @@ test("The arrow keys walk the projects as listed, and the Inbox is read-only", a
   await expect(
     inbox.getByRole("button", { name: "Delete project" }),
   ).toHaveCount(0)
+})
+
+test("Enter pressed right after a refusal sends the draft again", async ({
+  page,
+}) => {
+  await newUser(page)
+
+  // The first attempt is refused; the second goes through to the server.
+  let refused = false
+  await page.route("**/api/v1/projects/", async (route) => {
+    if (route.request().method() !== "POST" || refused) return route.continue()
+    refused = true
+    await route.fulfill({
+      status: 422,
+      contentType: "application/json",
+      body: JSON.stringify({ detail: "That name will not do." }),
+    })
+  })
+
+  await page.goto("/projects")
+  await page.getByRole("button", { name: "New project" }).click()
+  const name = page.getByRole("textbox", { name: "Project name" })
+  await name.fill("Garden")
+  await name.press("Enter")
+  // The refusal is said before the draft is sent again.
+  await expect(page.getByText("That name will not do.")).toBeVisible()
+
+  await name.press("Enter")
+  await expect(
+    page.getByRole("complementary", { name: "Garden" }),
+  ).toBeVisible()
 })

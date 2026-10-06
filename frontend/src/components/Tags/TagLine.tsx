@@ -38,7 +38,7 @@ export function TagLine({ tag }: { tag: TagPublic }) {
       <div className="min-w-0">
         <RouterLink
           {...recordLink("tag", tag.id)}
-          className="focus-visible:ring-ring/50 block truncate rounded-sm leading-snug font-medium whitespace-pre underline-offset-4 outline-none hover:underline focus-visible:ring-[3px]"
+          className="focus-visible:ring-ring/50 block truncate rounded-sm leading-snug font-medium whitespace-pre underline-offset-4 outline-none hover:underline focus-visible:ring-[3px] pointer-coarse:-my-3 pointer-coarse:py-3"
         >
           {tag.name}
         </RouterLink>

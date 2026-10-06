@@ -3,7 +3,7 @@ import { Link as RouterLink } from "@tanstack/react-router"
 import { useState } from "react"
 
 import { type TagPublic, TagsService } from "@/client"
-import { textLink } from "@/components/Dashboard/shared"
+import { act } from "@/components/Common/RecordWork"
 import { useRecordPanel } from "@/components/Records/panels"
 import {
   EditableText,
@@ -32,12 +32,6 @@ import { MergeTags } from "./MergeTags"
 import { NewTag } from "./NewTag"
 import { OpenTasks } from "./TagWork"
 import { deletionReach, tasksInWords } from "./words"
-
-/** A property's action, in words, as the mock sets it: ink, 13.5px, medium. */
-const act = cn(
-  textLink,
-  "text-ink text-[13.5px] font-medium pointer-coarse:-my-3 pointer-coarse:py-3",
-)
 
 /** A merge being considered, and which of its two names the reader keeps. */
 interface Merging {

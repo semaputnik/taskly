@@ -3,13 +3,13 @@ import { Link as RouterLink } from "@tanstack/react-router"
 
 import type { ProjectPublic } from "@/client"
 import { ActivityDescription } from "@/components/Activity/ActivityDescription"
+import { Empty, more, Pending } from "@/components/Common/RecordWork"
 import { CaptureLine } from "@/components/Dashboard/CaptureLine"
 import { byDay, clock } from "@/components/Dashboard/log"
 import { textLink } from "@/components/Dashboard/shared"
 import { RecordSection } from "@/components/Records/RecordPanel"
 import { CompactTaskRow } from "@/components/Tasks/CompactTaskRow"
 import { OPEN_STATUSES } from "@/components/Tasks/statuses"
-import { Skeleton } from "@/components/ui/skeleton"
 import useAuth from "@/hooks/useAuth"
 import { formatDateTime } from "@/lib/dates"
 import { activityQuery, tasksQuery } from "@/lib/serverState"
@@ -24,11 +24,6 @@ import { cn } from "@/lib/utils"
  */
 
 const PREVIEW = 5
-
-export const more = cn(
-  textLink,
-  "text-ink-3 hover:text-ink inline-block pt-2 text-[13px]",
-)
 
 /**
  * Its first open tasks as task lines, with a line to write another into the
@@ -195,21 +190,5 @@ export function ProjectActivity({ project }: { project: ProjectPublic }) {
         </>
       )}
     </RecordSection>
-  )
-}
-
-export function Empty({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="text-ink-3 pt-2 text-sm text-pretty italic">{children}</p>
-  )
-}
-
-export function Pending() {
-  return (
-    <div className="flex flex-col gap-2 pt-3" aria-hidden>
-      {Array.from({ length: 3 }).map((_, index) => (
-        <Skeleton key={index} className="h-8 w-full" />
-      ))}
-    </div>
   )
 }

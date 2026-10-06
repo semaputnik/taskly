@@ -100,6 +100,7 @@ function RecoverForm() {
                     data-testid="email-input"
                     type="email"
                     autoComplete="username"
+                    placeholder="user@example.com"
                     className={fieldInput}
                     {...field}
                   />

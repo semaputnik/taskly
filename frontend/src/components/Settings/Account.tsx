@@ -14,7 +14,8 @@ export function Account() {
         <div className="flex min-w-0 flex-wrap items-center gap-x-3">
           <DeleteConfirmation triggerClassName={cn(act, "hover:text-late")} />
           <span className="text-ink-3 min-w-0 text-[13px] text-pretty">
-            removes your tasks, projects, bot users and passkeys
+            removes your tasks, projects, bot users and passkeys; nothing leaves
+            Paperless
           </span>
         </div>
       </PropertyRow>

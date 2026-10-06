@@ -9,7 +9,7 @@
     -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
     "Noto Sans", Arial, sans-serif;
   --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-  /* The measure of a page's one column: Today, Tasks, Bots and Activity. */
+  /* The measure of a page's one column, on every page of the app. */
   --container-page-column: 820px;
 }
 
@@ -20,7 +20,6 @@
   --radius-xl: calc(var(--radius) + 4px);
   /* The Changelog palette, by its own names. */
   --color-page: var(--page);
-  --color-raised: var(--raised);
   --color-ink: var(--ink);
   --color-ink-2: var(--ink-2);
   --color-ink-3: var(--ink-3);
@@ -29,8 +28,8 @@
   --color-hover: var(--hover);
   --color-done: var(--done);
   --color-late: var(--late);
-  /* The shadcn names, mapped onto the palette so the screens not yet
-     redesigned read as the same world until their own slice. */
+  /* The shadcn names (dialogs, menus, inputs, buttons), mapped onto the
+     palette so the kit reads as the same world as the screens. */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -43,7 +42,6 @@
   --color-scrim: var(--scrim);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
-  --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);

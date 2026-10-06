@@ -12,19 +12,23 @@ import { gotoAndBeSentAway, logInUser, logOutUser } from "./utils/user.ts"
 
 test.use({ storageState: { cookies: [], origins: [] } })
 
-test("The sign-in screen asks for nothing but a passkey", async ({ page }) => {
+test("The sign-in screen offers the passkey in an email field and by a button", async ({
+  page,
+}) => {
   await page.goto("/login")
 
   await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible()
   await expect(
     page.getByRole("button", { name: "Sign in with a passkey" }),
   ).toBeVisible()
-  // The email field is the browser's passkey suggestions' anchor only: it is
-  // not shown and cannot be reached, so there is nothing to type.
-  const email = page.getByTestId("email-input")
+  // One frameless email field above the button: it is where the browser's
+  // passkey suggestions are offered (FR-12.3), and it is reachable.
+  const email = page.getByLabel("Email")
+  await expect(email).toBeVisible()
   await expect(email).toHaveAttribute("autocomplete", "username webauthn")
-  await expect(email).toHaveAttribute("tabindex", "-1")
-  await expect(email).toHaveAttribute("aria-hidden", "true")
+  await expect(email).toHaveCSS("border-top-width", "0px")
+  await email.focus()
+  await expect(email).toBeFocused()
   await expect(
     page.getByRole("link", { name: "Use a recovery code" }),
   ).toBeVisible()
@@ -93,7 +97,9 @@ test("The sign-in screen is keyboard complete and readable", async ({
     page.getByRole("button", { name: "Sign in with a passkey" }),
   ).toBeVisible()
 
-  // The action, the two links, then the appearance choice.
+  // The email field, the action, the two links, then the appearance choice.
+  await page.keyboard.press("Tab")
+  await expect(page.getByLabel("Email")).toBeFocused()
   await page.keyboard.press("Tab")
   await expect(
     page.getByRole("button", { name: "Sign in with a passkey" }),

@@ -6,7 +6,7 @@ import {
   ProjectsService,
   type ProjectUpdate,
 } from "@/client"
-import { textLink } from "@/components/Dashboard/shared"
+import { act } from "@/components/Common/RecordWork"
 import { useRecordPanel } from "@/components/Records/panels"
 import {
   DescriptionSection,
@@ -27,12 +27,6 @@ import DeleteProject from "./DeleteProject"
 import { NewProject } from "./NewProject"
 import { KeptTasks, OpenTasks, ProjectActivity } from "./ProjectWork"
 import { botsIn, tasksInWords } from "./words"
-
-/** A property's action, in words, as the mock sets it: ink, 13.5px, medium. */
-const act = cn(
-  textLink,
-  "text-ink text-[13.5px] font-medium disabled:opacity-50 pointer-coarse:-my-3 pointer-coarse:py-3",
-)
 
 /**
  * A project as one document: what it holds and who works in it, whether it is
@@ -74,11 +68,15 @@ export function ProjectPanel() {
           </>
         ) : project ? (
           <>
-            <span className="shrink-0">Project</span>
+            {/* The word repeats the title's own role: on a phone the date
+                gets the room. */}
+            <span className="max-sm:sr-only">Project</span>
             {project.created_at && (
               <>
-                <span aria-hidden>·</span>
-                <span className="truncate">
+                <span aria-hidden className="max-sm:hidden">
+                  ·
+                </span>
+                <span className="shrink-0 whitespace-nowrap">
                   created {formatDayOf(project.created_at)}
                 </span>
               </>
@@ -130,7 +128,14 @@ function ProjectRecord({ project }: { project: ProjectPublic }) {
           <span className="text-ink-2 text-sm tabular-nums">
             {project.is_archived
               ? `${project.task_count ?? 0} kept`
-              : tasksInWords(project)}
+              : tasksInWords(project)
+                  .split(" · ")
+                  .map((fact, index) => (
+                    <span key={fact}>
+                      {index > 0 && " · "}
+                      <span className="whitespace-nowrap">{fact}</span>
+                    </span>
+                  ))}
           </span>
           {project.is_archived ? (
             (project.task_count ?? 0) > 0 && (
