@@ -51,6 +51,10 @@ const useAuth = () => {
         await UsersService.updateUserMe({ body: { full_name: name } }).catch(
           () => undefined,
         )
+        // The page may have read the account already, before it had a name.
+        await queryClient.invalidateQueries({
+          queryKey: currentUserQuery().queryKey,
+        })
       }
       navigate({ to: "/" })
     },
