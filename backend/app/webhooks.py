@@ -416,6 +416,7 @@ def claim_due(
     *,
     now: datetime,
     limit: int,
+    lease: timedelta = LEASE,
 ) -> list[uuid.UUID]:
     """
     Claim up to `limit` pending rows of an outbox table that are due as of
@@ -437,7 +438,7 @@ def claim_due(
         ).all()
         ids = [row.id for row in due]
         for row in due:
-            row.next_attempt_at = now + LEASE
+            row.next_attempt_at = now + lease
             session.add(row)
         session.commit()
     return ids

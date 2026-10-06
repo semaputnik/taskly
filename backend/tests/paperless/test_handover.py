@@ -875,7 +875,10 @@ def test_a_crash_mid_attempt_only_delays_the_retry_until_the_lease_runs_out(
     webhooks.claim_due(PaperlessHandover, now=now, limit=10)
 
     assert drain(stub, storage, now=now + timedelta(seconds=30)) == 0
-    assert drain(stub, storage, now=now + webhooks.LEASE + timedelta(seconds=1)) == 1
+    assert (
+        drain(stub, storage, now=now + paperless.HANDOVER_LEASE + timedelta(seconds=1))
+        == 1
+    )
     assert handover(db, attached["id"]) is not None
 
 
@@ -895,3 +898,30 @@ def test_the_post_carries_nothing_but_the_file_its_title_and_the_tag(
     assert set(files) == {"document"}
     # Whatever a note says, it is never in the post: it follows the document.
     assert json.dumps(fields).count("Taskly") == 0
+
+
+def test_what_an_attempt_came_to_is_dropped_when_the_connection_changed_meanwhile(
+    client: TestClient,
+    db: Session,
+    stub: StubPaperless,
+    storage: InMemoryAttachmentStorage,
+) -> None:
+    headers = connected_user(client, db)
+    attached = upload(client, headers, _task(client, headers), pdf())
+    original_handle = stub.handle
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/api/documents/post_document/":
+            # The owner points Paperless somewhere else while the file is sent.
+            connect(client, headers, url="https://other.example.com", token="theirs")
+        return original_handle(request)
+
+    stub.handle = handle  # type: ignore[method-assign]
+
+    drain(stub, storage)
+
+    row = handover(db, attached["id"])
+    assert row is not None
+    # The restart stands: the stale task id of the old instance was not written.
+    assert row.stage == "send"
+    assert row.paperless_task_id is None

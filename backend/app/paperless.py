@@ -61,6 +61,9 @@ REQUEST_TIMEOUT = 30.0
 # webhook schedule, FR-04.6).
 POLL_INTERVAL = timedelta(seconds=10)
 POLL_DEADLINE = timedelta(minutes=15)
+# How long a claimed hand-over is held: an attempt makes several requests of up
+# to REQUEST_TIMEOUT each, so the webhook lease would be too short.
+HANDOVER_LEASE = timedelta(minutes=10)
 
 NOT_CONNECTED_CODE = "paperless_not_connected"
 UNREACHABLE_CODE = "paperless_unreachable"
@@ -504,7 +507,7 @@ def fetch_original(
         ) from error
 
 
-def test_connection(client: httpx.Client, url: str, token: str) -> str | None:
+def check_connection(client: httpx.Client, url: str, token: str) -> str | None:
     """None when the address answers and the token works, otherwise why not."""
     try:
         PaperlessApi(client, url, token).check()
@@ -531,6 +534,9 @@ class _Work:
     paperless_task_id: str | None
     document_id: int | None
     sent_at: datetime | None
+    # The time the claim left on the row. Anything that restarts the hand-over
+    # moves it, which is how an attempt in flight learns it was overtaken.
+    leased_until: datetime
 
 
 @dataclass
@@ -675,6 +681,7 @@ def _work_for(session: Session, handover_id: uuid.UUID) -> _Work | None:
         paperless_task_id=handover.paperless_task_id,
         document_id=handover.paperless_document_id,
         sent_at=handover.sent_at,
+        leased_until=handover.next_attempt_at,
     )
 
 
@@ -682,7 +689,15 @@ def _apply(session: Session, work: _Work, step: _Step, now: datetime) -> bool:
     """Write down what an attempt came to. True when the hand-over is finished
     and Taskly's copy can be released."""
     handover = session.get(PaperlessHandover, work.handover_id)
-    if handover is None:
+    if (
+        handover is None
+        or handover.state != DeliveryState.PENDING.value
+        or handover.stage != work.stage
+        or handover.paperless_task_id != work.paperless_task_id
+        or handover.next_attempt_at != work.leased_until
+    ):
+        # Gone, or restarted while this attempt was in flight (the connection
+        # changed): what it came to no longer applies.
         return False
     if step.done:
         attachment = session.get(Attachment, work.attachment_id)
@@ -775,7 +790,9 @@ def hand_over_due(
     `client`, `storage` and `now` exist for tests.
     """
     now = now or datetime.now(UTC)
-    ids = webhooks.claim_due(PaperlessHandover, now=now, limit=limit)
+    ids = webhooks.claim_due(
+        PaperlessHandover, now=now, limit=limit, lease=HANDOVER_LEASE
+    )
     if not ids:
         return 0
     own_client = client is None

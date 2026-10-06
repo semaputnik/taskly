@@ -3,7 +3,7 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Body, HTTPException
 
-from app import paperless
+from app import paperless, webhooks
 from app.api.deps import CurrentUser, PaperlessClientDep, SessionDep
 from app.core import outbound
 from app.models import (
@@ -104,6 +104,7 @@ def set_connection(
     session.add(connection)
     paperless.restart_handovers(session, current_user.id)
     session.commit()
+    webhooks.wake()
     session.refresh(connection)
     return _public(session, current_user.id, connection)
 
@@ -145,7 +146,7 @@ def test_connection(
             return PaperlessTestResult(ok=False, error=error.message)
     # No connection is held while Paperless takes its time to answer.
     session.commit()
-    failure = paperless.test_connection(client, url, token)
+    failure = paperless.check_connection(client, url, token)
     return PaperlessTestResult(ok=failure is None, error=failure)
 
 
