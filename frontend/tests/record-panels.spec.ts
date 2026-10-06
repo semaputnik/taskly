@@ -28,6 +28,10 @@ async function api(page: Page) {
 const row = (page: Page, name: string) =>
   page.getByRole("row", { name: `Open ${name}` })
 
+/** A project's name on its line: the link that opens its column. */
+const projectLink = (page: Page, name: string) =>
+  page.getByRole("main").getByRole("link", { name, exact: true })
+
 test("A project is read, renamed and archived in its own panel", async ({
   page,
 }) => {
@@ -45,33 +49,43 @@ test("A project is read, renamed and archived in its own panel", async ({
   })
 
   await page.goto("/projects")
-  await row(page, "Kitchen rebuild").click()
+  await projectLink(page, "Kitchen rebuild").click()
 
   const panel = page.getByRole("complementary", { name: "Kitchen rebuild" })
   await expect(panel).toBeVisible()
   await expect(page).toHaveURL(new RegExp(`project=${project.id}`))
-  await expect(panel.getByRole("link", { name: "1 task" })).toBeVisible()
+  await expect(panel).toContainText("1 open · 0 done")
+  await expect(panel.getByRole("link", { name: /Open the list/ })).toBeVisible()
 
   // Renaming is typing in the name, and the list behind it keeps up.
   const name = panel.getByRole("textbox", { name: "Project name" })
   await name.fill("Kitchen refit")
   await name.press("Enter")
   await page.keyboard.press("Escape")
-  await expect(row(page, "Kitchen refit")).toBeVisible()
+  await expect(projectLink(page, "Kitchen refit")).toBeVisible()
 
-  // Archiving is a property of the project, read where it is changed.
-  await row(page, "Kitchen refit").click()
+  // Archiving is a property of the project, read where it is changed, and
+  // the project moves to the Archived section of the same page.
+  await projectLink(page, "Kitchen refit").click()
   await page
     .getByRole("complementary", { name: "Kitchen refit" })
-    .getByRole("button", { name: "Archive" })
+    .getByRole("button", { name: "Archive", exact: true })
     .click()
   await expect(page.getByText("moved to the archive")).toBeVisible()
   await page.keyboard.press("Escape")
-  await expect(row(page, "Kitchen refit")).toHaveCount(0)
+  await expect(
+    page
+      .getByRole("list", { name: "Projects", exact: true })
+      .getByRole("link", { name: "Kitchen refit", exact: true }),
+  ).toHaveCount(0)
+  const archived = page.getByRole("list", { name: "Archived projects" })
+  await expect(
+    archived.getByRole("link", { name: "Kitchen refit", exact: true }),
+  ).toBeVisible()
 
-  await page.goto("/archive")
-  await expect(row(page, "Kitchen refit")).toBeVisible()
-  await row(page, "Kitchen refit").click()
+  await archived
+    .getByRole("link", { name: "Kitchen refit", exact: true })
+    .click()
   await page
     .getByRole("complementary", { name: "Kitchen refit" })
     .getByRole("button", { name: "Unarchive" })
@@ -103,7 +117,11 @@ test("A panel opens on reload and from a link the list would exclude", async ({
   const panel = page.getByRole("complementary", { name: "Old house" })
   await expect(panel).toBeVisible()
   await expect(panel.getByRole("button", { name: "Unarchive" })).toBeVisible()
-  await expect(row(page, "Old house")).toHaveCount(0)
+  await expect(
+    page
+      .getByRole("list", { name: "Projects", exact: true })
+      .getByRole("link", { name: "Old house" }),
+  ).toHaveCount(0)
 
   await page.reload()
   await expect(
@@ -115,11 +133,11 @@ test("The Inbox says what cannot be done to it", async ({ page }) => {
   await newUser(page)
 
   await page.goto("/projects")
-  await row(page, "Inbox").click()
+  await projectLink(page, "Inbox").click()
 
   const panel = page.getByRole("complementary", { name: "Inbox" })
   await expect(panel).toContainText(
-    "The Inbox is always in use, so it is never archived or renamed",
+    "The Inbox cannot be renamed, archived or deleted",
   )
   await expect(
     panel.getByRole("textbox", { name: "Project name" }),
@@ -278,7 +296,7 @@ test("Creating a project or a tag opens the new record's panel", async ({
   await newUser(page)
 
   await page.goto("/projects")
-  await page.getByRole("button", { name: "Add Project" }).click()
+  await page.getByRole("button", { name: "New project" }).click()
   const projectName = page.getByRole("textbox", { name: "Project name" })
   await expect(projectName).toBeFocused()
   await projectName.fill("Move house")
@@ -288,7 +306,7 @@ test("Creating a project or a tag opens the new record's panel", async ({
   ).toBeVisible()
   await expect(page).toHaveURL(/project=[0-9a-f-]{36}/)
   await page.keyboard.press("Escape")
-  await expect(row(page, "Move house")).toBeVisible()
+  await expect(projectLink(page, "Move house")).toBeVisible()
 
   await page.goto("/tags")
   await page.getByRole("button", { name: "Add Tag" }).click()
@@ -337,7 +355,7 @@ test("No record carries a three-dot menu, and rows open from the keyboard", asyn
     data: { name: "Watering bot", scope: { project_ids: [], permissions: {} } },
   })
 
-  for (const path of ["/tasks", "/projects", "/tags", "/bots", "/archive"]) {
+  for (const path of ["/tasks", "/projects", "/tags", "/bots"]) {
     await page.goto(path)
     await expect(page.getByRole("button", { name: /^Actions/ })).toHaveCount(0)
     await expect(page.locator(".lucide-ellipsis-vertical")).toHaveCount(0)
@@ -345,7 +363,7 @@ test("No record carries a three-dot menu, and rows open from the keyboard", asyn
 
   // A row is a control: it takes focus and answers Enter.
   await page.goto("/projects")
-  await row(page, "Garden").focus()
+  await projectLink(page, "Garden").focus()
   await page.keyboard.press("Enter")
   await expect(
     page.getByRole("complementary", { name: "Garden" }),

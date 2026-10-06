@@ -85,7 +85,6 @@ const SCREENS = [
   "/activity",
   "/projects",
   "/tags",
-  "/archive",
   "/settings",
 ]
 
@@ -355,7 +354,7 @@ test("The account control holds the other screens, appearance and signing out", 
 
   await account.tap()
   const menu = page.getByRole("menu")
-  for (const name of ["Projects", "Tags", "Archive", "Settings", "Log out"]) {
+  for (const name of ["Projects", "Tags", "Settings", "Log out"]) {
     const item = menu.getByRole("menuitem", { name })
     await expect(item).toBeVisible()
     // The menu grows into place; it is measured once it has.

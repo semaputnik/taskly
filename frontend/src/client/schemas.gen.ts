@@ -1031,6 +1031,31 @@ export const ProjectPublicSchema = {
             title: 'Task Count',
             default: 0
         },
+        open_count: {
+            type: 'integer',
+            title: 'Open Count',
+            default: 0
+        },
+        overdue_count: {
+            type: 'integer',
+            title: 'Overdue Count',
+            default: 0
+        },
+        backlog_count: {
+            type: 'integer',
+            title: 'Backlog Count',
+            default: 0
+        },
+        review_count: {
+            type: 'integer',
+            title: 'Review Count',
+            default: 0
+        },
+        done_count: {
+            type: 'integer',
+            title: 'Done Count',
+            default: 0
+        },
         created_at: {
             anyOf: [
                 {

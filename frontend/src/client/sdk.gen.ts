@@ -983,6 +983,11 @@ export class ActivityService {
      * same answer for both — rather than a history that looks empty. A deleted
      * task's history still reads.
      *
+     * `project_id` narrows it to one project's chronology, the way `task_id`
+     * does a task's: the entries about the project, the tasks in it and their
+     * comments and files. It is what the project panel's Activity section
+     * reads, and a project that is not the caller's is a 404 like a task.
+     *
      * `order` turns the log around. It changes which end a page starts from and
      * nothing about what the log holds, so it combines with every narrowing and
      * with `skip` and `limit`.

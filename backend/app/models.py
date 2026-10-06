@@ -300,6 +300,16 @@ class ProjectPublic(ProjectBase):
     # The tasks resolving to it that are not deleted — what archiving takes out
     # of view and what deleting takes down with it (FR-05.9, FR-05.11).
     task_count: int = 0
+    # What the Projects page says about the tasks, so it reads one list rather
+    # than a list of tasks per project (FR-05.15). Subtasks count with their
+    # root's project, like `task_count`; `open_count` is the number the task
+    # list narrowed to the project shows, and `overdue_count`, `backlog_count`
+    # and `review_count` are parts of it.
+    open_count: int = 0
+    overdue_count: int = 0
+    backlog_count: int = 0
+    review_count: int = 0
+    done_count: int = 0
     created_at: datetime | None = None
 
 

@@ -634,6 +634,26 @@ export type ProjectPublic = {
      */
     task_count?: number;
     /**
+     * Open Count
+     */
+    open_count?: number;
+    /**
+     * Overdue Count
+     */
+    overdue_count?: number;
+    /**
+     * Backlog Count
+     */
+    backlog_count?: number;
+    /**
+     * Review Count
+     */
+    review_count?: number;
+    /**
+     * Done Count
+     */
+    done_count?: number;
+    /**
      * Created At
      */
     created_at?: string | null;
@@ -2762,6 +2782,10 @@ export type activityReadActivityLogData = {
          * Task Id
          */
         task_id?: string | null;
+        /**
+         * Project Id
+         */
+        project_id?: string | null;
         order?: ActivityOrder;
     };
     url: '/api/v1/activity-log/';

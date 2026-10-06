@@ -130,7 +130,7 @@ function Activity() {
         </div>
       ) : data.data.length === 0 ? (
         <p className="text-ink-3 border-rule border-b py-8">
-          {emptyMessage(search.actor, search.kind)}
+          {emptyMessage(search.actor, search.kind, search.project_id)}
         </p>
       ) : (
         <ActivityLog

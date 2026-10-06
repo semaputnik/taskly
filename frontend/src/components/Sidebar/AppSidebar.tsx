@@ -20,7 +20,6 @@ const baseItems: NavItem[] = [
   { title: "Tags", path: "/tags" },
   { title: "Bots", path: "/bots" },
   { title: "Activity", path: "/activity" },
-  { title: "Archive", path: "/archive" },
 ]
 
 const itemClass = cn(

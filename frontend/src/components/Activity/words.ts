@@ -91,7 +91,13 @@ const KIND_EMPTY: Record<ActivityKind, string> = {
 export function emptyMessage(
   actor: string | undefined,
   kind: ActivityKind | undefined,
+  project?: string,
 ): string {
+  if (project) {
+    return actor || kind
+      ? "Nothing in this project matches those filters."
+      : "Nothing has happened in this project yet."
+  }
   if (actor === ME) {
     return kind
       ? `You have nothing under “${KIND_LABELS[kind]}”.`

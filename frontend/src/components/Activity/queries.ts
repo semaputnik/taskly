@@ -31,6 +31,9 @@ export const activitySearchSchema = z.object({
     .catch(undefined),
   // Not a sort and not a page: which of its questions the log is answering.
   kind: z.enum(KINDS).optional().catch(undefined),
+  // The project whose chronology this is: what a project's column hands off
+  // with (FR-05.15).
+  project_id: z.string().uuid().optional().catch(undefined),
   order: z.enum(ORDERS).optional().catch(undefined),
 })
 
@@ -38,11 +41,12 @@ export type ActivitySearch = z.infer<typeof activitySearchSchema>
 
 /** What the address asks the API for. */
 export function logRequest(search: ActivitySearch) {
-  const { page = 1, actor, kind, order } = search
+  const { page = 1, actor, kind, order, project_id } = search
   return {
     skip: (page - 1) * PAGE_SIZE,
     limit: PAGE_SIZE,
     kind: kind as ActivityKind | undefined,
+    project_id,
     actor_bot_user_id: actor && actor !== ME ? actor : undefined,
     by_user: actor === ME ? true : undefined,
     // Newest is the API's own order, so it is not asked for: one key for one
