@@ -34,6 +34,7 @@ You can also configure these environment variables as needed:
 * `SMTP_USER`: The SMTP server user.
 * `EMAILS_FROM_EMAIL`: The email account used to send emails.
 * `SENTRY_DSN`: The DSN for Sentry.
+* `OUTBOUND_ALLOW_PRIVATE_ADDRESSES`: Set to `true` to let webhooks point at loopback and private addresses (see [Webhooks](#webhooks)). Off by default.
 
 ### Secrets
 
@@ -215,6 +216,16 @@ Accounts created with a password keep their data but lose their way in when you 
 2. As the superuser, open the users list and issue a recovery code to each other user, and hand it to them yourself. Each one spends theirs on a new passkey.
 
 `FIRST_SUPERUSER_PASSWORD` is no longer read; remove it from your environment and secrets.
+
+## Webhooks
+
+Taskly calls a bot user's webhook URLs when a task becomes ready for it or someone comments on a task it is involved in (ADR-0009). Three things are the operator's to know:
+
+* **Private addresses are refused by default.** A webhook URL that resolves to loopback or a private range (`127.0.0.1`, `10.x`, `192.168.x`, a Docker network, the cloud metadata address) is refused when it is set and again on every delivery, so a visitor cannot make the server probe its own network. When your bot users run on the same machine or LAN, which is the usual self-hosted case, set `OUTBOUND_ALLOW_PRIVATE_ADDRESSES=true`. Inside a container, `localhost` is the container itself: point the webhook at the host's LAN address or a service name instead.
+* **There is no worker to run.** Every API process drains the outbox itself and retries a failed delivery after 1, 5, 15, 60 and 60 minutes, so a restart loses nothing. Several processes never send the same delivery twice. To stop a process from sending, set `WEBHOOK_DELIVERY_LOOP=false` on it; `WEBHOOK_POLL_SECONDS` (default 5) is how often it looks for due deliveries.
+* **`SECRET_KEY` protects the webhook secrets.** Taskly signs each delivery with the bot user's webhook secret, so it keeps the secret encrypted under a key derived from `SECRET_KEY`. Changing `SECRET_KEY` makes stored secrets unreadable: deliveries then fail saying so, until the owner regenerates each secret in the bot user's settings.
+
+The delivery contract (body, headers, signature, a verifier to copy) is in the API documentation, under the `bots` tag.
 
 ## URLs
 

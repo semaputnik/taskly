@@ -18,6 +18,8 @@ Add these required [environment variables](https://fastapicloud.com/docs/builds-
 * `FIRST_SUPERUSER`: The email address of the first superuser. Whoever registers it while there is no superuser becomes one.
 * `FRONTEND_HOST`: The public URL of the application, such as the generated `https://your-app.fastapicloud.dev` URL or a custom domain. Passkeys are bound to its hostname: changing it later makes every passkey unusable (see [Passkeys and the Hostname](deployment-docker-compose.md#passkeys-and-the-hostname)).
 
+To let webhooks point at loopback and private addresses, set `OUTBOUND_ALLOW_PRIVATE_ADDRESSES` to `true`. It is off by default (see [Webhooks](deployment-docker-compose.md#webhooks)).
+
 To enable emails, add these optional environment variables with values from your email provider:
 
 * `SMTP_HOST`

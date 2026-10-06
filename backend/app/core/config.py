@@ -40,6 +40,20 @@ class Settings(BaseSettings):
     # tuned per deployment without a code change (FR-04.2).
     ATTACHMENT_MAX_SIZE_BYTES: int = 25 * 1024 * 1024
 
+    # Whether a webhook URL (or a Paperless address) may point at loopback or a
+    # private range (FR-11.3, FR-04.4). Off by default, because anyone can
+    # register and would otherwise be able to probe the server's own network.
+    # Turn it on for an installation whose agents run on the same machine or
+    # LAN, which is the case the default forbids (ADR-0009).
+    OUTBOUND_ALLOW_PRIVATE_ADDRESSES: bool = False
+
+    # Whether this API process drains the webhook outbox in the background
+    # (ADR-0009). Every process may; they never send the same delivery twice.
+    WEBHOOK_DELIVERY_LOOP: bool = True
+    # How often the loop looks for due deliveries, in seconds. A delivery made
+    # by this process is picked up at once, whatever this says.
+    WEBHOOK_POLL_SECONDS: float = 5.0
+
     @field_validator("DATABASE_URL", mode="before")
     @classmethod
     def _use_psycopg_driver(cls, value: str | PostgresDsn) -> str:

@@ -6,7 +6,7 @@ from collections.abc import Collection, Iterable, Sequence
 from datetime import UTC, date, datetime, timedelta
 from typing import Any, NamedTuple
 
-from sqlalchemy import ARRAY, Text, and_, case, literal, nullslast, or_
+from sqlalchemy import ARRAY, Text, and_, case, delete, literal, nullslast, or_
 from sqlalchemy.orm import aliased
 from sqlmodel import Session, col, func, select
 
@@ -52,6 +52,7 @@ from app.models import (
     User,
     UserCreate,
     UserUpdate,
+    WebhookDelivery,
 )
 
 
@@ -1499,13 +1500,21 @@ def delete_bot_user(*, session: Session, bot: BotUser) -> None:
     Mark a bot user deleted. The row stays, so its activity log entries, its
     comments and the tasks assigned to it keep naming it (FR-08.19, FR-08.21).
     Its token goes with it: authentication refuses a deleted bot user anyway
-    (FR-08.20), and this way it holds no credential at all.
+    (FR-08.20), and this way it holds no credential at all. So do its
+    webhooks: the events still waiting for them are discarded and its
+    deliveries end (FR-11.13).
     """
     now = datetime.now(UTC)
     bot.deleted_at = now
     if bot.token_hash is not None:
         bot.token_hash = None
         bot.token_revoked_at = now
+    bot.task_webhook_url = None
+    bot.comment_webhook_url = None
+    bot.webhook_secret_encrypted = None
+    session.exec(
+        delete(WebhookDelivery).where(col(WebhookDelivery.bot_user_id) == bot.id)
+    )
     session.add(bot)
     session.commit()
 
