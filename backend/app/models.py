@@ -581,11 +581,20 @@ class TaskQuery(SQLModel):
     assignee_id: uuid.UUID | None = None
     # The other half of the assignee filter: tasks with nobody on them.
     unassigned: bool = False
+    # Tasks on any of the owner's bot users, whichever one: the question "how
+    # much is with my integrations" without asking after each of them.
+    assigned_to_bots: bool = False
     # Who filed the task: the owner, or one of their bot users, named by the
     # same id either way. It has no "unassigned" counterpart — every task has
     # a reporter (FR-01.29).
     reporter_id: uuid.UUID | None = None
     tag: str | None = None
+    # Titles that contain this text, whatever its case (FR-06.14). Only the
+    # title is searched. The spaces around the text are not part of it, and
+    # blank text is refused rather than matching all.
+    title: (
+        Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)] | None
+    ) = None
     priority: TaskPriority | None = None
     # Any of the listed statuses matches; none listed means every status. A
     # list rather than an "open" flag, so a client can ask for exactly the
@@ -618,6 +627,10 @@ class TaskQuery(SQLModel):
     def check_assignee(self) -> TaskQuery:
         if self.unassigned and self.assignee_id is not None:
             raise ValueError("Ask for an assignee or for unassigned tasks, not both")
+        if self.unassigned and self.assigned_to_bots:
+            raise ValueError(
+                "Ask for unassigned tasks or for tasks on bot users, not both"
+            )
         return self
 
 

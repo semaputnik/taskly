@@ -16,18 +16,7 @@ export const Refusal = {
   HAS_SUBTASKS: "task_has_subtasks",
   /** The name asked for is already one of the user's tags. */
   TAG_EXISTS: "tag_exists",
-  /** A batch cannot move a recurring task's due date. */
-  TASK_REPEATS: "task_repeats",
-  /** A batch could not be done whole; the refusals say which tasks and why. */
-  BULK_REFUSED: "bulk_refused",
 } as const
-
-/** One task a batch could not change, and why. */
-export interface BatchRefusal {
-  task_id: string
-  code: string
-  message: string
-}
 
 const statusOf = (error: unknown): number | undefined =>
   error instanceof AxiosError ? error.response?.status : undefined
@@ -88,11 +77,4 @@ export function refusalMessage(error: unknown): string {
     return message
   }
   return error.message
-}
-
-/** The tasks a batch refused, when that is what came back. */
-export function batchRefusals(error: unknown): BatchRefusal[] | null {
-  if (refusalCode(error) !== Refusal.BULK_REFUSED) return null
-  const detail = detailOf(error) as { refusals?: BatchRefusal[] }
-  return detail.refusals ?? []
 }

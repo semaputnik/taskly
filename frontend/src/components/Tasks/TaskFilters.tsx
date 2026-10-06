@@ -1,29 +1,39 @@
 import { useQuery } from "@tanstack/react-query"
-import { List, SlidersHorizontal, Table2, X } from "lucide-react"
-import { useState } from "react"
+import { Check, ChevronDown, X } from "lucide-react"
+import { type ReactNode, useState } from "react"
 
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { ButtonGroup } from "@/components/ui/button-group"
-import { Input } from "@/components/ui/input"
+import { DayField } from "@/components/Common/DayField"
+import { navItemFocus } from "@/components/Sidebar/styles"
+import { Checkbox } from "@/components/ui/checkbox"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Label } from "@/components/ui/label"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
+import {
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet"
+import { useIsPhone } from "@/hooks/useIsPhone"
 import { projectsQuery, tagsQuery } from "@/lib/serverState"
 import { cn } from "@/lib/utils"
 import { useBotUsers } from "./assignee"
+import { orderChoice, timeLabel } from "./listWords"
 import { PriorityOption } from "./priority"
-import {
-  clearedFilters,
-  hasActiveFilters,
-  isCompact,
-  type TaskSearch,
-} from "./search"
+import { clearedFilters, hasActiveFilters, type TaskSearch } from "./search"
 import {
   describeStatusFilter,
   isOpenFilter,
@@ -33,392 +43,578 @@ import {
 } from "./statuses"
 import { PRIORITIES } from "./writes"
 
-// A Select cannot hold an empty value, so "no filter" needs a name of its own.
-// Everything selectable here is an id or a fixed keyword, never free text, so
-// nothing a user types can collide with it.
+// A radio group cannot hold an empty value, so "no filter" needs a name of
+// its own. Everything offered here is an id or a fixed keyword, never free
+// text, so nothing a user types can collide with it.
 const ANY = "any"
 
-// The list's own order — subtasks under their parents — which no sort names.
-const DEFAULT_ORDER = "default"
-
-interface TaskFiltersProps {
-  search: TaskSearch
-  onChange: (next: Partial<TaskSearch>) => void
-  /** Switch between the table and compact rows, without touching filters. */
-  onViewChange: (view: TaskSearch["view"]) => void
-}
-
 /**
- * Compact rows or the table. The current one is marked with a quiet fill, not
- * a colour, since it is a place, not an action.
+ * One text button on the row, quiet until it is set: ink, a weight up, and an
+ * × beside it that drops the filter. A button's focus is the navigation's
+ * own: a 2px ink outline clear of it.
  */
-function ViewSwitch({
-  view,
-  onChange,
-}: {
-  view: TaskSearch["view"]
-  onChange: (view: TaskSearch["view"]) => void
-}) {
-  const choices = [
-    { value: undefined, label: "Compact", icon: List },
-    { value: "table" as const, label: "Table", icon: Table2 },
-  ]
-  return (
-    <ButtonGroup aria-label="View" className="ml-auto">
-      {choices.map(({ value, label, icon: Icon }) => {
-        const current = view === value
-        return (
-          <Button
-            key={label}
-            variant="outline"
-            aria-pressed={current}
-            onClick={() => onChange(value)}
-            className={cn(
-              "aria-pressed:bg-accent aria-pressed:text-accent-foreground",
-              !current && "text-muted-foreground",
-            )}
-          >
-            <Icon aria-hidden />
-            <span className="hidden sm:inline">{label}</span>
-            <span className="sr-only sm:hidden">{label}</span>
-          </Button>
-        )
-      })}
-    </ButtonGroup>
-  )
-}
+const control = cn(
+  navItemFocus,
+  "text-ink-3 hover:bg-hover hover:text-ink data-[state=open]:bg-hover data-[state=open]:text-ink inline-flex h-7 items-center gap-[5px] rounded-md px-1.5 whitespace-nowrap transition-colors",
+)
 
-interface Option {
+interface Choice {
   value: string
   label: string
   /** Drawn in the menu in place of the label, where the label needs a mark. */
-  display?: React.ReactNode
+  display?: ReactNode
 }
 
-function FilterSelect({
-  label,
+/**
+ * A filter as it sits on the row: its text, and when it is set the value in
+ * place of "Any …" with the × that drops it. The two are separate buttons in
+ * one pill, so the hover fill reads as one control.
+ */
+function Filter({
+  noun,
   anyLabel,
   value,
-  options,
-  onChange,
+  onRemove,
+  menu,
 }: {
-  label: string
+  /** What is filtered, for the button's name: "Project". */
+  noun: string
   anyLabel: string
+  /** What the filter is set to, in the reader's words; none when it is not. */
   value: string | undefined
-  options: Option[]
-  onChange: (value: string | undefined) => void
+  onRemove: () => void
+  /** Wraps the button in what it opens. */
+  menu: (button: ReactNode) => ReactNode
 }) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <Label className="text-muted-foreground text-xs">{label}</Label>
-      <Select
-        value={value ?? ANY}
-        onValueChange={(next) => onChange(next === ANY ? undefined : next)}
-      >
-        <SelectTrigger className="w-full" aria-label={label}>
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value={ANY}>{anyLabel}</SelectItem>
-          {options.map((option) => (
-            <SelectItem key={option.value} value={option.value}>
-              {option.display ?? option.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
+  // An empty value in a hand-edited URL is set but narrows nothing, so it is
+  // not drawn as a filter.
+  const set = Boolean(value)
+  const button = (
+    <button
+      type="button"
+      aria-label={set ? `${noun}: ${value}` : undefined}
+      className={cn(
+        control,
+        set && "text-ink font-medium",
+        // The pill is the hover target when there is an × beside the text.
+        set && "hover:bg-transparent data-[state=open]:bg-transparent",
+      )}
+    >
+      {set ? value : anyLabel}
+      {!set && <ChevronDown aria-hidden className="size-2.5 opacity-70" />}
+    </button>
   )
-}
-
-function DateFilter({
-  label,
-  value,
-  onChange,
-}: {
-  label: string
-  value: string | undefined
-  onChange: (value: string | undefined) => void
-}) {
   return (
-    <div className="flex flex-col gap-1.5">
-      <Label className="text-muted-foreground text-xs">{label}</Label>
-      <Input
-        type="date"
-        value={value ?? ""}
-        onChange={(e) => onChange(e.target.value || undefined)}
-      />
-    </div>
+    <span
+      className={cn(
+        "inline-flex items-center rounded-md",
+        set && "hover:bg-hover pr-1",
+      )}
+    >
+      {menu(button)}
+      {set && (
+        <button
+          type="button"
+          aria-label={`Remove the ${noun.toLowerCase()} filter`}
+          onClick={onRemove}
+          className={cn(
+            navItemFocus,
+            // A finger needs more than 14px: the hit area grows past the mark
+            // without moving anything.
+            "text-ink-3 hover:bg-rule hover:text-ink relative grid size-3.5 place-items-center rounded-full transition-colors pointer-coarse:after:absolute pointer-coarse:after:-inset-3.5",
+          )}
+        >
+          <X aria-hidden className="size-2.5" strokeWidth={2} />
+        </button>
+      )}
+    </span>
   )
 }
 
 /**
- * Which choice the status select shows. Every open status is the baseline, so
- * it shows as no narrowing at all. A URL naming some other set of them
- * matches no single choice; its chip still says what it filters.
+ * A menu on a phone: a sheet that rises from the bottom, where a thumb is,
+ * with rows 44px tall. The trigger is whatever button the caller wraps in
+ * `SheetTrigger`; this is the sheet it opens.
  */
-function statusValue(statuses: OpenStatus[] | undefined): string | undefined {
-  if (!statuses) return undefined
-  if (isOpenFilter(statuses)) return undefined
+function PickSheet({
+  title,
+  description,
+  children,
+  done,
+}: {
+  title: string
+  description: string
+  children: ReactNode
+  /** A closing button at the foot, for a sheet that is used more than once. */
+  done?: boolean
+}) {
+  return (
+    <SheetContent
+      side="bottom"
+      className="bg-page max-h-[85svh] gap-0 rounded-t-xl pb-[env(safe-area-inset-bottom)] shadow-none"
+    >
+      <SheetHeader className="px-4 pt-4 pb-1">
+        <SheetTitle className="text-[15px]">{title}</SheetTitle>
+        <SheetDescription className="sr-only">{description}</SheetDescription>
+      </SheetHeader>
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-2">
+        {children}
+      </div>
+      {done && (
+        <div className="border-rule border-t px-4 py-2">
+          <SheetClose className="bg-ink text-page h-11 w-full rounded-md text-[15px] font-medium">
+            Done
+          </SheetClose>
+        </div>
+      )}
+    </SheetContent>
+  )
+}
+
+/** One row of a sheet: 44px, the chosen one in ink with a check. */
+function SheetOption({
+  selected,
+  onClick,
+  children,
+}: {
+  selected: boolean
+  onClick: () => void
+  children: ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={selected}
+      onClick={onClick}
+      className={cn(
+        "hover:bg-hover flex min-h-11 w-full items-center gap-3 px-4 text-left text-[15px]",
+        selected ? "text-ink font-medium" : "text-ink-2",
+      )}
+    >
+      <span className="min-w-0 flex-1 truncate">{children}</span>
+      {selected && <Check aria-hidden className="size-4 shrink-0" />}
+    </button>
+  )
+}
+
+/** The choices of one filter as sheet rows, "any" first. */
+function ChoiceOptions({
+  anyLabel,
+  value,
+  selected,
+  choices,
+  onChange,
+}: {
+  anyLabel: string
+  value: string | undefined
+  selected: string | undefined
+  choices: Choice[]
+  onChange: (value: string | undefined) => void
+}) {
+  const marked = selected ?? (value ? "" : ANY)
+  return (
+    <>
+      <SheetOption
+        selected={marked === ANY}
+        onClick={() => onChange(undefined)}
+      >
+        {anyLabel}
+      </SheetOption>
+      {choices.map((choice) => (
+        <SheetOption
+          key={choice.value}
+          selected={marked === choice.value}
+          onClick={() => onChange(choice.value)}
+        >
+          {choice.display ?? choice.label}
+        </SheetOption>
+      ))}
+    </>
+  )
+}
+
+/** A filter that is one choice among a list: a menu of radio items. */
+function ChoiceFilter({
+  noun,
+  anyLabel,
+  value,
+  selected,
+  choices,
+  onChange,
+}: {
+  noun: string
+  anyLabel: string
+  /** The set filter in the reader's words; none when the filter is not set. */
+  value: string | undefined
+  /** The value of the choice to mark, which is none for an odd URL's set. */
+  selected: string | undefined
+  choices: Choice[]
+  /** The chosen value, or undefined for "any". */
+  onChange: (value: string | undefined) => void
+}) {
+  const phone = useIsPhone()
+  const [sheetOpen, setSheetOpen] = useState(false)
+  return (
+    <Filter
+      noun={noun}
+      anyLabel={anyLabel}
+      value={value}
+      onRemove={() => onChange(undefined)}
+      menu={(button) =>
+        phone ? (
+          // A phone's menu is a sheet; choosing a row closes it.
+          <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+            <SheetTrigger asChild>{button}</SheetTrigger>
+            <PickSheet title={noun} description="Choose what to filter by.">
+              <ChoiceOptions
+                anyLabel={anyLabel}
+                value={value}
+                selected={selected}
+                choices={choices}
+                onChange={(next) => {
+                  onChange(next)
+                  setSheetOpen(false)
+                }}
+              />
+            </PickSheet>
+          </Sheet>
+        ) : (
+          <DropdownMenu modal={false}>
+            <DropdownMenuTrigger asChild>{button}</DropdownMenuTrigger>
+            <DropdownMenuContent align="start" aria-label={noun}>
+              <DropdownMenuRadioGroup
+                value={selected ?? (value ? "" : ANY)}
+                onValueChange={(next) =>
+                  onChange(next === ANY ? undefined : next)
+                }
+              >
+                <DropdownMenuRadioItem value={ANY}>
+                  {anyLabel}
+                </DropdownMenuRadioItem>
+                {choices.map((choice) => (
+                  <DropdownMenuRadioItem
+                    key={choice.value}
+                    value={choice.value}
+                  >
+                    {choice.display ?? choice.label}
+                  </DropdownMenuRadioItem>
+                ))}
+              </DropdownMenuRadioGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )
+      }
+    />
+  )
+}
+
+/**
+ * Which choice the status menu marks. Every open status is the baseline, so
+ * it is no narrowing at all. A URL naming some other set of them matches no
+ * single choice; the button still says what it filters.
+ */
+function singleStatus(statuses: OpenStatus[] | undefined): string | undefined {
+  if (!statuses || isOpenFilter(statuses)) return undefined
   return statuses.length === 1 ? statuses[0] : undefined
 }
 
-/** One active filter, named in the reader's words, with the way to drop it. */
-function ActiveChip({
-  label,
-  display,
-  onRemove,
+/**
+ * The time filter's two questions: overdue, and a range of due days. It is
+ * the only filter that is not a pick from a list, and is in a popover on a
+ * wide screen and in the More sheet on a phone.
+ */
+function TimeFields({
+  search,
+  onChange,
 }: {
-  label: string
-  /** Drawn in place of the label; the label still names the remove button. */
-  display?: React.ReactNode
-  onRemove: () => void
+  search: TaskSearch
+  onChange: (next: Partial<TaskSearch>) => void
 }) {
   return (
-    <Badge variant="secondary" className="gap-1 py-1 pr-1 pl-2.5">
-      {display ?? label}
-      <button
-        type="button"
-        aria-label={`Remove filter: ${label}`}
-        onClick={onRemove}
-        className="hover:bg-foreground/10 rounded-full p-0.5 transition-colors"
-      >
-        <X className="size-3" />
-      </button>
-    </Badge>
+    <div className="flex flex-col gap-3.5">
+      <Label className="min-h-6 gap-2.5 font-normal pointer-coarse:min-h-11">
+        <Checkbox
+          checked={search.overdue === true}
+          onCheckedChange={(checked) =>
+            onChange({ overdue: checked === true ? true : undefined })
+          }
+        />
+        Overdue
+      </Label>
+      <div className="flex flex-col gap-1.5">
+        <Label className="text-ink-3 text-xs font-normal">Due from</Label>
+        <DayField
+          label="Due from"
+          value={search.due_from}
+          onChange={(day) => onChange({ due_from: day ?? undefined })}
+        />
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <Label className="text-ink-3 text-xs font-normal">Due to</Label>
+        <DayField
+          label="Due to"
+          value={search.due_to}
+          onChange={(day) => onChange({ due_to: day ?? undefined })}
+        />
+      </div>
+    </div>
+  )
+}
+
+/** Clears the time filter's three parts. */
+const NO_TIME = { overdue: undefined, due_from: undefined, due_to: undefined }
+
+/**
+ * The time filter: overdue, or a range of due dates. Two kinds of question in
+ * one menu, since a day is all either one is about.
+ */
+function TimeFilter({
+  search,
+  onChange,
+}: {
+  search: TaskSearch
+  onChange: (next: Partial<TaskSearch>) => void
+}) {
+  const label = timeLabel(search)
+  return (
+    <Filter
+      noun="Time"
+      anyLabel="Any time"
+      value={label}
+      onRemove={() => onChange(NO_TIME)}
+      menu={(button) => (
+        <Popover>
+          <PopoverTrigger asChild>{button}</PopoverTrigger>
+          <PopoverContent align="start" aria-label="Time" className="w-64">
+            <TimeFields search={search} onChange={onChange} />
+          </PopoverContent>
+        </Popover>
+      )}
+    />
+  )
+}
+
+type Sort = NonNullable<TaskSearch["sort"]>
+
+/** The orders the list can be put in, the list's own first. */
+const ORDERS: { sort: Sort | undefined; label: string }[] = [
+  { sort: undefined, label: "Newest first" },
+  { sort: "due_date", label: "Due date" },
+  { sort: "priority", label: "Priority" },
+  { sort: "created_at", label: "Filed" },
+]
+
+/**
+ * The order menu, at the row's right. The list opens newest first with each
+ * subtask under its root; the other three order it flat. Choosing one gives
+ * it the direction it naturally runs in, and choosing it again reverses it,
+ * which the menu says beside the order that is in force (FR-06.4).
+ */
+function OrderMenu({
+  search,
+  onOrder,
+}: {
+  search: TaskSearch
+  onOrder: (sort: Sort | undefined) => void
+}) {
+  const { label } = orderChoice(search)
+  const phone = useIsPhone()
+  const [sheetOpen, setSheetOpen] = useState(false)
+  if (phone) {
+    return (
+      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+        <SheetTrigger asChild>
+          <button
+            type="button"
+            aria-label={`Order: ${label}`}
+            className={cn(control, "-mr-1.5")}
+          >
+            {label}
+            <ChevronDown aria-hidden className="size-2.5 opacity-70" />
+          </button>
+        </SheetTrigger>
+        <PickSheet title="Order" description="Choose how the list is ordered.">
+          {ORDERS.map(({ sort, label: name }) => (
+            <SheetOption
+              key={sort ?? "default"}
+              selected={sort === search.sort}
+              onClick={() => {
+                onOrder(sort)
+                setSheetOpen(false)
+              }}
+            >
+              {name}
+              {sort && sort === search.sort && (
+                <span className="text-ink-3 ml-3 text-xs font-normal">
+                  Choose again to reverse
+                </span>
+              )}
+            </SheetOption>
+          ))}
+        </PickSheet>
+      </Sheet>
+    )
+  }
+  return (
+    <DropdownMenu modal={false}>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          aria-label={`Order: ${label}`}
+          className={cn(control, "-mr-1.5")}
+        >
+          {label}
+          <ChevronDown aria-hidden className="size-2.5 opacity-70" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" aria-label="Order">
+        <DropdownMenuRadioGroup value={search.sort ?? "default"}>
+          {ORDERS.map(({ sort, label: name }) => (
+            <DropdownMenuRadioItem
+              key={sort ?? "default"}
+              value={sort ?? "default"}
+              // Chosen again it must reverse, so the item acts on selection
+              // rather than on the group's change, which a repeat is not.
+              onSelect={() => onOrder(sort)}
+              className="gap-6"
+            >
+              {name}
+              {sort && sort === search.sort && (
+                <span className="text-ink-3 ml-auto text-xs">
+                  Choose again to reverse
+                </span>
+              )}
+            </DropdownMenuRadioItem>
+          ))}
+        </DropdownMenuRadioGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }
 
 /**
- * The filter bar over the task list.
+ * The row of filters over the task list, and the order menu at its end.
  *
- * Sorting is not here: it belongs to the column it orders, where the reader
- * is already looking, and it is not a filter — clearing the filters must not
- * disturb the order.
+ * Each filter is a quiet text button that opens a menu; one that is set is
+ * said in ink, a weight up, in place of its "Any …", with an × to drop it.
+ * Nothing is hidden by being closed: a set filter is always on the row, so
+ * a list narrowed by a control you cannot see cannot happen. "Clear" at the
+ * end of the filters drops them all and leaves the order alone.
  *
  * Every filter that is set narrows the list further — they combine with AND,
  * never OR (FR-06.3) — and each one lives in the URL, so a view can be shared
  * or reloaded.
- *
- * All nine filters at once is a wall of controls that mostly say "any", so
- * the panel is closed by default. What is closed is never hidden, though: an
- * active filter is always named on a chip that can drop it, because a list
- * silently narrowed by a control you cannot see is the worst outcome here.
  */
 export function TaskFilters({
   search,
   onChange,
-  onViewChange,
-}: TaskFiltersProps) {
-  const [isOpen, setIsOpen] = useState(false)
+  onOrder,
+}: {
+  search: TaskSearch
+  onChange: (next: Partial<TaskSearch>) => void
+  onOrder: (sort: Sort | undefined) => void
+}) {
   const { data: bots } = useBotUsers()
   const { data: projects } = useQuery(projectsQuery())
   const { data: tags } = useQuery(tagsQuery())
 
-  // Tag names are free text, so a tag could be called "any". Selecting by id
-  // keeps the sentinel out of the user's namespace; the URL keeps the name.
-  const tagOptions = (tags?.data ?? []).map((tag) => ({
+  const botName = (id: string) =>
+    bots?.data.find((bot) => bot.id === id)?.name ?? "A bot user"
+  const projectName = (id: string) =>
+    projects
+      ? (projects.data.find((project) => project.id === id)?.name ??
+        "Unknown project")
+      : "Loading…"
+  // Tag names are free text, so a tag could be called "any". The menu holds
+  // ids to keep the sentinel out of the reader's namespace; the URL keeps the
+  // name, which is what the API filters by.
+  const tagChoices = (tags?.data ?? []).map((tag) => ({
     value: tag.id,
     label: tag.name,
   }))
-  const selectedTagId = tagOptions.find(
-    (option) => option.label === search.tag,
-  )?.value
-  const projectName = (id: string) =>
-    projects?.data.find((project) => project.id === id)?.name ?? "Unknown"
-  const assigneeName = (value: string) => {
-    if (value === "me") return "Me"
-    if (value === "unassigned") return "Unassigned"
-    return bots?.data.find((bot) => bot.id === value)?.name ?? "A bot user"
+
+  const status = describeStatusFilter(search.status)
+  // On a phone the row keeps the project, the assignee and the status; the
+  // priority and the tag fold behind More with the time, since a narrow row
+  // has room for the filters people reach for and no more.
+  const phone = useIsPhone()
+  const [moreOpen, setMoreOpen] = useState(false)
+  const priorityFilter = {
+    noun: "Priority",
+    anyLabel: "Any priority",
+    value: search.priority,
+    selected: search.priority,
+    choices: PRIORITIES.map((priority) => ({
+      value: priority,
+      label: priority,
+      display: <PriorityOption priority={priority} />,
+    })),
+    onChange: (value: string | undefined) =>
+      onChange({ priority: value as TaskSearch["priority"] }),
   }
-  const reporterName = (value: string) =>
-    value === "me"
-      ? "Me"
-      : (bots?.data.find((bot) => bot.id === value)?.name ?? "A bot user")
+  const tagFilter = {
+    noun: "Tag",
+    anyLabel: "Any tag",
+    value: search.tag,
+    selected: tagChoices.find((tag) => tag.label === search.tag)?.value,
+    choices: tagChoices,
+    onChange: (id: string | undefined) =>
+      onChange({ tag: tagChoices.find((tag) => tag.value === id)?.label }),
+  }
 
-  /** Each active filter as a label plus the change that removes it. */
-  const chips: {
-    key: string
-    label: string
-    display?: React.ReactNode
-    clear: Partial<TaskSearch>
-  }[] = []
-  if (search.project_id)
-    chips.push({
-      key: "project_id",
-      label: `Project: ${projectName(search.project_id)}`,
-      clear: { project_id: undefined },
-    })
-  if (search.assignee)
-    chips.push({
-      key: "assignee",
-      label: `Assignee: ${assigneeName(search.assignee)}`,
-      clear: { assignee: undefined },
-    })
-  if (search.reporter)
-    chips.push({
-      key: "reporter",
-      label: `Created by: ${reporterName(search.reporter)}`,
-      clear: { reporter: undefined },
-    })
-  if (search.tag)
-    chips.push({
-      key: "tag",
-      label: `Tag: ${search.tag}`,
-      clear: { tag: undefined },
-    })
-  if (search.priority)
-    chips.push({
-      key: "priority",
-      label: `Priority: ${search.priority}`,
-      display: (
-        <span className="flex items-center gap-1">
-          Priority: <PriorityOption priority={search.priority} />
-        </span>
-      ),
-      clear: { priority: undefined },
-    })
-  const statusLabel = describeStatusFilter(search.status)
-  if (statusLabel)
-    chips.push({
-      key: "status",
-      label: `Status: ${statusLabel}`,
-      clear: { status: undefined },
-    })
-  if (search.overdue)
-    chips.push({
-      key: "overdue",
-      label: "Overdue",
-      clear: { overdue: undefined },
-    })
-  if (search.due_from)
-    chips.push({
-      key: "due_from",
-      label: `Due from ${search.due_from}`,
-      clear: { due_from: undefined },
-    })
-  if (search.due_to)
-    chips.push({
-      key: "due_to",
-      label: `Due to ${search.due_to}`,
-      clear: { due_to: undefined },
-    })
-
-  // Counted from the chips rather than from the schema keys, so the badge can
-  // never claim a filter the reader has no chip for — an empty value in a
-  // hand-edited URL is set but filters nothing.
-  const activeCount = chips.length
-
-  return (
-    <div className="bg-card flex flex-col rounded-md border">
-      <div className="flex flex-wrap items-center gap-2 p-3">
-        <Button
-          variant="outline"
-          aria-expanded={isOpen}
-          onClick={() => setIsOpen((open) => !open)}
-        >
-          <SlidersHorizontal />
-          Filters
-          {activeCount > 0 && (
-            <Badge variant="secondary" className="ml-0.5 tabular-nums">
-              {activeCount}
-            </Badge>
-          )}
-        </Button>
-
-        {/* Late work is open work, which the list shows and nothing else, so
-            the button no longer has to say so in the status filter too. */}
-        <Button
-          variant={search.overdue ? "default" : "outline"}
-          onClick={() =>
-            onChange({ overdue: search.overdue ? undefined : true })
+  const row = (
+    <fieldset className="border-rule-strong m-0 min-w-0 text-ink-3 border-0 border-b p-0 pb-2.5 text-[13.5px]">
+      <legend className="sr-only">Filters</legend>
+      <div className="-ml-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+        <ChoiceFilter
+          noun="Project"
+          anyLabel="Any project"
+          value={search.project_id && projectName(search.project_id)}
+          selected={search.project_id}
+          choices={(projects?.data ?? []).map((project) => ({
+            value: project.id,
+            label: project.name,
+          }))}
+          onChange={(project_id) => onChange({ project_id })}
+        />
+        <ChoiceFilter
+          noun="Assignee"
+          anyLabel="Anyone"
+          value={
+            search.assignee === "me"
+              ? "Assigned to me"
+              : search.assignee === "unassigned"
+                ? "Unassigned"
+                : search.assignee && botName(search.assignee)
           }
-        >
-          Overdue
-        </Button>
-
-        {/* On a phone the order and the view take a line of their own, the
-            order stretching to fill it, so the bar wraps into two rows that
-            line up rather than a ragged second one. */}
-        <div
-          className={cn(
-            "ml-auto flex items-center gap-2",
-            // The table has no order control here, and the view alone fits
-            // on the first line.
-            isCompact(search) && "w-full sm:w-auto",
-          )}
-        >
-          {/* The table sorts from its headers; compact rows have none, so
-              the same two orders are offered here instead. */}
-          {isCompact(search) && (
-            <Select
-              value={search.sort ?? DEFAULT_ORDER}
-              onValueChange={(next) =>
-                onChange({
-                  sort:
-                    next === DEFAULT_ORDER
-                      ? undefined
-                      : (next as TaskSearch["sort"]),
-                  order: undefined,
-                })
-              }
-            >
-              <SelectTrigger
-                className="min-w-0 flex-1 sm:w-40 sm:flex-none"
-                aria-label="Sort by"
-              >
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={DEFAULT_ORDER}>Default order</SelectItem>
-                <SelectItem value="due_date">Due date</SelectItem>
-                <SelectItem value="priority">Priority</SelectItem>
-                {/* Newest first, which is this order's natural direction, so
-                    it needs no direction control of its own here. */}
-                <SelectItem value="created_at">Created</SelectItem>
-              </SelectContent>
-            </Select>
-          )}
-          <ViewSwitch view={search.view} onChange={onViewChange} />
-        </div>
-      </div>
-
-      {isOpen && (
-        <div className="grid gap-3 border-t p-3 sm:grid-cols-2 lg:grid-cols-4">
-          <FilterSelect
-            label="Project"
-            anyLabel="Any project"
-            value={search.project_id}
-            options={(projects?.data ?? []).map((project) => ({
-              value: project.id,
-              label: project.name,
-            }))}
-            onChange={(project_id) => onChange({ project_id })}
-          />
-          <FilterSelect
-            label="Assignee"
-            anyLabel="Anyone"
-            value={search.assignee}
-            options={[
-              { value: "me", label: "Me" },
-              { value: "unassigned", label: "Unassigned" },
-              ...(bots?.data ?? []).map((bot) => ({
-                value: bot.id,
-                label: bot.name,
-              })),
-            ]}
-            onChange={(value) =>
-              onChange({ assignee: value as TaskSearch["assignee"] })
+          selected={search.assignee}
+          choices={[
+            { value: "me", label: "Me" },
+            { value: "unassigned", label: "Unassigned" },
+            ...(bots?.data ?? []).map((bot) => ({
+              value: bot.id,
+              label: bot.name,
+            })),
+          ]}
+          onChange={(value) =>
+            onChange({ assignee: value as TaskSearch["assignee"] })
+          }
+        />
+        {/* Not on the row until a link asks for it: who filed a task is a
+            question the lines answer themselves, and the row has room for
+            the filters people reach for. A list narrowed to one still says
+            so here, and it can be dropped. */}
+        {search.reporter && (
+          <ChoiceFilter
+            noun="Created by"
+            anyLabel="Anyone created"
+            value={
+              search.reporter === "me"
+                ? "Created by me"
+                : `Created by ${botName(search.reporter)}`
             }
-          />
-          {/* Beside Assignee, because the two ask the same kind of question:
-              who owes the work, and who put it here. No "unassigned" among
-              the choices — every task has a reporter. */}
-          <FilterSelect
-            label="Created by"
-            anyLabel="Anyone"
-            value={search.reporter}
-            options={[
+            selected={search.reporter}
+            choices={[
               { value: "me", label: "Me" },
               ...(bots?.data ?? []).map((bot) => ({
                 value: bot.id,
@@ -429,82 +625,112 @@ export function TaskFilters({
               onChange({ reporter: value as TaskSearch["reporter"] })
             }
           />
-          <FilterSelect
-            label="Tag"
-            anyLabel="Any tag"
-            value={selectedTagId}
-            options={tagOptions}
-            onChange={(id) =>
-              onChange({
-                tag: tagOptions.find((option) => option.value === id)?.label,
-              })
-            }
-          />
-          <FilterSelect
-            label="Priority"
-            anyLabel="Any priority"
-            value={search.priority}
-            options={PRIORITIES.map((priority) => ({
-              value: priority,
-              label: priority,
-              display: <PriorityOption priority={priority} />,
-            }))}
-            onChange={(value) =>
-              onChange({ priority: value as TaskSearch["priority"] })
-            }
-          />
-          {/* Done is not among the choices: the list holds open work, and
-              finished work is read in the activity log (ADR-0006). "Any open
-              status" is both the default and what used to be called Open —
-              one choice now, because they are the same thing. */}
-          <FilterSelect
-            label="Status"
-            anyLabel="Any open status"
-            value={statusValue(search.status)}
-            options={OPEN_STATUS_VALUES.map((status) => ({
-              value: status,
-              label: STATUS_LABELS[status],
-            }))}
-            onChange={(value) =>
-              onChange({
-                status: value === undefined ? undefined : [value as OpenStatus],
-              })
-            }
-          />
-          <DateFilter
-            label="Due from"
-            value={search.due_from}
-            onChange={(due_from) => onChange({ due_from })}
-          />
-          <DateFilter
-            label="Due to"
-            value={search.due_to}
-            onChange={(due_to) => onChange({ due_to })}
-          />
+        )}
+        {/* Done is not among the choices: the list holds open work, and
+            finished work is read in the activity log (ADR-0006). Every open
+            status is the baseline, so it is "Any status", not a filter. */}
+        <ChoiceFilter
+          noun="Status"
+          anyLabel="Any status"
+          value={status}
+          selected={singleStatus(search.status)}
+          choices={OPEN_STATUS_VALUES.map((value) => ({
+            value,
+            label: STATUS_LABELS[value],
+          }))}
+          onChange={(value) =>
+            onChange({
+              status: value === undefined ? undefined : [value as OpenStatus],
+            })
+          }
+        />
+        {phone ? (
+          <>
+            {/* The rarer filters are folded behind More, but a set one is
+                still said here, in ink, with its ×: opening it opens the
+                sheet it is set in. */}
+            {search.priority && (
+              <Filter
+                noun="Priority"
+                anyLabel="Any priority"
+                value={search.priority}
+                onRemove={() => onChange({ priority: undefined })}
+                menu={(button) => <SheetTrigger asChild>{button}</SheetTrigger>}
+              />
+            )}
+            {search.tag && (
+              <Filter
+                noun="Tag"
+                anyLabel="Any tag"
+                value={search.tag}
+                onRemove={() => onChange({ tag: undefined })}
+                menu={(button) => <SheetTrigger asChild>{button}</SheetTrigger>}
+              />
+            )}
+            {timeLabel(search) && (
+              <Filter
+                noun="Time"
+                anyLabel="Any time"
+                value={timeLabel(search)}
+                onRemove={() => onChange(NO_TIME)}
+                menu={(button) => <SheetTrigger asChild>{button}</SheetTrigger>}
+              />
+            )}
+            <SheetTrigger asChild>
+              <button type="button" className={control}>
+                More
+                <ChevronDown aria-hidden className="size-2.5 opacity-70" />
+              </button>
+            </SheetTrigger>
+          </>
+        ) : (
+          <>
+            <ChoiceFilter {...priorityFilter} />
+            <ChoiceFilter {...tagFilter} />
+            <TimeFilter search={search} onChange={onChange} />
+          </>
+        )}
+        {hasActiveFilters(search) && (
+          <button
+            type="button"
+            aria-label="Clear all filters"
+            onClick={() => onChange(clearedFilters())}
+            className={cn(control, "-ml-1")}
+          >
+            Clear
+          </button>
+        )}
+        <div className="ml-auto">
+          <OrderMenu search={search} onOrder={onOrder} />
         </div>
-      )}
-
-      {chips.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2 border-t p-3">
-          {chips.map((chip) => (
-            <ActiveChip
-              key={chip.key}
-              label={chip.label}
-              display={chip.display}
-              onRemove={() => onChange(chip.clear)}
-            />
-          ))}
-          {hasActiveFilters(search) && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => onChange(clearedFilters())}
-            >
-              Clear all
-            </Button>
+      </div>
+      {phone && (
+        <PickSheet
+          title="More filters"
+          description="Filter by priority, tag or time."
+          done
+        >
+          <h3 className="text-ink-3 px-4 pt-2 pb-1 text-[12.5px]">Priority</h3>
+          <ChoiceOptions {...priorityFilter} />
+          <h3 className="text-ink-3 px-4 pt-4 pb-1 text-[12.5px]">Tag</h3>
+          {tagChoices.length > 0 ? (
+            <ChoiceOptions {...tagFilter} />
+          ) : (
+            <p className="text-ink-3 px-4 py-2.5 text-[15px]">No tags yet</p>
           )}
-        </div>
+          <h3 className="text-ink-3 px-4 pt-4 pb-1 text-[12.5px]">Time</h3>
+          <div className="px-4 pb-2">
+            <TimeFields search={search} onChange={onChange} />
+          </div>
+        </PickSheet>
       )}
-    </div>
+    </fieldset>
+  )
+  return phone ? (
+    <Sheet open={moreOpen} onOpenChange={setMoreOpen}>
+      {row}
+    </Sheet>
+  ) : (
+    row
   )
 }

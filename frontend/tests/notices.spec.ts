@@ -6,7 +6,7 @@ test.use({ storageState: { cookies: [], origins: [] } })
 /** A notice, raised by writing a task into the day page's line. */
 async function raiseNotice(page: Page, title: string) {
   await page.goto("/")
-  const line = page.getByRole("textbox", { name: "Add a task" })
+  const line = page.getByRole("combobox", { name: "Add a task" })
   await line.fill(title)
   await line.press("Enter")
   const notice = page.locator("[data-sonner-toast]").filter({ hasText: title })
@@ -117,7 +117,7 @@ test("A notice raised from inside a panel is at the top of the screen too", asyn
   const task = await api.create("/tasks/", { title: "Renew the lease" })
   await api.create(`/tasks/${task.id}/comments/`, { body: "Sign it by Friday" })
 
-  await page.goto(`/tasks?view=table&task=${task.id}`)
+  await page.goto(`/tasks?task=${task.id}`)
   const panel = page.getByRole("complementary", { name: "Renew the lease" })
   await panel
     .getByRole("listitem")
@@ -170,7 +170,7 @@ test("The same title sent twice while the first is on its way is not handed back
     }
     await route.continue()
   })
-  const line = page.getByRole("textbox", { name: "Add a task" })
+  const line = page.getByRole("combobox", { name: "Add a task" })
   await line.fill("Water the plants")
   await line.press("Enter")
   await line.fill("Water the plants")

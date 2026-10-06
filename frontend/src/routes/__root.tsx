@@ -1,5 +1,10 @@
+import type { QueryClient } from "@tanstack/react-query"
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools"
-import { createRootRoute, HeadContent, Outlet } from "@tanstack/react-router"
+import {
+  createRootRouteWithContext,
+  HeadContent,
+  Outlet,
+} from "@tanstack/react-router"
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools"
 import ErrorComponent from "@/components/Common/ErrorComponent"
 import NotFound from "@/components/Common/NotFound"
@@ -11,7 +16,16 @@ import NotFound from "@/components/Common/NotFound"
  */
 const devtools = import.meta.env.VITE_DEVTOOLS === "true"
 
-export const Route = createRootRoute({
+/**
+ * What every route's loader is handed: the query client, so a route can start
+ * its page's requests as soon as it is matched, while its component's code is
+ * still on its way.
+ */
+export interface RouterContext {
+  queryClient: QueryClient
+}
+
+export const Route = createRootRouteWithContext<RouterContext>()({
   component: () => (
     <>
       <HeadContent />

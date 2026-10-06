@@ -29,7 +29,7 @@ const DUE_TONE: Record<DueTone, string> = {
 
 /** Each fact's glyph, and the label a screen reader hears before it. */
 const FACT: Record<
-  MetaFact["kind"],
+  Exclude<MetaFact["kind"], "assignee">,
   { glyph: LucideIcon; spokenLabel: string }
 > = {
   subtasks: { glyph: ListTree, spokenLabel: "Subtasks done:" },
@@ -42,9 +42,10 @@ const FACT: Record<
  * The task line: its status mark, which is also the control that closes it
  * and carries the priority as its colour; the title in medium weight; and
  * beneath it a quiet meta line — subtask progress, due day, recurrence and
- * tags, each a small glyph and its value, with the project at the far right
- * as a neutral square and its name. A line with nothing to say in its meta
- * is one line tall.
+ * tags, each a small glyph and its value, then who the task is with, in
+ * words, with the project at the far right
+ * as a neutral square and its name. The project is always there, so a line
+ * is two lines tall even when it has nothing else to say.
  *
  * It is the dashboard's line and the task list's compact view. It opens the
  * task from its title, never the whole line: the line also holds the mark,
@@ -55,6 +56,8 @@ export function CompactTaskRow({
   projectName,
   receipt = false,
   flush = false,
+  depth = 0,
+  asItem = false,
   children,
 }: {
   task: TaskPublic
@@ -70,6 +73,15 @@ export function CompactTaskRow({
    * the line runs to the column's edges, as the rules between lines do.
    */
   flush?: boolean
+  /**
+   * How far down its root task's tree the line is drawn, where it is drawn
+   * under that root: indented, with a branch mark in place of the subtask
+   * glyph, which only says a line is a subtask when nothing beside it does.
+   * Root tasks, and lines in a list that is not a tree, are 0.
+   */
+  depth?: number
+  /** Set where the line sits in a list: it is the list's item itself. */
+  asItem?: boolean
   /** Set under the meta line, in the title's column: a line about the task. */
   children?: React.ReactNode
 }) {
@@ -83,14 +95,26 @@ export function CompactTaskRow({
     projectName,
   })
 
+  const Line = asItem ? "li" : "div"
+  const branch = depth > 0
+
   return (
-    <div
+    <Line
       className={cn(
         "border-rule hover:row-tint flex gap-3 border-b py-2.5 transition-colors last:border-b-0",
         open && "row-tint",
         flush ? "px-0" : "px-4",
       )}
+      // 30px under the root, and a little more for each level below that.
+      style={branch ? { paddingLeft: 30 + (depth - 1) * 20 } : undefined}
     >
+      {branch && (
+        <span
+          role="img"
+          aria-label="Subtask"
+          className="border-rule-strong -mr-1 mt-0.5 size-2.5 shrink-0 self-start rounded-bl-[3px] border-b-[1.5px] border-l-[1.5px]"
+        />
+      )}
       {/* Held to the title's line, not centred on the whole task line, and
           nudged so the two share a centre: the mark itself sits a pixel
           down, inside its larger target. */}
@@ -102,7 +126,7 @@ export function CompactTaskRow({
       />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
-          {task.parent_id && (
+          {task.parent_id && !branch && (
             <CornerDownRight
               className="text-ink-3 size-3.5 shrink-0"
               aria-label="Subtask"
@@ -146,11 +170,12 @@ export function CompactTaskRow({
         )}
         {children}
       </div>
-    </div>
+    </Line>
   )
 }
 
 function Fact({ fact }: { fact: MetaFact }) {
+  if (fact.kind === "assignee") return <Assignee fact={fact} />
   const { glyph: Glyph, spokenLabel } = FACT[fact.kind]
   return (
     <span
@@ -162,6 +187,34 @@ function Fact({ fact }: { fact: MetaFact }) {
       <Glyph className="size-[0.8125rem] shrink-0" aria-hidden />
       <span className="sr-only">{spokenLabel}</span>
       <span className="truncate">{fact.text}</span>
+    </span>
+  )
+}
+
+/**
+ * Whose task it is, in words alone: a name needs no glyph beside it. Quiet
+ * like the rest of the line, except the hand-over, which is set in Ink 2 as
+ * the one fact that asks something of the reader (FR-06.13). On a phone its
+ * name is capped, so a long one gives way before the project does.
+ */
+export function Assignee({
+  fact,
+}: {
+  fact: Extract<MetaFact, { kind: "assignee" }>
+}) {
+  return (
+    <span
+      className={cn(
+        "flex max-w-32 min-w-0 sm:max-w-64",
+        fact.handover && "text-ink-2",
+      )}
+    >
+      <span className="sr-only">
+        {fact.handover ? "Handed over by:" : "Assigned to:"}
+      </span>
+      {/* The arrow is the hand-over; a long name gives way before it does. */}
+      <span className="min-w-0 truncate">{fact.name ?? fact.text}</span>
+      {fact.name && <span className="shrink-0 whitespace-pre"> → you</span>}
     </span>
   )
 }

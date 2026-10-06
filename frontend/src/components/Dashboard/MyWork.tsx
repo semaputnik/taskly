@@ -15,13 +15,13 @@ import {
 import { completionReceipt } from "@/components/Tasks/CompleteTask"
 import { useTaskStatus } from "@/components/Tasks/useTaskWrites"
 import { Skeleton } from "@/components/ui/skeleton"
-import { currentUserQuery, projectsQuery, tasksQuery } from "@/lib/serverState"
+import { currentUserQuery, projectsQuery } from "@/lib/serverState"
 import { cn } from "@/lib/utils"
+import { myWorkQueries } from "./queries"
 import { textLink } from "./shared"
 import {
   handoverLine,
   MY_WORK_GROUPS,
-  MY_WORK_PREVIEW,
   type MyWorkStatus,
   myWorkSearch,
 } from "./work"
@@ -33,21 +33,9 @@ import {
  * Tasks page's; this is what is on the reader now.
  */
 
-/** One request per group, so each knows its own count. */
-const myWorkQueries = (userId: string) =>
-  MY_WORK_GROUPS.map(({ status }) =>
-    tasksQuery({
-      assignee_id: userId,
-      status: [status],
-      sort: "priority",
-      limit: MY_WORK_PREVIEW,
-    }),
-  )
-
 /**
- * Start the groups' requests beside the rest of the page's, rather than
- * once the sections before them have resumed. Waits on nothing: until the
- * reader is known, it asks for nothing.
+ * Watch the groups' requests from the page, outside the sections' boundary.
+ * Waits on nothing: until the reader is known, it asks for nothing.
  */
 export function usePrefetchMyWork() {
   const { data: user } = useQuery(currentUserQuery())

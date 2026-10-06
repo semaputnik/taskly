@@ -1,5 +1,6 @@
 import { expect, type Page, test } from "@playwright/test"
 import { randomEmail } from "./utils/random"
+import { taskLine } from "./utils/tasks"
 import { storeTokenAndClose } from "./utils/tokenDialog"
 import { logInUser } from "./utils/user"
 
@@ -159,8 +160,8 @@ test("A tag is renamed and deleted from its panel", async ({ page }) => {
   await expect(row(page, "errands")).toHaveCount(0)
 
   // And it is off the task that carried it.
-  await page.goto("/tasks?view=table")
-  await expect(row(page, "Buy stamps")).not.toContainText("errands")
+  await page.goto("/tasks")
+  await expect(taskLine(page, "Buy stamps")).not.toContainText("errands")
 })
 
 test("A bot user's scope and permissions each save on their own", async ({

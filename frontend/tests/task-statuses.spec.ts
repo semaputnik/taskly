@@ -4,14 +4,21 @@ import {
   OPEN_STATUSES,
 } from "../src/components/Tasks/statuses"
 import { newUser, userApi } from "./utils/account"
+import { openDraft } from "./utils/capture"
+import { taskLine } from "./utils/tasks"
 
 test.use({ storageState: { cookies: [], origins: [] } })
 
-const row = (page: Page, title: string) =>
-  page.getByRole("row", { name: `Open ${title}` })
+const row = taskLine
 
-const statusTrigger = (page: Page, title: string) =>
-  row(page, title).getByRole("button", { name: /Change status of/ })
+/**
+ * A line's mark, which says the task's status in its name: it is the control
+ * that closes the task, and carries the status for a screen reader.
+ */
+const mark = (page: Page, title: string, status: string) =>
+  taskLine(page, title).getByRole("checkbox", {
+    name: new RegExp(`\\(${status}[,)]`),
+  })
 
 async function seed(
   page: Page,
@@ -74,10 +81,12 @@ test("Completing sends done, takes the row away, and undoes to To do", async ({
     { title: "Started", status: "in_progress" },
     { title: "Parked", status: "waiting" },
   ])
-  await page.goto("/tasks?view=table")
+  await page.goto("/tasks")
 
   for (const title of ["Started", "Parked"]) {
-    const box = row(page, title).getByRole("checkbox", { name: "Mark as done" })
+    const box = row(page, title).getByRole("checkbox", {
+      name: "Mark as done",
+    })
     await expect(box).not.toBeChecked()
     const sent = nextUpdate(page)
     await box.click()
@@ -96,7 +105,7 @@ test("Completing sends done, takes the row away, and undoes to To do", async ({
     const back = nextUpdate(page)
     await notice.getByRole("button", { name: "Undo" }).click()
     expect(await back).toEqual({ status: "todo" })
-    await expect(statusTrigger(page, title)).toContainText("To do")
+    await expect(mark(page, title, "To do")).toBeVisible()
   }
 })
 
@@ -104,11 +113,8 @@ test("A task captured from the interface starts in Backlog", async ({
   page,
 }) => {
   await newUser(page)
-  await page.goto("/tasks?view=table")
-  // The shell has to be listening before a key means anything to it.
-  await expect(page.getByRole("button", { name: "Filters" })).toBeVisible()
-
-  await page.keyboard.press("c")
+  await page.goto("/tasks")
+  await openDraft(page)
   const title = page.getByRole("textbox", { name: "Task title" })
   await expect(title).toBeFocused()
   const created = page.waitForResponse(
@@ -120,21 +126,26 @@ test("A task captured from the interface starts in Backlog", async ({
   await title.press("Enter")
   expect((await (await created).json()).status).toBe("backlog")
 
-  await expect(statusTrigger(page, "Book the dentist")).toContainText("Backlog")
+  await expect(mark(page, "Book the dentist", "Backlog")).toBeVisible()
 })
 
-test("A status is changed from the list column and from the panel", async ({
+test("A status is changed in the panel, and the line's mark follows", async ({
   page,
 }) => {
   await newUser(page)
   await seed(page, [{ title: "Call the bank" }])
-  await page.goto("/tasks?view=table")
+  await page.goto("/tasks")
 
-  await expect(page.getByRole("columnheader", { name: "Status" })).toBeVisible()
-  await expect(statusTrigger(page, "Call the bank")).toContainText("Backlog")
-  await statusTrigger(page, "Call the bank").click()
+  await expect(mark(page, "Call the bank", "Backlog")).toBeVisible()
+  await row(page, "Call the bank")
+    .getByRole("link", { name: "Call the bank" })
+    .click()
+  const panel = page.getByRole("complementary", { name: "Call the bank" })
+  const select = panel.getByRole("combobox", { name: "Status" })
+  await expect(select).toContainText("Backlog")
+  await select.click()
   // Every status, in the order work moves.
-  await expect(page.getByRole("menuitemradio")).toHaveText([
+  await expect(page.getByRole("option")).toHaveText([
     "Backlog",
     "To do",
     "In progress",
@@ -142,27 +153,18 @@ test("A status is changed from the list column and from the panel", async ({
     "Waiting",
     "Done",
   ])
-  await expect(
-    page.getByRole("menuitemradio", { name: "Backlog" }),
-  ).toBeChecked()
-  await page.getByRole("menuitemradio", { name: "Waiting" }).click()
-  await expect(statusTrigger(page, "Call the bank")).toContainText("Waiting")
-  // Choosing in the menu did not open the task behind it.
-  await expect(page.locator("[data-record-column]")).toHaveCount(0)
-  await expect(page.getByText("Call the bank moved to Waiting")).toBeAttached()
-
-  await row(page, "Call the bank").click()
-  const panel = page.getByRole("complementary", { name: "Call the bank" })
-  const select = panel.getByRole("combobox", { name: "Status" })
+  await page.getByRole("option", { name: "Waiting" }).click()
   await expect(select).toContainText("Waiting")
+  await expect(mark(page, "Call the bank", "Waiting")).toBeVisible()
+
   await select.click()
   await page.getByRole("option", { name: "Review" }).click()
   await expect(select).toContainText("Review")
   await page.keyboard.press("Escape")
-  await expect(statusTrigger(page, "Call the bank")).toContainText("Review")
+  await expect(mark(page, "Call the bank", "Review")).toBeVisible()
 })
 
-test("Done asks about open subtasks from the checkbox and from the menu", async ({
+test("Done asks about open subtasks from the checkbox and from the panel", async ({
   page,
 }) => {
   await newUser(page)
@@ -179,7 +181,7 @@ test("Done asks about open subtasks from the checkbox and from the menu", async 
     parent_id: ids["Other parent"],
     status: "in_progress",
   })
-  await page.goto("/tasks?view=table")
+  await page.goto("/tasks")
 
   await row(page, "Move house")
     .getByRole("checkbox", { name: "Mark as done" })
@@ -200,8 +202,12 @@ test("Done asks about open subtasks from the checkbox and from the menu", async 
     page.locator("[data-sonner-toast]").filter({ hasText: "Move house" }),
   ).toBeVisible()
 
-  await statusTrigger(page, "Other parent").click()
-  await page.getByRole("menuitemradio", { name: "Done" }).click()
+  await row(page, "Other parent")
+    .getByRole("link", { name: "Other parent" })
+    .click()
+  const panel = page.getByRole("complementary", { name: "Other parent" })
+  await panel.getByRole("combobox", { name: "Status" }).click()
+  await page.getByRole("option", { name: "Done" }).click()
   prompt = page.getByRole("dialog", { name: "This task has open subtasks" })
   await expect(prompt).toBeVisible()
   await prompt
@@ -209,7 +215,7 @@ test("Done asks about open subtasks from the checkbox and from the menu", async 
     .click()
   await expect(row(page, "Other parent")).toHaveCount(0)
   // Left as it was, so it is still open and still listed.
-  await expect(statusTrigger(page, "Pack plates")).toContainText("In progress")
+  await expect(mark(page, "Pack plates", "In progress")).toBeVisible()
 })
 
 test("The list holds open work, and narrows to a single open status", async ({
@@ -232,54 +238,50 @@ test("The list holds open work, and narrows to a single open status", async ({
     { title: "Parked", status: "waiting" },
     { title: "Finished", status: "done" },
   ])
-  await page.goto("/tasks?view=table")
+  await page.goto("/tasks")
   await listed
 
   await expect(row(page, "Planned")).toBeVisible()
   await expect(row(page, "Parked")).toBeVisible()
   await expect(row(page, "Finished")).toHaveCount(0)
 
-  await page.getByRole("button", { name: "Filters" }).click()
-  const filter = page.getByRole("combobox", { name: "Status" })
-  // The baseline is the default, and it is not a filter: no chip.
-  await expect(filter).toContainText("Any open status")
-  await expect(page.getByText(/^Status:/)).toHaveCount(0)
+  // The baseline is the default, and it is not a filter: "Any status" with
+  // no × beside it.
+  const filter = page.getByRole("button", { name: "Any status" })
+  await expect(filter).toBeVisible()
+  await expect(
+    page.getByRole("button", { name: "Remove the status filter" }),
+  ).toHaveCount(0)
 
   await filter.click()
   // The five open statuses, in the order work moves. Done is not a view of
   // this list to ask for.
-  await expect(page.getByRole("option")).toHaveText([
-    "Any open status",
+  await expect(page.getByRole("menuitemradio")).toHaveText([
+    "Any status",
     "Backlog",
     "To do",
     "In progress",
     "Review",
     "Waiting",
   ])
-  await page.getByRole("option", { name: "Waiting" }).click()
-  await expect(page.getByText("Status: Waiting")).toBeVisible()
+  await page.getByRole("menuitemradio", { name: "Waiting" }).click()
+  await expect(
+    page.getByRole("button", { name: "Status: Waiting" }),
+  ).toBeVisible()
   await expect(row(page, "Parked")).toBeVisible()
   await expect(row(page, "Planned")).toHaveCount(0)
 
   // The view is in the address.
   await page.reload()
-  await expect(page.getByText("Status: Waiting")).toBeVisible()
+  await expect(
+    page.getByRole("button", { name: "Status: Waiting" }),
+  ).toBeVisible()
   await expect(row(page, "Planned")).toHaveCount(0)
-})
 
-test("Bulk Set status moves every selected task", async ({ page }) => {
-  await newUser(page)
-  await seed(page, [{ title: "One" }, { title: "Two" }])
-  await page.goto("/tasks?view=table")
-
-  await page
-    .getByRole("checkbox", { name: "Select every task on this page" })
-    .check()
-  await page.getByRole("button", { name: "Set status" }).click()
-  await page.getByRole("menuitemradio", { name: "In progress" }).click()
-  await expect(page.getByText("2 tasks changed")).toBeVisible()
-  await expect(statusTrigger(page, "One")).toContainText("In progress")
-  await expect(statusTrigger(page, "Two")).toContainText("In progress")
+  // Dropping it returns to the baseline, which is every open status.
+  await page.getByRole("button", { name: "Remove the status filter" }).click()
+  await expect(row(page, "Planned")).toBeVisible()
+  await expect(row(page, "Parked")).toBeVisible()
 })
 
 test("The activity log says a task moved to Waiting", async ({ page }) => {
@@ -291,20 +293,4 @@ test("The activity log says a task moved to Waiting", async ({ page }) => {
   await expect(
     page.getByRole("row").filter({ hasText: "Renew the lease" }).first(),
   ).toContainText("Moved Renew the lease to Waiting")
-})
-
-test("On a phone the status column is a mark with a 44px target", async ({
-  page,
-}) => {
-  await newUser(page)
-  await seed(page, [{ title: "Water the plants", status: "in_progress" }])
-  await page.setViewportSize({ width: 375, height: 812 })
-  await page.goto("/tasks?view=table")
-
-  const trigger = statusTrigger(page, "Water the plants")
-  await expect(trigger).toHaveAccessibleName(/In progress/)
-  await expect(trigger.getByText("In progress")).toBeHidden()
-  const box = await trigger.boundingBox()
-  expect(box?.width).toBeGreaterThanOrEqual(44)
-  expect(box?.height).toBeGreaterThanOrEqual(44)
 })

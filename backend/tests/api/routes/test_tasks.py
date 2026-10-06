@@ -91,7 +91,9 @@ def test_priority_ordering_treats_unset_as_p4(client: TestClient, db: Session) -
             payload["priority"] = priority
         client.post(f"{settings.API_V1_STR}/tasks/", headers=headers, json=payload)
 
-    r = client.get(f"{settings.API_V1_STR}/tasks/", headers=headers)
+    r = client.get(
+        f"{settings.API_V1_STR}/tasks/", headers=headers, params={"sort": "priority"}
+    )
     titles = [t["title"] for t in r.json()["data"]]
 
     assert titles.index("p1 task") < titles.index("p3 task")

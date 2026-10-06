@@ -3,7 +3,6 @@ import { useRef, useState } from "react"
 import type {
   DueDateScope,
   SubtaskCompletion,
-  TaskBulkUpdate,
   TaskPublic,
   TaskStatus,
   TaskUpdate,
@@ -19,7 +18,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import useAuth from "@/hooks/useAuth"
-import type { BatchRefusal } from "@/lib/apiErrors"
 import { useReportChange } from "@/lib/serverState"
 import { toastError, toastProblem, toastSuccess } from "@/lib/toasts"
 import type { CaptureTarget } from "./capture"
@@ -27,8 +25,6 @@ import { draftToCreate, emptyDraft, type TaskDraft } from "./draft"
 import { DueDateScopeDialog } from "./recurrence"
 import { STATUS_LABELS } from "./statuses"
 import {
-  bulkDelete,
-  bulkUpdate,
   createTask,
   deleteTask,
   type Outcome,
@@ -356,60 +352,4 @@ export function useTaskDelete(task: TaskPublic) {
   }
 
   return { remove, isPending }
-}
-
-/**
- * Changing or deleting a selection as one act. `known` are the selected
- * tasks this screen has seen, which lets a batch the server would refuse be
- * refused before it is sent. A refusal lands in `refused`, naming the tasks
- * that stood in the way.
- */
-export function useBulkTaskWrites(selected: string[], known: TaskPublic[]) {
-  const { run, isPending } = useWrites()
-  const [refused, setRefused] = useState<BatchRefusal[]>([])
-
-  const settle = <T,>(outcome: Outcome<T>, success: string) => {
-    if (outcome.saved) {
-      setRefused([])
-      toastSuccess(success)
-    } else if (outcome.reason === "batch") {
-      // A batch lands whole or not at all, so a refusal names the rows that
-      // stood in the way and leaves everything as it was (story 29).
-      setRefused(outcome.refusals)
-    }
-    return outcome.saved
-  }
-
-  const count = (n: number | undefined, done: string) =>
-    `${n ?? 0} ${n === 1 ? "task" : "tasks"} ${done}`
-
-  return {
-    refused,
-    isPending,
-    change: async (body: Omit<TaskBulkUpdate, "task_ids">) => {
-      const outcome = await run((report) =>
-        bulkUpdate(report, selected, known, body),
-      )
-      return settle(
-        outcome,
-        count(outcome.saved ? outcome.data.updated : 0, "changed"),
-      )
-    },
-    /**
-     * Delete the selection. `settled` says the question is answered: deleted,
-     * or refused with the tasks in the way listed. A failure that says
-     * nothing about the tasks leaves it open.
-     */
-    remove: async () => {
-      const outcome = await run((report) => bulkDelete(report, selected))
-      const deleted = settle(
-        outcome,
-        count(outcome.saved ? outcome.data.deleted : 0, "deleted"),
-      )
-      return {
-        deleted,
-        settled: deleted || (!outcome.saved && outcome.reason === "batch"),
-      }
-    },
-  }
 }

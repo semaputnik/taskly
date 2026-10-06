@@ -92,54 +92,30 @@ test("A compact row shows subtasks, due day, tags and project, and its status ma
   ).toHaveClass(/text-priority-p3/)
 })
 
-test("The task list opens in compact rows, and switches to the table and back, keeping its filters", async ({
-  page,
-}) => {
-  await newUser(page)
-  await seedStarted(page)
-  await page.goto("/tasks?status=%5B%22in_progress%22%5D")
-
-  await expect(page.getByRole("button", { name: "Compact" })).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  )
-  await expect(page.getByRole("table")).toHaveCount(0)
-  await expect(page.getByRole("link", { name: "File the taxes" })).toBeVisible()
-  await expect(page.getByText("Status: In progress")).toBeVisible()
-  await expect(page.getByText("Water the plants")).toHaveCount(0)
-
-  // Compact rows have no headers to sort from, so the bar offers the order.
-  await page.getByRole("combobox", { name: "Sort by" }).click()
-  await page.getByRole("option", { name: "Priority" }).click()
-  await expect(page).toHaveURL(/sort=priority/)
-  await expect(
-    page.getByRole("link").filter({ hasText: /taxes|shed/ }),
-  ).toHaveText(["File the taxes", "Tidy the shed"])
-
-  await page.getByRole("button", { name: "Table" }).click()
-  await expect(page).toHaveURL(/view=table/)
-  await expect(page.getByRole("table")).toBeVisible()
-  await expect(page.getByText("Status: In progress")).toBeVisible()
-
-  await page.getByRole("button", { name: "Compact" }).click()
-  await expect(page).not.toHaveURL(/view=/)
-  await expect(page.getByRole("table")).toHaveCount(0)
-})
-
-test("A priority badge in the table carries its hue; P4 stays ink", async ({
+test("A priority badge in the archive's table carries its hue; P4 stays ink", async ({
   page,
 }) => {
   await newUser(page)
   const api = await userApi(page)
-  await api.create("/tasks/", { title: "Urgent", priority: "P1" })
-  await api.create("/tasks/", { title: "Someday", priority: "P4" })
-  await page.goto("/tasks?view=table")
+  const project = await api.create("/projects/", { name: "Shelved" })
+  await api.create("/tasks/", {
+    title: "Urgent",
+    priority: "P1",
+    project_id: project.id,
+  })
+  await api.create("/tasks/", {
+    title: "Someday",
+    priority: "P4",
+    project_id: project.id,
+  })
+  expect((await api.post(`/projects/${project.id}/archive`)).ok()).toBe(true)
+  await page.goto("/archive")
 
-  const urgent = page.getByRole("row", { name: "Open Urgent" })
+  const urgent = page.getByRole("row").filter({ hasText: "Urgent" })
   await expect(urgent.getByText("P1", { exact: true })).toHaveClass(
     /text-priority-p1/,
   )
-  const someday = page.getByRole("row", { name: "Open Someday" })
+  const someday = page.getByRole("row").filter({ hasText: "Someday" })
   await expect(someday.getByText("P4", { exact: true })).not.toHaveClass(
     /text-priority/,
   )

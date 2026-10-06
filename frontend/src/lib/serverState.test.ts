@@ -67,7 +67,6 @@ describe("what a change refreshes", () => {
     for (const change of [
       { type: "task created" },
       { type: "task deleted", taskId: "t1" },
-      { type: "tasks changed in bulk" },
     ] satisfies Change[]) {
       expect(refreshes(change, keys.projects)).toBe(true)
       expect(refreshes(change, project)).toBe(true)
@@ -75,10 +74,6 @@ describe("what a change refreshes", () => {
       expect(refreshes(change, keys.activity)).toBe(true)
       expect(refreshes(change, keys.tasks)).toBe(true)
     }
-  })
-
-  test("a batch refreshes every open task", () => {
-    expect(refreshes({ type: "tasks changed in bulk" }, otherTask)).toBe(true)
   })
 
   test("a tag change reaches every task that carries it", () => {

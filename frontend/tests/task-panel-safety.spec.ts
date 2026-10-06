@@ -1,5 +1,6 @@
 import { expect, type Locator, type Page, test } from "@playwright/test"
 import { newUser, userApi } from "./utils/account"
+import { taskLine } from "./utils/tasks"
 
 test.use({ storageState: { cookies: [], origins: [] } })
 
@@ -24,7 +25,7 @@ async function openTaskWithSubtask(page: Page) {
   const api = await userApi(page)
   const task = await api.create("/tasks/", { title: "Plan the trip" })
   await api.create("/tasks/", { title: "Book the train", parent_id: task.id })
-  await page.goto(`/tasks?view=table&task=${task.id}`)
+  await page.goto(`/tasks?task=${task.id}`)
   const panel = page.getByRole("complementary", { name: "Plan the trip" })
   await expect(panel).toBeVisible()
   return panel
@@ -132,8 +133,8 @@ test("The delete confirmation says the task comes back from the activity log, an
     .click()
   await expect(page.getByText("“Plan the trip” restored")).toBeVisible()
 
-  await page.goto("/tasks?view=table")
-  await expect(page.getByRole("row", { name: /Plan the trip/ })).toBeVisible()
+  await page.goto("/tasks")
+  await expect(taskLine(page, "Plan the trip")).toBeVisible()
   const api = await userApi(page)
   const titles = (await (await api.get("/tasks/")).json()).data.map(
     (task: { title: string }) => task.title,

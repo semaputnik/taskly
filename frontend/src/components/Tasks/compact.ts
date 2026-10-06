@@ -76,6 +76,36 @@ export function subtaskProgress(
 }
 
 /**
+ * Whose a task is: "you" for the owner, the bot user's name, or, for a task
+ * the owner holds in Review because a bot user handed it over, that bot
+ * user's name, an arrow and "you". A deleted bot user is named all the same
+ * (FR-08.19). Nobody for an unassigned task.
+ *
+ * A bot user's id is also in `assignee_id`, so the owner is the task with an
+ * assignee id and no bot user.
+ */
+function describeAssignee(
+  task: Pick<
+    Partial<TaskPublic>,
+    "status" | "assignee_id" | "assignee_bot_user" | "handover"
+  >,
+): { text: string; handover: boolean; name?: string } | null {
+  if (task.assignee_bot_user) {
+    return { text: task.assignee_bot_user.name, handover: false }
+  }
+  if (!task.assignee_id) return null
+  if (task.status === "review" && task.handover) {
+    return {
+      text: `${task.handover.bot_user.name} → you`,
+      handover: true,
+      // The name alone, so a long one can give way before the arrow does.
+      name: task.handover.bot_user.name,
+    }
+  }
+  return { text: "you", handover: false }
+}
+
+/**
  * One fact the meta line states about a task, drawn with its own glyph; the
  * due day also carries its tone.
  */
@@ -84,6 +114,11 @@ export type MetaFact =
   | { kind: "due"; text: string; tone: DueTone }
   | { kind: "recurrence"; text: string }
   | { kind: "tag"; text: string }
+  /**
+   * Whose task it is (FR-06.13). `handover` is the "bot → you" form, which
+   * the line sets in a heavier grey than the other two.
+   */
+  | { kind: "assignee"; text: string; handover: boolean; name?: string }
 
 /**
  * The line beneath a task's title: its facts, then the project it sits in,
@@ -96,8 +131,8 @@ export interface MetaLine {
 
 /**
  * What the line beneath a task's title says, in the order it says it: how far
- * through its subtasks it is, when it is due, how it repeats and its tags;
- * then its project. Whatever the task does not have is left out, so a task
+ * through its subtasks it is, when it is due, how it repeats and its tags,
+ * and whose it is; then its project. Whatever the task does not have is left out, so a task
  * with nothing to say has an empty meta line and its row stays one line tall.
  */
 export function metaLine(
@@ -110,6 +145,9 @@ export function metaLine(
       | "recurrence"
       | "tags"
       | "status"
+      | "assignee_id"
+      | "assignee_bot_user"
+      | "handover"
     >
   >,
   { today, projectName }: { today: string; projectName?: string },
@@ -130,5 +168,7 @@ export function metaLine(
     })
   }
   for (const tag of task.tags ?? []) facts.push({ kind: "tag", text: tag })
+  const assignee = describeAssignee(task)
+  if (assignee) facts.push({ kind: "assignee", ...assignee })
   return { facts, project: projectName || null }
 }

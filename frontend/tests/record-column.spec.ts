@@ -50,7 +50,7 @@ test("A task opens in a 560px column and the page beside it stays live", async (
 
   // The page is neither inert nor hidden from a screen reader: its capture
   // line takes focus and typing while the column is open.
-  const line = page.getByRole("textbox", { name: "Add a task" })
+  const line = page.getByRole("combobox", { name: "Add a task" })
   await line.click()
   await line.fill("Still typing")
   await expect(line).toHaveValue("Still typing")
@@ -238,7 +238,7 @@ test("A notice pressed beside an open column leaves it open", async ({
   await link(order[0]).click()
   await expect(column(page, order[0])).toBeVisible()
 
-  const line = page.getByRole("textbox", { name: "Add a task" })
+  const line = page.getByRole("combobox", { name: "Add a task" })
   await line.fill("Order milk")
   await line.press("Enter")
   const notice = page

@@ -9,8 +9,6 @@ import type { TaskPublic } from "@/client"
 import { client } from "@/client/client.gen"
 import type { Change } from "@/lib/serverState"
 import {
-  bulkDelete,
-  bulkUpdate,
   createTask,
   deleteTask,
   PRIORITIES,
@@ -174,67 +172,6 @@ describe("a single task", () => {
 
     expect(outcome).toEqual({ saved: true, data: task() })
     expect(reports).toEqual([{ type: "task created" }])
-  })
-})
-
-describe("a batch", () => {
-  test("a batch moving a recurring task's date is refused before sending", async () => {
-    const outcome = await bulkUpdate(
-      report,
-      ["t1", "r1"],
-      [task(), recurring],
-      { due_date: "2026-09-30" },
-    )
-
-    expect(outcome).toMatchObject({ saved: false, reason: "batch" })
-    if (!outcome.saved && outcome.reason === "batch") {
-      expect(outcome.refusals.map((refusal) => refusal.task_id)).toEqual(["r1"])
-      expect(outcome.refusals[0].message).toContain("Take out the bins")
-    }
-    expect(sent).toHaveLength(0)
-    expect(reports).toHaveLength(0)
-  })
-
-  test("a recurring task may still be changed in other ways", async () => {
-    answer = { status: 200, data: { updated: 2 } }
-
-    const outcome = await bulkUpdate(
-      report,
-      ["t1", "r1"],
-      [task(), recurring],
-      { priority: "P1" },
-    )
-
-    expect(outcome).toEqual({ saved: true, data: { updated: 2 } })
-    expect(sent[0].data).toEqual({ priority: "P1", task_ids: ["t1", "r1"] })
-    expect(reports).toEqual([{ type: "tasks changed in bulk" }])
-  })
-
-  test("a server refusal names the tasks in the way", async () => {
-    answer = {
-      status: 409,
-      data: {
-        detail: {
-          code: "bulk_refused",
-          message: "",
-          refusals: [
-            { task_id: "t1", code: "project_archived", message: "Archived." },
-          ],
-        },
-      },
-    }
-
-    const outcome = await bulkDelete(report, ["t1"])
-
-    expect(outcome).toEqual({
-      saved: false,
-      reason: "batch",
-      refusals: [
-        { task_id: "t1", code: "project_archived", message: "Archived." },
-      ],
-    })
-    expect(sent[0].data).toEqual({ task_ids: ["t1"], delete_subtasks: true })
-    expect(reports).toEqual([{ type: "tasks changed in bulk" }])
   })
 })
 

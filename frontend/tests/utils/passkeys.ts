@@ -38,7 +38,7 @@ export async function registerWithPasskey(page: Page, email: string) {
   await page.getByTestId("email-input").fill(email)
   await page.getByRole("button", { name: "Create account" }).click()
   await page.waitForURL("/")
-  await expect(page.getByRole("textbox", { name: "Add a task" })).toBeVisible()
+  await expect(page.getByRole("combobox", { name: "Add a task" })).toBeVisible()
 }
 
 /**
@@ -61,7 +61,7 @@ export async function signInWithPasskey(page: Page) {
   await page.goto("/login")
   await page.getByRole("button", { name: "Sign in with passkey" }).click()
   await page.waitForURL("/")
-  await expect(page.getByRole("textbox", { name: "Add a task" })).toBeVisible()
+  await expect(page.getByRole("combobox", { name: "Add a task" })).toBeVisible()
 }
 
 /** Make the page's browser one without WebAuthn at all (FR-12.12). */

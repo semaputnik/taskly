@@ -1,5 +1,7 @@
 import {
+  type EnsureQueryDataOptions,
   infiniteQueryOptions,
+  type Query,
   type QueryClient,
   type QueryKey,
   queryOptions,
@@ -147,6 +149,27 @@ export const tasksQuery = (query: ReadTasksQuery = {}) =>
   queryOptions({
     queryKey: [ROOT.tasks, query],
     queryFn: async () => (await TasksService.readTasks({ query })).data,
+  })
+
+/**
+ * The tasks whose title contains what the reader typed, newest first. The
+ * answer carries the text it is for, so a screen that has moved on to newer
+ * text can tell an answer to older text from one to its own.
+ */
+export const taskTitleSearchQuery = (
+  text: string,
+  { status, limit }: Pick<NonNullable<ReadTasksQuery>, "status" | "limit">,
+) =>
+  queryOptions({
+    // Under its own segment, like the tag search: no text typed into a
+    // search can make up another key.
+    queryKey: [ROOT.tasks, "title", text, status, limit],
+    queryFn: async () => {
+      const { data } = await TasksService.readTasks({
+        query: { title: text, status, limit },
+      })
+      return { text, tasks: data.data }
+    },
   })
 
 export const taskQuery = (taskId: string | null | undefined) =>
@@ -324,8 +347,6 @@ export type Change =
   | { type: "task changed"; taskId: string }
   | { type: "task created" }
   | { type: "task deleted"; taskId: string }
-  /** A batch changed or deleted a selection of tasks. */
-  | { type: "tasks changed in bulk" }
   | { type: "tag created" }
   /** A tag was renamed, merged or deleted. */
   | { type: "tag changed" }
@@ -363,7 +384,6 @@ export function staleKeys(change: Change): QueryKey[] {
       ]
     case "task created":
       return roots(ROOT.tasks, ROOT.activity, ...COUNTS)
-    case "tasks changed in bulk":
     case "deletion restored":
       return roots(ROOT.tasks, ROOT.task, ROOT.activity, ...COUNTS)
     case "tag created":
@@ -414,6 +434,53 @@ export function reportChange(
   ).then(() => undefined)
 }
 
+/**
+ * How long an answer a route asked for ahead of its screen still counts as
+ * just read when that screen mounts on it. A screen whose code arrives after
+ * its data would otherwise ask for everything a second time.
+ */
+const WARM_WINDOW_MS = 3000
+
+// Each query a warm-up answered, with the moment of that answer. A later
+// answer, from any request, moves the query's own moment past it.
+const warmed = new WeakMap<Query, number>()
+
+/**
+ * Start a request ahead of the screen that will show it, unless its answer is
+ * already cached; nothing waits on it. A failure is left in the cache for
+ * that screen to report and retry, as it would had the screen asked first.
+ */
+export async function warmQuery<
+  TQueryFnData,
+  TError,
+  TData,
+  TQueryKey extends QueryKey,
+>(
+  queryClient: QueryClient,
+  options: EnsureQueryDataOptions<TQueryFnData, TError, TData, TQueryKey>,
+): Promise<TData | undefined> {
+  const asking = queryClient.getQueryData(options.queryKey) === undefined
+  const data = await queryClient.ensureQueryData(options).catch(() => undefined)
+  if (asking && data !== undefined) {
+    const query = queryClient
+      .getQueryCache()
+      .find({ queryKey: options.queryKey, exact: true })
+    if (query) warmed.set(query, query.state.dataUpdatedAt)
+  }
+  return data
+}
+
+/** Whether a query's answer is a warm-up's, unchanged and moments old. */
+function justWarmed(query: Query): boolean {
+  const answeredAt = warmed.get(query)
+  return (
+    answeredAt !== undefined &&
+    answeredAt === query.state.dataUpdatedAt &&
+    !query.state.isInvalidated &&
+    Date.now() - answeredAt < WARM_WINDOW_MS
+  )
+}
+
 /** `reportChange`, bound to the app's query client. */
 export function useReportChange() {
   const queryClient = useQueryClient()
@@ -439,4 +506,14 @@ export function configureServerState(queryClient: QueryClient) {
     staleTime: 5 * 60 * 1000,
   })
   queryClient.setQueryDefaults([ROOT.projects], { staleTime: 10 * 1000 })
+  // A screen mounting on what its route has just read asks for nothing
+  // again; every other mount refreshes stale data as before.
+  const defaults = queryClient.getDefaultOptions()
+  queryClient.setDefaultOptions({
+    ...defaults,
+    queries: {
+      ...defaults.queries,
+      refetchOnMount: (query) => !justWarmed(query),
+    },
+  })
 }

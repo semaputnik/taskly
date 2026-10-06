@@ -5,7 +5,14 @@ from fastapi.testclient import TestClient
 from sqlmodel import Session
 
 from app.core.config import settings
-from tests.utils.accounts import create_project, create_task_record, my_id
+from tests.utils.accounts import (
+    ALL_PERMISSIONS,
+    create_bot_user,
+    create_project,
+    create_task_record,
+    issue_bot_headers,
+    my_id,
+)
 from tests.utils.user import new_user_headers
 
 TODAY = date.today()
@@ -64,6 +71,53 @@ def test_filter_by_assignee_and_by_being_unassigned(
 
     assert _titles(client, headers, assignee_id=user_id) == ["Mine"]
     assert _titles(client, headers, unassigned=True) == ["Nobody's"]
+
+
+def test_filter_by_being_on_a_bot_user(client: TestClient, db: Session) -> None:
+    """
+    "On bot users" is one question across all of them, so a list can count the
+    work that is on its owner's integrations without asking after each.
+    """
+    headers = new_user_headers(client, db)
+    user_id = my_id(client, headers)
+    project_id = create_project(client, headers)
+    first = create_bot_user(
+        client,
+        headers,
+        project_ids=[project_id],
+        permissions=ALL_PERMISSIONS,
+        name="first-bot",
+    )
+    second = create_bot_user(
+        client,
+        headers,
+        project_ids=[project_id],
+        permissions=ALL_PERMISSIONS,
+        name="second-bot",
+    )
+
+    create_task_record(client, headers, "Mine", assignee_id=user_id)
+    create_task_record(client, headers, "Nobody's")
+    create_task_record(client, headers, "On first", assignee_id=first["id"])
+    create_task_record(client, headers, "On second", assignee_id=second["id"])
+
+    assert sorted(_titles(client, headers, assigned_to_bots=True)) == [
+        "On first",
+        "On second",
+    ]
+
+
+def test_being_on_a_bot_user_and_unassigned_at_once_is_refused(
+    client: TestClient, db: Session
+) -> None:
+    headers = new_user_headers(client, db)
+
+    r = client.get(
+        f"{settings.API_V1_STR}/tasks/",
+        headers=headers,
+        params={"assigned_to_bots": True, "unassigned": True},
+    )
+    assert r.status_code == 422
 
 
 def test_asking_for_an_assignee_and_unassigned_at_once_is_refused(
@@ -308,6 +362,23 @@ def test_sort_by_creation_date_is_newest_first(client: TestClient, db: Session) 
     ]
 
 
+def test_the_default_order_is_newest_filed_first(
+    client: TestClient, db: Session
+) -> None:
+    """
+    A request that names no sort gets the created order's natural direction,
+    so the list a person opens is the newest work first rather than the most
+    pressing (FR-06.4). Priority is still one request away.
+    """
+    headers = new_user_headers(client, db)
+    create_task_record(client, headers, "Old and urgent", priority="P1")
+    create_task_record(client, headers, "Middle")
+    create_task_record(client, headers, "New and idle", priority="P4")
+
+    assert _titles(client, headers) == ["New and idle", "Middle", "Old and urgent"]
+    assert _titles(client, headers, sort="priority")[0] == "Old and urgent"
+
+
 def test_the_other_orders_keep_the_direction_they_always_had(
     client: TestClient, db: Session
 ) -> None:
@@ -460,3 +531,142 @@ def test_filter_by_another_users_task_as_parent_is_refused(
         params={"parent_id": parent["id"]},
     )
     assert r.status_code == 404
+
+
+def test_filter_by_title_contains_the_text_in_any_case(
+    client: TestClient, db: Session
+) -> None:
+    headers = new_user_headers(client, db)
+    create_task_record(client, headers, "Renew the Passport")
+    create_task_record(client, headers, "passport photos")
+    create_task_record(client, headers, "Book flights", description="passport")
+
+    assert sorted(_titles(client, headers, title="PASSPORT")) == [
+        "Renew the Passport",
+        "passport photos",
+    ]
+    assert _titles(client, headers, title="visa") == []
+
+
+def test_filter_by_title_reads_percent_and_underscore_literally(
+    client: TestClient, db: Session
+) -> None:
+    headers = new_user_headers(client, db)
+    create_task_record(client, headers, "Save 50% on rent")
+    create_task_record(client, headers, "Save 500 on rent")
+    create_task_record(client, headers, "snake_case rename")
+    create_task_record(client, headers, "snakeXcase rename")
+
+    assert _titles(client, headers, title="50%") == ["Save 50% on rent"]
+    assert _titles(client, headers, title="e_c") == ["snake_case rename"]
+
+
+def test_filter_by_title_combines_with_the_other_filters(
+    client: TestClient, db: Session
+) -> None:
+    headers = new_user_headers(client, db)
+    work_id = create_project(client, headers, "Work")
+    create_task_record(client, headers, "Plan the launch", project_id=work_id)
+    create_task_record(client, headers, "Plan the move")
+    create_task_record(client, headers, "Plan done", status="done")
+
+    assert sorted(_titles(client, headers, title="plan")) == [
+        "Plan done",
+        "Plan the launch",
+        "Plan the move",
+    ]
+    assert _titles(client, headers, title="plan", project_id=work_id) == [
+        "Plan the launch"
+    ]
+    assert sorted(
+        _titles(client, headers, title="plan", status=["backlog", "todo"])
+    ) == ["Plan the launch", "Plan the move"]
+
+
+def test_filter_by_title_is_scoped_to_the_owner(
+    client: TestClient, db: Session
+) -> None:
+    headers_a = new_user_headers(client, db)
+    headers_b = new_user_headers(client, db)
+    create_task_record(client, headers_a, "Shared words")
+    create_task_record(client, headers_b, "Shared words too")
+
+    assert _titles(client, headers_a, title="shared") == ["Shared words"]
+
+
+def test_filter_by_title_gives_a_bot_user_only_its_scope(
+    client: TestClient, db: Session
+) -> None:
+    headers = new_user_headers(client, db)
+    in_scope = create_project(client, headers, "In scope")
+    out_of_scope = create_project(client, headers, "Out of scope")
+    create_task_record(client, headers, "Invoice in scope", project_id=in_scope)
+    create_task_record(client, headers, "Invoice out", project_id=out_of_scope)
+    bot_headers = issue_bot_headers(
+        client, headers, project_ids=[in_scope], permissions=ALL_PERMISSIONS
+    )
+
+    assert _titles(client, bot_headers, title="invoice") == ["Invoice in scope"]
+
+
+def test_filter_by_an_empty_title_is_refused(client: TestClient, db: Session) -> None:
+    headers = new_user_headers(client, db)
+
+    r = client.get(
+        f"{settings.API_V1_STR}/tasks/", headers=headers, params={"title": ""}
+    )
+    assert r.status_code == 422
+
+
+def test_filter_by_a_blank_title_is_refused(client: TestClient, db: Session) -> None:
+    headers = new_user_headers(client, db)
+
+    for blank in (" ", "   ", "\t"):
+        r = client.get(
+            f"{settings.API_V1_STR}/tasks/", headers=headers, params={"title": blank}
+        )
+        assert r.status_code == 422
+
+
+def test_filter_by_title_ignores_the_spaces_around_the_text(
+    client: TestClient, db: Session
+) -> None:
+    headers = new_user_headers(client, db)
+    create_task_record(client, headers, "Invoice the client")
+    create_task_record(client, headers, "Water the plants")
+
+    assert _titles(client, headers, title="  invoice ") == ["Invoice the client"]
+
+
+def test_being_on_a_bot_user_and_on_the_owner_at_once_is_refused(
+    client: TestClient, db: Session
+) -> None:
+    headers = new_user_headers(client, db)
+    user_id = my_id(client, headers)
+
+    r = client.get(
+        f"{settings.API_V1_STR}/tasks/",
+        headers=headers,
+        params={"assigned_to_bots": True, "assignee_id": user_id},
+    )
+    assert r.status_code == 422
+
+
+def test_being_on_bot_users_and_on_one_of_them_is_allowed(
+    client: TestClient, db: Session
+) -> None:
+    headers = new_user_headers(client, db)
+    project_id = create_project(client, headers, "Work")
+    bot = create_bot_user(
+        client,
+        headers,
+        project_ids=[project_id],
+        permissions=ALL_PERMISSIONS,
+        name="the-bot",
+    )
+    create_task_record(client, headers, "On the bot", assignee_id=bot["id"])
+    create_task_record(client, headers, "Nobody's")
+
+    assert _titles(client, headers, assigned_to_bots=True, assignee_id=bot["id"]) == [
+        "On the bot"
+    ]

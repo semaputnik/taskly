@@ -2,7 +2,6 @@ import { useQuery } from "@tanstack/react-query"
 import { Check, Plus, Tag, X } from "lucide-react"
 import { useEffect, useState } from "react"
 
-import { Button } from "@/components/ui/button"
 import {
   Command,
   CommandGroup,
@@ -289,49 +288,5 @@ export function TagPicker({
         {announcement}
       </output>
     </div>
-  )
-}
-
-/**
- * Add tag for a selection: each choice adds that tag to every selected task
- * at once, and is marked until the popover closes, so the reader sees what
- * was applied. The tasks' own tags are not shown — they differ.
- */
-export function BulkTagPicker({ onAdd }: { onAdd: (name: string) => void }) {
-  const [open, setOpen] = useState(false)
-  const [applied, setApplied] = useState<string[]>([])
-  const [announcement, setAnnouncement] = useState("")
-
-  return (
-    <>
-      <Popover
-        open={open}
-        onOpenChange={(next) => {
-          setOpen(next)
-          if (!next) setApplied([])
-        }}
-      >
-        <PopoverTrigger asChild>
-          <Button type="button" variant="outline" size="sm">
-            <Plus />
-            Add tag
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent align="start" className={popoverClass}>
-          <TagPickerContent
-            chosen={applied}
-            mode="add"
-            onAdd={(tagName) => {
-              setApplied((previous) => [...previous, tagName])
-              setAnnouncement(`${tagName} added`)
-              onAdd(tagName)
-            }}
-          />
-        </PopoverContent>
-      </Popover>
-      <output aria-live="polite" className="sr-only">
-        {announcement}
-      </output>
-    </>
   )
 }

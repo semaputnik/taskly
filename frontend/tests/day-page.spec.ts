@@ -93,7 +93,9 @@ test("The bands take every open status but Waiting, and the sentence counts them
   await week.click()
   await expect(page).toHaveURL(/\/tasks/)
   await expect(
-    page.getByText("Status: Backlog, To do, In progress, Review"),
+    page.getByRole("button", {
+      name: "Status: Backlog, To do, In progress, Review",
+    }),
   ).toBeVisible()
 })
 
@@ -115,7 +117,9 @@ test("A band too long to show hands off to the list narrowed the same way", asyn
   await overdue.getByRole("link", { name: "2 more" }).click()
   await expect(page).toHaveURL(/\/tasks\?.*overdue=true/)
   await expect(
-    page.getByText("Status: Backlog, To do, In progress, Review"),
+    page.getByRole("button", {
+      name: "Status: Backlog, To do, In progress, Review",
+    }),
   ).toBeVisible()
   await expect(page.getByText("Late 7")).toBeVisible()
 })
@@ -168,7 +172,7 @@ test("The capture line makes the task at once, and the key still opens the draft
   await newUser(page)
   await page.goto("/")
 
-  const line = page.getByRole("textbox", { name: "Add a task" })
+  const line = page.getByRole("combobox", { name: "Add a task" })
   const sent = page.waitForRequest(
     (request) =>
       request.method() === "POST" && /\/tasks\/$/.test(request.url()),
@@ -214,7 +218,7 @@ test("An empty line makes nothing", async ({ page }) => {
   page.on("request", (request) => {
     if (request.method() === "POST") requests.push(request.url())
   })
-  const line = page.getByRole("textbox", { name: "Add a task" })
+  const line = page.getByRole("combobox", { name: "Add a task" })
   await line.press("Enter")
   await line.fill("   ")
   await line.press("Enter")
@@ -227,7 +231,7 @@ test("The notice's Open lands on the task's panel", async ({ page }) => {
   await newUser(page)
   await page.goto("/")
 
-  const line = page.getByRole("textbox", { name: "Add a task" })
+  const line = page.getByRole("combobox", { name: "Add a task" })
   await line.fill("Order milk")
   await line.press("Enter")
   await notice(page).getByRole("button", { name: "Open" }).click()
@@ -244,7 +248,7 @@ test("Undo deletes the task, and the activity log keeps both acts", async ({
   await newUser(page)
   await page.goto("/")
 
-  const line = page.getByRole("textbox", { name: "Add a task" })
+  const line = page.getByRole("combobox", { name: "Add a task" })
   await line.fill("Order milk")
   await line.press("Enter")
   await notice(page).getByRole("button", { name: "Undo" }).click()
@@ -388,7 +392,7 @@ test.describe("on a phone", () => {
     isMobile: true,
   })
 
-  test("Capture first, then the date, then the bands, with no sideways scroll", async ({
+  test("The date, then the bands, with the capture line pinned beneath them and no sideways scroll", async ({
     page,
   }) => {
     await newUser(page)
@@ -408,11 +412,14 @@ test.describe("on a phone", () => {
 
     const top = async (locator: Locator) =>
       (await locator.boundingBox())?.y ?? Number.NaN
-    const capture = await top(page.getByRole("textbox", { name: "Add a task" }))
+    const capture = await top(
+      page.getByRole("combobox", { name: "Add a task" }),
+    )
     const date = await top(page.getByRole("heading", { level: 1 }))
     const overdue = await top(page.getByRole("heading", { name: /^Overdue/ }))
     const today = await top(page.getByRole("heading", { name: /^Due today/ }))
-    expect(capture).toBeLessThan(date)
+    // The line is not at the top on a phone: it is the bottom bar (FR-06.15).
+    expect(capture).toBeGreaterThan(812 - 90)
     expect(date).toBeLessThan(overdue)
     expect(overdue).toBeLessThan(today)
 

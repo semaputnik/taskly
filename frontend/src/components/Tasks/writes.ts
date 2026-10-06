@@ -1,7 +1,6 @@
 import {
   type DueDateScope,
   type SubtaskCompletion,
-  type TaskBulkUpdate,
   type TaskCreate,
   type TaskPublic,
   type TaskStatus,
@@ -9,12 +8,7 @@ import {
   type TaskUpdate,
 } from "@/client"
 import { TaskPrioritySchema } from "@/client/schemas.gen"
-import {
-  type BatchRefusal,
-  batchRefusals,
-  Refusal,
-  refusalCode,
-} from "@/lib/apiErrors"
+import { Refusal, refusalCode } from "@/lib/apiErrors"
 import type { Change } from "@/lib/serverState"
 import { sameRecurrence } from "./recurrence"
 
@@ -43,8 +37,6 @@ export type Refused =
   | { reason: "has subtasks" }
   /** A moved due date on a recurring task needs a scope; nothing was sent. */
   | { reason: "needs scope" }
-  /** A batch could not be done whole: these tasks stood in the way. */
-  | { reason: "batch"; refusals: BatchRefusal[] }
   /** Anything else, to be said as the API said it. */
   | { reason: "failed"; error: unknown }
 
@@ -61,8 +53,6 @@ function refusedFor(error: unknown): Refused {
       return { reason: "open subtasks" }
     case Refusal.HAS_SUBTASKS:
       return { reason: "has subtasks" }
-    case Refusal.BULK_REFUSED:
-      return { reason: "batch", refusals: batchRefusals(error) ?? [] }
     default:
       return { reason: "failed", error }
   }
@@ -155,55 +145,6 @@ export function deleteTask(
     TasksService.deleteTask({
       path: { task_id: task.id },
       query: { delete_subtasks: withSubtasks },
-    }),
-  )
-}
-
-/**
- * The tasks of a selection a batch cannot move the due date of: moving one
- * occurrence of a series asks how far the move reaches, which is a question
- * for the task's own panel. The server refuses them too; saying so here
- * spares the reader a request that could only fail.
- */
-export function repeatingRefusals(tasks: TaskPublic[]): BatchRefusal[] {
-  return tasks.filter(isRecurring).map((task) => ({
-    task_id: task.id,
-    code: Refusal.TASK_REPEATS,
-    message: `“${task.title}” repeats. Move its due date from the task itself, where the rest of the series can be settled.`,
-  }))
-}
-
-/**
- * Apply one set of changes to a selection. `known` are the selected tasks
- * this screen has seen, which is what is checked before sending.
- */
-export async function bulkUpdate(
-  report: Report,
-  taskIds: string[],
-  known: TaskPublic[],
-  body: Omit<TaskBulkUpdate, "task_ids">,
-): Promise<Outcome<{ updated?: number }>> {
-  if ("due_date" in body) {
-    const refusals = repeatingRefusals(
-      known.filter((task) => taskIds.includes(task.id)),
-    )
-    if (refusals.length > 0) {
-      return { saved: false, reason: "batch", refusals }
-    }
-  }
-  return attempt(report, { type: "tasks changed in bulk" }, () =>
-    TasksService.bulkUpdateTasks({ body: { ...body, task_ids: taskIds } }),
-  )
-}
-
-/** Delete a selection, and its subtasks with it, as one event. */
-export function bulkDelete(
-  report: Report,
-  taskIds: string[],
-): Promise<Outcome<{ deleted?: number }>> {
-  return attempt(report, { type: "tasks changed in bulk" }, () =>
-    TasksService.bulkDeleteTasks({
-      body: { task_ids: taskIds, delete_subtasks: true },
     }),
   )
 }

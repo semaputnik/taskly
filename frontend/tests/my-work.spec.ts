@@ -97,7 +97,9 @@ test("A group too long to show hands off to the list narrowed the same way", asy
 
   await group(page, "To do").getByRole("link", { name: "1 more" }).click()
   await expect(page).toHaveURL(/\/tasks\?.*assignee=me/)
-  await expect(page.getByText("Status: To do")).toBeVisible()
+  await expect(
+    page.getByRole("button", { name: "Status: To do" }),
+  ).toBeVisible()
   await expect(page.getByText("Errand 4")).toBeVisible()
 })
 
