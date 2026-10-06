@@ -146,7 +146,7 @@ function Bots() {
   const { capture } = useRecordPanels()
 
   return (
-    <div className="max-w-[760px]">
+    <div className="page-column">
       <div className="mb-1 flex items-baseline gap-4">
         <h1 className="text-[22px] leading-[1.2] font-semibold tracking-[-0.015em]">
           Bots

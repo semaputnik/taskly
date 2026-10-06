@@ -41,9 +41,16 @@ test("A task opens in a 560px column and the page beside it stays live", async (
 
   const panel = column(page, order[0])
   await expect(panel).toBeVisible()
+  // The column slides in as the page gives way, so it is measured once it
+  // has settled against the right edge.
+  await expect
+    .poll(async () => {
+      const box = await panel.boundingBox()
+      return (box?.x ?? 0) + (box?.width ?? 0)
+    })
+    .toBeCloseTo(1280, 0)
   const place = await panel.boundingBox()
   expect(place?.width).toBeCloseTo(560, 0)
-  expect((place?.x ?? 0) + (place?.width ?? 0)).toBeCloseTo(1280, 0)
   // A hairline on its left, and nothing laid over the page.
   await expect(panel).toHaveCSS("border-left-width", "1px")
   await expect(page.locator("[data-slot=sheet-overlay]")).toHaveCount(0)

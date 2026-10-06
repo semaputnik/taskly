@@ -94,7 +94,7 @@ function Dashboard() {
   usePrefetchMyWork()
 
   return (
-    <div className="max-w-[820px]">
+    <div className="page-column">
       <PageCaptureLine className="mb-9" />
       {/* Needs nothing from the server, so it is never a skeleton. */}
       <DayHeading />

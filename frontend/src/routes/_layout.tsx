@@ -67,9 +67,12 @@ function Layout() {
         Skip to content
       </a>
       {/* A record opens in a third column beside the page, which is why the
-          grid has a track for it: empty, it is no width at all. Below 1200px
-          the column is fixed over the screen and takes no track. */}
-      <div className="group/shell bg-page min-h-svh md:grid md:grid-cols-[200px_minmax(0,1fr)_auto]">
+          grid has a track for it: empty, it is no width at all, and it grows
+          to the column's 560px as one opens, so the page gives way in one
+          motion rather than jumping. Below 1200px the column is fixed over
+          the screen and takes no track. The grid clips, not scrolls, while
+          the track is growing. */}
+      <div className="group/shell bg-page min-h-svh md:grid md:grid-cols-[200px_minmax(0,1fr)_0px] min-[1200px]:overflow-x-clip min-[1200px]:transition-[grid-template-columns] min-[1200px]:duration-[260ms] min-[1200px]:ease-[cubic-bezier(0.16,1,0.3,1)] min-[1200px]:has-[[data-record-column]]:grid-cols-[200px_minmax(0,1fr)_560px] motion-reduce:transition-none">
         {/* On a wide screen the navigation is a column of its own, held in
             place while the page scrolls. No rule divides it from the work:
             whitespace does. */}
@@ -85,7 +88,7 @@ function Layout() {
         <main
           id="main"
           tabIndex={-1}
-          className="min-w-0 px-4 pt-5 pb-[calc(5rem+env(safe-area-inset-bottom))] outline-none md:px-12 md:pt-9 md:pb-24 min-[1200px]:group-has-[[data-record-column]]/shell:px-8"
+          className="@container min-w-0 px-4 pt-5 pb-[calc(5rem+env(safe-area-inset-bottom))] outline-none md:px-12 md:pt-9 md:pb-24 min-[1200px]:transition-[padding] min-[1200px]:duration-[260ms] min-[1200px]:ease-[cubic-bezier(0.16,1,0.3,1)] min-[1200px]:group-has-[[data-record-column]]/shell:px-8 motion-reduce:transition-none"
         >
           <div className="max-w-7xl">
             <Outlet />
