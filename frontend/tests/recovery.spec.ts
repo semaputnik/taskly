@@ -63,14 +63,24 @@ test("The superuser issues a code that gets a user back in", async ({
 
   const email = randomEmail()
   await createUser({ email })
-  await admin.goto("/admin")
-  const row = admin.getByRole("row").filter({ hasText: email })
-  await row.getByRole("button", { name: "Issue recovery code" }).click()
+  await admin.goto("/settings")
+  const line = admin
+    .getByRole("region", { name: "Users" })
+    .getByRole("listitem")
+    .filter({ hasText: email })
+  await line.getByRole("button", { name: /Issue a recovery code/ }).click()
   const code = await admin
     .getByRole("textbox", { name: "Recovery code" })
     .inputValue()
   expect(code).toMatch(/^[0-9A-Z]{4}(-[0-9A-Z]{4}){3}$/)
+  // Shown once, as a token is: it closes on being said to be stored, and
+  // asks again when it was never copied.
+  await admin.getByLabel("I have stored this code somewhere safe").check()
   await admin.getByRole("button", { name: "Done" }).click()
+  await admin.getByRole("button", { name: "Close without copying" }).click()
+  await expect(admin.getByRole("dialog")).toHaveCount(0)
+  // The line now offers another, which replaces this one.
+  await expect(line.getByRole("button")).toContainText("Issue another")
 
   // The user, on their own device.
   const user = await browser.newPage()

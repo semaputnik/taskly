@@ -88,8 +88,7 @@ test("Every destructive confirmation names its consequence before its button", a
   )
 
   await page.goto("/settings")
-  await page.getByRole("tab", { name: "Danger zone" }).click()
-  await page.getByRole("button", { name: "Delete Account" }).click()
+  await page.getByRole("button", { name: "Delete my account" }).click()
   await expectConsequenceFirst(
     page.getByRole("dialog"),
     "Delete my account",

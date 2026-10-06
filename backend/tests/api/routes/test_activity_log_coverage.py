@@ -62,6 +62,7 @@ NOT_LOGGED = {
     f"POST {API}/users/me/confirmation/options": ACCOUNT,
     f"POST {API}/users/me/passkeys/options": ACCOUNT,
     f"POST {API}/users/me/passkeys": ACCOUNT,
+    f"PATCH {API}/users/me/passkeys/{{passkey_id}}": ACCOUNT,
     f"DELETE {API}/users/me/passkeys/{{passkey_id}}": ACCOUNT,
     f"POST {API}/users/me/sign-out-everywhere": ACCOUNT,
     # Sign-in events are out of the log (features.md, Out of scope).

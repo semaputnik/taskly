@@ -883,6 +883,22 @@ export const PasskeyPublicSchema = {
     title: 'PasskeyPublic'
 } as const;
 
+export const PasskeyRenameSchema = {
+    properties: {
+        name: {
+            type: 'string',
+            maxLength: 255,
+            minLength: 1,
+            title: 'Name'
+        }
+    },
+    type: 'object',
+    required: [
+        'name'
+    ],
+    title: 'PasskeyRename'
+} as const;
+
 export const PasskeysPublicSchema = {
     properties: {
         data: {
@@ -2091,6 +2107,80 @@ export const TokenSchema = {
     title: 'Token'
 } as const;
 
+export const UserListedSchema = {
+    properties: {
+        email: {
+            type: 'string',
+            maxLength: 255,
+            format: 'email',
+            title: 'Email'
+        },
+        is_active: {
+            type: 'boolean',
+            title: 'Is Active',
+            default: true
+        },
+        is_superuser: {
+            type: 'boolean',
+            title: 'Is Superuser',
+            default: false
+        },
+        full_name: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 255
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Full Name'
+        },
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        created_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Created At'
+        },
+        passkey_count: {
+            type: 'integer',
+            title: 'Passkey Count'
+        },
+        last_sign_in_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Last Sign In At'
+        }
+    },
+    type: 'object',
+    required: [
+        'email',
+        'id',
+        'passkey_count'
+    ],
+    title: 'UserListed',
+    description: 'An account as the superuser\'s list shows it: the account fields, how many\npasskeys it holds, and when one of them last signed it in (FR-09.2). Nothing\nabout what the account holds or does (FR-10.7).'
+} as const;
+
 export const UserPublicSchema = {
     properties: {
         email: {
@@ -2183,7 +2273,7 @@ export const UsersPublicSchema = {
     properties: {
         data: {
             items: {
-                $ref: '#/components/schemas/UserPublic'
+                $ref: '#/components/schemas/UserListed'
             },
             type: 'array',
             title: 'Data'

@@ -86,9 +86,8 @@ for (const theme of ["light", "dark"] as const) {
       // A record's column is no modal layer, so the one opened here is a
       // confirmation: the sort a reader must answer before going on.
       await page.goto("/settings")
-      await page.getByRole("tab", { name: "Danger zone" }).click()
       const ground = await pageGround(page)
-      await page.getByRole("button", { name: "Delete Account" }).click()
+      await page.getByRole("button", { name: "Delete my account" }).click()
       const overlay = page.locator("[data-slot=dialog-overlay]")
       await expect(overlay).toBeVisible()
       await overlay.evaluate((node) =>

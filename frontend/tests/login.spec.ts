@@ -40,7 +40,7 @@ test("Sign in with a passkey made when registering", async ({ page }) => {
   await signInWithPasskey(page)
 
   await page.goto("/settings")
-  await expect(page.locator("form").getByText(email)).toBeVisible()
+  await expect(page.getByRole("main").getByText(email)).toBeVisible()
 })
 
 test("The email field's autofill offers the passkey and signs in", async ({
@@ -57,7 +57,7 @@ test("The email field's autofill offers the passkey and signs in", async ({
   await page.waitForURL("/")
 
   await page.goto("/settings")
-  await expect(page.locator("form").getByText(email)).toBeVisible()
+  await expect(page.getByRole("main").getByText(email)).toBeVisible()
 })
 
 test("A passkey this installation does not know is refused", async ({

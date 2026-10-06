@@ -482,7 +482,9 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
 - **FR-09.1** The system has exactly one superuser.
 - **FR-09.2** The superuser can view the list of registered users. The list
   is a section of the superuser's own Settings, not a screen of its own, and
-  the code of FR-12.16 is issued from the user's line there.
+  the code of FR-12.16 is issued from the user's line there. Each line shows
+  the account's name and email, how many passkeys it holds (said plainly when
+  there are none) and when one of them last signed it in.
 - **FR-09.3** The superuser's one other administrative function is issuing
   recovery codes to users who have lost every passkey
   (see [F-12](#f-12-sign-in)). There are no others for now.
@@ -640,7 +642,8 @@ Taskly calls a bot user back when there is something for it to act on
   the device — both when it is created and every time it is used.
 - **FR-12.6** A user holds one or more passkeys. Settings lists them, each
   with a name, when it was created and when it was last used. The name is
-  given automatically from the browser and device that made it.
+  given automatically from the browser and device that made it, and the user
+  can rename it; a name is a label, so renaming asks for no confirmation.
 - **FR-12.7** The user can add a passkey and remove one. Either takes a fresh
   confirmation with one of the account's passkeys at that moment; the session
   alone is not enough.

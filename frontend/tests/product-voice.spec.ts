@@ -67,8 +67,7 @@ test("Deleting an account names its button and what goes with it", async ({
 }) => {
   await newUser(page)
   await page.goto("/settings")
-  await page.getByRole("tab", { name: "Danger zone" }).click()
-  await page.getByRole("button", { name: "Delete Account" }).click()
+  await page.getByRole("button", { name: "Delete my account" }).click()
 
   const dialog = page.getByRole("dialog")
   const description = dialog.locator("[data-slot=dialog-description]")
@@ -162,13 +161,9 @@ test("Heading levels descend without skipping on every screen", async ({
     if (index > 0) expect(level).toBeLessThanOrEqual(inPanel[index - 1] + 1)
   })
 
+  // Settings is one document: the heading, then Profile, Passkeys, Sessions
+  // and Account (this account is not the superuser's, so no Users).
   await page.goto("/settings")
-  for (const [tab, expected] of [
-    ["Passkeys", [1, 2, 2]],
-    ["Danger zone", [1, 2]],
-  ] as const) {
-    await page.getByRole("tab", { name: tab }).click()
-    const levels = await outline()
-    expect(levels, tab).toEqual(expected)
-  }
+  await expect(page.getByRole("heading", { name: "Account" })).toBeVisible()
+  expect(await outline()).toEqual([1, 2, 2, 2, 2])
 })

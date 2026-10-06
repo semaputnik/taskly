@@ -23,7 +23,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 from urllib.parse import urlsplit
 
-from sqlmodel import Session, col, delete, select
+from sqlmodel import Session, col, delete, func, select
 from webauthn import (
     base64url_to_bytes,
     generate_authentication_options,
@@ -307,6 +307,23 @@ def finish_new_passkey(
     return passkey
 
 
+def rename_passkey(
+    session: Session, *, user: User, passkey_id: uuid.UUID, name: str
+) -> Passkey:
+    """
+    Give one of the user's passkeys a name they recognise (FR-12.6). Naming is
+    a label and opens nothing, so the session alone is enough.
+    """
+    passkey = session.get(Passkey, passkey_id)
+    if passkey is None or passkey.user_id != user.id:
+        raise PasskeyNotFound()
+    passkey.name = name
+    session.add(passkey)
+    session.commit()
+    session.refresh(passkey)
+    return passkey
+
+
 def remove_passkey(
     session: Session,
     *,
@@ -330,6 +347,25 @@ def remove_passkey(
         raise LastPasskey()
     session.delete(passkey)
     session.commit()
+
+
+def passkey_summaries(
+    session: Session, user_ids: list[uuid.UUID]
+) -> dict[uuid.UUID, tuple[int, datetime | None]]:
+    """
+    For each of the accounts: how many passkeys it holds and when one last
+    signed it in, in one query. An account with none is absent.
+    """
+    rows = session.exec(
+        select(
+            Passkey.user_id,
+            func.count(),
+            func.max(col(Passkey.last_used_at)),
+        )
+        .where(col(Passkey.user_id).in_(user_ids))  # type: ignore[attr-defined]
+        .group_by(Passkey.user_id)
+    ).all()
+    return {user_id: (count, last) for user_id, count, last in rows}
 
 
 def sign_out_everywhere(session: Session, *, user: User) -> None:

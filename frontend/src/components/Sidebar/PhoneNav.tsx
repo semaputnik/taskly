@@ -24,7 +24,6 @@ import { useIsPhone } from "@/hooks/useIsPhone"
 import { useVisualViewport } from "@/hooks/useVisualViewport"
 import { cn } from "@/lib/utils"
 import { navItemFocus } from "./styles"
-import { AppearanceItems } from "./User"
 
 const tabClass = cn(
   navItemFocus,
@@ -128,7 +127,10 @@ export function AccountMenu() {
     { title: "Projects", to: "/projects" },
     { title: "Tags", to: "/tags" },
     { title: "Settings", to: "/settings" },
-    ...(user.is_superuser ? [{ title: "Admin", to: "/admin" }] : []),
+    // The superuser's users are a section of Settings, not a screen.
+    ...(user.is_superuser
+      ? [{ title: "Users", to: "/settings", hash: "users" }]
+      : []),
   ]
 
   return (
@@ -160,11 +162,11 @@ export function AccountMenu() {
         <DropdownMenuSeparator />
         {places.map((place) => (
           <DropdownMenuItem key={place.to} asChild className={menuItemClass}>
-            <RouterLink to={place.to}>{place.title}</RouterLink>
+            <RouterLink to={place.to} hash={place.hash}>
+              {place.title}
+            </RouterLink>
           </DropdownMenuItem>
         ))}
-        <DropdownMenuSeparator />
-        <AppearanceItems itemClassName={menuItemClass} />
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={logout} className={menuItemClass}>
           <LogOut />

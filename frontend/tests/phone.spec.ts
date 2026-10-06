@@ -1,5 +1,7 @@
 import { expect, type Page, test } from "@playwright/test"
+import { firstSuperuser } from "./config.ts"
 import { newUser, userApi } from "./utils/account"
+import { logInUser } from "./utils/user"
 
 // Everything here is on a phone: a narrow screen, touched rather than
 // pointed at.
@@ -340,12 +342,12 @@ test("The bar gives way to a record's full-screen column", async ({ page }) => {
   await expect(bar(page)).toBeVisible()
 })
 
-test("The account control holds the other screens, appearance and signing out", async ({
+test("The account control holds the other screens and signing out", async ({
   page,
 }) => {
   await newUser(page)
   await page.goto("/")
-  const account = page.getByRole("button", { name: "Account" })
+  const account = page.getByRole("button", { name: "Account", exact: true })
   // The top bar keeps the wordmark and gains the avatar, a target for a thumb.
   await expect(page.getByRole("link", { name: "Taskly" })).toBeVisible()
   expect((await boxOf(account)).height).toBeGreaterThanOrEqual(44)
@@ -362,20 +364,13 @@ test("The account control holds the other screens, appearance and signing out", 
       .poll(async () => (await boxOf(item)).height)
       .toBeGreaterThanOrEqual(44)
   }
-  for (const name of ["Light", "Dark", "System"]) {
-    await expect(menu.getByRole("menuitemradio", { name })).toBeVisible()
-  }
-
-  // Appearance is chosen here.
-  await menu.getByRole("menuitemradio", { name: "Dark" }).tap()
-  await expect(page.locator("html")).toHaveClass(/dark/)
-  await account.tap()
-  await page.getByRole("menuitemradio", { name: "Light" }).tap()
-  await expect(page.locator("html")).toHaveClass(/light/)
+  // Appearance moved to Settings; the menu is only places and signing out.
+  await expect(menu.getByRole("menuitemradio")).toHaveCount(0)
+  // This account is not the superuser's: no Users entry either.
+  await expect(menu.getByRole("menuitem", { name: "Users" })).toHaveCount(0)
 
   // The screens that are not tabs are a tap away, and none of the tabs is
-  // current there.
-  await account.tap()
+  // current there. The menu is still open from the check above.
   await page.getByRole("menuitem", { name: "Projects" }).tap()
   await expect(page).toHaveURL(/\/projects/)
   await expect(bar(page).locator('[aria-current="page"]')).toHaveCount(0)
@@ -506,4 +501,18 @@ test("The task list never scrolls sideways, however long a title or a project na
   const item = page.getByRole("list", { name: "Tasks" }).getByRole("listitem")
   const first = await boxOf(item.first())
   expect(first.x + first.width).toBeLessThanOrEqual(375)
+})
+
+test("The superuser's account menu has Users, which lands on that section of Settings", async ({
+  page,
+}) => {
+  await logInUser(page, firstSuperuser)
+  await page.getByRole("button", { name: "Account", exact: true }).tap()
+  await page.getByRole("menuitem", { name: "Users" }).tap()
+
+  await expect(page).toHaveURL(/\/settings#users$/)
+  await expect(page.getByRole("region", { name: "Users" })).toBeVisible()
+  // Admin is gone as an entry.
+  await page.getByRole("button", { name: "Account", exact: true }).tap()
+  await expect(page.getByRole("menuitem", { name: "Admin" })).toHaveCount(0)
 })

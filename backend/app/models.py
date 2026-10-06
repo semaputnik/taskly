@@ -69,8 +69,19 @@ class UserPublic(UserBase):
     created_at: datetime | None = None
 
 
+class UserListed(UserPublic):
+    """
+    An account as the superuser's list shows it: the account fields, how many
+    passkeys it holds, and when one of them last signed it in (FR-09.2). Nothing
+    about what the account holds or does (FR-10.7).
+    """
+
+    passkey_count: int
+    last_sign_in_at: datetime | None = None
+
+
 class UsersPublic(SQLModel):
-    data: list[UserPublic]
+    data: list[UserListed]
     count: int
 
 
@@ -109,6 +120,17 @@ class PasskeyPublic(SQLModel):
     name: str
     created_at: datetime
     last_used_at: datetime | None
+
+
+# A passkey's name is given from the browser and device that made it, and the
+# owner may replace it with words they recognise (FR-12.6). Blank is refused.
+PasskeyName = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=255)
+]
+
+
+class PasskeyRename(SQLModel):
+    name: PasskeyName
 
 
 class PasskeysPublic(SQLModel):

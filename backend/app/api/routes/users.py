@@ -17,9 +17,11 @@ from app.models import (
     Message,
     PasskeyCredential,
     PasskeyPublic,
+    PasskeyRename,
     PasskeysPublic,
     RecoveryCodeIssued,
     User,
+    UserListed,
     UserPublic,
     UsersPublic,
     UserUpdateMe,
@@ -51,8 +53,16 @@ def read_users(session: SessionDep, skip: int = 0, limit: int = 100) -> Any:
     )
     users = session.exec(statement).all()
 
-    users_public = [UserPublic.model_validate(user) for user in users]
-    return UsersPublic(data=users_public, count=count)
+    summaries = passkeys.passkey_summaries(session, [user.id for user in users])
+    listed = []
+    for user in users:
+        held, last_sign_in = summaries.get(user.id, (0, None))
+        listed.append(
+            UserListed.model_validate(
+                user, update={"passkey_count": held, "last_sign_in_at": last_sign_in}
+            )
+        )
+    return UsersPublic(data=listed, count=count)
 
 
 @router.patch("/me", response_model=UserPublic)
@@ -155,6 +165,22 @@ def add_passkey(
         user=current_user,
         credential=body.credential,
         user_agent=user_agent,
+    )
+
+
+@router.patch("/me/passkeys/{passkey_id}", response_model=PasskeyPublic)
+def rename_passkey(
+    session: SessionDep,
+    current_user: CurrentUser,
+    passkey_id: uuid.UUID,
+    body: PasskeyRename,
+) -> Any:
+    """
+    Rename one of the caller's passkeys (FR-12.6). A name is a label: the
+    session alone is enough, no passkey confirmation is asked for.
+    """
+    return passkeys.rename_passkey(
+        session, user=current_user, passkey_id=passkey_id, name=body.name
     )
 
 

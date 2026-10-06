@@ -6,7 +6,11 @@ import { expect, type Page } from "@playwright/test"
  * phone or laptop with a fingerprint reader does (FR-12.5). Every prompt is
  * answered at once.
  */
-export async function addVirtualAuthenticator(page: Page) {
+export async function addVirtualAuthenticator(
+  page: Page,
+  /** Chrome allows one internal authenticator; a second device is a USB key. */
+  transport: "internal" | "usb" = "internal",
+) {
   const cdp = await page.context().newCDPSession(page)
   await cdp.send("WebAuthn.enable")
   const { authenticatorId } = await cdp.send(
@@ -14,7 +18,7 @@ export async function addVirtualAuthenticator(page: Page) {
     {
       options: {
         protocol: "ctap2",
-        transport: "internal",
+        transport,
         hasResidentKey: true,
         hasUserVerification: true,
         isUserVerified: true,
