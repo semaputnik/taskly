@@ -139,6 +139,11 @@ function KeptTasks() {
               ))}
             </ul>
           )}
+          {tasks && tasks.count > LIMIT && (
+            <p className="text-ink-3 pt-3.5 text-[13px]">
+              Showing the first {LIMIT} of {tasks.count}.
+            </p>
+          )}
         </>
       )}
     </div>
