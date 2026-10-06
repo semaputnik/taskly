@@ -121,6 +121,8 @@ function Connected({ connection }: { connection: PaperlessConnectionPublic }) {
               <button
                 type="button"
                 className={act}
+                // A test still out would write its answer under a form.
+                disabled={test.isPending}
                 onClick={() => edit("connection")}
               >
                 Change
@@ -144,7 +146,12 @@ function Connected({ connection }: { connection: PaperlessConnectionPublic }) {
         <PropertyRow label="Token">
           <div className="flex min-w-0 flex-wrap items-center gap-x-3.5">
             <span className="text-ink-3 text-sm">set, never shown again</span>
-            <button type="button" className={act} onClick={() => edit("token")}>
+            <button
+              type="button"
+              className={act}
+              disabled={test.isPending}
+              onClick={() => edit("token")}
+            >
               Replace
               <span className="sr-only"> the Paperless token</span>
             </button>

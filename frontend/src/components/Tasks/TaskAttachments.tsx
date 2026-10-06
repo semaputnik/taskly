@@ -183,7 +183,10 @@ export const TaskAttachments = ({ task }: TaskAttachmentsProps) => {
                   <button
                     type="button"
                     aria-label={`Send ${attachment.filename} again`}
-                    disabled={resendMutation.isPending}
+                    disabled={
+                      resendMutation.isPending &&
+                      resendMutation.variables?.id === attachment.id
+                    }
                     className={cn(action, "text-ink-2 font-medium")}
                     onClick={() => resendMutation.mutate(attachment)}
                   >
