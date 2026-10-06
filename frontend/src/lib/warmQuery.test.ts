@@ -1,7 +1,12 @@
 import { afterEach, describe, expect, setSystemTime, test } from "bun:test"
 import { QueryClient, QueryObserver, queryOptions } from "@tanstack/react-query"
 
-import { configureServerState, warmQuery } from "./serverState"
+import {
+  configureServerState,
+  reportChange,
+  tagVocabularyQuery,
+  warmQuery,
+} from "./serverState"
 
 /** A query whose requests are counted, answering at once. */
 function counted(key: string) {
@@ -89,5 +94,47 @@ describe("a request started ahead of its screen", () => {
     expect(calls).toBe(2)
     const answer: unknown = queryClient.getQueryData(options.queryKey)
     expect(answer).toBe("answer")
+  })
+})
+
+describe("the tag vocabulary", () => {
+  // The Tags page reads it, and each tag's column mounts on it again.
+  const vocabulary = () => {
+    const calls = { count: 0 }
+    const options = queryOptions({
+      queryKey: tagVocabularyQuery().queryKey,
+      queryFn: async () => {
+        calls.count += 1
+        return []
+      },
+    })
+    return { calls, options }
+  }
+
+  test("is not asked again by a column that opens moments after the page read it", async () => {
+    const queryClient = client()
+    const { calls, options } = vocabulary()
+    await queryClient.fetchQuery(options)
+    await mount(queryClient, options)
+    expect(calls.count).toBe(1)
+  })
+
+  test("is asked again once a tag change has made it stale", async () => {
+    const queryClient = client()
+    const { calls, options } = vocabulary()
+    await queryClient.fetchQuery(options)
+    await reportChange(queryClient, { type: "tag changed" })
+    await mount(queryClient, options)
+    expect(calls.count).toBe(2)
+  })
+
+  test("is asked again by a column that opens later on", async () => {
+    const queryClient = client()
+    const { calls, options } = vocabulary()
+    setSystemTime(new Date("2026-10-06T09:00:00Z"))
+    await queryClient.fetchQuery(options)
+    setSystemTime(new Date("2026-10-06T09:01:00Z"))
+    await mount(queryClient, options)
+    expect(calls.count).toBe(2)
   })
 })
