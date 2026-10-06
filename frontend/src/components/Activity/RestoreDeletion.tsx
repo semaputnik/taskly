@@ -1,8 +1,8 @@
 import { useMutation } from "@tanstack/react-query"
-import { ArchiveRestore } from "lucide-react"
 import { useState } from "react"
 
 import { type ActivityEntryPublic, ActivityService } from "@/client"
+import { textLink } from "@/components/Dashboard/shared"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -16,6 +16,7 @@ import {
 import { LoadingButton } from "@/components/ui/loading-button"
 import { useReportChange } from "@/lib/serverState"
 import { toastError, toastSuccess } from "@/lib/toasts"
+import { cn } from "@/lib/utils"
 
 interface RestoreDeletionProps {
   entry: ActivityEntryPublic
@@ -93,10 +94,17 @@ export function RestoreDeletion({ entry }: RestoreDeletionProps) {
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <Button variant="outline" size="sm" onClick={() => setIsOpen(true)}>
-        <ArchiveRestore />
+      <button
+        type="button"
+        onClick={() => setIsOpen(true)}
+        aria-label={`Restore ${name}`}
+        className={cn(
+          textLink,
+          "text-ink underline pointer-coarse:-my-3 pointer-coarse:py-3",
+        )}
+      >
         Restore
-      </Button>
+      </button>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{heading}</DialogTitle>

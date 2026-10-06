@@ -381,10 +381,10 @@ test("A captured task is one creation entry in the activity log", async ({
 
   await page.goto("/activity")
   await expect(
-    page.getByRole("row", { name: /Return the library books/ }),
+    page.getByRole("listitem").filter({ hasText: /Return the library books/ }),
   ).toHaveCount(1)
   await expect(
-    page.getByRole("row", { name: /Return the library books/ }),
+    page.getByRole("listitem").filter({ hasText: /Return the library books/ }),
   ).toContainText("Created")
 })
 
@@ -563,7 +563,9 @@ test("Enter creates the whole draft as one task and one log entry", async ({
   })
 
   await page.goto("/activity")
-  const entries = page.getByRole("row", { name: /Send the invoice/ })
+  const entries = page
+    .getByRole("listitem")
+    .filter({ hasText: /Send the invoice/ })
   await expect(entries).toHaveCount(1)
   await expect(entries).toContainText("Created Send the invoice in Accounts")
 })

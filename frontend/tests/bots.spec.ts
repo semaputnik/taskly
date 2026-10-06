@@ -265,7 +265,7 @@ test("A bot's scope is narrowed and the bot is deleted from the Bots page", asyn
   // What it did is still in the log under its name.
   await page.goto("/activity")
   await expect(
-    page.getByRole("row").filter({ hasText: "Draft the invoice notes" }),
+    page.getByRole("listitem").filter({ hasText: "Draft the invoice notes" }),
   ).toContainText("Docs agent")
 })
 

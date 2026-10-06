@@ -188,7 +188,7 @@ test("An activity entry opens the bot user that made it, and the section hands o
   // From an unexpected change in the log to the integration responsible.
   await page.goto("/activity")
   await page
-    .getByRole("row")
+    .getByRole("listitem")
     .filter({ hasText: "Triaged ticket 6" })
     .getByRole("link", { name: "Triage agent" })
     .click()
@@ -209,9 +209,12 @@ test("An activity entry opens the bot user that made it, and the section hands o
   await panel.getByRole("link", { name: /Everything it did/ }).click()
 
   await expect(page).toHaveURL(/actor=/)
-  await expect(page.getByText("Showing only")).toContainText("Triage agent")
+  // The narrowing is said on the filter row, in ink, where it can be dropped.
   await expect(
-    page.getByRole("row").filter({ hasText: "Triaged ticket 0" }),
+    page.getByRole("button", { name: "Actor: By Triage agent" }),
+  ).toBeVisible()
+  await expect(
+    page.getByRole("listitem").filter({ hasText: "Triaged ticket 0" }),
   ).toBeVisible()
 })
 

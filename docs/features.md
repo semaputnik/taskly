@@ -529,7 +529,8 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
   do not overlap, so an entry answers to exactly one of them. Completing
   several tasks at once is one act and is logged as one entry (FR-10.9); that
   entry is Completed, not Changed. The narrowing is a visible control, lives
-  in the URL, and combines with the narrowing to one bot user (FR-10.2).
+  in the URL, and combines with the narrowing to one actor (FR-10.2): one bot
+  user, or the reader themselves.
   Neither narrowing ever widens the log past the reader's own entries
   (FR-10.7).
 - **FR-10.9** One act over many tasks is one log entry naming what the act

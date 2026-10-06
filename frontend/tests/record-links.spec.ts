@@ -41,7 +41,7 @@ test("Activity entries open the record they name", async ({ page }) => {
   await api.create(`/tasks/${task.id}/comments/`, { body: "Friday works" })
 
   await page.goto("/activity")
-  const rows = page.getByRole("row")
+  const rows = page.getByRole("listitem")
 
   await rows
     .filter({ hasText: "errands" })
