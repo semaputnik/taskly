@@ -79,7 +79,6 @@ function WebhookRow({
   kind: WebhookKind
   label: string
   unset: string
-  noun: string
 }) {
   const hook = bot.webhooks[kind]
   const url = hook.url ?? null
@@ -158,7 +157,7 @@ function WebhookRow({
                     >
                       Change
                     </Button>
-                    <ClearWebhook bot={bot} kind={kind} noun={noun} />
+                    <ClearWebhook bot={bot} kind={kind} label={label} />
                   </>
                 ) : (
                   <Button
@@ -330,11 +329,11 @@ function useTestWebhook(bot: BotUserPublic, kind: WebhookKind) {
 function ClearWebhook({
   bot,
   kind,
-  noun,
+  label,
 }: {
   bot: BotUserPublic
   kind: WebhookKind
-  noun: string
+  label: string
 }) {
   const [isOpen, setIsOpen] = useState(false)
   const reportChange = useReportChange()
@@ -347,7 +346,7 @@ function ClearWebhook({
         path: { bot_user_id: bot.id, kind },
       }),
     onSuccess: () => {
-      toastSuccess(`The ${noun} was cleared`)
+      toastSuccess(`The ${label.toLowerCase()} webhook was cleared`)
       setIsOpen(false)
     },
     onError: (failure) => toastError(failure),
@@ -368,7 +367,7 @@ function ClearWebhook({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>
-            Clear the {noun} of {bot.name}?
+            Clear the {label.toLowerCase()} webhook of {bot.name}?
           </DialogTitle>
           <DialogDescription>
             Taskly stops calling this address, and deliveries still waiting for

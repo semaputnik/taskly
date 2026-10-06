@@ -49,19 +49,19 @@ test("A URL is set, the secret shown once, a test sent and its result read", asy
 }) => {
   const receiver = await startReceiver()
   try {
-    await openNewBot(page, "Triage agent")
-    const row = taskRow(page, "Triage agent")
+    await openNewBot(page, "Triage bot")
+    const row = taskRow(page, "Triage bot")
 
     // Nothing is set, and the empty row says what that means.
     await expect(row).toContainText("Not set")
     await expect(row).toContainText("not told about tasks")
-    await expect(commentRow(page, "Triage agent")).toContainText("Not set")
+    await expect(commentRow(page, "Triage bot")).toContainText("Not set")
     await expect(
-      hooks(page, "Triage agent").getByRole("button", {
+      hooks(page, "Triage bot").getByRole("button", {
         name: "Regenerate secret",
       }),
     ).toHaveCount(0)
-    await expect(botLine(page, "Triage agent")).not.toContainText("webhook")
+    await expect(botLine(page, "Triage bot")).not.toContainText("webhook")
 
     await row.getByRole("button", { name: "Set a URL" }).click()
     await row
@@ -72,7 +72,7 @@ test("A URL is set, the secret shown once, a test sent and its result read", asy
     // The first URL makes the secret, which is shown once and holds against
     // being dismissed by accident.
     const dialog = page.getByRole("dialog", {
-      name: "Webhook secret for Triage agent",
+      name: "Webhook secret for Triage bot",
     })
     await expect(dialog).toBeVisible()
     await page.keyboard.press("Escape")
@@ -85,9 +85,7 @@ test("A URL is set, the secret shown once, a test sent and its result read", asy
 
     await expect(row).toContainText(receiver.url())
     await expect(row).toContainText("No delivery yet")
-    await expect(botLine(page, "Triage agent")).toContainText(
-      "task webhook set",
-    )
+    await expect(botLine(page, "Triage bot")).toContainText("task webhook set")
 
     // A test is sent at once, and what came of it is the last delivery.
     await row.getByRole("button", { name: "Send a test" }).click()
@@ -99,7 +97,7 @@ test("A URL is set, the secret shown once, a test sent and its result read", asy
     expect(delivery.headers["x-taskly-event"]).toBe("test")
     // The secret on screen is the one that signs.
     expect(signedWith(secret, delivery)).toBe(true)
-    await expect(botLine(page, "Triage agent")).not.toContainText(
+    await expect(botLine(page, "Triage bot")).not.toContainText(
       "last delivery failed",
     )
 
@@ -109,16 +107,14 @@ test("A URL is set, the secret shown once, a test sent and its result read", asy
     await row.getByRole("button", { name: "Send a test" }).click()
     await expect(row).toContainText("Failed")
     await expect(row).toContainText("500")
-    const failed = botLine(page, "Triage agent").getByText(
-      "last delivery failed",
-    )
+    const failed = botLine(page, "Triage bot").getByText("last delivery failed")
     await expect(failed).toBeVisible()
     await expect(failed).toHaveClass(/text-late/)
 
     // The record is the server's: it is the same after a reload.
     await page.reload()
-    await expect(taskRow(page, "Triage agent")).toContainText("Failed")
-    await expect(taskRow(page, "Triage agent")).toContainText(receiver.url())
+    await expect(taskRow(page, "Triage bot")).toContainText("Failed")
+    await expect(taskRow(page, "Triage bot")).toContainText(receiver.url())
   } finally {
     await receiver.close()
   }
@@ -127,8 +123,8 @@ test("A URL is set, the secret shown once, a test sent and its result read", asy
 test("An address the server refuses is answered in the field", async ({
   page,
 }) => {
-  await openNewBot(page, "Triage agent")
-  const row = commentRow(page, "Triage agent")
+  await openNewBot(page, "Triage bot")
+  const row = commentRow(page, "Triage bot")
 
   await row.getByRole("button", { name: "Set a URL" }).click()
   const field = row.getByRole("textbox", { name: "Comment URL" })
@@ -149,7 +145,7 @@ test("An address the server refuses is answered in the field", async ({
   await field.press("Escape")
   await expect(field).toBeHidden()
   await expect(row).toContainText("Not set")
-  await expect(botColumn(page, "Triage agent")).toBeVisible()
+  await expect(botColumn(page, "Triage bot")).toBeVisible()
 })
 
 test("A URL is changed, and cleared once its loss is confirmed", async ({
@@ -157,15 +153,13 @@ test("A URL is changed, and cleared once its loss is confirmed", async ({
 }) => {
   const receiver = await startReceiver()
   try {
-    const { api, bot } = await openNewBot(page, "Triage agent")
+    const { api, bot } = await openNewBot(page, "Triage bot")
     await setWebhookByApi(page, api, bot.id, "task", receiver.url("/first"))
     await setWebhookByApi(page, api, bot.id, "comment", receiver.url("/second"))
     await page.reload()
-    const row = taskRow(page, "Triage agent")
+    const row = taskRow(page, "Triage bot")
     await expect(row).toContainText("/first")
-    await expect(botLine(page, "Triage agent")).toContainText(
-      "both webhooks set",
-    )
+    await expect(botLine(page, "Triage bot")).toContainText("both webhooks set")
 
     await row.getByRole("button", { name: "Change" }).click()
     const field = row.getByRole("textbox", { name: "Task ready URL" })
@@ -179,26 +173,26 @@ test("A URL is changed, and cleared once its loss is confirmed", async ({
     // Clearing says what goes with it, and the other webhook stays.
     await row.getByRole("button", { name: "Clear" }).click()
     const confirm = page.getByRole("dialog", {
-      name: "Clear the task ready webhook of Triage agent?",
+      name: "Clear the task webhook of Triage bot?",
     })
     await expect(confirm).toContainText("The other webhook and the secret stay")
     await confirm.getByRole("button", { name: "Clear webhook" }).click()
     await expect(row).toContainText("Not set")
-    await expect(botLine(page, "Triage agent")).toContainText(
+    await expect(botLine(page, "Triage bot")).toContainText(
       "comment webhook set",
     )
 
     // The last one takes the secret with it, and says so beforehand.
-    const comment = commentRow(page, "Triage agent")
+    const comment = commentRow(page, "Triage bot")
     await comment.getByRole("button", { name: "Clear" }).click()
     const last = page.getByRole("dialog", {
-      name: "Clear the comment webhook of Triage agent?",
+      name: "Clear the comment webhook of Triage bot?",
     })
     await expect(last).toContainText("the secret is discarded too")
     await last.getByRole("button", { name: "Clear webhook" }).click()
     await expect(comment).toContainText("Not set")
     await expect(
-      hooks(page, "Triage agent").getByRole("button", {
+      hooks(page, "Triage bot").getByRole("button", {
         name: "Regenerate secret",
       }),
     ).toHaveCount(0)
@@ -210,7 +204,7 @@ test("A URL is changed, and cleared once its loss is confirmed", async ({
       .fill(receiver.url("/again"))
     await row.getByRole("button", { name: "Save" }).click()
     await storeTokenAndClose(
-      page.getByRole("dialog", { name: "Webhook secret for Triage agent" }),
+      page.getByRole("dialog", { name: "Webhook secret for Triage bot" }),
       "secret",
     )
   } finally {
@@ -223,29 +217,29 @@ test("The secret is regenerated, shown once, and signs from then on", async ({
 }) => {
   const receiver = await startReceiver()
   try {
-    const { api, bot } = await openNewBot(page, "Triage agent")
+    const { api, bot } = await openNewBot(page, "Triage bot")
     const first = (
       await setWebhookByApi(page, api, bot.id, "task", receiver.url())
     ).secret
     expect(first).toBeTruthy()
     await page.reload()
 
-    await hooks(page, "Triage agent")
+    await hooks(page, "Triage bot")
       .getByRole("button", { name: "Regenerate secret" })
       .click()
     const confirm = page.getByRole("dialog", {
-      name: "Regenerate the webhook secret of Triage agent?",
+      name: "Regenerate the webhook secret of Triage bot?",
     })
     await confirm.getByRole("button", { name: "Cancel" }).click()
     await expect(confirm).toBeHidden()
 
-    await hooks(page, "Triage agent")
+    await hooks(page, "Triage bot")
       .getByRole("button", { name: "Regenerate secret" })
       .click()
     await confirm.getByRole("button", { name: "Regenerate" }).click()
 
     const dialog = page.getByRole("dialog", {
-      name: "Webhook secret for Triage agent",
+      name: "Webhook secret for Triage bot",
     })
     await expect(dialog).toBeVisible()
     const second = await dialog
@@ -254,10 +248,10 @@ test("The secret is regenerated, shown once, and signs from then on", async ({
     expect(second).not.toBe(first)
     await storeTokenAndClose(dialog, "secret")
 
-    await taskRow(page, "Triage agent")
+    await taskRow(page, "Triage bot")
       .getByRole("button", { name: "Send a test" })
       .click()
-    await expect(taskRow(page, "Triage agent")).toContainText("Delivered")
+    await expect(taskRow(page, "Triage bot")).toContainText("Delivered")
     const [delivery] = receiver.received
     expect(signedWith(second, delivery)).toBe(true)
     expect(signedWith(first ?? "", delivery)).toBe(false)
@@ -300,7 +294,7 @@ test.describe("on a phone", () => {
   test("The section fits the screen and its controls are thumb-sized", async ({
     page,
   }) => {
-    const { api, bot } = await openNewBot(page, "Triage agent")
+    const { api, bot } = await openNewBot(page, "Triage bot")
     await setWebhookByApi(
       page,
       api,
@@ -310,9 +304,9 @@ test.describe("on a phone", () => {
     )
     await page.reload()
 
-    const section = hooks(page, "Triage agent")
+    const section = hooks(page, "Triage bot")
     await section.scrollIntoViewIfNeeded()
-    await expect(taskRow(page, "Triage agent")).toContainText("hooks.example")
+    await expect(taskRow(page, "Triage bot")).toContainText("hooks.example")
 
     // Nothing pushes the page sideways.
     const overflow = await page.evaluate(
