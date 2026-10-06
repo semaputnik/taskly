@@ -140,13 +140,13 @@ export function BotActivity({ bot }: { bot: BotUserPublic }) {
                   {day.entries.map((entry) => (
                     <li
                       key={entry.id}
-                      className="border-rule grid grid-cols-[52px_minmax(0,1fr)] items-baseline gap-3 border-b py-2 last:border-b-0"
+                      className="border-rule grid grid-cols-[4.25rem_minmax(0,1fr)] items-baseline gap-3 border-b py-2 last:border-b-0"
                     >
                       {entry.created_at ? (
                         <time
                           dateTime={entry.created_at}
                           title={formatDateTime(entry.created_at)}
-                          className="text-ink-3 font-mono text-xs tabular-nums"
+                          className="text-ink-3 font-mono text-xs tabular-nums whitespace-nowrap"
                         >
                           {clock(new Date(entry.created_at))}
                         </time>

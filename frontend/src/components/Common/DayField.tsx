@@ -40,6 +40,7 @@ export function DayField({
   label,
   value,
   onChange,
+  min,
   className,
 }: {
   id?: string
@@ -47,6 +48,8 @@ export function DayField({
   label: string
   value: string | null | undefined
   onChange: (day: string | null) => void
+  /** The earliest day the picker offers (a stored day, `YYYY-MM-DD`). */
+  min?: string
   className?: string
 }) {
   const picker = useRef<HTMLInputElement>(null)
@@ -102,6 +105,7 @@ export function DayField({
           aria-hidden={coarse ? undefined : true}
           aria-label={coarse ? name : undefined}
           value={value ?? ""}
+          min={min}
           onChange={(event) => onChange(event.target.value || null)}
           // `appearance-none` and a full-size box keep iOS from shrinking the
           // field to its own intrinsic width, which would leave most of the

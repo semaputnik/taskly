@@ -1,5 +1,5 @@
 import { expect, type Locator, type Page } from "@playwright/test"
-import { storeTokenAndClose } from "./tokenDialog"
+import { storeSecretAndClose } from "./secretDialog"
 
 /** A bot user's line on the Bots page, found by the name it is opened by. */
 export const botLine = (page: Page, name: string): Locator =>
@@ -44,7 +44,7 @@ export async function createBotInColumn(
   const token = await dialog
     .getByRole("textbox", { name: "Bot token" })
     .inputValue()
-  await storeTokenAndClose(dialog)
+  await storeSecretAndClose(dialog)
   await expect(botColumn(page, name)).toBeVisible()
   return token
 }

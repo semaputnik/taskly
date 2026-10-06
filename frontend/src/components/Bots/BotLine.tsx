@@ -120,12 +120,15 @@ export function BotLine({
                   last delivery failed
                 </span>
               )}
+              {/* On a phone the right-hand column would take a third of the
+                  line, so last use joins the facts instead. */}
+              <span className="sm:hidden">{lastUseInWords(bot)}</span>
             </>
           )}
         </div>
       </div>
       {!bot.deleted && (
-        <span className="text-ink-3 max-w-[7.5rem] text-right text-[0.8125rem] leading-snug sm:max-w-none sm:whitespace-nowrap">
+        <span className="text-ink-3 hidden text-right text-[0.8125rem] leading-snug whitespace-nowrap sm:block">
           {lastUseInWords(bot)}
         </span>
       )}

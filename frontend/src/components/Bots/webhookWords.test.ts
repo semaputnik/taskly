@@ -91,6 +91,12 @@ describe("a delivery in words", () => {
     ).toMatch(/200 in 1\.8 s$/)
   })
 
+  test("a delivery too quick to measure is not said to take 0 ms", () => {
+    expect(deliveryInWords(delivery({ duration_ms: 0 }), now).detail).toMatch(
+      /200 in under 1 ms$/,
+    )
+  })
+
   test("a test is said to be one", () => {
     expect(
       deliveryInWords(delivery({ event: "test", attempted_at: at(1) }), now)

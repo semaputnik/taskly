@@ -240,7 +240,7 @@ export function CaptureSheet({
           event.preventDefault()
           returnFocusTo.current?.focus()
         }}
-        className="bg-page bottom-[var(--kb-inset,0px)] max-h-[var(--vv-height,100svh)] gap-0 rounded-t-xl px-4 pt-2.5 pb-[max(0px,calc(env(safe-area-inset-bottom)-var(--kb-inset,0px)))] shadow-[0_-10px_30px_rgb(0_0_0/0.15)] data-[state=closed]:duration-150 data-[state=open]:duration-200"
+        className="bg-page bottom-[var(--kb-inset,0px)] max-h-[var(--vv-height,100svh)] gap-0 rounded-t-xl px-4 pt-2.5 pb-[max(0px,calc(env(safe-area-inset-bottom)-var(--kb-inset,0px)))] shadow-none data-[state=closed]:duration-150 data-[state=open]:duration-200"
       >
         <div
           aria-hidden

@@ -6,19 +6,12 @@ import { DayField } from "@/components/Common/DayField"
 import {
   ChoiceFilter,
   ChoiceOptions,
+  OrderMenu as CommonOrderMenu,
   control,
   Filter,
   PickSheet,
-  SheetOption,
 } from "@/components/Common/FilterRow"
 import { Checkbox } from "@/components/ui/checkbox"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 import { Label } from "@/components/ui/label"
 import {
   Popover,
@@ -152,77 +145,18 @@ function OrderMenu({
   onOrder: (sort: Sort | undefined) => void
 }) {
   const { label } = orderChoice(search)
-  const phone = useIsPhone()
-  const [sheetOpen, setSheetOpen] = useState(false)
-  if (phone) {
-    return (
-      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-        <SheetTrigger asChild>
-          <button
-            type="button"
-            aria-label={`Order: ${label}`}
-            className={cn(control, "-mr-1.5")}
-          >
-            {label}
-            <ChevronDown aria-hidden className="size-2.5 opacity-70" />
-          </button>
-        </SheetTrigger>
-        <PickSheet title="Order" description="Choose how the list is ordered.">
-          {ORDERS.map(({ sort, label: name }) => (
-            <SheetOption
-              key={sort ?? "default"}
-              selected={sort === search.sort}
-              onClick={() => {
-                onOrder(sort)
-                setSheetOpen(false)
-              }}
-            >
-              {name}
-              {sort && sort === search.sort && (
-                <span className="text-ink-3 ml-3 text-xs font-normal">
-                  Choose again to reverse
-                </span>
-              )}
-            </SheetOption>
-          ))}
-        </PickSheet>
-      </Sheet>
-    )
-  }
   return (
-    <DropdownMenu modal={false}>
-      <DropdownMenuTrigger asChild>
-        <button
-          type="button"
-          aria-label={`Order: ${label}`}
-          className={cn(control, "-mr-1.5")}
-        >
-          {label}
-          <ChevronDown aria-hidden className="size-2.5 opacity-70" />
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" aria-label="Order">
-        <DropdownMenuRadioGroup value={search.sort ?? "default"}>
-          {ORDERS.map(({ sort, label: name }) => (
-            <DropdownMenuRadioItem
-              key={sort ?? "default"}
-              value={sort ?? "default"}
-              // Chosen again it must reverse, so the item acts on selection
-              // rather than on the group's change, which a repeat is not.
-              onSelect={() => onOrder(sort)}
-              className="gap-6"
-            >
-              {name}
-              {sort && sort === search.sort && (
-                <span className="text-ink-3 ml-auto text-xs">
-                  Choose again to reverse
-                </span>
-              )}
-            </DropdownMenuRadioItem>
-          ))}
-        </DropdownMenuRadioGroup>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <CommonOrderMenu
+      label={label}
+      description="Choose how the list is ordered."
+      selected={search.sort ?? "default"}
+      choices={ORDERS.map(({ sort, label: name }) => ({
+        key: sort ?? "default",
+        label: name,
+        reverses: Boolean(sort && sort === search.sort),
+      }))}
+      onChoose={(key) => onOrder(key === "default" ? undefined : (key as Sort))}
+    />
   )
 }
 

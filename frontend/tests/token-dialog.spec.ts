@@ -1,6 +1,6 @@
 import { expect, type Page, test } from "@playwright/test"
 import { newUser, userApi } from "./utils/account"
-import { storeTokenAndClose } from "./utils/tokenDialog"
+import { storeSecretAndClose } from "./utils/secretDialog"
 
 test.use({ storageState: { cookies: [], origins: [] } })
 
@@ -76,7 +76,7 @@ test("Leaving needs the token stored, and warns when it was never copied", async
 
 test("A copied and stored token closes without a warning", async ({ page }) => {
   const { dialog } = await revealToken(page)
-  await storeTokenAndClose(dialog)
+  await storeSecretAndClose(dialog)
 })
 
 test("Copying from the field by keyboard counts as copied", async ({
