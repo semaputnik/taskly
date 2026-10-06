@@ -7,6 +7,7 @@ import {
   botsQuery,
   type Change,
   currentUserQuery,
+  deletedBotsQuery,
   nearTagsQuery,
   projectQuery,
   projectsQuery,
@@ -40,6 +41,7 @@ const keys = {
   tags: tagsQuery().queryKey,
   tag: tagQuery("g1").queryKey,
   bots: botsQuery().queryKey,
+  deletedBots: deletedBotsQuery().queryKey,
   activity: activityQuery({ skip: 0, limit: 5 }).queryKey,
 }
 
@@ -73,6 +75,18 @@ describe("what a change refreshes", () => {
       expect(refreshes(change, keys.tags)).toBe(true)
       expect(refreshes(change, keys.activity)).toBe(true)
       expect(refreshes(change, keys.tasks)).toBe(true)
+    }
+  })
+
+  test("a task moves what a deleted bot user is still named on, and no live one", () => {
+    for (const change of [
+      { type: "task created" },
+      { type: "task changed", taskId: "t1" },
+      { type: "task deleted", taskId: "t1" },
+      { type: "deletion restored" },
+    ] satisfies Change[]) {
+      expect(refreshes(change, keys.deletedBots)).toBe(true)
+      expect(refreshes(change, keys.bots)).toBe(false)
     }
   })
 

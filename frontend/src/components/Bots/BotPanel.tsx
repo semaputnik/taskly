@@ -100,9 +100,13 @@ function BotRecord({ bot }: { bot: BotUserPublic }) {
   // follows the server without undoing an edit that has not landed yet.
   useEffect(() => setScope(bot.scope), [bot.scope])
 
-  const change = (next: BotScope) => {
+  const change = async (next: BotScope) => {
+    const previous = scope
     setScope(next)
-    return save(next)
+    const saved = await save(next)
+    // A refused save leaves the box as the server holds it: the toast says
+    // what went wrong, and a box that stayed ticked would say it was granted.
+    if (!saved) setScope((current) => (current === next ? previous : current))
   }
 
   const reach = reachInWords(
