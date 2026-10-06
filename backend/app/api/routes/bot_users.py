@@ -97,14 +97,23 @@ def read_bot_users(
     Deleted bot users are not among them, unless `deleted` asks for them
     instead: then it is only those, the most recently deleted first.
     """
-    gone = col(BotUser.deleted_at).is_not(None)
-    where = [BotUser.owner_id == current_user.id, gone if deleted else ~gone]
-    count = session.exec(select(func.count()).select_from(BotUser).where(*where)).one()
-    order = (
-        col(BotUser.deleted_at).desc() if deleted else col(BotUser.created_at).asc()
+    state = (
+        col(BotUser.deleted_at).is_not(None)
+        if deleted
+        else col(BotUser.deleted_at).is_(None)
     )
+    count = session.exec(
+        select(func.count())
+        .select_from(BotUser)
+        .where(BotUser.owner_id == current_user.id, state)
+    ).one()
+    order = col(BotUser.deleted_at).desc() if deleted else col(BotUser.created_at).asc()
     bots = session.exec(
-        select(BotUser).where(*where).order_by(order).offset(skip).limit(limit)
+        select(BotUser)
+        .where(BotUser.owner_id == current_user.id, state)
+        .order_by(order)
+        .offset(skip)
+        .limit(limit)
     ).all()
     return BotUsersPublic(data=_public_many(session, list(bots)), count=count)
 
