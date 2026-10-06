@@ -448,7 +448,7 @@ The brand is the wordmark "Taskly", set in the interface's own face. The craft b
 - One page, one ground: sections are groups under a hairline heading, never framed containers.
 - Ink plus two greys for all reading; colour only for state that asks for action.
 - The current screen is marked by weight (600), never by a fill or a colour.
-- Every log line leads with its actor; bot users' lines are news (ink), the reader's own are reminders (muted).
+- Every log line leads with its actor; bot users' lines are news (ink); the reader's own are reminders (muted) on the Activity page, and on the day page one muted line folds them.
 - The platform UI sans at 15px; monospace only for times, counts, ids, URLs, secrets and key caps.
 - Six stroked status marks, told apart by shape; priority is the mark's colour, and the Priority row's.
 - A record opens in a column beside the page, not over it: no scrim, no focus trap, the page stays live.
@@ -485,7 +485,7 @@ A white page with near-black ink, two greys and two hairlines, and four action c
 
 **The Action-Only Colour Rule.** Colour exists only for state that asks for action: red for overdue and P1, green for done and close, amber and blue only for P2 and P3 status marks and Priority rows; the one place green and red mark severity is the icon of a notice, and only the icon. No accent marks location, selection, hover or brand; `theme.test.ts` asserts that no accent hue returns. If a new element wants colour, it must name the action the colour asks for.
 
-**The Priority Hue Rule.** Priority hue lives on two things only: an open task's status mark, and the flag and label of the Priority row in a task's property list (the choices in that row's menu carry their flag in the same hue, so the colour is learnt where it is set). P1 is Overdue Red, P2 Priority Amber, P3 Priority Blue: the same values and the same contrast as on the mark, red 5.4 / 4.9, amber 5.8 / 5.3 and blue 5.2 / 4.7 on the light page / hover, and in dark red 6.0 / 5.0, amber 8.7 / 7.3 and blue 7.8 / 6.6. In the row the label is set at 500 beside a filled 14px flag. P4 is the flag and label in ink; no priority is the words "No priority" in Ink 3 with no flag. A closed task's mark is Done Green whatever its priority was. Nowhere else: not a pill, not a line, not a column.
+**The Priority Hue Rule.** Priority hue lives on two things only: an open task's status mark (a P1 mark on an overdue line is the exception: ink, since the due day is already the same red), and the flag and label of the Priority row in a task's property list (the choices in that row's menu carry their flag in the same hue, so the colour is learnt where it is set). P1 is Overdue Red, P2 Priority Amber, P3 Priority Blue: the same values and the same contrast as on the mark, red 5.4 / 4.9, amber 5.8 / 5.3 and blue 5.2 / 4.7 on the light page / hover, and in dark red 6.0 / 5.0, amber 8.7 / 7.3 and blue 7.8 / 6.6. In the row the label is set at 500 beside a filled 14px flag. P4 is the flag and label in ink; no priority is the words "No priority" in Ink 3 with no flag. A closed task's mark is Done Green whatever its priority was. Nowhere else: not a pill, not a line, not a column.
 
 **The Mirrored Theme Rule.** Every token exists in both themes and every text/ground pair is checked in both. No colour is introduced in one theme alone, and a changed value is not done until `src/theme.test.ts` passes.
 
@@ -569,7 +569,7 @@ The status marks are the system's signature geometry: drawn on an 18-unit grid w
 
 ### Named Rules
 
-**The Six-Mark Rule.** A task's status is one of six 18px stroked marks, told apart by shape alone so they read in greyscale: a dashed ring for Backlog, a solid ring for To do, a half-filled ring for In progress, a dot in a ring for Review, an eye for Waiting, and a filled check for Done. Status is the shape and priority is the colour: an open task's mark takes P1 red, P2 amber or P3 blue, otherwise ink; Done is always the green fill with its check cut out in the page colour; a mark standing for a status alone, as in a menu, is ink. A mark always travels with its label, or with an accessible name stating status and priority. In the task line the mark is itself the control that closes the task.
+**The Six-Mark Rule.** A task's status is one of six 18px stroked marks, told apart by shape alone so they read in greyscale: a dashed ring for Backlog, a solid ring for To do, a half-filled ring for In progress, a dot in a ring for Review, an eye for Waiting, and a filled check for Done. Status is the shape and priority is the colour: an open task's mark takes P1 red, P2 amber or P3 blue, otherwise ink (a P1 mark on an overdue line is ink, so red is said once there); Done is always the green fill with its check cut out in the page colour; a mark standing for a status alone, as in a menu, is ink. A mark always travels with its label, or with an accessible name stating status and priority. In the task line the mark is itself the control that closes the task.
 
 ## Components
 
