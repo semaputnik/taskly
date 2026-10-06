@@ -953,7 +953,8 @@ export class ActivityService {
     /**
      * Read Activity Log
      *
-     * Retrieve the current user's activity log, newest first.
+     * Retrieve the current user's activity log, newest first unless `order` says
+     * `oldest` (FR-10.10).
      *
      * `actor_bot_user_id` narrows it to one bot user's own changes — what an
      * operator asks when they want to read an integration rather than their
@@ -965,6 +966,9 @@ export class ActivityService {
      * can still answer one question at a time. The groups do not overlap. The
      * two narrowings are independent and combine: what this integration
      * finished is both of them at once.
+     *
+     * `by_user` keeps the user's own changes, the other side of `by_bots`: what
+     * "You" is in the log's actor menu.
      *
      * `by_bots` keeps the changes any of the user's bot users made, and `since`
      * the entries written after a moment. Together they are what the dashboard
@@ -978,6 +982,10 @@ export class ActivityService {
      * records, so one that is not theirs, or does not exist, is a 404 — the
      * same answer for both — rather than a history that looks empty. A deleted
      * task's history still reads.
+     *
+     * `order` turns the log around. It changes which end a page starts from and
+     * nothing about what the log holds, so it combines with every narrowing and
+     * with `skip` and `limit`.
      *
      * Always the requesting user's own entries and nothing wider: there is no
      * parameter or role that reaches another user's log, the superuser's

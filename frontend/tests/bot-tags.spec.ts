@@ -103,7 +103,9 @@ test("Granting a bot user “Create tags” lets it add to the vocabulary", asyn
 
   // And the tags are the bot user's doing, not its owner's.
   await page.goto("/activity")
-  const logRow = page.getByRole("row").filter({ hasText: "Created the tag" })
+  const logRow = page
+    .getByRole("listitem")
+    .filter({ hasText: "Created the tag" })
   await expect(logRow.first()).toContainText("Triage agent")
   await expect(logRow.first()).not.toContainText("You")
 })

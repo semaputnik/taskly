@@ -123,7 +123,7 @@ test("The delete confirmation says the task comes back from the activity log, an
 
   await page.goto("/activity")
   const deletions = page
-    .getByRole("row")
+    .getByRole("listitem")
     .filter({ hasText: "Deleted Plan the trip" })
   await expect(deletions).toHaveCount(1)
   await deletions.getByRole("button", { name: "Restore" }).click()

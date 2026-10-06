@@ -260,7 +260,7 @@ test("Undo deletes the task, and the activity log keeps both acts", async ({
     .toBe(0)
 
   await page.goto("/activity")
-  const rows = page.getByRole("row").filter({ hasText: "Order milk" })
+  const rows = page.getByRole("listitem").filter({ hasText: "Order milk" })
   await expect(rows).toHaveCount(2)
   await expect(rows.nth(0)).toContainText("Deleted Order milk")
   await expect(rows.nth(1)).toContainText("Created Order milk in Inbox")

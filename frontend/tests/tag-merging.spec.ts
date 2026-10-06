@@ -89,7 +89,9 @@ test("Merging from a tag's panel moves its tasks and removes it", async ({
 
   await page.goto("/activity")
   await expect(
-    page.getByRole("row").filter({ hasText: "Merged “Deploy” into deploy" }),
+    page
+      .getByRole("listitem")
+      .filter({ hasText: "Merged “Deploy” into deploy" }),
   ).toContainText("moving 3 tasks onto it")
 })
 

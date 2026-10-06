@@ -5,6 +5,7 @@ import type { ActivityEntryPublic, TaskStatus } from "@/client"
 import { type RecordKind, recordLink } from "@/components/Records/panels"
 import { STATUS_LABELS } from "@/components/Tasks/statuses"
 import { formatDay } from "@/lib/dates"
+import { cn } from "@/lib/utils"
 
 interface ProjectRef {
   id: string
@@ -148,7 +149,16 @@ export function ActivityDescription({
       {name}
     </Link>
   ) : (
-    <span className="font-medium">{name}</span>
+    // A name whose record is gone is struck through: it is still what the
+    // line is about, and it can no longer be opened.
+    <span
+      className={cn(
+        "font-medium",
+        recordOf(entry) && "text-ink-3 line-through",
+      )}
+    >
+      {name}
+    </span>
   )
 
   switch (entry.action) {

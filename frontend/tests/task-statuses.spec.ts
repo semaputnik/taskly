@@ -291,6 +291,6 @@ test("The activity log says a task moved to Waiting", async ({ page }) => {
 
   await page.goto("/activity")
   await expect(
-    page.getByRole("row").filter({ hasText: "Renew the lease" }).first(),
+    page.getByRole("listitem").filter({ hasText: "Renew the lease" }).first(),
   ).toContainText("Moved Renew the lease to Waiting")
 })

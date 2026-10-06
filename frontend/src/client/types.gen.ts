@@ -102,6 +102,13 @@ export type ActivityEntryPublic = {
 export type ActivityKind = 'completed' | 'created' | 'changed' | 'deleted' | 'comments' | 'tags';
 
 /**
+ * ActivityOrder
+ *
+ * Which end of the log a read starts from (FR-10.10).
+ */
+export type ActivityOrder = 'newest' | 'oldest';
+
+/**
  * AttachmentPublic
  */
 export type AttachmentPublic = {
@@ -2744,6 +2751,10 @@ export type activityReadActivityLogData = {
          */
         by_bots?: boolean;
         /**
+         * By User
+         */
+        by_user?: boolean;
+        /**
          * Since
          */
         since?: string | null;
@@ -2751,6 +2762,7 @@ export type activityReadActivityLogData = {
          * Task Id
          */
         task_id?: string | null;
+        order?: ActivityOrder;
     };
     url: '/api/v1/activity-log/';
 };

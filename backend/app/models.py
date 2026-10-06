@@ -1092,6 +1092,13 @@ class ActivityKind(StrEnum):
     TAGS = "tags"
 
 
+class ActivityOrder(StrEnum):
+    """Which end of the log a read starts from (FR-10.10)."""
+
+    NEWEST = "newest"
+    OLDEST = "oldest"
+
+
 class ActivityEntityType(StrEnum):
     TASK = "task"
     PROJECT = "project"
