@@ -68,10 +68,14 @@ export function ProjectPanel() {
           </>
         ) : project ? (
           <>
-            <span className="truncate">Project</span>
+            {/* The word repeats the title's own role: on a phone the date
+                gets the room. */}
+            <span className="max-sm:sr-only">Project</span>
             {project.created_at && (
               <>
-                <span aria-hidden>·</span>
+                <span aria-hidden className="max-sm:hidden">
+                  ·
+                </span>
                 <span className="shrink-0 whitespace-nowrap">
                   created {formatDayOf(project.created_at)}
                 </span>
@@ -124,7 +128,14 @@ function ProjectRecord({ project }: { project: ProjectPublic }) {
           <span className="text-ink-2 text-sm tabular-nums">
             {project.is_archived
               ? `${project.task_count ?? 0} kept`
-              : tasksInWords(project)}
+              : tasksInWords(project)
+                  .split(" · ")
+                  .map((fact, index) => (
+                    <span key={fact}>
+                      {index > 0 && " · "}
+                      <span className="whitespace-nowrap">{fact}</span>
+                    </span>
+                  ))}
           </span>
           {project.is_archived ? (
             (project.task_count ?? 0) > 0 && (
