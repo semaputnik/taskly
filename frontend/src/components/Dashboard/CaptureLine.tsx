@@ -82,9 +82,15 @@ export interface SheetBinding {
 export function CaptureLine({
   opens,
   sheet,
+  project,
 }: {
   opens?: "down" | "up"
   sheet?: SheetBinding
+  /**
+   * The project this line files into, for a line that sits in a project's own
+   * column rather than on a page narrowed to one (FR-05.15).
+   */
+  project?: { id: string; name: string }
 }) {
   const panels = useRecordPanels()
   const undo = useUndoCapture()
@@ -97,7 +103,10 @@ export function CaptureLine({
     if (sheet) sheet.setTitle(value)
     else setOwn(value)
   }
-  const target = useCaptureTarget()
+  const narrowed = useCaptureTarget()
+  const target = project
+    ? { projectId: project.id, projectName: project.name }
+    : narrowed
   // A page narrowed to a project knows the project's name only once the
   // projects have come: words committed before then would go to the Inbox
   // under a line that already says the project's name. The line holds them

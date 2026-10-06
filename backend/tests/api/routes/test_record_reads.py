@@ -22,6 +22,7 @@ from tests.utils.accounts import (
     create_bot_user,
     create_project,
     create_task,
+    create_task_record,
     create_user_headers,
     error_code,
     issue_bot_headers,
@@ -240,6 +241,59 @@ def test_a_project_reports_the_tasks_that_resolve_to_it(
     assert counts[project_id] == 2
     assert counts[elsewhere] == 0
     assert _project(client, owner, project_id).json()["task_count"] == 2
+
+
+def test_a_project_reports_its_tasks_by_where_they_stand(
+    client: TestClient, owner: Headers
+) -> None:
+    """
+    The open count is what the task list narrowed to the project shows, and
+    the Projects page links it there (FR-05.15): open means not Done, overdue
+    is an open task due before today, and subtasks count with their root.
+    """
+    project_id = create_project(client, owner, "Website")
+    late = create_task_record(
+        client, owner, "Late", project_id=project_id, due_date="2000-01-01"
+    )
+    create_task_record(
+        client, owner, "In review", project_id=project_id, status="review"
+    )
+    create_task_record(client, owner, "Done", project_id=project_id, status="done")
+    create_task_record(
+        client,
+        owner,
+        "Finished long ago",
+        project_id=project_id,
+        status="done",
+        due_date="2000-01-01",
+    )
+    create_task_record(client, owner, "Subtask", parent_id=late["id"])
+    create_project(client, owner, "Untouched")
+
+    project = _project(client, owner, project_id).json()
+    assert (
+        project["task_count"],
+        project["open_count"],
+        project["overdue_count"],
+        project["backlog_count"],
+        project["review_count"],
+        project["done_count"],
+    ) == (5, 3, 1, 2, 1, 2)
+    listed = client.get(
+        f"{API}/tasks/",
+        headers=owner,
+        params={
+            "project_id": project_id,
+            "status": ["backlog", "todo", "in_progress", "waiting", "review"],
+        },
+    ).json()
+    assert listed["count"] == project["open_count"]
+    untouched = next(
+        p
+        for p in client.get(f"{API}/projects/", headers=owner).json()["data"]
+        if p["name"] == "Untouched"
+    )
+    assert untouched["open_count"] == untouched["done_count"] == 0
 
 
 def test_a_deleted_task_is_not_counted(client: TestClient, owner: Headers) -> None:

@@ -15,7 +15,7 @@ test("A bot user is drafted in the column and its token is shown once", async ({
   await logInUser(page, email)
 
   await page.goto("/projects")
-  await page.getByRole("button", { name: "Add Project" }).click()
+  await page.getByRole("button", { name: "New project" }).click()
   const projectName = page.getByRole("textbox", { name: "Project name" })
   await projectName.fill("Support queue")
   await projectName.press("Enter")
@@ -170,7 +170,7 @@ test("A bot's scope is narrowed and the bot is deleted from the Bots page", asyn
 
   await page.goto("/projects")
   for (const name of ["Docs", "Billing"]) {
-    await page.getByRole("button", { name: "Add Project" }).click()
+    await page.getByRole("button", { name: "New project" }).click()
     const field = page.getByRole("textbox", { name: "Project name" })
     await field.fill(name)
     await field.press("Enter")

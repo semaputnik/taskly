@@ -20,12 +20,12 @@ from app.models import (
 router = APIRouter(prefix="/projects", tags=["projects"])
 
 
-def _task_count(session: SessionDep, project: Project) -> int:
+def _task_stats(session: SessionDep, project: Project) -> crud.ProjectTaskStats:
     """What one project holds, for the responses that report a single one."""
-    counts = crud.get_project_task_counts(
+    stats = crud.get_project_task_stats(
         session=session, owner_id=project.owner_id, project_ids=[project.id]
     )
-    return counts.get(project.id, 0)
+    return stats.get(project.id, crud.ProjectTaskStats())
 
 
 @router.get("/", response_model=ProjectsPublic)
@@ -57,14 +57,14 @@ def read_projects(
 
     statement = select(Project).where(*conditions).offset(skip).limit(limit)
     projects = session.exec(statement).all()
-    task_counts = crud.get_project_task_counts(
+    task_stats = crud.get_project_task_stats(
         session=session,
         owner_id=caller.owner_id,
         project_ids=[project.id for project in projects],
     )
     return ProjectsPublic(
         data=[
-            crud.project_public(project, task_counts.get(project.id, 0))
+            crud.project_public(project, task_stats.get(project.id))
             for project in projects
         ],
         count=count,
@@ -84,7 +84,7 @@ def read_project(
     into a project has to be able to resolve the project it writes into.
     """
     project = access.get_project(session, caller, project_id, action=None)
-    return crud.project_public(project, _task_count(session, project))
+    return crud.project_public(project, _task_stats(session, project))
 
 
 @router.post("/", response_model=ProjectPublic)
@@ -121,7 +121,7 @@ def update_project(
     project = crud.update_project(
         session=session, db_project=project, project_in=project_in
     )
-    return crud.project_public(project, _task_count(session, project))
+    return crud.project_public(project, _task_stats(session, project))
 
 
 @router.post("/{project_id}/archive", response_model=ProjectPublic)
@@ -146,7 +146,7 @@ def archive_project(
             status_code=400, detail="The Inbox project cannot be archived"
         )
     project = crud.set_project_archived(session=session, project=project, archived=True)
-    return crud.project_public(project, _task_count(session, project))
+    return crud.project_public(project, _task_stats(session, project))
 
 
 @router.post("/{project_id}/unarchive", response_model=ProjectPublic)
@@ -163,7 +163,7 @@ def unarchive_project(
     project = crud.set_project_archived(
         session=session, project=project, archived=False
     )
-    return crud.project_public(project, _task_count(session, project))
+    return crud.project_public(project, _task_stats(session, project))
 
 
 @router.delete("/{project_id}")

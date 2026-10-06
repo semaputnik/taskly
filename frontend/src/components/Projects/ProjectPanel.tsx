@@ -1,4 +1,4 @@
-import { useMutation } from "@tanstack/react-query"
+import { useMutation, useQuery } from "@tanstack/react-query"
 import { Link as RouterLink } from "@tanstack/react-router"
 
 import {
@@ -6,65 +6,89 @@ import {
   ProjectsService,
   type ProjectUpdate,
 } from "@/client"
-import { NewRecord } from "@/components/Records/NewRecord"
+import { textLink } from "@/components/Dashboard/shared"
 import { useRecordPanel } from "@/components/Records/panels"
 import {
   DescriptionSection,
   EditableText,
+  gutter,
   PropertyList,
   PropertyRow,
   ReadOnlyValue,
-  RecordHeader,
   RecordPanel,
   titleFieldClass,
 } from "@/components/Records/RecordPanel"
-import { taskCountLabel } from "@/components/Tags/counts"
-import { LoadingButton } from "@/components/ui/loading-button"
+import { useWalk } from "@/components/Records/walk"
 import { formatDayOf } from "@/lib/dates"
-import { useReportChange } from "@/lib/serverState"
+import { botsQuery, useReportChange } from "@/lib/serverState"
 import { toastError, toastSuccess } from "@/lib/toasts"
+import { cn } from "@/lib/utils"
 import DeleteProject from "./DeleteProject"
+import { NewProject } from "./NewProject"
+import { KeptTasks, OpenTasks, ProjectActivity } from "./ProjectWork"
+import { botsIn, tasksInWords } from "./words"
+
+/** A property's action, in words, as the mock sets it: ink, 13.5px, medium. */
+const act = cn(
+  textLink,
+  "text-ink text-[13.5px] font-medium disabled:opacity-50 pointer-coarse:-my-3 pointer-coarse:py-3",
+)
 
 /**
- * A project as a record: read, renamed, archived and deleted in one place.
+ * A project as one document: what it holds and who works in it, whether it is
+ * in use, then its description, its open tasks with a line to add one, and
+ * what has happened in it.
  *
- * Before this a project had no address at all — its name lived in a row, its
- * actions behind that row's overflow menu, and each action in a dialog of its
- * own. Nothing could link to a project.
+ * There are no tabs and no Save: the name is edited in place, and every change
+ * saves as it is made. A project is fetched by id rather than read out of the
+ * page behind, because a link may point at one the list in view excludes — an
+ * archived one, most of all.
  */
 export function ProjectPanel() {
-  // Fetched by id rather than read out of the table: a link may point at a
-  // project the list in view excludes — an archived one, most of all.
   const {
+    id,
     capturing,
     record: project,
     panels,
     shell,
   } = useRecordPanel("project")
+  // The projects listed on the page behind, so ↓ and ↑ walk them.
+  const walk = useWalk(id)
 
   return (
     <RecordPanel
       {...shell}
+      walk={walk}
+      onWalk={(to) => panels.walkTo(to, "project")}
       destructive={
-        project && !project.is_inbox ? (
+        project && !project.is_inbox && !capturing ? (
           <DeleteProject project={project} onSuccess={shell.onClose} />
+        ) : undefined
+      }
+      bar={
+        capturing ? (
+          <>
+            <span className="shrink-0">New project</span>
+            <span aria-hidden>·</span>
+            <span className="truncate">Not saved yet</span>
+          </>
+        ) : project ? (
+          <>
+            <span className="shrink-0">Project</span>
+            {project.created_at && (
+              <>
+                <span aria-hidden>·</span>
+                <span className="truncate">
+                  created {formatDayOf(project.created_at)}
+                </span>
+              </>
+            )}
+          </>
         ) : undefined
       }
     >
       {capturing ? (
-        <NewRecord
-          kind="Project"
-          label="Project name"
-          placeholder="What is it for?"
-          hint="Enter creates it and opens it here, where its description, its archive state and the tasks it holds are read."
-          create={(name) =>
-            ProjectsService.createProject({ body: { name } }) as Promise<{
-              data: ProjectPublic
-            }>
-          }
-          change={{ type: "project created" }}
-          onCreated={(created) => panels.openProject(created.id)}
-        />
+        <NewProject />
       ) : project ? (
         <ProjectRecord project={project} />
       ) : null}
@@ -74,18 +98,18 @@ export function ProjectPanel() {
 
 function ProjectRecord({ project }: { project: ProjectPublic }) {
   const save = useProjectUpdate(project)
-  const readOnly = project.is_inbox || project.is_archived
+  const { data: bots } = useQuery(botsQuery())
+  const working = botsIn(project.id, bots?.data ?? [])
 
   return (
     <>
-      <RecordHeader
-        breadcrumb="Project"
-        title={
+      <div className={cn("pt-2 pb-[18px]", gutter)}>
+        {
           // The Inbox's name is fixed, and an archived project is frozen
           // whole until it is unarchived (FR-05.12): both read as prose, not
           // as a control that would be refused.
-          readOnly ? (
-            <p className="px-2 py-1.5 text-xl leading-snug font-semibold">
+          project.is_inbox || project.is_archived ? (
+            <p className="-ml-2 px-2 py-1.5 text-xl leading-snug font-semibold">
               {project.name}
             </p>
           ) : (
@@ -95,49 +119,62 @@ function ProjectRecord({ project }: { project: ProjectPublic }) {
               onCommit={async (name) =>
                 name.trim() ? save({ name: name.trim() }) : false
               }
-              className={titleFieldClass}
+              className={cn(titleFieldClass, "-ml-2")}
             />
           )
         }
-      />
+      </div>
 
       <PropertyList>
         <PropertyRow label="Tasks">
-          {(project.task_count ?? 0) > 0 ? (
+          <span className="text-ink-2 text-sm tabular-nums">
+            {project.is_archived
+              ? `${project.task_count ?? 0} kept`
+              : tasksInWords(project)}
+          </span>
+          {project.is_archived ? (
+            (project.task_count ?? 0) > 0 && (
+              <RouterLink
+                to="/projects/$projectId/tasks"
+                params={{ projectId: project.id }}
+                className={act}
+              >
+                Read the kept tasks <span aria-hidden>→</span>
+              </RouterLink>
+            )
+          ) : (
             <RouterLink
               to="/tasks"
               search={{ project_id: project.id }}
-              className="underline-offset-4 hover:underline"
+              className={act}
             >
-              {taskCountLabel(project.task_count ?? 0)}
+              Open the list <span aria-hidden>→</span>
             </RouterLink>
-          ) : (
-            <ReadOnlyValue>No tasks</ReadOnlyValue>
           )}
         </PropertyRow>
 
-        <PropertyRow label="Archive">
+        <PropertyRow label="Bot users">
+          <span className="text-ink-2 py-1 text-sm text-pretty">
+            {working.length > 0 ? (
+              working.join(", ")
+            ) : (
+              <span className="text-ink-3">No bot user has it in scope</span>
+            )}
+          </span>
+        </PropertyRow>
+
+        <PropertyRow label="State">
           {project.is_inbox ? (
             // The Inbox takes every task created without a project, so an
-            // archived, read-only Inbox could no longer do its job (FR-05.4).
+            // archived, read-only Inbox could no longer do its job (FR-05.4),
+            // and it keeps its name and stays (FR-05.6).
             <ReadOnlyValue>
-              The Inbox is always in use, so it is never archived or renamed
+              Always in use. The Inbox cannot be renamed, archived or deleted,
+              because every task filed without a project lands in it.
             </ReadOnlyValue>
           ) : (
             <ArchiveToggle project={project} />
           )}
-        </PropertyRow>
-
-        <PropertyRow label="Created">
-          <ReadOnlyValue>
-            {project.created_at ? (
-              <time dateTime={project.created_at}>
-                {formatDayOf(project.created_at)}
-              </time>
-            ) : (
-              "Unknown"
-            )}
-          </ReadOnlyValue>
         </PropertyRow>
       </PropertyList>
 
@@ -158,6 +195,13 @@ function ProjectRecord({ project }: { project: ProjectPublic }) {
           />
         )}
       </DescriptionSection>
+
+      {project.is_archived ? (
+        <KeptTasks key={`tasks-${project.id}`} project={project} />
+      ) : (
+        <OpenTasks key={`tasks-${project.id}`} project={project} />
+      )}
+      <ProjectActivity key={`activity-${project.id}`} project={project} />
     </>
   )
 }
@@ -186,20 +230,20 @@ function ArchiveToggle({ project }: { project: ProjectPublic }) {
   })
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <span>
+    <div className="flex flex-wrap items-center gap-x-3.5 gap-y-1">
+      <span className="text-ink-2 text-sm">
         {project.is_archived
           ? "Archived — read-only until it comes back"
-          : "In use"}
+          : "Active"}
       </span>
-      <LoadingButton
-        variant="outline"
-        size="sm"
-        loading={mutation.isPending}
+      <button
+        type="button"
+        disabled={mutation.isPending}
         onClick={() => mutation.mutate()}
+        className={act}
       >
         {project.is_archived ? "Unarchive" : "Archive"}
-      </LoadingButton>
+      </button>
     </div>
   )
 }

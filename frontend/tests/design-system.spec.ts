@@ -24,12 +24,24 @@ for (const theme of ["light", "dark"] as const) {
     })
 
     test("The primary action is readable on its fill", async ({ page }) => {
-      // The Projects page's own button is the filled one.
-      await page.goto("/projects")
+      // The Tags page still has its filled button.
+      await page.goto("/tags")
       const add = page
         .getByRole("main")
-        .getByRole("button", { name: "Add Project" })
+        .getByRole("button", { name: "Add Tag" })
       expect(await textOnFill(add)).toBeGreaterThanOrEqual(AA)
+    })
+
+    test("The Projects page's quiet text is readable", async ({ page }) => {
+      await page.goto("/projects")
+      const ground = await pageGround(page)
+      // The page's action is text, and the sentence of counts is quiet.
+      const add = page.getByRole("button", { name: "New project" })
+      await expect(add).toBeVisible()
+      expect(await textOn(add, ground)).toBeGreaterThanOrEqual(AA)
+      const counts = page.getByText("Nothing is overdue.")
+      await expect(counts).toBeVisible()
+      expect(await textOn(counts, ground)).toBeGreaterThanOrEqual(AA)
     })
 
     test("The task list's quiet text is readable", async ({ page }) => {

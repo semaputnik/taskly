@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
-from sqlalchemy import and_, literal_column, not_, or_
+from sqlalchemy import Text, and_, cast, literal_column, not_, or_
 from sqlmodel import col, func, select
 
 from app import crud, deletions
@@ -125,6 +125,26 @@ def _on_task(task_id: uuid.UUID) -> Any:
     )
 
 
+def _in_project(project_id: uuid.UUID) -> Any:
+    """
+    What an entry has to satisfy to belong to a project's chronology: it is
+    about the project itself, about a task in it, about a comment or file on
+    such a task, or it records a task's deletion or restore. Those carry the
+    project the task was in, because the project no longer lists a deleted
+    task to find it by.
+    """
+    tasks = crud.project_task_ids(project_id).subquery()
+    return or_(
+        and_(
+            col(ActivityEntry.entity_type) == ActivityEntityType.PROJECT,
+            col(ActivityEntry.entity_id) == project_id,
+        ),
+        col(ActivityEntry.entity_id).in_(select(tasks.c.id)),
+        literal_column(ACTIVITY_TASK_REF).in_(select(cast(tasks.c.id, Text))),
+        col(ActivityEntry.details).contains({"project": {"id": str(project_id)}}),
+    )
+
+
 # A restore that cannot go ahead is a state the user can resolve, not a
 # malformed request: each cause has its own code so the client can say which
 # thing is in the way (semaputnik/taskly#8, story 27).
@@ -153,6 +173,7 @@ def read_activity_log(
     by_user: bool = Query(default=False),
     since: datetime | None = Query(default=None),
     task_id: uuid.UUID | None = Query(default=None),
+    project_id: uuid.UUID | None = Query(default=None),
     order: ActivityOrder = Query(default=ActivityOrder.NEWEST),
 ) -> Any:
     """
@@ -186,6 +207,11 @@ def read_activity_log(
     same answer for both — rather than a history that looks empty. A deleted
     task's history still reads.
 
+    `project_id` narrows it to one project's chronology, the way `task_id`
+    does a task's: the entries about the project, the tasks in it and their
+    comments and files. It is what the project panel's Activity section
+    reads, and a project that is not the caller's is a 404 like a task.
+
     `order` turns the log around. It changes which end a page starts from and
     nothing about what the log holds, so it combines with every narrowing and
     with `skip` and `limit`.
@@ -205,6 +231,13 @@ def read_activity_log(
         if task_owner != current_user.id:
             raise HTTPException(status_code=404, detail="Task not found")
         where.append(_on_task(task_id))
+    if project_id is not None:
+        project_owner = session.exec(
+            select(Project.owner_id).where(Project.id == project_id)
+        ).first()
+        if project_owner != current_user.id:
+            raise HTTPException(status_code=404, detail="Project not found")
+        where.append(_in_project(project_id))
     if actor_bot_user_id is not None:
         where.append(ActivityEntry.actor_bot_user_id == actor_bot_user_id)
     if kind is not None:

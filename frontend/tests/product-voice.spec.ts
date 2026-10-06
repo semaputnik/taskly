@@ -9,7 +9,6 @@ const SIGNED_IN = [
   "/tasks",
   "/projects",
   "/tags",
-  "/archive",
   "/bots",
   "/activity",
   "/settings",
