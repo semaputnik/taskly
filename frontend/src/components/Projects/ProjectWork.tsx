@@ -25,7 +25,7 @@ import { cn } from "@/lib/utils"
 
 const PREVIEW = 5
 
-const more = cn(
+export const more = cn(
   textLink,
   "text-ink-3 hover:text-ink inline-block pt-2 text-[13px]",
 )
@@ -198,13 +198,13 @@ export function ProjectActivity({ project }: { project: ProjectPublic }) {
   )
 }
 
-function Empty({ children }: { children: React.ReactNode }) {
+export function Empty({ children }: { children: React.ReactNode }) {
   return (
     <p className="text-ink-3 pt-2 text-sm text-pretty italic">{children}</p>
   )
 }
 
-function Pending() {
+export function Pending() {
   return (
     <div className="flex flex-col gap-2 pt-3" aria-hidden>
       {Array.from({ length: 3 }).map((_, index) => (

@@ -1388,6 +1388,18 @@ export const TagPublicSchema = {
                     type: 'null'
                 }
             ]
+        },
+        created_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Created At'
         }
     },
     type: 'object',

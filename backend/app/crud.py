@@ -773,6 +773,7 @@ def tag_publics(
             name=tag.name,
             task_count=counts.get(tag.id, (0, 0))[0],
             archived_task_count=counts.get(tag.id, (0, 0))[1],
+            created_at=tag.created_at,
             created_by_bot_user=bots.get(creators[tag.id])
             if tag.id in creators
             else None,
