@@ -296,9 +296,9 @@ test("A deleted bot user is read-only in its column", async ({ page }) => {
   // control, no way to delete it twice.
   await expect(column.getByRole("textbox")).toHaveCount(0)
   await expect(column.getByRole("region", { name: "Projects" })).toHaveCount(0)
-  await expect(
-    column.getByRole("region", { name: "Permissions" }),
-  ).toHaveCount(0)
+  await expect(column.getByRole("region", { name: "Permissions" })).toHaveCount(
+    0,
+  )
   await expect(
     column.getByRole("button", { name: /token|Revoke/i }),
   ).toHaveCount(0)
