@@ -103,7 +103,7 @@ test("A group too long to show hands off to the list narrowed the same way", asy
   await expect(page.getByText("Errand 4")).toBeVisible()
 })
 
-test("With nothing on the reader, the panel says so rather than disappearing", async ({
+test("With nothing on the reader, one muted line stands in place of the panel", async ({
   page,
 }) => {
   await newUser(page)
@@ -111,7 +111,11 @@ test("With nothing on the reader, the panel says so rather than disappearing", a
   await api.create("/tasks/", { title: "Nobody's task", status: "todo" })
   await page.goto("/")
 
-  await expect(panel(page)).toContainText("Nothing is in your hands right now.")
+  // No heading and no rule over a count of zero: one line, and nothing else.
+  await expect(page.getByText("Nothing is in your hands.")).toBeVisible()
+  await expect(page.getByRole("heading", { name: /In my hands/ })).toHaveCount(
+    0,
+  )
 })
 
 test("A bot user's hand-over is named, and Close it closes the task with an Undo", async ({
@@ -153,7 +157,8 @@ test("A bot user's hand-over is named, and Close it closes the task with an Undo
     .click()
 
   await expect(page.getByText("“Summarise the trackers” done")).toBeVisible()
-  await expect(panel(page)).not.toContainText("Summarise the trackers")
+  // It was the only task: the panel gives way to its one line.
+  await expect(page.getByText("Nothing is in your hands.")).toBeVisible()
 
   await page.getByRole("button", { name: "Undo" }).click()
   // Undoing a close returns the task to To do, as it always does.

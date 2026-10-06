@@ -1,4 +1,5 @@
 import type { TaskPublic } from "@/client"
+import { formatDay } from "@/lib/dates"
 import { describeRecurrence } from "./recurrence"
 
 /**
@@ -15,6 +16,9 @@ import { describeRecurrence } from "./recurrence"
 export type DueTone = "late" | "today" | "soon" | "later"
 
 const DAY_MS = 86_400_000
+
+/** The most days a missed due day is counted in; past it the date is said. */
+const MAX_DAYS_LATE = 14
 
 /** A `YYYY-MM-DD` day as a local midnight, never as UTC. */
 function localDay(day: string): Date {
@@ -36,6 +40,12 @@ function plainDay(due: Date, now: Date): string {
  * "Tomorrow", a weekday within the week, "3 days late" once missed, and a
  * short date past that, with the year only when it is not this one.
  *
+ * A missed day is counted in days only up to a fortnight; past that the number
+ * is one nobody reads ("9775 days late"), so the date is said instead, in the
+ * product's numeric format ("due 03/02/2026"), and still in the alert tone.
+ * This is the one place the rule is kept: the Today page, the task list, the
+ * task column and subtask lines all say a due day through here.
+ *
  * A done task's due day is read plainly instead, at every distance. The
  * relative wording and the alert tone both say the same thing — this is still
  * owed — and neither is true of work that is finished. Said of a done task,
@@ -53,6 +63,9 @@ export function describeDue(
 
   const days = Math.round((due.getTime() - now.getTime()) / DAY_MS)
 
+  if (days < -MAX_DAYS_LATE) {
+    return { text: `due ${formatDay(dueDate)}`, tone: "late" }
+  }
   if (days < -1) return { text: `${-days} days late`, tone: "late" }
   if (days === -1) return { text: "Yesterday", tone: "late" }
   if (days === 0) return { text: "Today", tone: "today" }

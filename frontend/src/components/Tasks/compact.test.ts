@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
+import { formatDay, isoDay } from "@/lib/dates"
 import { describeDue, metaLine, subtaskProgress } from "./compact"
 import { priorityTone } from "./priorityTone"
 
@@ -25,6 +26,36 @@ describe("a due date in a compact row", () => {
     })
     expect(describeDue("2026-09-15", TODAY)).toEqual({
       text: "3 days late",
+      tone: "late",
+    })
+  })
+
+  // Up to a fortnight a count of days is something a reader can hold; past
+  // it, the number only grows, and the date says more than it does.
+  test("counts days late up to a fortnight, then says the date", () => {
+    // Days before TODAY, as the `YYYY-MM-DD` day that far back.
+    const ago = (days: number) => {
+      const date = new Date(2026, 8, 18 - days)
+      return isoDay(date)
+    }
+    expect(describeDue(ago(0), TODAY)).toEqual({ text: "Today", tone: "today" })
+    expect(describeDue(ago(1), TODAY)).toEqual({
+      text: "Yesterday",
+      tone: "late",
+    })
+    expect(describeDue(ago(2), TODAY).text).toBe("2 days late")
+    expect(describeDue(ago(14), TODAY)).toEqual({
+      text: "14 days late",
+      tone: "late",
+    })
+    // Past the line the date is said in the product's numeric format, and
+    // is still red.
+    expect(describeDue(ago(15), TODAY)).toEqual({
+      text: `due ${formatDay(ago(15))}`,
+      tone: "late",
+    })
+    expect(describeDue("1999-12-31", TODAY)).toEqual({
+      text: `due ${formatDay("1999-12-31")}`,
       tone: "late",
     })
   })

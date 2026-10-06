@@ -17,7 +17,7 @@ const today = () => {
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
 }
 
-test("An edit shows in the day page's Changes without a reload", async ({
+test("An edit counts in the day page's Changes without a reload", async ({
   page,
 }) => {
   await newUser(page)
@@ -25,9 +25,12 @@ test("An edit shows in the day page's Changes without a reload", async ({
   await api.create("/tasks/", { title: "Book the vet", due_date: today() })
 
   // The log is read once, here; the panel opens over the dashboard from its
-  // row, so nothing reloads it but the edit.
+  // row, so nothing reloads it but the edit. The reader's own changes are
+  // the one folded line's count.
   await page.goto("/")
-  await expect(page.getByText("Created Book the vet")).toBeVisible()
+  await expect(
+    page.getByRole("link", { name: /^1 change of yours/ }),
+  ).toBeVisible()
   await page.getByRole("link", { name: "Book the vet" }).first().click()
   const title = page.getByRole("textbox", { name: "Task title" })
   await title.fill("Book the vet for Friday")
@@ -35,7 +38,7 @@ test("An edit shows in the day page's Changes without a reload", async ({
   await page.keyboard.press("Escape")
 
   await expect(
-    page.getByText("Changed the title of Book the vet for Friday"),
+    page.getByRole("link", { name: /^[2-9] changes of yours/ }),
   ).toBeVisible()
 })
 

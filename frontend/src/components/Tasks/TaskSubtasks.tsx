@@ -86,7 +86,7 @@ function SubtaskLine({
   return (
     <li className="border-rule grid min-h-9 grid-cols-[18px_minmax(0,1fr)_auto] items-center gap-3 border-b py-px">
       <span className="flex">
-        <CompleteTask asMark task={task} />
+        <CompleteTask asMark late={due?.tone === "late"} task={task} />
       </span>
       <button
         type="button"

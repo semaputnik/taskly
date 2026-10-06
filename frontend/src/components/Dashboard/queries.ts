@@ -8,7 +8,7 @@ import {
   tasksQuery,
   warmQuery,
 } from "@/lib/serverState"
-import { changesQuery, PREVIEW_ROWS } from "./shared"
+import { LOG_LINES, PREVIEW_ROWS } from "./shared"
 import { inAWeek, today, tomorrow } from "./when"
 import { MY_WORK_GROUPS, MY_WORK_PREVIEW } from "./work"
 
@@ -55,12 +55,23 @@ export const dayQueries = () =>
   ] as const
 
 /**
- * The sentence's second half reads the activity log: the bot users' changes
- * as a count alone, and the Changes log's own request, so the sentence
- * counts what the log counts. Started by the page beside the bands.
+ * The Changes log: the bot users' changes in the window the page counts
+ * from, newest first. Its count is also what the sentence under the date
+ * says, so one request serves both through the cache.
  */
 export const botChangesQuery = (since: string | null) =>
-  activityQuery({ by_bots: true, since: since ?? undefined, limit: 1 })
+  activityQuery({
+    by_bots: true,
+    since: since ?? undefined,
+    limit: LOG_LINES,
+  })
+
+/**
+ * The reader's own changes in the same window, as a count alone: the log
+ * folds them into one line at its end rather than list them.
+ */
+export const ownChangesQuery = (since: string | null) =>
+  activityQuery({ by_user: true, since: since ?? undefined, limit: 1 })
 
 /** My work's requests, one per group, so each knows its own count. */
 export const myWorkQueries = (userId: string) =>
@@ -85,8 +96,8 @@ export function prefetchDay(queryClient: QueryClient, since: string | null) {
   void warmQuery(queryClient, due)
   void warmQuery(queryClient, week)
   void warmQuery(queryClient, projects)
-  void warmQuery(queryClient, changesQuery(since))
   void warmQuery(queryClient, botChangesQuery(since))
+  void warmQuery(queryClient, ownChangesQuery(since))
   // My work is the reader's own, so it waits on knowing who they are.
   void warmQuery(queryClient, currentUserQuery()).then((user) => {
     if (!user) return

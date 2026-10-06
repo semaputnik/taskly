@@ -86,28 +86,29 @@ export function MyWork() {
     groups.flatMap((group) => group.data.data.map((task) => task.id)),
   )
 
+  // Nothing in the reader's hands needs no heading and no rule over a count
+  // of zero: one muted line says it, and the section keeps its place.
+  if (total === 0) {
+    return <p className="text-ink-3 mb-9">Nothing is in your hands.</p>
+  }
+
   return (
     <section className="mb-9">
       <Heading count={total} />
-      {total === 0 ? (
-        // Drawn even when empty: the page keeps its shape from day to day.
-        <p className="text-ink-2 pt-3">Nothing is in your hands right now.</p>
-      ) : (
-        MY_WORK_GROUPS.map(({ status, label }, index) => {
-          const { data, count } = groups[index].data
-          if (count === 0) return null
-          return (
-            <StatusGroup
-              key={status}
-              status={status}
-              label={label}
-              count={count}
-              tasks={data}
-              projectNames={projectNames}
-            />
-          )
-        })
-      )}
+      {MY_WORK_GROUPS.map(({ status, label }, index) => {
+        const { data, count } = groups[index].data
+        if (count === 0) return null
+        return (
+          <StatusGroup
+            key={status}
+            status={status}
+            label={label}
+            count={count}
+            tasks={data}
+            projectNames={projectNames}
+          />
+        )
+      })}
     </section>
   )
 }
