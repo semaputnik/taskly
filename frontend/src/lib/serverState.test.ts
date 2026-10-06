@@ -121,13 +121,25 @@ describe("what a change refreshes", () => {
     expect(refreshes(change, botQuery("b2").queryKey)).toBe(false)
   })
 
-  test("a webhook change reaches the bot user and its line, not the log", () => {
-    const change: Change = { type: "bot webhooks changed", botId: "b1" }
-    for (const key of [keys.bots, bot]) {
-      expect(refreshes(change, key)).toBe(true)
-    }
-    for (const key of [keys.tasks, keys.activity, botQuery("b2").queryKey]) {
-      expect(refreshes(change, key)).toBe(false)
+  test("a webhook or scope change reaches the bot user and its line alone", () => {
+    // Neither is logged, no task names either, and a deleted bot user has
+    // neither webhooks nor a scope that can change.
+    for (const change of [
+      { type: "bot webhooks changed", botId: "b1" },
+      { type: "bot scope changed", botId: "b1" },
+    ] satisfies Change[]) {
+      for (const key of [keys.bots, bot]) {
+        expect(refreshes(change, key)).toBe(true)
+      }
+      for (const key of [
+        keys.deletedBots,
+        keys.tasks,
+        task,
+        keys.activity,
+        botQuery("b2").queryKey,
+      ]) {
+        expect(refreshes(change, key)).toBe(false)
+      }
     }
   })
 

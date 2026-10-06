@@ -269,9 +269,10 @@ export const tagQuery = (tagId: string | null | undefined) =>
     enabled: Boolean(tagId),
   })
 
+/** The live bot users. Under a segment of its own, beside the deleted ones. */
 export const botsQuery = () =>
   queryOptions({
-    queryKey: [ROOT.bots],
+    queryKey: [ROOT.bots, "live"],
     queryFn: async () =>
       (await BotsService.readBotUsers({ query: FIRST_PAGE })).data,
   })
@@ -373,6 +374,8 @@ export type Change =
   /** A bot user was created, renamed, rescoped or deleted. */
   | { type: "bot user changed"; botId?: string }
   | { type: "bot token changed"; botId?: string }
+  /** A bot user's scope was replaced: the projects it reaches, or what it may do there. */
+  | { type: "bot scope changed"; botId: string }
   /** A bot user's webhook was set, changed, cleared or tested, or its secret renewed. */
   | { type: "bot webhooks changed"; botId: string }
   | { type: "deletion restored" }
@@ -393,6 +396,7 @@ const COUNTS: Root[] = [ROOT.projects, ROOT.project, ROOT.tags, ROOT.tag]
 // created, reassigned or deleted moves that count. The live bot users carry no
 // such number and are left alone.
 const DELETED_BOTS: QueryKey = [ROOT.bots, "deleted"]
+const LIVE_BOTS: QueryKey = botsQuery().queryKey
 
 /** The query keys a change makes stale, as prefixes of the keys they cover. */
 export function staleKeys(change: Change): QueryKey[] {
@@ -435,10 +439,12 @@ export function staleKeys(change: Change): QueryKey[] {
       ]
     case "bot token changed":
       return [[ROOT.bots], change.botId ? [ROOT.bot, change.botId] : [ROOT.bot]]
+    case "bot scope changed":
     case "bot webhooks changed":
-      // Webhooks are not in the log and no task names them: the bot user's
-      // line and its column are all that show them.
-      return [[ROOT.bots], [ROOT.bot, change.botId]]
+      // Neither is in the log and no task names them: the bot user's line
+      // and its column are all that show them. A deleted bot user has
+      // neither, so its list is left alone.
+      return [LIVE_BOTS, [ROOT.bot, change.botId]]
     case "comments changed":
       return [[ROOT.comments, change.taskId], [ROOT.activity]]
     case "attachments changed":
