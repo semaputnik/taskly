@@ -287,8 +287,14 @@ function useBotUpdate(bot: BotUserPublic) {
         body: { scope, name },
       }),
     onError: (error) => toastError(error),
-    // A renamed bot user is named on its tasks and in the log.
-    onSettled: () => reportChange({ type: "bot user changed", botId: bot.id }),
+    // A renamed bot user is named on its tasks and in the log; a new scope
+    // shows only on the bot user itself.
+    onSettled: (_data, _error, { name }) =>
+      reportChange(
+        name === undefined
+          ? { type: "bot scope changed", botId: bot.id }
+          : { type: "bot user changed", botId: bot.id },
+      ),
   })
 
   return async (scope?: BotScope, name?: string) => {
