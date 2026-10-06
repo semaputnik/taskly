@@ -288,19 +288,23 @@ test("A deleted bot user is read-only in its column", async ({ page }) => {
   await expect(column).toContainText(/Bot user.?Deleted/)
   await expect(column).toContainText("This bot user was deleted")
   await expect(column).toContainText("cannot be undone")
-  // Nothing about it changes again: no field, no box, no token control.
+  // What it was given is still read, as the user's own tasks.
+  await expect(
+    column.getByRole("list", { name: "Tasks assigned to Old backup" }),
+  ).toContainText("Still on the record")
+  // Nothing about it changes again: no field, no scope to tick, no token
+  // control, no way to delete it twice.
   await expect(column.getByRole("textbox")).toHaveCount(0)
-  await expect(column.getByRole("checkbox")).toHaveCount(0)
+  await expect(column.getByRole("region", { name: "Projects" })).toHaveCount(0)
+  await expect(
+    column.getByRole("region", { name: "Permissions" }),
+  ).toHaveCount(0)
   await expect(
     column.getByRole("button", { name: /token|Revoke/i }),
   ).toHaveCount(0)
   await expect(
     column.getByRole("button", { name: "Delete bot user" }),
   ).toHaveCount(0)
-  // What it was given is still read.
-  await expect(
-    column.getByRole("list", { name: "Tasks assigned to Old backup" }),
-  ).toContainText("Still on the record")
 })
 
 test("The page counts the bot users and their week", async ({ page }) => {
