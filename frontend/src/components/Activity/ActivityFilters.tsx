@@ -21,9 +21,14 @@ import { useIsPhone } from "@/hooks/useIsPhone"
 import { botQuery, botsQuery, deletedBotsQuery } from "@/lib/serverState"
 import { cn } from "@/lib/utils"
 import type { ActivitySearch } from "./queries"
-import { KIND_LABELS, KINDS, type LogOrder, ME, ORDER_LABELS } from "./words"
-
-const ORDERS = Object.keys(ORDER_LABELS) as LogOrder[]
+import {
+  KIND_LABELS,
+  KINDS,
+  type LogOrder,
+  ME,
+  ORDER_LABELS,
+  ORDERS,
+} from "./words"
 
 /**
  * The order menu, at the row's right: newest or oldest first. The log reads

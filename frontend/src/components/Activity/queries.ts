@@ -4,12 +4,11 @@ import { z } from "zod"
 import type { ActivityKind } from "@/client"
 import {
   activityQuery,
-  botQuery,
   botsQuery,
   deletedBotsQuery,
   warmQuery,
 } from "@/lib/serverState"
-import { KINDS, ME, PAGE_SIZE } from "./words"
+import { KINDS, ME, ORDERS, PAGE_SIZE } from "./words"
 
 /**
  * Every request the Activity page makes, and nothing that draws it. Kept
@@ -32,7 +31,7 @@ export const activitySearchSchema = z.object({
     .catch(undefined),
   // Not a sort and not a page: which of its questions the log is answering.
   kind: z.enum(KINDS).optional().catch(undefined),
-  order: z.enum(["newest", "oldest"]).optional().catch(undefined),
+  order: z.enum(ORDERS).optional().catch(undefined),
 })
 
 export type ActivitySearch = z.infer<typeof activitySearchSchema>
@@ -70,7 +69,4 @@ export function prefetchActivity(
   void warmQuery(queryClient, byBotsQuery())
   void warmQuery(queryClient, botsQuery())
   void warmQuery(queryClient, deletedBotsQuery())
-  if (search.actor && search.actor !== ME) {
-    void warmQuery(queryClient, botQuery(search.actor))
-  }
 }

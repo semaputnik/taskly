@@ -1124,7 +1124,8 @@ class ActivityEntry(SQLModel, table=True):
     """
 
     __table_args__ = (
-        # A user's log, newest first, is the only way entries are read.
+        # A user's log is read from either end (FR-10.10); the index serves
+        # both directions.
         Index("ix_activityentry_owner_id_position", "owner_id", "position"),
         # One bot user's own feed, newest first. Without it, reading a quiet
         # bot user means walking a log that is kept for ever (FR-10.5) until

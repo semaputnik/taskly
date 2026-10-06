@@ -154,7 +154,11 @@ export function ActivityDescription({
     <span
       className={cn(
         "font-medium",
-        recordOf(entry) && "text-ink-3 line-through",
+        // Only for an entry about the record itself: for a comment or a
+        // file, `entity_exists` says whether that is still there, not the
+        // task the line names.
+        ["task", "project", "tag"].includes(entry.entity_type) &&
+          "text-ink-3 line-through",
       )}
     >
       {name}

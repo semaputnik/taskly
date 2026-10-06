@@ -111,6 +111,7 @@ function Line({
           showBadge={false}
           showIcon={false}
         />
+        {bot && <span className="sr-only">, bot user</span>}
       </span>
       {/* The sentence follows its actor, so its verb is not capitalised:
           "release-bot deleted …". The words are the ones the day page and the

@@ -33,7 +33,8 @@ export const KIND_LABELS: Record<ActivityKind, string> = {
 }
 
 /** The log is read newest first unless the reader turns it around. */
-export type LogOrder = "newest" | "oldest"
+export const ORDERS = ["newest", "oldest"] as const
+export type LogOrder = (typeof ORDERS)[number]
 
 export const ORDER_LABELS: Record<LogOrder, string> = {
   newest: "Newest first",
