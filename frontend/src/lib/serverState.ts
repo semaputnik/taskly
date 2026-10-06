@@ -561,6 +561,12 @@ export function configureServerState(queryClient: QueryClient) {
     staleTime: 5 * 60 * 1000,
   })
   queryClient.setQueryDefaults([ROOT.projects], { staleTime: 10 * 1000 })
+  // The same holds for the whole tag vocabulary, which carries every tag's
+  // count: the Tags page lists it and each tag's column reads it again, so
+  // without this every step of the arrow keys asked for all of it.
+  queryClient.setQueryDefaults(tagVocabularyQuery().queryKey, {
+    staleTime: 10 * 1000,
+  })
   // A screen mounting on what its route has just read asks for nothing
   // again; every other mount refreshes stale data as before.
   const defaults = queryClient.getDefaultOptions()

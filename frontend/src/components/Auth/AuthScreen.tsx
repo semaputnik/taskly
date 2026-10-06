@@ -1,7 +1,6 @@
 import { Link } from "@tanstack/react-router"
-
+import { AppearanceChoice } from "@/components/Common/AppearanceChoice"
 import { Wordmark } from "@/components/Common/Wordmark"
-import { AppearanceChoice } from "@/components/Settings/Appearance"
 import { cn } from "@/lib/utils"
 
 /**
