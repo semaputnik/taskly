@@ -37,12 +37,9 @@ export function counts(
 }
 
 /** Who made a tag: "created by you", or by the bot user's name. */
-export function createdBy(
-  tag: Pick<TagPublic, "created_by_bot_user">,
-  you = "you",
-): string {
+export function createdBy(tag: Pick<TagPublic, "created_by_bot_user">): string {
   const bot = tag.created_by_bot_user
-  if (!bot) return `created by ${you}`
+  if (!bot) return "created by you"
   return `created by ${bot.name}${bot.deleted ? " (deleted)" : ""}`
 }
 
