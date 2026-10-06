@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test"
 import { botLine } from "./utils/bots"
 import { randomEmail } from "./utils/random"
-import { storeTokenAndClose } from "./utils/tokenDialog"
+import { storeSecretAndClose } from "./utils/secretDialog"
 import { logInUser } from "./utils/user"
 
 test.use({ storageState: { cookies: [], origins: [] } })
@@ -51,7 +51,7 @@ test("Granting a bot user “Create tags” lets it add to the vocabulary", asyn
   const token = await dialog
     .getByRole("textbox", { name: "Bot token" })
     .inputValue()
-  await storeTokenAndClose(dialog)
+  await storeSecretAndClose(dialog)
   const asBot = { Authorization: `Bearer ${token}` }
 
   const line = botLine(page, "Triage agent")

@@ -152,7 +152,7 @@ function SecretReveal({
           readOnly
           aria-label={fieldLabel}
           value={value}
-          className="font-mono text-xs"
+          className="font-mono text-base md:text-xs"
           onFocus={(event) => event.target.select()}
           onCopy={() => setEverCopied(true)}
         />

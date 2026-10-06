@@ -12,7 +12,7 @@ import { type LogDay, logDays } from "./words"
 // right. On a phone the sentence drops beneath the time and the actor, and
 // Restore beneath the sentence, rather than squeezing them.
 const lineGrid =
-  "border-rule grid grid-cols-[3.25rem_minmax(0,1fr)] items-baseline gap-x-3 gap-y-0.5 border-b py-[9px] md:grid-cols-[3.25rem_136px_minmax(0,1fr)_auto]"
+  "border-rule grid grid-cols-[4.25rem_minmax(0,1fr)] items-baseline gap-x-3 gap-y-0.5 border-b py-[9px] md:grid-cols-[4.25rem_136px_minmax(0,1fr)_auto]"
 
 /**
  * The log in day groups, each with its name and how many lines it holds on
@@ -94,7 +94,7 @@ function Line({
         <time
           dateTime={entry.created_at}
           title={formatDateTime(entry.created_at)}
-          className="text-ink-3 font-mono text-xs tabular-nums"
+          className="text-ink-3 font-mono text-xs tabular-nums whitespace-nowrap"
         >
           {formatTimeOf(entry.created_at)}
         </time>

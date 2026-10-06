@@ -52,9 +52,9 @@ const DeleteBotUser = ({ bot, onSuccess }: DeleteBotUserProps) => {
         <DialogHeader>
           <DialogTitle>Delete {bot.name}?</DialogTitle>
           <DialogDescription>
-            Its token stops working right away, and the bot can't be restored.
-            Tasks assigned to it stay assigned to it, and the activity log still
-            names it.
+            Its token stops working right away, and the bot user can't be
+            restored. Tasks assigned to it stay assigned to it, and the activity
+            log still names it.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>

@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test"
 import { newUser, userApi } from "./utils/account"
 import { botColumn, botLine, createBotInColumn, openBot } from "./utils/bots"
 import { randomEmail } from "./utils/random"
-import { storeTokenAndClose } from "./utils/tokenDialog"
+import { storeSecretAndClose } from "./utils/secretDialog"
 import { logInUser } from "./utils/user"
 
 test.use({ storageState: { cookies: [], origins: [] } })
@@ -61,7 +61,7 @@ test("A bot user is drafted in the column and its token is shown once", async ({
     "Support queue",
   ])
 
-  await storeTokenAndClose(dialog)
+  await storeSecretAndClose(dialog)
 
   // Created, the draft has become the record, at the record's address.
   const column = botColumn(page, "Triage agent")
@@ -113,7 +113,7 @@ test("A token is revoked and a new one issued with an expiry", async ({
   const first = await firstDialog
     .getByRole("textbox", { name: "Bot token" })
     .inputValue()
-  await storeTokenAndClose(firstDialog)
+  await storeSecretAndClose(firstDialog)
 
   const panel = botColumn(page, "Nightly sync")
   await panel.getByRole("button", { name: "Revoke" }).click()
@@ -138,7 +138,7 @@ test("A token is revoked and a new one issued with an expiry", async ({
     String(expiresOn.getMonth() + 1).padStart(2, "0"),
     String(expiresOn.getDate()).padStart(2, "0"),
   ].join("-")
-  await page.getByLabel("Expires on (optional)").fill(date)
+  await page.getByRole("dialog").locator('input[type="date"]').fill(date)
   await page.getByRole("button", { name: "Issue", exact: true }).click()
 
   const secondDialog = page.getByRole("dialog", {
@@ -150,7 +150,7 @@ test("A token is revoked and a new one issued with an expiry", async ({
     .getByRole("textbox", { name: "Bot token" })
     .inputValue()
   expect(second).not.toBe(first)
-  await storeTokenAndClose(secondDialog)
+  await storeSecretAndClose(secondDialog)
 
   await expect(panel).toContainText("Working")
   await expect(panel).toContainText("expires")

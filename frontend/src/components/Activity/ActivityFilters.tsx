@@ -1,23 +1,11 @@
 import { useQuery } from "@tanstack/react-query"
-import { ChevronDown } from "lucide-react"
-import { useState } from "react"
 
 import type { ActivityKind } from "@/client"
 import {
   ChoiceFilter,
+  OrderMenu as CommonOrderMenu,
   control,
-  PickSheet,
-  SheetOption,
 } from "@/components/Common/FilterRow"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { Sheet, SheetTrigger } from "@/components/ui/sheet"
-import { useIsPhone } from "@/hooks/useIsPhone"
 import { botQuery, botsQuery, deletedBotsQuery } from "@/lib/serverState"
 import { cn } from "@/lib/utils"
 import type { ActivitySearch } from "./queries"
@@ -42,56 +30,17 @@ function OrderMenu({
   order: LogOrder
   onOrder: (order: LogOrder) => void
 }) {
-  const phone = useIsPhone()
-  const [sheetOpen, setSheetOpen] = useState(false)
-  const label = ORDER_LABELS[order]
-  const button = (
-    <button
-      type="button"
-      aria-label={`Order: ${label}`}
-      className={cn(control, "-mr-1.5")}
-    >
-      {label}
-      <ChevronDown aria-hidden className="size-2.5 opacity-70" />
-    </button>
-  )
-  if (phone) {
-    return (
-      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-        <SheetTrigger asChild>{button}</SheetTrigger>
-        <PickSheet title="Order" description="Choose how the log is ordered.">
-          {ORDERS.map((value) => (
-            <SheetOption
-              key={value}
-              selected={value === order}
-              onClick={() => {
-                onOrder(value)
-                setSheetOpen(false)
-              }}
-            >
-              {ORDER_LABELS[value]}
-            </SheetOption>
-          ))}
-        </PickSheet>
-      </Sheet>
-    )
-  }
   return (
-    <DropdownMenu modal={false}>
-      <DropdownMenuTrigger asChild>{button}</DropdownMenuTrigger>
-      <DropdownMenuContent align="end" aria-label="Order">
-        <DropdownMenuRadioGroup
-          value={order}
-          onValueChange={(next) => onOrder(next as LogOrder)}
-        >
-          {ORDERS.map((value) => (
-            <DropdownMenuRadioItem key={value} value={value}>
-              {ORDER_LABELS[value]}
-            </DropdownMenuRadioItem>
-          ))}
-        </DropdownMenuRadioGroup>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <CommonOrderMenu
+      label={ORDER_LABELS[order]}
+      description="Choose how the log is ordered."
+      selected={order}
+      choices={ORDERS.map((value) => ({
+        key: value,
+        label: ORDER_LABELS[value],
+      }))}
+      onChoose={(key) => onOrder(key as LogOrder)}
+    />
   )
 }
 

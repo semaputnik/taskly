@@ -1,8 +1,8 @@
 import { expect, type Page, test } from "@playwright/test"
 import { botLine, createBotInColumn, openBot } from "./utils/bots"
 import { randomEmail } from "./utils/random"
+import { storeSecretAndClose } from "./utils/secretDialog"
 import { taskLine } from "./utils/tasks"
-import { storeTokenAndClose } from "./utils/tokenDialog"
 import { logInUser } from "./utils/user"
 
 test.use({ storageState: { cookies: [], origins: [] } })
@@ -255,7 +255,7 @@ test("A token is issued and revoked from the bot user's panel", async ({
     .inputValue()
   expect(token).toMatch(/^taskly_bot_/)
   await expect(reveal.getByRole("button", { name: "Copy" })).toBeVisible()
-  await storeTokenAndClose(reveal)
+  await storeSecretAndClose(reveal)
 
   await expect(panel).toContainText("Working")
   await panel.getByRole("button", { name: "Revoke" }).click()

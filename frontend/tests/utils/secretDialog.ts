@@ -5,7 +5,7 @@ import { expect, type Locator } from "@playwright/test"
  * shows, say it is stored, and close. The dialog refuses anything quicker.
  * `noun` is what the dialog calls the value: a token, or a webhook secret.
  */
-export async function storeTokenAndClose(
+export async function storeSecretAndClose(
   dialog: Locator,
   noun: "token" | "secret" = "token",
 ) {

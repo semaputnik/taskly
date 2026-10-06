@@ -39,7 +39,7 @@ export const ANY = "any"
  */
 export const control = cn(
   navItemFocus,
-  "text-ink-3 hover:bg-hover hover:text-ink data-[state=open]:bg-hover data-[state=open]:text-ink inline-flex h-7 items-center gap-[5px] rounded-md px-1.5 whitespace-nowrap transition-colors",
+  "text-ink-3 hover:bg-hover hover:text-ink data-[state=open]:bg-hover data-[state=open]:text-ink inline-flex h-7 pointer-coarse:h-11 items-center gap-[5px] rounded-md px-1.5 whitespace-nowrap transition-colors",
 )
 
 export interface Choice {
@@ -289,5 +289,97 @@ export function ChoiceFilter({
         )
       }
     />
+  )
+}
+
+/** One order the menu offers. `reverses` is set on the one in force when choosing it again turns it around. */
+export interface OrderChoice {
+  key: string
+  label: string
+  reverses?: boolean
+}
+
+/**
+ * The order menu at the row's right: a quiet button saying the order in
+ * force, over a radio menu on a wide screen and a bottom sheet on a phone.
+ * Choosing acts on selection, not on the group's change, so choosing the one
+ * in force again still reaches the page (the task list reverses it).
+ */
+export function OrderMenu({
+  label,
+  description,
+  choices,
+  selected,
+  onChoose,
+}: {
+  /** The order in force, in words. */
+  label: string
+  /** What the phone sheet says it is for ("Choose how the list is ordered."). */
+  description: string
+  choices: OrderChoice[]
+  selected: string
+  onChoose: (key: string) => void
+}) {
+  const phone = useIsPhone()
+  const [sheetOpen, setSheetOpen] = useState(false)
+  const button = (
+    <button
+      type="button"
+      aria-label={`Order: ${label}`}
+      className={cn(control, "-mr-1.5")}
+    >
+      {label}
+      <ChevronDown aria-hidden className="size-2.5 opacity-70" />
+    </button>
+  )
+  if (phone) {
+    return (
+      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+        <SheetTrigger asChild>{button}</SheetTrigger>
+        <PickSheet title="Order" description={description}>
+          {choices.map(({ key, label: name, reverses }) => (
+            <SheetOption
+              key={key}
+              selected={key === selected}
+              onClick={() => {
+                onChoose(key)
+                setSheetOpen(false)
+              }}
+            >
+              {name}
+              {reverses && (
+                <span className="text-ink-3 ml-3 text-xs font-normal">
+                  Choose again to reverse
+                </span>
+              )}
+            </SheetOption>
+          ))}
+        </PickSheet>
+      </Sheet>
+    )
+  }
+  return (
+    <DropdownMenu modal={false}>
+      <DropdownMenuTrigger asChild>{button}</DropdownMenuTrigger>
+      <DropdownMenuContent align="end" aria-label="Order">
+        <DropdownMenuRadioGroup value={selected}>
+          {choices.map(({ key, label: name, reverses }) => (
+            <DropdownMenuRadioItem
+              key={key}
+              value={key}
+              onSelect={() => onChoose(key)}
+              className="gap-6"
+            >
+              {name}
+              {reverses && (
+                <span className="text-ink-3 ml-auto text-xs">
+                  Choose again to reverse
+                </span>
+              )}
+            </DropdownMenuRadioItem>
+          ))}
+        </DropdownMenuRadioGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }

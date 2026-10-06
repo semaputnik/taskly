@@ -1,7 +1,7 @@
 import { expect, type Page, test } from "@playwright/test"
 import { newUser, userApi } from "./utils/account"
 import { botColumn, botLine } from "./utils/bots"
-import { storeTokenAndClose } from "./utils/tokenDialog"
+import { storeSecretAndClose } from "./utils/secretDialog"
 import { signedWith, startReceiver } from "./utils/webhookReceiver"
 
 test.use({ storageState: { cookies: [], origins: [] } })
@@ -81,7 +81,7 @@ test("A URL is set, the secret shown once, a test sent and its result read", asy
       .getByRole("textbox", { name: "Webhook secret" })
       .inputValue()
     expect(secret).toBeTruthy()
-    await storeTokenAndClose(dialog, "secret")
+    await storeSecretAndClose(dialog, "secret")
 
     await expect(row).toContainText(receiver.url())
     await expect(row).toContainText("No delivery yet")
@@ -203,7 +203,7 @@ test("A URL is changed, and cleared once its loss is confirmed", async ({
       .getByRole("textbox", { name: "Task ready URL" })
       .fill(receiver.url("/again"))
     await row.getByRole("button", { name: "Save" }).click()
-    await storeTokenAndClose(
+    await storeSecretAndClose(
       page.getByRole("dialog", { name: "Webhook secret for Triage bot" }),
       "secret",
     )
@@ -246,7 +246,7 @@ test("The secret is regenerated, shown once, and signs from then on", async ({
       .getByRole("textbox", { name: "Webhook secret" })
       .inputValue()
     expect(second).not.toBe(first)
-    await storeTokenAndClose(dialog, "secret")
+    await storeSecretAndClose(dialog, "secret")
 
     await taskRow(page, "Triage bot")
       .getByRole("button", { name: "Send a test" })

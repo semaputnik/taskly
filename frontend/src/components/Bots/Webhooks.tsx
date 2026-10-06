@@ -270,7 +270,7 @@ function UrlForm({
           setValue(event.target.value)
           setError(null)
         }}
-        className="h-9 font-mono text-[12.5px] md:text-[12.5px]"
+        className="h-9 font-mono text-base md:text-[12.5px]"
       />
       {error && (
         <p
@@ -356,44 +356,31 @@ function ClearWebhook({
   })
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <Button
-        variant="ghost"
-        size="sm"
-        className={cn(action, "hover:text-late")}
-        onClick={() => setIsOpen(true)}
-      >
-        Clear
-      </Button>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>
-            Clear the {noun} of {bot.name}?
-          </DialogTitle>
-          <DialogDescription>
-            Taskly stops calling this address, and deliveries still waiting for
-            it are discarded.
-            {last
-              ? " It is the last webhook set, so the secret is discarded too: the next URL set makes a new one, shown once."
-              : " The other webhook and the secret stay as they are."}
-          </DialogDescription>
-        </DialogHeader>
-        <DialogFooter>
-          <DialogClose asChild>
-            <Button variant="outline" disabled={mutation.isPending}>
-              Cancel
-            </Button>
-          </DialogClose>
-          <LoadingButton
-            variant="destructive"
-            loading={mutation.isPending}
-            onClick={() => mutation.mutate()}
-          >
-            Clear webhook
-          </LoadingButton>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <ConfirmDialog
+      isOpen={isOpen}
+      onOpenChange={setIsOpen}
+      trigger={
+        <Button
+          variant="ghost"
+          size="sm"
+          className={cn(action, "hover:text-late")}
+          onClick={() => setIsOpen(true)}
+        >
+          Clear
+        </Button>
+      }
+      title={`Clear the ${noun} of ${bot.name}?`}
+      confirm="Clear webhook"
+      destructive
+      pending={mutation.isPending}
+      onConfirm={() => mutation.mutate()}
+    >
+      Taskly stops calling this address, and deliveries still waiting for it are
+      discarded.
+      {last
+        ? " It is the last webhook set, so the secret is discarded too: the next URL set makes a new one, shown once."
+        : " The other webhook and the secret stay as they are."}
+    </ConfirmDialog>
   )
 }
 
@@ -421,37 +408,76 @@ function RegenerateSecret({ bot }: { bot: BotUserPublic }) {
   })
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <Button
-        variant="ghost"
-        size="sm"
-        className="text-ink-3 hover:text-ink -my-1.5 -mr-2 h-8 px-2 text-[13px] font-normal pointer-coarse:h-11"
-        onClick={() => setIsOpen(true)}
-      >
-        Regenerate secret
-      </Button>
+    <ConfirmDialog
+      isOpen={isOpen}
+      onOpenChange={setIsOpen}
+      trigger={
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-ink-3 hover:text-ink -my-1.5 -mr-2 h-8 px-2 text-[13px] font-normal pointer-coarse:h-11"
+          onClick={() => setIsOpen(true)}
+        >
+          Regenerate secret
+        </Button>
+      }
+      title={`Regenerate the webhook secret of ${bot.name}?`}
+      confirm="Regenerate"
+      pending={mutation.isPending}
+      onConfirm={() => mutation.mutate()}
+    >
+      From the next delivery on, requests are signed with a new secret, and a
+      receiver still checking the old one will refuse them. The new secret is
+      shown once.
+    </ConfirmDialog>
+  )
+}
+
+/**
+ * The question both irreversible webhook steps ask first: what is about to
+ * be lost, said before the button that does it.
+ */
+function ConfirmDialog({
+  isOpen,
+  onOpenChange,
+  trigger,
+  title,
+  children,
+  confirm,
+  destructive = false,
+  pending,
+  onConfirm,
+}: {
+  isOpen: boolean
+  onOpenChange: (open: boolean) => void
+  trigger: React.ReactNode
+  title: string
+  children: React.ReactNode
+  confirm: string
+  destructive?: boolean
+  pending: boolean
+  onConfirm: () => void
+}) {
+  return (
+    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+      {trigger}
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>
-            Regenerate the webhook secret of {bot.name}?
-          </DialogTitle>
-          <DialogDescription>
-            From the next delivery on, requests are signed with a new secret,
-            and a receiver still checking the old one will refuse them. The new
-            secret is shown once.
-          </DialogDescription>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>{children}</DialogDescription>
         </DialogHeader>
         <DialogFooter>
           <DialogClose asChild>
-            <Button variant="outline" disabled={mutation.isPending}>
+            <Button variant="outline" disabled={pending}>
               Cancel
             </Button>
           </DialogClose>
           <LoadingButton
-            loading={mutation.isPending}
-            onClick={() => mutation.mutate()}
+            variant={destructive ? "destructive" : undefined}
+            loading={pending}
+            onClick={onConfirm}
           >
-            Regenerate
+            {confirm}
           </LoadingButton>
         </DialogFooter>
       </DialogContent>

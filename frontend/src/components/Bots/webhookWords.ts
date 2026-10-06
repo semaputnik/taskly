@@ -57,7 +57,11 @@ function whenInWords(at: string, now: Date): string {
 }
 
 function durationInWords(ms: number): string {
-  return ms < 1000 ? `${ms} ms` : `${(ms / 1000).toFixed(1)} s`
+  return ms < 1
+    ? "under 1 ms"
+    : ms < 1000
+      ? `${ms} ms`
+      : `${(ms / 1000).toFixed(1)} s`
 }
 
 /**

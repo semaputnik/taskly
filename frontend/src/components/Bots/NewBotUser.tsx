@@ -2,6 +2,7 @@ import { useMutation, useQuery } from "@tanstack/react-query"
 import { useState } from "react"
 
 import { type BotPermissions, BotsService } from "@/client"
+import { DayField } from "@/components/Common/DayField"
 import { useCaptureFocus, useRecordPanels } from "@/components/Records/panels"
 import {
   ghost,
@@ -127,14 +128,13 @@ export function NewBotUser() {
       <PropertyList>
         <PropertyRow label="Token" htmlFor="new-bot-expires">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <Input
+            <DayField
               id="new-bot-expires"
-              type="date"
+              label="Expires on"
               min={today()}
-              value={expiresOn}
-              onChange={(event) => setExpiresOn(event.target.value)}
-              aria-describedby="new-bot-expires-hint"
-              className={cn(ghost, "-ml-2 h-[30px] w-auto px-2 text-[15px]")}
+              value={expiresOn || null}
+              onChange={(day) => setExpiresOn(day ?? "")}
+              className="-ml-[9px] h-[30px] border-transparent px-2 text-[15px]"
             />
             <span
               id="new-bot-expires-hint"
