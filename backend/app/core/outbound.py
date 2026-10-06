@@ -68,7 +68,9 @@ def _kind(address: IPAddress) -> str | None:
     return None
 
 
-def allowed_addresses(host: str) -> list[str]:
+def allowed_addresses(
+    host: str, *, code: str = "webhook_url_private_address"
+) -> list[str]:
     """
     What `host` resolves to, if the installation may send to all of it: raises
     `Refusal` naming the rule if any address is loopback or private, unless the
@@ -80,7 +82,7 @@ def allowed_addresses(host: str) -> list[str]:
             kind = _kind(ipaddress.ip_address(text))
             if kind is not None:
                 raise Refusal(
-                    "webhook_url_private_address",
+                    code,
                     f"{host} resolves to {text}, a {kind} address. Loopback and "
                     "private ranges are refused unless the installation allows "
                     f"them with {ALLOW_SETTING}.",
@@ -88,19 +90,23 @@ def allowed_addresses(host: str) -> list[str]:
     return addresses
 
 
-def check_url(url: str) -> None:
+def check_url(
+    url: str, *, what: str = "webhook URL", code_prefix: str = "webhook_url"
+) -> None:
     """
     Raise `Refusal` unless `url` is an http or https address Taskly may send
     to: its host must not resolve to loopback or a private range, unless the
-    installation allows those (FR-11.3).
+    installation allows those (FR-11.3, FR-04.4). `what` names the address in
+    the refusal and `code_prefix` starts its code: a webhook URL by default, a
+    Paperless address for the other user of this rule.
 
     A host that does not resolve passes: whether it exists is not this rule's
     question, and a delivery to it fails with the resolver's own error.
     """
     if any(char.isspace() or not char.isprintable() for char in url):
         raise Refusal(
-            "webhook_url_invalid",
-            "A webhook URL cannot contain spaces or control characters.",
+            f"{code_prefix}_invalid",
+            f"A {what} cannot contain spaces or control characters.",
         )
     try:
         parts = urlsplit(url)
@@ -109,17 +115,17 @@ def check_url(url: str) -> None:
         _ = parts.port
     except ValueError as error:
         raise Refusal(
-            "webhook_url_invalid", f"That is not a valid URL: {error}."
+            f"{code_prefix}_invalid", f"That is not a valid URL: {error}."
         ) from error
     if parts.scheme not in ("http", "https"):
         raise Refusal(
-            "webhook_url_scheme",
-            "A webhook URL has to start with http:// or https://.",
+            f"{code_prefix}_scheme",
+            f"A {what} has to start with http:// or https://.",
         )
     if not host:
-        raise Refusal("webhook_url_host", "A webhook URL has to name a host.")
+        raise Refusal(f"{code_prefix}_host", f"A {what} has to name a host.")
     try:
-        allowed_addresses(host)
+        allowed_addresses(host, code=f"{code_prefix}_private_address")
     except OSError:
         return
 

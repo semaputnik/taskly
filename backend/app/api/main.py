@@ -6,6 +6,7 @@ from app.api.routes import (
     bot_users,
     comments,
     login,
+    paperless,
     private,
     projects,
     tags,
@@ -25,6 +26,7 @@ api_router.include_router(attachments.router)
 api_router.include_router(tags.router)
 api_router.include_router(activity.router)
 api_router.include_router(bot_users.router)
+api_router.include_router(paperless.router)
 api_router.include_router(utils.router)
 
 

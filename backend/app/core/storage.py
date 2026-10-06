@@ -1,5 +1,8 @@
 from abc import ABC, abstractmethod
+from functools import lru_cache
 from pathlib import Path
+
+from app.core.config import settings
 
 
 class AttachmentStorage(ABC):
@@ -40,3 +43,10 @@ class LocalAttachmentStorage(AttachmentStorage):
 
     def delete(self, key: str) -> None:
         self._path(key).unlink(missing_ok=True)
+
+
+@lru_cache
+def default_storage() -> LocalAttachmentStorage:
+    """The installation's storage, for code that runs outside a request (the
+    background hand-over to Paperless releases bytes from it)."""
+    return LocalAttachmentStorage(Path(settings.ATTACHMENTS_DIR))

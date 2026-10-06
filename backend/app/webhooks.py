@@ -15,7 +15,6 @@ the lease runs out.
 """
 
 import asyncio
-import base64
 import hashlib
 import hmac
 import json
@@ -31,11 +30,10 @@ from typing import Any
 
 import httpx
 from cryptography.fernet import Fernet, InvalidToken
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from sqlalchemy import delete
 from sqlmodel import Session, col, select
 
+from app.core import security
 from app.core.config import settings
 from app.core.db import engine
 from app.core.outbound import GuardedTransport, Refusal, check_url
@@ -82,13 +80,7 @@ def generate_secret() -> str:
 
 
 def _fernet() -> Fernet:
-    key = HKDF(
-        algorithm=hashes.SHA256(),
-        length=32,
-        salt=None,
-        info=b"taskly webhook secret",
-    ).derive(settings.WEBHOOK_SECRET_KEY.encode())
-    return Fernet(base64.urlsafe_b64encode(key))
+    return security.fernet_for(settings.WEBHOOK_SECRET_KEY, b"taskly webhook secret")
 
 
 def encrypt_secret(secret: str) -> str:
@@ -417,6 +409,40 @@ def _attempt(delivery_id: uuid.UUID, client: httpx.Client, now: datetime) -> Non
         session.commit()
 
 
+def claim_due(
+    # Either outbox table: they share these columns, which no common base
+    # class names.
+    model: Any,
+    *,
+    now: datetime,
+    limit: int,
+) -> list[uuid.UUID]:
+    """
+    Claim up to `limit` pending rows of an outbox table that are due as of
+    `now`: lock them (skipping what another process holds), push their
+    `next_attempt_at` out by the lease and commit, so no other process sends
+    them while this one does. Webhook deliveries and Paperless hand-overs wait
+    in tables of the same shape and are claimed the same way.
+    """
+    with Session(engine) as session:
+        due = session.exec(
+            select(model)
+            .where(
+                col(model.state) == DeliveryState.PENDING.value,
+                col(model.next_attempt_at) <= now,
+            )
+            .order_by(col(model.next_attempt_at))
+            .limit(limit)
+            .with_for_update(skip_locked=True)
+        ).all()
+        ids = [row.id for row in due]
+        for row in due:
+            row.next_attempt_at = now + LEASE
+            session.add(row)
+        session.commit()
+    return ids
+
+
 def deliver_due(
     *,
     client: httpx.Client | None = None,
@@ -432,22 +458,7 @@ def deliver_due(
     retry schedule without waiting.
     """
     now = now or datetime.now(UTC)
-    with Session(engine) as session:
-        due = session.exec(
-            select(WebhookDelivery)
-            .where(
-                col(WebhookDelivery.state) == DeliveryState.PENDING.value,
-                col(WebhookDelivery.next_attempt_at) <= now,
-            )
-            .order_by(col(WebhookDelivery.next_attempt_at))
-            .limit(limit)
-            .with_for_update(skip_locked=True)
-        ).all()
-        ids = [delivery.id for delivery in due]
-        for delivery in due:
-            delivery.next_attempt_at = now + LEASE
-            session.add(delivery)
-        session.commit()
+    ids = claim_due(WebhookDelivery, now=now, limit=limit)
     if not ids:
         return 0
     own_client = client is None
@@ -564,11 +575,37 @@ def wake() -> None:
             pass
 
 
+def _drain_once(
+    client: httpx.Client | None, paperless_client: httpx.Client | None
+) -> int:
+    """One pass over every outbox: webhook deliveries, then Paperless
+    hand-overs. Returns how many rows were claimed in all."""
+    # Imported here: `app.paperless` builds on this module's claim and retry
+    # rules, so it cannot be imported by it at the top.
+    from app import paperless
+
+    claimed = 0
+    # One outbox failing must not starve the other.
+    try:
+        claimed += deliver_due(client=client)
+    except Exception:
+        logger.exception("Webhook delivery pass failed")
+    try:
+        claimed += paperless.hand_over_due(client=paperless_client)
+    except Exception:
+        logger.exception("Paperless hand-over pass failed")
+    return claimed
+
+
 async def drain_forever(
-    *, client: httpx.Client | None = None, poll_seconds: float | None = None
+    *,
+    client: httpx.Client | None = None,
+    paperless_client: httpx.Client | None = None,
+    poll_seconds: float | None = None,
 ) -> None:
     """
-    Drain the outbox until cancelled: look for due deliveries, send them, then
+    Drain the outboxes until cancelled: look for due deliveries and Paperless
+    hand-overs (ADR-0010 shares the loop the webhooks brought), send them, then
     wait for the next poll or for a commit in this process to wake the loop.
 
     A failure inside a pass is logged and the loop carries on; a pass that
@@ -582,9 +619,9 @@ async def drain_forever(
         while True:
             wakeup.clear()
             try:
-                claimed = await asyncio.to_thread(deliver_due, client=client)
+                claimed = await asyncio.to_thread(_drain_once, client, paperless_client)
             except Exception:
-                logger.exception("Webhook delivery pass failed")
+                logger.exception("Outbox pass failed")
                 claimed = 0
             if claimed >= BATCH_SIZE:
                 continue

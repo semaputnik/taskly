@@ -38,6 +38,10 @@ LOGGED = {
     f"POST {API}/tags/{{tag_id}}/merge",
 }
 ACCOUNT = "Account and sign-in, not a change to the tasks and projects the log covers"
+PAPERLESS = (
+    "The Paperless connection is the owner's own setting, not among the changes "
+    "FR-10.3 covers (FR-04.4)"
+)
 
 NOT_LOGGED = {
     f"POST {API}/projects/{{project_id}}/archive": (
@@ -67,6 +71,13 @@ NOT_LOGGED = {
     f"POST {API}/users/me/sign-out-everywhere": ACCOUNT,
     # Sign-in events are out of the log (features.md, Out of scope).
     f"POST {API}/users/{{user_id}}/recovery-code": ACCOUNT,
+    f"PUT {API}/paperless/": PAPERLESS,
+    f"POST {API}/paperless/test": PAPERLESS,
+    f"DELETE {API}/paperless/": PAPERLESS,
+    f"POST {API}/attachments/{{attachment_id}}/resend": (
+        "Sending a PDF to Paperless again retries a delivery; it changes no task, "
+        "tag or attachment the log records (FR-04.6)"
+    ),
     f"POST {API}/bot-users/": (
         "Bot user management is not among the changes FR-10.3 covers; what a bot "
         "user does is logged, as its own actor"

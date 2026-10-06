@@ -44,6 +44,7 @@ Generate and set secure values for the database password, the token signing key 
 export POSTGRES_PASSWORD="$(python -c 'import secrets; print(secrets.token_urlsafe(32))')"
 export SECRET_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(32))')"
 export WEBHOOK_SECRET_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(32))')"
+export PAPERLESS_TOKEN_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(32))')"
 ```
 
 To use an authenticated email provider, also set `SMTP_PASSWORD`.
@@ -90,6 +91,7 @@ Add these repository secrets:
 * `POSTGRES_PASSWORD`
 * `SECRET_KEY`
 * `WEBHOOK_SECRET_KEY`
+* `PAPERLESS_TOKEN_KEY`
 
 To use an authenticated email provider, add the optional `SMTP_PASSWORD` repository secret.
 
@@ -157,7 +159,7 @@ cd /root/taskly
 mv .env.release.example .env
 ```
 
-Set `TASKLY_IMAGE` to the published image, such as `docker.io/your-account/taskly`, and `TASKLY_TAG` to the released version, such as `1.2.3`. Pinning the version rather than `latest` means a restart brings back the same image. The application refuses to start while `SECRET_KEY`, `WEBHOOK_SECRET_KEY` or `POSTGRES_PASSWORD` is still `changethis`.
+Set `TASKLY_IMAGE` to the published image, such as `docker.io/your-account/taskly`, and `TASKLY_TAG` to the released version, such as `1.2.3`. Pinning the version rather than `latest` means a restart brings back the same image. The application refuses to start while `SECRET_KEY`, `WEBHOOK_SECRET_KEY`, `PAPERLESS_TOKEN_KEY` or `POSTGRES_PASSWORD` is still `changethis`.
 
 For an image in a private Docker Hub repository, log in on the server first with `docker login`.
 
@@ -228,6 +230,16 @@ Taskly calls a bot user's webhook URLs when a task becomes ready for it or someo
 * **`WEBHOOK_SECRET_KEY` protects the webhook secrets.** Taskly signs each delivery with the bot user's webhook secret, so it keeps the secret encrypted under a key derived from `WEBHOOK_SECRET_KEY`, a setting of its own. Set it once and keep it, and back it up with your other secrets. Rotating `SECRET_KEY` does not affect webhook secrets. Changing `WEBHOOK_SECRET_KEY` makes every stored secret unreadable: deliveries then fail saying so, until each owner regenerates their secret in the bot user's settings, and each receiver is given the new one. The application refuses to start while it is still `changethis`.
 
 The delivery contract (body, headers, signature, a verifier to copy) is in the API documentation, under the `bots` tag.
+
+## Paperless
+
+A user can connect their own Paperless-ngx instance in Settings, and from then on their PDF attachments are kept there (ADR-0010). Three things are the operator's to know:
+
+* **The same address rule as webhooks.** A Paperless address that resolves to loopback or a private range is refused when it is set and on every request, unless `OUTBOUND_ALLOW_PRIVATE_ADDRESSES=true`. A Paperless instance on the same machine or LAN, the usual self-hosted case, needs that setting.
+* **There is no worker to run.** The same loop that delivers webhooks hands PDFs over to Paperless and waits for it to consume them, and a failed attempt is retried after 1, 5, 15, 60 and 60 minutes. Until Paperless has the document, Taskly keeps the file itself, in `ATTACHMENTS_DIR`. `WEBHOOK_DELIVERY_LOOP=false` stops a process from doing this too.
+* **`PAPERLESS_TOKEN_KEY` protects the Paperless tokens.** Taskly has to send each user's API token back to their Paperless, so it keeps it encrypted under a key derived from `PAPERLESS_TOKEN_KEY`, a setting of its own. Set it once and keep it, and back it up with your other secrets. Rotating `SECRET_KEY` does not affect the tokens. Changing `PAPERLESS_TOKEN_KEY` makes every stored token unreadable: Paperless then fails with a message saying so, until each user enters their token again in Settings. The application refuses to start while it is still `changethis`.
+
+Taskly never deletes anything from Paperless, and a user who disconnects leaves their documents there, out of reach until they connect again.
 
 ## URLs
 

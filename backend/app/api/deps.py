@@ -3,7 +3,6 @@ from collections.abc import Generator
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from functools import lru_cache
-from pathlib import Path
 from typing import Annotated
 
 import httpx
@@ -19,7 +18,7 @@ from app import activity, webhooks
 from app.core import security
 from app.core.config import settings
 from app.core.db import engine
-from app.core.storage import AttachmentStorage, LocalAttachmentStorage
+from app.core.storage import AttachmentStorage, default_storage
 from app.models import BotUser, BotUserProject, TokenPayload, User
 
 # The session token is a bearer token; there is no token URL to post a
@@ -209,13 +208,8 @@ def get_current_active_superuser(current_user: CurrentUser) -> User:
     return current_user
 
 
-@lru_cache
-def _local_attachment_storage() -> LocalAttachmentStorage:
-    return LocalAttachmentStorage(Path(settings.ATTACHMENTS_DIR))
-
-
 def get_attachment_storage() -> AttachmentStorage:
-    return _local_attachment_storage()
+    return default_storage()
 
 
 AttachmentStorageDep = Annotated[AttachmentStorage, Depends(get_attachment_storage)]
@@ -226,9 +220,23 @@ def _webhook_client() -> httpx.Client:
     return webhooks.make_client()
 
 
+@lru_cache
+def _paperless_client() -> httpx.Client:
+    return webhooks.make_client()
+
+
 def get_webhook_client() -> httpx.Client:
     """What the test endpoint sends with; tests swap it for a mock transport."""
     return _webhook_client()
 
 
 WebhookClientDep = Annotated[httpx.Client, Depends(get_webhook_client)]
+
+
+def get_paperless_client() -> httpx.Client:
+    """What requests to a user's Paperless go out through; tests swap it for a
+    mock transport."""
+    return _paperless_client()
+
+
+PaperlessClientDep = Annotated[httpx.Client, Depends(get_paperless_client)]
