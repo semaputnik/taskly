@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Taskly · Projects (slice 5 mock)</title>
+<style>
+  :root { color-scheme: light; --page:#ffffff; --ink:#0b0e11; --ink-2:#3d444d; --ink-3:#656d76; --rule:#e6e8eb; --rule-strong:#c9cdd2; --hover:#f3f4f6; --done:#1a7f37; --late:#cf222e; --p2:#8a5c00;
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", "Noto Sans", Arial, sans-serif; --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--page); color:var(--ink); font-family:var(--font); font-size:15px; line-height:1.45; -webkit-font-smoothing:antialiased; }
+  a { color:inherit; text-decoration:none; } a:hover { text-decoration:underline; text-underline-offset:3px; }
+  button { font:inherit; color:inherit; background:none; border:0; padding:0; cursor:pointer; }
+  .app { display:grid; grid-template-columns:200px minmax(0,1fr) 560px; min-height:100vh; }
+  .nav { padding:28px 20px 28px 28px; display:flex; flex-direction:column; gap:26px; position:sticky; top:0; height:100vh; }
+  .wordmark { font-weight:600; letter-spacing:-.01em; }
+  .nav ul { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:2px; }
+  .nav li a { display:flex; justify-content:space-between; align-items:center; height:30px; padding:0 8px; margin:0 -8px; border-radius:6px; color:var(--ink-2); }
+  .nav li a[aria-current] { color:var(--ink); font-weight:600; }
+  .nav li a .n { font-family:var(--mono); font-size:12px; color:var(--ink-3); }
+  .nav .foot { margin-top:auto; display:flex; align-items:center; gap:8px; font-size:13px; color:var(--ink-2); }
+  .nav .foot .av { width:20px; height:20px; border-radius:50%; background:var(--ink); color:var(--page); font-size:11px; font-weight:600; display:grid; place-items:center; }
+  main { padding:36px 32px 96px; max-width:760px; min-width:0; }
+  h1 { margin:0 0 4px; font-size:22px; font-weight:600; letter-spacing:-.015em; line-height:1.2; display:flex; align-items:baseline; gap:16px; }
+  h1 .act { margin-left:auto; font-size:13.5px; font-weight:500; color:var(--ink-2); }
+  .lede { margin:0 0 24px; color:var(--ink-3); } .lede b { color:var(--ink); font-weight:500; }
+  h2 { font-size:13px; font-weight:600; margin:0; padding:0 0 8px; border-bottom:1px solid var(--rule-strong); display:flex; gap:8px; }
+  h2 .n { font-family:var(--mono); font-weight:400; font-size:12px; color:var(--ink-3); }
+  .proj { display:grid; grid-template-columns:14px minmax(0,1fr) auto; gap:0 12px; align-items:start; padding:10px 0; border-bottom:1px solid var(--rule); }
+  .proj.open { background:var(--hover); margin:0 -12px; padding-left:12px; padding-right:12px; }
+  .sq { width:10px; height:10px; border-radius:2px; background:var(--ink-2); opacity:.55; margin-top:7px; }
+  .proj .t { font-weight:500; }
+  .proj .d { color:var(--ink-3); font-size:13.5px; margin-top:1px; }
+  .proj .meta { display:flex; gap:12px; color:var(--ink-3); font-size:12.5px; margin-top:3px; flex-wrap:wrap; }
+  .proj .meta .late { color:var(--late); font-weight:500; }
+  /* the one-click way into the project's tasks: the count is the link */
+  .proj .r { font-size:13.5px; white-space:nowrap; text-align:right; }
+  .proj .r a { font-weight:500; display:inline-flex; align-items:center; gap:6px; padding:4px 8px; margin:-4px -8px 0 0; border-radius:6px; }
+  .proj .r a:hover { background:var(--rule); text-decoration:none; }
+  .proj .r a svg { width:12px; height:12px; }
+  .proj .r .none { color:var(--ink-3); }
+  .sec { padding:18px 0 4px; }
+  .sec h4 { margin:0 0 8px; font-size:13px; font-weight:600; display:flex; align-items:baseline; gap:8px; border-bottom:1px solid var(--rule-strong); padding-bottom:8px; }
+  .sec h4 .n { font-family:var(--mono); font-weight:400; font-size:12px; color:var(--ink-3); } .sec h4 .act { margin-left:auto; font-weight:400; font-size:13px; color:var(--ink-3); }
+
+  .panel { border-left:1px solid var(--rule-strong); position:sticky; top:0; height:100vh; overflow-y:auto; padding:0 36px 48px; }
+  .bar { display:flex; align-items:center; gap:12px; height:52px; color:var(--ink-3); font-size:13px; position:sticky; top:0; background:var(--page); z-index:1; }
+  .bar .right { margin-left:auto; display:flex; gap:4px; } .bar .ib { width:28px; height:28px; display:grid; place-items:center; border-radius:6px; color:var(--ink-3); }
+  .title { padding:8px 0 18px; } .title h3 { margin:0; font-size:22px; font-weight:600; letter-spacing:-.015em; line-height:1.25; }
+  .props { display:grid; grid-template-columns:96px 1fr; row-gap:2px; column-gap:16px; padding:10px 0 14px; border-top:1px solid var(--rule-strong); border-bottom:1px solid var(--rule); }
+  .props dt { color:var(--ink-3); font-size:13px; min-height:30px; display:flex; align-items:center; margin:0; }
+  .props dd { margin:0; min-height:30px; display:flex; align-items:center; gap:14px; flex-wrap:wrap; font-size:14px; color:var(--ink-2); }
+  .props .act { font-size:13.5px; font-weight:500; color:var(--ink); }
+  .desc { color:var(--ink-2); line-height:1.5; }
+  .capture { display:flex; align-items:center; gap:10px; height:40px; border-bottom:1px solid var(--rule-strong); color:var(--ink-3); margin-bottom:4px; }
+  .capture span { flex:1; }
+  .task { display:grid; grid-template-columns:18px minmax(0,1fr); gap:0 12px; align-items:start; padding:8px 0; border-bottom:1px solid var(--rule); }
+  .mark { width:18px; height:18px; color:var(--ink-2); margin-top:1px; display:block; } .mark svg { width:18px; height:18px; display:block; } .mark.p1 { color:var(--late); } .mark.p2 { color:var(--p2); }
+  .task .t { font-weight:500; font-size:14px; } .task .meta { display:flex; gap:12px; color:var(--ink-3); font-size:12.5px; margin-top:2px; } .task .meta .late { color:var(--late); font-weight:500; } .task .meta .who { margin-left:auto; }
+  .more { font-size:13px; color:var(--ink-3); padding-top:8px; display:inline-block; }
+  .tl { list-style:none; margin:0; padding:0; }
+  .tl li { display:grid; grid-template-columns:52px 1fr; gap:12px; padding:8px 0; border-bottom:1px solid var(--rule); align-items:baseline; }
+  .tl time { font-family:var(--mono); font-size:12px; color:var(--ink-3); } .tl .ev { color:var(--ink-2); font-size:14px; } .tl .ev b { font-weight:500; color:var(--ink); }
+  .foot { margin-top:36px; padding-top:14px; border-top:1px solid var(--rule); font-size:13px; color:var(--ink-3); display:flex; gap:16px; }
+  .foot a:hover { color:var(--late); }
+</style>
+</head>
+<body>
+<div class="app">
+  <nav class="nav" aria-label="Main">
+    <div class="wordmark">Taskly</div>
+    <ul><li><a href="#">Today</a></li><li><a href="#">Tasks <span class="n">23</span></a></li><li><a href="#" aria-current="page">Projects <span class="n">4</span></a></li><li><a href="#">Tags</a></li><li><a href="#">Bots <span class="n">4</span></a></li><li><a href="#">Activity</a></li><li><a href="#">Archive</a></li></ul>
+    <div class="foot"><span class="av">S</span> Sam</div>
+  </nav>
+
+  <main>
+    <h1>Projects <a href="#" class="act">+ New project</a></h1>
+    <p class="lede"><b>4 projects, 23 open tasks.</b> 2 are overdue, in Inbox and Website relaunch.</p>
+
+    <h2>Projects <span class="n">4</span></h2>
+    <div class="proj"><span class="sq"></span><div><div class="t">Inbox</div><div class="d">Where a task lands when it names no project.</div><div class="meta"><span class="late">1 overdue</span><span>3 in Backlog</span><span>inbox-triage works here</span></div></div><div class="r"><a href="#">6 open <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 6h6M6 3l3 3-3 3"/></svg></a></div></div>
+    <div class="proj open"><span class="sq"></span><div><div class="t">Website relaunch</div><div class="d">Moving the four marketing pages off the old template before the 1.5 release.</div><div class="meta"><span class="late">1 overdue</span><span>1 in Review</span><span>inbox-triage, release-bot work here</span></div></div><div class="r"><a href="#">9 open <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 6h6M6 3l3 3-3 3"/></svg></a></div></div>
+    <div class="proj"><span class="sq"></span><div><div class="t">Research</div><div class="meta"><span>research-agent works here</span></div></div><div class="r"><a href="#">5 open <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 6h6M6 3l3 3-3 3"/></svg></a></div></div>
+    <div class="proj"><span class="sq"></span><div><div class="t">Home</div><div class="meta"><span>calendar-sync works here</span></div></div><div class="r"><a href="#">3 open <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 6h6M6 3l3 3-3 3"/></svg></a></div></div>
+
+    <div class="sec" style="margin-top:28px"><h4>Archived <span class="n">1</span><a href="#" class="act">Read-only until unarchived</a></h4>
+      <div class="proj"><span class="sq" style="opacity:.25"></span><div><div class="t" style="color:var(--ink-3)">Garage sale</div><div class="meta"><span>archived 12 Sept</span><span>4 tasks kept with it</span></div></div><div class="r"><a href="#" style="color:var(--ink-3)">4 tasks <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 6h6M6 3l3 3-3 3"/></svg></a></div></div>
+    </div>
+  </main>
+
+  <aside class="panel" aria-label="Project">
+    <div class="bar"><span>Project · created 24 Sept</span><div class="right"><button class="ib" aria-label="Next"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 2l5 5-5 5"/></svg></button><button class="ib" aria-label="Close"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 2l10 10M12 2L2 12"/></svg></button></div></div>
+    <div class="title"><h3>Website relaunch</h3></div>
+    <dl class="props">
+      <dt>Tasks</dt><dd><span>9 open · 1 overdue · 6 done</span><a href="#" class="act">Open the list →</a></dd>
+      <dt>Bot users</dt><dd><span>inbox-triage, release-bot</span></dd>
+      <dt>State</dt><dd><span>Active</span><a href="#" class="act">Archive</a></dd>
+    </dl>
+    <div class="sec"><h4>Description</h4><div class="desc">Moving the four marketing pages off the old template before the 1.5 release. Pricing copy is a separate task.</div></div>
+
+    <div class="sec"><h4>Open tasks <span class="n">9</span></h4>
+      <div class="capture"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 3v10M3 8h10"/></svg><span>Add a task to Website relaunch…</span></div>
+      <div class="task"><span class="mark p1"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M1.8 9c1.9-3.4 4.3-5 7.2-5s5.3 1.6 7.2 5c-1.9 3.4-4.3 5-7.2 5S3.7 12.4 1.8 9z"/><circle cx="9" cy="9" r="2.4"/><circle cx="9" cy="9" r=".9" fill="currentColor" stroke="none"/></svg></span><div><div class="t">Renew the domain</div><div class="meta"><span class="late">3 days late</span><span class="who">calendar-sync</span></div></div></div>
+      <div class="task"><span class="mark p2"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="9" cy="9" r="7"/><path d="M9 4.5a4.5 4.5 0 0 1 0 9z" fill="currentColor" stroke="none"/></svg></span><div><div class="t">Migrate the marketing pages</div><div class="meta"><span>2/5</span><span>Wed</span><span class="who">you</span></div></div></div>
+      <div class="task"><span class="mark"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="9" cy="9" r="7"/><circle cx="9" cy="9" r="2.6" fill="currentColor" stroke="none"/></svg></span><div><div class="t">Check the redirect map</div><div class="meta"><span class="who">release-bot → you</span></div></div></div>
+      <div class="task"><span class="mark p2"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="9" cy="9" r="7"/></svg></span><div><div class="t">Rewrite the pricing copy</div><div class="meta"><span>Thu</span><span>copy</span></div></div></div>
+      <div class="task"><span class="mark"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="9" cy="9" r="7" stroke-dasharray="2.6 2.4"/></svg></span><div><div class="t">Old staging banner</div><div class="meta"><span>Backlog</span></div></div></div>
+      <a href="#" class="more">4 more in the list →</a>
+    </div>
+
+    <div class="sec"><h4>Activity <span class="n">15</span></h4>
+      <ul class="tl">
+        <li><time>07:41</time><div class="ev"><b>inbox-triage</b> moved <b>Migrate the marketing pages</b> to In progress</div></li>
+        <li><time>06:12</time><div class="ev"><b>release-bot</b> deleted <b>Old staging banner</b></div></li>
+        <li><time>Yesterday</time><div class="ev"><b>You</b> completed 6 tasks here</div></li>
+      </ul>
+      <a href="#" class="more">Everything in this project →</a>
+    </div>
+
+    <div class="foot"><a href="#">Delete project</a></div>
+  </aside>
+</div>
+</body>
+</html>

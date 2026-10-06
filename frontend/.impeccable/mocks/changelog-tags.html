@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Taskly · Tags (slice 5 mock)</title>
+<style>
+  :root { color-scheme: light; --page:#ffffff; --ink:#0b0e11; --ink-2:#3d444d; --ink-3:#656d76; --rule:#e6e8eb; --rule-strong:#c9cdd2; --hover:#f3f4f6; --done:#1a7f37; --late:#cf222e;
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", "Noto Sans", Arial, sans-serif; --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--page); color:var(--ink); font-family:var(--font); font-size:15px; line-height:1.45; -webkit-font-smoothing:antialiased; }
+  a { color:inherit; text-decoration:none; } a:hover { text-decoration:underline; text-underline-offset:3px; }
+  button { font:inherit; color:inherit; background:none; border:0; padding:0; cursor:pointer; }
+  .app { display:grid; grid-template-columns:200px minmax(0,1fr) 560px; min-height:100vh; }
+  .nav { padding:28px 20px 28px 28px; display:flex; flex-direction:column; gap:26px; position:sticky; top:0; height:100vh; }
+  .wordmark { font-weight:600; letter-spacing:-.01em; }
+  .nav ul { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:2px; }
+  .nav li a { display:flex; justify-content:space-between; align-items:center; height:30px; padding:0 8px; margin:0 -8px; border-radius:6px; color:var(--ink-2); }
+  .nav li a[aria-current] { color:var(--ink); font-weight:600; } .nav li a .n { font-family:var(--mono); font-size:12px; color:var(--ink-3); }
+  .nav .foot { margin-top:auto; display:flex; align-items:center; gap:8px; font-size:13px; color:var(--ink-2); } .nav .foot .av { width:20px; height:20px; border-radius:50%; background:var(--ink); color:var(--page); font-size:11px; font-weight:600; display:grid; place-items:center; }
+  main { padding:36px 32px 96px; max-width:760px; min-width:0; }
+  h1 { margin:0 0 4px; font-size:22px; font-weight:600; letter-spacing:-.015em; line-height:1.2; display:flex; align-items:baseline; gap:16px; } h1 .act { margin-left:auto; font-size:13.5px; font-weight:500; color:var(--ink-2); }
+  .lede { margin:0 0 24px; color:var(--ink-3); } .lede b { color:var(--ink); font-weight:500; }
+  h2 { font-size:13px; font-weight:600; margin:0; padding:0 0 8px; border-bottom:1px solid var(--rule-strong); display:flex; gap:8px; } h2 .n { font-family:var(--mono); font-weight:400; font-size:12px; color:var(--ink-3); }
+  .alike { padding:10px 0; border-bottom:1px solid var(--rule); display:flex; align-items:baseline; gap:14px; flex-wrap:wrap; font-size:14px; }
+  .alike .names { font-weight:500; } .alike .names span { color:var(--ink-3); font-weight:400; margin:0 4px; }
+  .alike .acts { margin-left:auto; display:flex; gap:14px; font-size:13.5px; } .alike .acts a { font-weight:500; } .alike .acts a.q { color:var(--ink-3); font-weight:400; }
+  .tag { display:grid; grid-template-columns:16px minmax(0,1fr) auto; gap:0 12px; align-items:start; padding:10px 0; border-bottom:1px solid var(--rule); }
+  .tag.open { background:var(--hover); margin:0 -12px; padding-left:12px; padding-right:12px; }
+  .tag svg.ti { width:14px; height:14px; color:var(--ink-3); margin-top:5px; }
+  .tag .t { font-weight:500; } .tag .meta { display:flex; gap:12px; color:var(--ink-3); font-size:12.5px; margin-top:2px; }
+  .tag .r a { font-size:13.5px; font-weight:500; display:inline-flex; align-items:center; gap:6px; padding:4px 8px; margin:-4px -8px 0 0; border-radius:6px; } .tag .r a:hover { background:var(--rule); text-decoration:none; } .tag .r a svg { width:12px; height:12px; }
+  .tag .r .none { color:var(--ink-3); font-size:13.5px; }
+  .panel { border-left:1px solid var(--rule-strong); position:sticky; top:0; height:100vh; overflow-y:auto; padding:0 36px 48px; }
+  .bar { display:flex; align-items:center; gap:12px; height:52px; color:var(--ink-3); font-size:13px; } .bar .right { margin-left:auto; display:flex; gap:4px; } .bar .ib { width:28px; height:28px; display:grid; place-items:center; border-radius:6px; color:var(--ink-3); }
+  .title { padding:8px 0 18px; display:flex; gap:10px; align-items:center; } .title h3 { margin:0; font-size:22px; font-weight:600; letter-spacing:-.015em; } .title svg { width:20px; height:20px; color:var(--ink-3); }
+  .props { display:grid; grid-template-columns:96px 1fr; row-gap:2px; column-gap:16px; padding:10px 0 14px; border-top:1px solid var(--rule-strong); border-bottom:1px solid var(--rule); }
+  .props dt { color:var(--ink-3); font-size:13px; min-height:30px; display:flex; align-items:center; margin:0; } .props dd { margin:0; min-height:30px; display:flex; align-items:center; gap:14px; flex-wrap:wrap; font-size:14px; color:var(--ink-2); } .props .act { font-size:13.5px; font-weight:500; color:var(--ink); }
+  .sec { padding:18px 0 4px; } .sec h4 { margin:0 0 8px; font-size:13px; font-weight:600; display:flex; align-items:baseline; gap:8px; border-bottom:1px solid var(--rule-strong); padding-bottom:8px; } .sec h4 .n { font-family:var(--mono); font-weight:400; font-size:12px; color:var(--ink-3); }
+  .task { display:grid; grid-template-columns:18px minmax(0,1fr); gap:0 12px; align-items:start; padding:8px 0; border-bottom:1px solid var(--rule); }
+  .mark { width:18px; height:18px; color:var(--ink-2); margin-top:1px; display:block; } .mark svg { width:18px; height:18px; display:block; } .mark.p1 { color:var(--late); }
+  .task .t { font-weight:500; font-size:14px; } .task .meta { display:flex; gap:12px; color:var(--ink-3); font-size:12.5px; margin-top:2px; } .task .meta .proj { margin-left:auto; }
+  .more { font-size:13px; color:var(--ink-3); padding-top:8px; display:inline-block; }
+  .merge { font-size:14px; color:var(--ink-2); line-height:1.5; } .merge a { font-weight:500; color:var(--ink); }
+  .foot { margin-top:36px; padding-top:14px; border-top:1px solid var(--rule); font-size:13px; color:var(--ink-3); display:flex; gap:16px; } .foot a:hover { color:var(--late); }
+</style>
+</head>
+<body>
+<div class="app">
+  <nav class="nav" aria-label="Main">
+    <div class="wordmark">Taskly</div>
+    <ul><li><a href="#">Today</a></li><li><a href="#">Tasks <span class="n">23</span></a></li><li><a href="#">Projects <span class="n">4</span></a></li><li><a href="#" aria-current="page">Tags</a></li><li><a href="#">Bots <span class="n">4</span></a></li><li><a href="#">Activity</a></li><li><a href="#">Archive</a></li></ul>
+    <div class="foot"><span class="av">S</span> Sam</div>
+  </nav>
+
+  <main>
+    <h1>Tags <a href="#" class="act">+ New tag</a></h1>
+    <p class="lede"><b>7 tags.</b> 2 look alike. Tags are created by typing them onto a task, too.</p>
+
+    <h2>Look alike <span class="n">1</span></h2>
+    <div class="alike"><span class="names">urgent <span>and</span> Urgent</span><span style="color:var(--ink-3);font-size:13px">3 and 1 tasks</span><span class="acts"><a href="#">Merge into urgent</a><a href="#" class="q">Keep apart</a></span></div>
+
+    <h2 style="margin-top:28px">Tags <span class="n">7</span></h2>
+    <div class="tag"><svg class="ti" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M2.5 2.5h5l6 6-5 5-6-6z"/><circle cx="5.5" cy="5.5" r=".9" fill="currentColor"/></svg><div><div class="t">blocked</div><div class="meta"><span>created by you</span></div></div><div class="r"><a href="#">2 tasks <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 6h6M6 3l3 3-3 3"/></svg></a></div></div>
+    <div class="tag open"><svg class="ti" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M2.5 2.5h5l6 6-5 5-6-6z"/><circle cx="5.5" cy="5.5" r=".9" fill="currentColor"/></svg><div><div class="t">copy</div><div class="meta"><span>created by inbox-triage</span></div></div><div class="r"><a href="#">4 tasks <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 6h6M6 3l3 3-3 3"/></svg></a></div></div>
+    <div class="tag"><svg class="ti" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M2.5 2.5h5l6 6-5 5-6-6z"/><circle cx="5.5" cy="5.5" r=".9" fill="currentColor"/></svg><div><div class="t">support</div><div class="meta"><span>created by inbox-triage</span></div></div><div class="r"><a href="#">3 tasks <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 6h6M6 3l3 3-3 3"/></svg></a></div></div>
+    <div class="tag"><svg class="ti" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M2.5 2.5h5l6 6-5 5-6-6z"/><circle cx="5.5" cy="5.5" r=".9" fill="currentColor"/></svg><div><div class="t">urgent</div><div class="meta"><span>created by you</span></div></div><div class="r"><a href="#">3 tasks <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 6h6M6 3l3 3-3 3"/></svg></a></div></div>
+    <div class="tag"><svg class="ti" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M2.5 2.5h5l6 6-5 5-6-6z"/><circle cx="5.5" cy="5.5" r=".9" fill="currentColor"/></svg><div><div class="t">Urgent</div><div class="meta"><span>created by research-agent</span></div></div><div class="r"><a href="#">1 task <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 6h6M6 3l3 3-3 3"/></svg></a></div></div>
+    <div class="tag"><svg class="ti" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M2.5 2.5h5l6 6-5 5-6-6z"/><circle cx="5.5" cy="5.5" r=".9" fill="currentColor"/></svg><div><div class="t">weekly</div><div class="meta"><span>created by you</span></div></div><div class="r"><a href="#">1 task <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 6h6M6 3l3 3-3 3"/></svg></a></div></div>
+    <div class="tag"><svg class="ti" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M2.5 2.5h5l6 6-5 5-6-6z"/><circle cx="5.5" cy="5.5" r=".9" fill="currentColor"/></svg><div><div class="t">website</div><div class="meta"><span>created by you</span></div></div><div class="r"><span class="none">No open tasks</span></div></div>
+  </main>
+
+  <aside class="panel" aria-label="Tag">
+    <div class="bar"><span>Tag · created 25 Sept by inbox-triage</span><div class="right"><button class="ib" aria-label="Next"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 2l5 5-5 5"/></svg></button><button class="ib" aria-label="Close"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 2l10 10M12 2L2 12"/></svg></button></div></div>
+    <div class="title"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M2.5 2.5h5l6 6-5 5-6-6z"/><circle cx="5.5" cy="5.5" r=".9" fill="currentColor"/></svg><h3>copy</h3></div>
+    <dl class="props">
+      <dt>Tasks</dt><dd><span>4 open · 2 in archived projects</span><a href="#" class="act">Open the list →</a></dd>
+      <dt>Merge</dt><dd><span class="merge">Fold another tag into this one: <a href="#">choose a tag…</a></span></dd>
+    </dl>
+    <div class="sec"><h4>Open tasks <span class="n">4</span></h4>
+      <div class="task"><span class="mark"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="9" cy="9" r="7"/></svg></span><div><div class="t">Rewrite the pricing copy</div><div class="meta"><span>Thu</span><span class="proj">Website relaunch</span></div></div></div>
+      <div class="task"><span class="mark"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="9" cy="9" r="7" stroke-dasharray="2.6 2.4"/></svg></span><div><div class="t">Rework the about page</div><div class="meta"><span>Backlog</span><span class="proj">Website relaunch</span></div></div></div>
+      <div class="task"><span class="mark"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="9" cy="9" r="7" stroke-dasharray="2.6 2.4"/></svg></span><div><div class="t">Newsletter intro</div><div class="meta"><span>Backlog</span><span class="proj">Inbox</span></div></div></div>
+      <div class="task"><span class="mark"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="9" cy="9" r="7"/></svg></span><div><div class="t">Release notes 1.5</div><div class="meta"><span class="proj">Website relaunch</span></div></div></div>
+    </div>
+    <div class="foot"><a href="#">Delete tag</a><span>Deleting takes it off 6 tasks and cannot be undone.</span></div>
+  </aside>
+</div>
+</body>
+</html>
