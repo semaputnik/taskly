@@ -9,6 +9,8 @@
     -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
     "Noto Sans", Arial, sans-serif;
   --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  /* The measure of a page's one column: Today, Tasks, Bots and Activity. */
+  --container-page-column: 820px;
 }
 
 @theme inline {
@@ -211,6 +213,40 @@
  */
 @utility row-tint {
   background-image: linear-gradient(to right, var(--hover), transparent 85%);
+}
+
+/*
+ * How far a page's column is from the left of the main area, as a share of
+ * the way to centre: 1 centred, 0 against the left edge.
+ */
+@property --page-centre {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 1;
+}
+
+/*
+ * A page's one column: held to the measure, and centred in the main area (the
+ * container `main` makes of itself) while no record is open. From 1200px an
+ * open record takes the right of the screen, and the column moves to sit
+ * beside it, against the left edge; the move is `--page-centre` going from 1
+ * to 0 while the main area narrows, so it is one motion. One utility, so the
+ * pages cannot drift apart in width or in position.
+ */
+@utility page-column {
+  width: min(100%, var(--container-page-column));
+  margin-left: calc(
+    max(0px, (100cqw - var(--container-page-column)) / 2) * var(--page-centre)
+  );
+  transition: --page-centre 260ms cubic-bezier(0.16, 1, 0.3, 1);
+  @media (min-width: 1200px) {
+    :where(.group\/shell):has([data-record-column]) & {
+      --page-centre: 0;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
 }
 
 @layer components {

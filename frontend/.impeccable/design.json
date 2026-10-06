@@ -524,7 +524,7 @@
       {
         "name": "record-column",
         "value": "1200px",
-        "purpose": "The record column becomes a sticky 560px third shell track beside the page; below it, it is fixed over the whole screen."
+        "purpose": "The record column becomes a sticky 560px third shell track beside the page, and the page column (820px, centred while no record is open) moves to the left edge to sit beside it; below it, the record is fixed over the whole screen."
       }
     ]
   },

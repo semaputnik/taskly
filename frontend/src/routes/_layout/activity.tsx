@@ -97,7 +97,7 @@ function Activity() {
   })
 
   return (
-    <div className="max-w-[820px]">
+    <div className="page-column">
       <h1 className="mb-1 text-[22px] leading-[1.2] font-semibold tracking-[-0.015em]">
         Activity
       </h1>
