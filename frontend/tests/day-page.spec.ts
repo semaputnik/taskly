@@ -76,16 +76,10 @@ test("The bands take every open status but Waiting, and the sentence counts them
   await expect(page.getByRole("heading", { name: /Waiting/ })).toHaveCount(0)
 
   await expect(page.getByText("5 need you.")).toBeVisible()
-  // A first visit counts every change the bot users have made. The Changes
-  // log counts the reader's own seeding too, so the sentence names the bot
-  // users' share of the very figure the log's heading shows.
-  const logHeading = page.getByRole("heading", { name: /^Changes/ })
-  await expect(logHeading).toHaveText(/^Changes\s*\d+/)
-  const logCount = (await logHeading.innerText()).match(/\d+/)?.[0]
+  // A first visit counts every change the bot users have made, and only
+  // those: the reader's own seeding is not part of the count.
   await expect(
-    page.getByText(
-      `Your bot users have made 1 of the ${logCount} changes so far.`,
-    ),
+    page.getByText("Your bot users have made 1 change so far."),
   ).toBeVisible()
 
   const week = page.getByRole("link", { name: /2 more due later this week/ })
@@ -147,19 +141,19 @@ test("The next visit counts the bot users' changes since the last one", async ({
   await newUser(page)
   await page.goto("/")
   await expect(
-    page.getByText("Your bot users have made no changes yet."),
+    page.getByText("No bot user has changed anything yet."),
   ).toBeVisible()
   // A reload is the same visit.
   await page.reload()
   await expect(
-    page.getByText("Your bot users have made no changes yet."),
+    page.getByText("No bot user has changed anything yet."),
   ).toBeVisible()
 
   // A new tab is a new visit, counted from the last look.
   const later = await context.newPage()
   await later.goto("/")
   await expect(
-    later.getByText("Your bot users made no changes since your last visit."),
+    later.getByText("No bot user has changed anything yet."),
   ).toBeVisible()
 })
 
@@ -304,7 +298,7 @@ async function botWithProject(page: Page, name: string) {
   }
 }
 
-test("Changes reads the reader's and the bot users' entries newest first, with Restore on deletions", async ({
+test("Changes lists the bot users' entries newest first, folds the reader's own into one line, and has Restore on deletions", async ({
   page,
 }) => {
   await newUser(page)
@@ -318,59 +312,74 @@ test("Changes reads the reader's and the bot users' entries newest first, with R
   await page.goto("/")
 
   const log = changesLog(page)
-  // A first visit has no last one: the window is everything so far.
+  // A first visit has no last one: the window is everything so far, and the
+  // count is the bot users' alone.
   await expect(log.getByRole("heading", { level: 2 })).toHaveText(
-    /^Changes\s*6\s*so far$/,
+    /^Changes\s*3\s*so far$/,
   )
   const lines = log.getByRole("listitem")
-  // The actor first, then what they did, newest first.
+  // The actor first, then what they did, newest first. Only bot users.
   await expect(lines).toHaveText([
-    /You\s*deleted Renew the domain\s*Restore$/i,
     /Triage agent\s*deleted Old staging banner\s*Restore$/i,
     /Triage agent\s*created Migrate the marketing pages/i,
     /Triage agent\s*created Old staging banner/i,
-    /You\s*created the project Support queue/i,
-    /You\s*created Renew the domain/i,
   ])
-  await expect(log.getByRole("button", { name: /^Restore/ })).toHaveCount(2)
+  await expect(log.getByRole("button", { name: /^Restore/ })).toHaveCount(1)
   await expect(
     log.getByRole("link", { name: "Migrate the marketing pages" }),
   ).toBeVisible()
 
-  // The reader's own lines are muted; a bot user's are in full ink.
-  const sentenceColour = (line: Locator) =>
-    line.evaluate((node) =>
-      node.lastElementChild
-        ? getComputedStyle(node.lastElementChild).color
-        : null,
-    )
-  expect(await sentenceColour(lines.nth(0))).not.toBe(
-    await sentenceColour(lines.nth(1)),
-  )
+  // The reader's own three changes (the project, the task, its deletion) are
+  // one muted line after the list, a link into the log narrowed to You.
+  const own = log.getByRole("link", { name: /3 changes of yours/ })
+  await expect(own).toBeVisible()
+  await expect(own.locator("xpath=..")).toHaveText(/^and 3 changes of yours/)
+  expect(
+    await own.evaluate((node) => getComputedStyle(node.parentElement ?? node).color),
+  ).not.toBe(await lines.first().evaluate((node) => getComputedStyle(node).color))
+
   // In the dark theme too. A reload is the same visit, so the log holds.
   await page.evaluate(() => localStorage.setItem("vite-ui-theme", "dark"))
   await page.reload()
-  await expect(lines).toHaveCount(6)
+  await expect(lines).toHaveCount(3)
   expect(
     await page.evaluate(
       () => getComputedStyle(document.documentElement).colorScheme,
     ),
   ).toBe("dark")
-  expect(await sentenceColour(lines.nth(0))).not.toBe(
-    await sentenceColour(lines.nth(1)),
-  )
 
   // Restore is inline: no dialog between the line and what it brings back.
   await lines
-    .nth(1)
+    .nth(0)
     .getByRole("button", { name: "Restore Old staging banner" })
     .click()
   await expect(page.getByText("“Old staging banner” restored")).toBeVisible()
-  await expect(lines.first()).toHaveText(/You\s*restored Old staging banner/i)
-  await expect(log.getByRole("button", { name: /^Restore/ })).toHaveCount(1)
+  await expect(log.getByRole("button", { name: /^Restore/ })).toHaveCount(0)
+  // Restoring is the reader's own change: the folded line counts it.
+  await expect(
+    log.getByRole("link", { name: /4 changes of yours/ }),
+  ).toBeVisible()
 
-  await log.getByRole("link", { name: "Full log" }).click()
-  await expect(page).toHaveURL(/\/activity/)
+  await log.getByRole("link", { name: /4 changes of yours/ }).click()
+  await expect(page).toHaveURL(/\/activity\?.*actor=me/)
+})
+
+test("Changes with only the reader's own changes says so in one quiet line", async ({
+  page,
+}) => {
+  await newUser(page)
+  const api = await userApi(page)
+  await api.create("/tasks/", { title: "Renew the domain" })
+  await page.goto("/")
+
+  const log = changesLog(page)
+  await expect(log.getByRole("listitem")).toHaveCount(0)
+  await expect(log).toContainText("Nothing from your bot users so far.")
+  await expect(
+    log.getByRole("link", { name: /1 change of yours/ }),
+  ).toBeVisible()
+  await expect(log.getByRole("link", { name: "Full log" })).toBeVisible()
+  await expect(page.getByText("No bot user has changed anything yet.")).toBeVisible()
 })
 
 test("An empty Changes log says so and points at bot users", async ({

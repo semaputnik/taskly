@@ -103,6 +103,8 @@ export function CompactTaskRow({
     projectName,
   })
 
+  const late = facts.some((fact) => fact.kind === "due" && fact.tone === "late")
+
   const Line = asItem ? "li" : "div"
   const branch = depth > 0
 
@@ -128,12 +130,18 @@ export function CompactTaskRow({
           down, inside its larger target. */}
       {readOnly ? (
         <span className="mt-px flex self-start">
-          <StatusMark status={task.status} priority={task.priority} labelled />
+          <StatusMark
+            status={task.status}
+            priority={task.priority}
+            labelled
+            late={late}
+          />
         </span>
       ) : (
         <CompleteTask
           task={task}
           asMark
+          late={late}
           receipt={receipt}
           className="-mt-[3px] self-start"
         />

@@ -335,7 +335,11 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
   end. There is no table view and no selection of several lines: a change to
   many tasks at once is made by a bot user through the REST API's batch
   endpoint, which stays (FR-10.9). A subtask line is indented under its root
-  task with a branch mark.
+  task with a branch mark. A due day that has passed reads "Yesterday" and
+  then "N days late" up to 14 days late; further back it reads the date in
+  the product's numeric format ("due 03/02/2026"), still in the alert
+  colour. The same words are used on the dashboard, the task list, the task
+  column's subtask lines and everywhere else a task line is shown.
 - **FR-06.6** Priorities are told apart by colour as well as by name: P1 red,
   P2 amber/yellow, P3 blue, and P4 (or no priority) uncoloured. A compact row
   shows its task's priority as the colour of its completion checkbox.
@@ -346,8 +350,10 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
   that, a link to the task list narrowed to that status and to the user as
   assignee. Tasks with no assignee, tasks on a bot user and tasks in Backlog
   are not in it: the dashboard is for the work in the user's hands, and the
-  Tasks page is where everything else is managed. The panel is drawn even
-  when it is empty, and says then that nothing is on the user.
+  Tasks page is where everything else is managed. The interface labels the
+  panel "In my hands": that is the label of the My work term. With no tasks
+  it has no heading, only one line saying that nothing is in the user's
+  hands.
 - **FR-06.8** The task list shows open tasks only. A Done task is not listed
   and cannot be filtered for; completed work is read in the activity log
   (FR-10.8, ADR-0006). Open work is the list's baseline rather than a filter
@@ -372,8 +378,12 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
   today — and how many changes their bot users made since the user's last
   visit. A visit is one browser tab's session, counted from the last time the
   dashboard was read on that device; a first visit counts every change the
-  bot users have made. When nothing is overdue or due today, the dashboard
-  says so in a sentence instead of drawing the bands.
+  bot users have made. When the bot users have changed nothing, the
+  sentence says that instead of counting a zero. When nothing is overdue or
+  due today, the dashboard says so in a sentence instead of drawing the
+  bands. The dashboard's Changes preview lists the bot users' changes only;
+  the user's own changes in the same window are folded into one line at its
+  end that opens the activity log narrowed to the user.
 - **FR-06.13** Wherever a task line is shown, its meta line names the
   assignee when there is one: "you", the bot user's name, or, for a task in
   Review that a bot user handed over, the bot user's name followed by an

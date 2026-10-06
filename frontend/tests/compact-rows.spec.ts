@@ -92,6 +92,56 @@ test("A compact row shows subtasks, due day, tags and project, and its status ma
   ).toHaveClass(/text-priority-p3/)
 })
 
+test("An overdue line says how late up to a fortnight, then the date, and is red only in its due day", async ({
+  page,
+}) => {
+  await newUser(page)
+  const api = await userApi(page)
+  const daysAgo = (days: number) => {
+    const date = new Date()
+    date.setDate(date.getDate() - days)
+    return isoDay(date)
+  }
+  await api.create("/tasks/", {
+    title: "Pay the invoice",
+    priority: "P1",
+    due_date: daysAgo(14),
+  })
+  await api.create("/tasks/", {
+    title: "Renew the licence",
+    priority: "P2",
+    due_date: daysAgo(15),
+  })
+  await page.goto("/")
+
+  const line = (title: string) =>
+    page
+      .locator("section")
+      .filter({ has: page.getByRole("heading", { name: /^Overdue/ }) })
+      .locator("div")
+      .filter({ has: page.getByRole("link", { name: title }) })
+      // The outermost match is the row; the rest are its own lines.
+      .first()
+  const recent = line("Pay the invoice")
+  await expect(recent).toContainText("14 days late")
+  const old = line("Renew the licence")
+  await expect(old).toContainText(/due \d{2}\D\d{2}\D\d{4}/)
+  await expect(old).not.toContainText("days late")
+  // Still red: the date takes the due day's alert colour.
+  await expect(old.getByText(/^due /).locator("xpath=..")).toHaveClass(
+    /text-late/,
+  )
+
+  // Red is said once on an overdue line: the P1 mark is ink there, while
+  // another priority keeps its hue.
+  await expect(
+    recent.getByRole("checkbox").locator("svg"),
+  ).not.toHaveClass(/text-priority-p1/)
+  await expect(
+    old.getByRole("checkbox").locator("svg"),
+  ).toHaveClass(/text-priority-p2/)
+})
+
 test("A kept task's status mark carries its priority's hue, and is not a control", async ({
   page,
 }) => {

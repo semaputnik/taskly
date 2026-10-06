@@ -1,4 +1,4 @@
-import { useSuspenseQueries } from "@tanstack/react-query"
+import { useSuspenseQueries, useSuspenseQuery } from "@tanstack/react-query"
 import { Link as RouterLink } from "@tanstack/react-router"
 import { ErrorBoundary } from "react-error-boundary"
 
@@ -12,7 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
 import { dayHeading, lede } from "./day"
 import { BANDS, botChangesQuery, dayQueries } from "./queries"
-import { changesQuery, PREVIEW_ROWS, textLink } from "./shared"
+import { PREVIEW_ROWS, textLink } from "./shared"
 import { today } from "./when"
 
 /**
@@ -41,13 +41,10 @@ function useDay() {
 
 /** How many changes the bot users made, as the second half of the sentence. */
 function BotChanges({ since }: { since: string | null }) {
-  const [bots, log] = useSuspenseQueries({
-    queries: [botChangesQuery(since), changesQuery(since)],
-  })
+  const { data } = useSuspenseQuery(botChangesQuery(since))
   return lede({
     needYou: 0,
-    changes: bots.data.count,
-    total: log.data.count,
+    changes: data.count,
     window: since ? "visit" : "ever",
   }).changes
 }
@@ -100,7 +97,6 @@ export function Day({ since }: { since: string | null }) {
   const { needs } = lede({
     needYou: overdue.count + due.count,
     changes: 0,
-    total: 0,
     window: "visit",
   })
   const clear = overdue.count === 0 && due.count === 0

@@ -18,6 +18,8 @@ interface CompleteTaskProps {
    * to a screen reader.
    */
   asMark?: boolean
+  /** With `asMark`, the task is overdue: see `StatusMark`'s `late`. */
+  late?: boolean
   /**
    * This control's row leaves the list when it is ticked, so confirm the
    * move and offer the way back.
@@ -60,6 +62,7 @@ export function completionReceipt(task: TaskPublic) {
 export function CompleteTask({
   task,
   asMark = false,
+  late = false,
   receipt = false,
   className,
   markClassName,
@@ -92,6 +95,7 @@ export function CompleteTask({
           <StatusMark
             status={task.status}
             priority={task.priority}
+            late={late}
             className={markClassName}
           />
         </CheckboxPrimitive.Root>

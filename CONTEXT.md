@@ -61,6 +61,8 @@ The dashboard's view of what is on the user: their tasks in To do, In
 progress, Review or Waiting whose assignee is the user themselves, grouped by
 status in the order work moves. Tasks with no assignee or on a bot user are
 not in it, and neither is Backlog; the Tasks page is where those are managed.
+The interface labels the panel "In my hands": that is this term's label on
+the page, not a second concept.
 _Avoid_: "inbox" (that is a project), "queue".
 
 **Recurring task**:
