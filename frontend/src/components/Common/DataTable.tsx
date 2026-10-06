@@ -5,10 +5,8 @@ import {
   tableFeatures,
   useTable,
 } from "@tanstack/react-table"
-import { MoveHorizontal } from "lucide-react"
 
 import { type RecordKind, useRecordPanels } from "@/components/Records/panels"
-import { Skeleton } from "@/components/ui/skeleton"
 import {
   Table,
   TableBody,
@@ -17,7 +15,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { cn } from "@/lib/utils"
 
 // v9's core row model is implicit. Paging is the server's: a table that pages
 // an array it was handed can only ever page what it was handed, and would
@@ -47,16 +44,6 @@ interface DataTableProps<TData extends RowData> {
    * control without a name is unusable to anyone not looking at the screen.
    */
   rowLabel?: (row: TData) => string
-  /**
-   * Draw the table's own skeleton while the data is on its way. It is built
-   * from these columns, so it cannot describe a table that is not coming, and
-   * the page does not jump when the rows land.
-   */
-  pending?: boolean
-  /** How many rows to expect, so the skeleton reserves the right height. */
-  pendingRows?: number
-  /** Names the sideways scroll, for a table too wide for a narrow screen. */
-  scrollLabel?: string
 }
 
 /**
@@ -96,9 +83,6 @@ export function DataTable<TData extends RowData>({
   onRowClick,
   opens,
   rowLabel,
-  pending = false,
-  pendingRows = 5,
-  scrollLabel,
 }: DataTableProps<TData>) {
   const table = useTable({ features, data, columns })
   const { idOf } = useRecordPanels()
@@ -106,126 +90,84 @@ export function DataTable<TData extends RowData>({
   const columnCount = columns.length
 
   return (
-    <>
-      {/* The row is wider than a phone, and a table that simply stops at the
-          screen edge looks like a table that ends there. Naming the scroll
-          makes it a region the keyboard can reach, and the container's edge
-          shadows say there is more where it came from. */}
-      <Table scrollLabel={scrollLabel}>
-        <TableHeader>
-          {table.getHeaderGroups().map((headerGroup) => (
-            <TableRow key={headerGroup.id} className="hover:bg-transparent">
-              {headerGroup.headers.map((header) => (
-                <TableHead key={header.id}>
-                  {header.isPlaceholder
-                    ? null
-                    : flexRender(
-                        header.column.columnDef.header,
-                        header.getContext(),
-                      )}
-                </TableHead>
-              ))}
-            </TableRow>
-          ))}
-        </TableHeader>
-        <TableBody>
-          {pending ? (
-            <PendingRows
-              rows={pendingRows}
-              columns={columnCount}
-              key="pending"
-            />
-          ) : table.getRowModel().rows.length ? (
-            table.getRowModel().rows.map((row) => {
-              return (
-                <TableRow
-                  key={row.id}
-                  data-open={
-                    openId !== null &&
-                    (row.original as { id?: string }).id === openId
-                      ? ""
-                      : undefined
-                  }
-                  className={
-                    onRowClick
-                      ? "focus-visible:ring-ring cursor-pointer outline-none focus-visible:ring-2"
-                      : undefined
-                  }
-                  // A row that opens a record takes focus, answers Enter and
-                  // Space, and says what it opens. It stays a row: giving it a
-                  // button's role would take the table's structure away from
-                  // every reader who relies on it.
-                  tabIndex={onRowClick ? 0 : undefined}
-                  aria-label={rowLabel?.(row.original)}
-                  onClick={
-                    onRowClick
-                      ? (event) => {
-                          if (fromRowItself(event)) onRowClick(row.original)
-                        }
-                      : undefined
-                  }
-                  onKeyDown={
-                    onRowClick
-                      ? (event) => {
-                          if (event.key !== "Enter" && event.key !== " ") return
-                          if (event.target !== event.currentTarget) return
-                          event.preventDefault()
-                          onRowClick(row.original)
-                        }
-                      : undefined
-                  }
-                >
-                  {row.getAllCells().map((cell) => (
-                    <TableCell key={cell.id}>
-                      {renderCell(
-                        cell.column.columnDef.cell,
-                        cell.getContext(),
-                      )}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              )
-            })
-          ) : (
-            <TableRow className="hover:bg-transparent">
-              <TableCell colSpan={columnCount} className="p-0">
-                {empty ?? (
-                  <p className="text-muted-foreground py-16 text-center">
-                    No results found.
-                  </p>
-                )}
-              </TableCell>
-            </TableRow>
-          )}
-        </TableBody>
-      </Table>
-
-      {scrollLabel && (
-        // Said in words as well as drawn: on a phone the row is wider than
-        // the screen, and a table that appears to end at the edge is the one
-        // thing this must not be.
-        <p className="text-muted-foreground flex items-center gap-1 text-xs md:hidden">
-          <MoveHorizontal className="size-3.5" aria-hidden />
-          Swipe sideways for the rest of each row
-        </p>
-      )}
-    </>
+    <Table>
+      <TableHeader>
+        {table.getHeaderGroups().map((headerGroup) => (
+          <TableRow key={headerGroup.id} className="hover:bg-transparent">
+            {headerGroup.headers.map((header) => (
+              <TableHead key={header.id}>
+                {header.isPlaceholder
+                  ? null
+                  : flexRender(
+                      header.column.columnDef.header,
+                      header.getContext(),
+                    )}
+              </TableHead>
+            ))}
+          </TableRow>
+        ))}
+      </TableHeader>
+      <TableBody>
+        {table.getRowModel().rows.length ? (
+          table.getRowModel().rows.map((row) => {
+            return (
+              <TableRow
+                key={row.id}
+                data-open={
+                  openId !== null &&
+                  (row.original as { id?: string }).id === openId
+                    ? ""
+                    : undefined
+                }
+                className={
+                  onRowClick
+                    ? "focus-visible:ring-ring cursor-pointer outline-none focus-visible:ring-2"
+                    : undefined
+                }
+                // A row that opens a record takes focus, answers Enter and
+                // Space, and says what it opens. It stays a row: giving it a
+                // button's role would take the table's structure away from
+                // every reader who relies on it.
+                tabIndex={onRowClick ? 0 : undefined}
+                aria-label={rowLabel?.(row.original)}
+                onClick={
+                  onRowClick
+                    ? (event) => {
+                        if (fromRowItself(event)) onRowClick(row.original)
+                      }
+                    : undefined
+                }
+                onKeyDown={
+                  onRowClick
+                    ? (event) => {
+                        if (event.key !== "Enter" && event.key !== " ") return
+                        if (event.target !== event.currentTarget) return
+                        event.preventDefault()
+                        onRowClick(row.original)
+                      }
+                    : undefined
+                }
+              >
+                {row.getAllCells().map((cell) => (
+                  <TableCell key={cell.id}>
+                    {renderCell(cell.column.columnDef.cell, cell.getContext())}
+                  </TableCell>
+                ))}
+              </TableRow>
+            )
+          })
+        ) : (
+          <TableRow className="hover:bg-transparent">
+            <TableCell colSpan={columnCount} className="p-0">
+              {empty ?? (
+                <p className="text-muted-foreground py-16 text-center">
+                  No results found.
+                </p>
+              )}
+            </TableCell>
+          </TableRow>
+        )}
+      </TableBody>
+    </Table>
   )
-}
-
-/**
- * The table's own loading state, with as many rows as are expected: a
- * skeleton that describes a different table makes the page jump when the real
- * one lands, which is the largest layout shift a list can produce.
- */
-function PendingRows({ rows, columns }: { rows: number; columns: number }) {
-  return Array.from({ length: rows }).map((_, rowIndex) => (
-    <TableRow key={rowIndex} className="hover:bg-transparent">
-      {Array.from({ length: columns }).map((_, cellIndex) => (
-        <TableCell key={cellIndex}>
-          <Skeleton className={cn("h-4", cellIndex === 0 ? "w-4" : "w-24")} />
-        </TableCell>
-      ))}
-    </TableRow>
-  ))
 }

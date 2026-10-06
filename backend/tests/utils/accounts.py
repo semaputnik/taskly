@@ -213,6 +213,59 @@ def token_headers(
     return {"Authorization": f"Bearer {r.json()['token']}"}
 
 
+def set_webhook(
+    client: TestClient,
+    headers: dict[str, str],
+    bot_user_id: str,
+    kind: str = "task",
+    url: str = "https://hooks.example.com/taskly",
+) -> dict[str, Any]:
+    """Set one of a bot user's webhooks, as the owner; the response, secret and all."""
+    r = client.put(
+        f"{API}/bot-users/{bot_user_id}/webhooks/{kind}",
+        headers=headers,
+        json={"url": url},
+    )
+    assert r.status_code == 200, r.text
+    result: dict[str, Any] = r.json()
+    return result
+
+
+def create_webhook_bot(
+    client: TestClient,
+    headers: dict[str, str],
+    *,
+    project_ids: list[str],
+    permissions: dict[str, bool] | None = None,
+    name: str = "Triage agent",
+    task: bool = True,
+    comment: bool = True,
+) -> dict[str, Any]:
+    """
+    A bot user with its task and comment webhooks set (unless left out), as the
+    API shows it, plus the `secret` its first webhook generated.
+    """
+    bot = create_bot_user(
+        client,
+        headers,
+        project_ids=project_ids,
+        permissions=permissions or ALL_PERMISSIONS,
+        name=name,
+    )
+    secret = None
+    if task:
+        result = set_webhook(
+            client, headers, bot["id"], "task", "https://hooks.example.com/task"
+        )
+        bot, secret = result["bot_user"], result["secret"]
+    if comment:
+        result = set_webhook(
+            client, headers, bot["id"], "comment", "https://hooks.example.com/comment"
+        )
+        bot, secret = result["bot_user"], secret or result["secret"]
+    return {**bot, "secret": secret}
+
+
 def error_code(r: Any) -> str | None:
     detail = r.json().get("detail")
     return detail.get("code") if isinstance(detail, dict) else None

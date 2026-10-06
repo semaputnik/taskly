@@ -7,6 +7,7 @@ import {
   botsQuery,
   type Change,
   currentUserQuery,
+  deletedBotsQuery,
   nearTagsQuery,
   projectQuery,
   projectsQuery,
@@ -40,6 +41,7 @@ const keys = {
   tags: tagsQuery().queryKey,
   tag: tagQuery("g1").queryKey,
   bots: botsQuery().queryKey,
+  deletedBots: deletedBotsQuery().queryKey,
   activity: activityQuery({ skip: 0, limit: 5 }).queryKey,
 }
 
@@ -76,6 +78,18 @@ describe("what a change refreshes", () => {
     }
   })
 
+  test("a task moves what a deleted bot user is still named on, and no live one", () => {
+    for (const change of [
+      { type: "task created" },
+      { type: "task changed", taskId: "t1" },
+      { type: "task deleted", taskId: "t1" },
+      { type: "deletion restored" },
+    ] satisfies Change[]) {
+      expect(refreshes(change, keys.deletedBots)).toBe(true)
+      expect(refreshes(change, keys.bots)).toBe(false)
+    }
+  })
+
   test("a tag change reaches every task that carries it", () => {
     const change: Change = { type: "tag changed" }
     for (const key of [keys.tags, keys.tag, keys.tasks, task, keys.activity]) {
@@ -105,6 +119,28 @@ describe("what a change refreshes", () => {
       expect(refreshes(change, key)).toBe(true)
     }
     expect(refreshes(change, botQuery("b2").queryKey)).toBe(false)
+  })
+
+  test("a webhook or scope change reaches the bot user and its line alone", () => {
+    // Neither is logged, no task names either, and a deleted bot user has
+    // neither webhooks nor a scope that can change.
+    for (const change of [
+      { type: "bot webhooks changed", botId: "b1" },
+      { type: "bot scope changed", botId: "b1" },
+    ] satisfies Change[]) {
+      for (const key of [keys.bots, bot]) {
+        expect(refreshes(change, key)).toBe(true)
+      }
+      for (const key of [
+        keys.deletedBots,
+        keys.tasks,
+        task,
+        keys.activity,
+        botQuery("b2").queryKey,
+      ]) {
+        expect(refreshes(change, key)).toBe(false)
+      }
+    }
   })
 
   test("a restore brings back tasks, projects and counts", () => {

@@ -2,35 +2,37 @@ import type { BotPermissions } from "@/client"
 
 type Permission = keyof BotPermissions
 
-// Everything a bot user can be granted, gathered by the kind of access it
-// gives. What it can never do — anything on projects, editing or deleting
-// comments, renaming or deleting tags — has no checkbox, because there is no
-// setting behind it. Reading tags has none either: every bot user reads its
-// owner's whole vocabulary (FR-08.9, FR-08.10, ADR-0003).
-export const PERMISSION_GROUPS: {
-  title: string
-  permissions: { key: Permission; label: string }[]
+/**
+ * Everything a bot user can be granted, in the order the column lists it:
+ * tasks, then comments, then tags. `note` is what a grant comes with that a
+ * reader would otherwise find out by trying.
+ */
+export const PERMISSIONS: {
+  key: Permission
+  label: string
+  note?: string
 }[] = [
-  {
-    title: "Tasks",
-    permissions: [
-      { key: "read_tasks", label: "Read tasks" },
-      { key: "create_tasks", label: "Create tasks" },
-      { key: "update_tasks", label: "Update tasks" },
-      { key: "delete_tasks", label: "Delete tasks" },
-    ],
-  },
-  {
-    title: "Comments",
-    permissions: [{ key: "add_comments", label: "Add comments" }],
-  },
-  {
-    title: "Tags",
-    permissions: [{ key: "create_tags", label: "Create tags" }],
-  },
+  { key: "read_tasks", label: "Read tasks" },
+  { key: "create_tasks", label: "Create tasks" },
+  { key: "update_tasks", label: "Update tasks" },
+  { key: "delete_tasks", label: "Delete tasks" },
+  { key: "add_comments", label: "Add comments", note: "append-only" },
+  { key: "create_tags", label: "Create tags" },
 ]
 
-/** The same grants as one list, for the surfaces that only name them. */
-export const PERMISSIONS = PERMISSION_GROUPS.flatMap(
-  (group) => group.permissions,
-)
+/**
+ * What no setting is behind, drawn dashed where the grants are so the list
+ * reads as the whole of it: reading tags is always allowed, since every bot
+ * user reads its owner's whole vocabulary, and renaming or deleting them is
+ * never allowed, like anything on projects or on comments already written
+ * (FR-08.9, FR-08.10, ADR-0003).
+ */
+export const FIXED_PERMISSIONS = [
+  { label: "Read tags", note: "always" },
+  { label: "Rename or delete tags", note: "never" },
+] as const
+
+/** A scope's permissions with nothing granted: where a draft starts. */
+export const NO_PERMISSIONS: BotPermissions = Object.fromEntries(
+  PERMISSIONS.map(({ key }) => [key, false]),
+) as unknown as BotPermissions

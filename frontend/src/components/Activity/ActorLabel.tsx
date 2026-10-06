@@ -4,6 +4,7 @@ import { Bot } from "lucide-react"
 import type { ActivityEntryPublic } from "@/client"
 import { recordLink } from "@/components/Records/panels"
 import { Badge } from "@/components/ui/badge"
+import { cn } from "@/lib/utils"
 
 interface ActorLabelProps {
   entry: ActivityEntryPublic
@@ -12,6 +13,8 @@ interface ActorLabelProps {
   showBadge?: boolean
   /** Drop the bot glyph where weight and ink already set a bot apart. */
   showIcon?: boolean
+  /** Strike the bot user's name through: it has been deleted. */
+  deleted?: boolean
 }
 
 /**
@@ -28,6 +31,7 @@ export function ActorLabel({
   currentUserId,
   showBadge = true,
   showIcon = true,
+  deleted = false,
 }: ActorLabelProps) {
   if (entry.actor_bot_user_id) {
     return (
@@ -37,7 +41,10 @@ export function ActorLabel({
         )}
         <Link
           {...recordLink("bot", entry.actor_bot_user_id)}
-          className="font-medium underline-offset-4 hover:underline"
+          className={cn(
+            "font-medium underline-offset-4 hover:underline",
+            deleted && "line-through",
+          )}
         >
           {entry.actor_bot_user_name ?? "A bot user"}
         </Link>

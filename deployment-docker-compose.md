@@ -34,14 +34,16 @@ You can also configure these environment variables as needed:
 * `SMTP_USER`: The SMTP server user.
 * `EMAILS_FROM_EMAIL`: The email account used to send emails.
 * `SENTRY_DSN`: The DSN for Sentry.
+* `OUTBOUND_ALLOW_PRIVATE_ADDRESSES`: Set to `true` to let webhooks point at loopback and private addresses (see [Webhooks](#webhooks)). Off by default.
 
 ### Secrets
 
-Generate and set secure values for the database password and token signing key:
+Generate and set secure values for the database password, the token signing key and the webhook secret key:
 
 ```bash
 export POSTGRES_PASSWORD="$(python -c 'import secrets; print(secrets.token_urlsafe(32))')"
 export SECRET_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(32))')"
+export WEBHOOK_SECRET_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(32))')"
 ```
 
 To use an authenticated email provider, also set `SMTP_PASSWORD`.
@@ -87,6 +89,7 @@ Add these repository secrets:
 
 * `POSTGRES_PASSWORD`
 * `SECRET_KEY`
+* `WEBHOOK_SECRET_KEY`
 
 To use an authenticated email provider, add the optional `SMTP_PASSWORD` repository secret.
 
@@ -154,7 +157,7 @@ cd /root/taskly
 mv .env.release.example .env
 ```
 
-Set `TASKLY_IMAGE` to the published image, such as `docker.io/your-account/taskly`, and `TASKLY_TAG` to the released version, such as `1.2.3`. Pinning the version rather than `latest` means a restart brings back the same image. The application refuses to start while `SECRET_KEY` or `POSTGRES_PASSWORD` is still `changethis`.
+Set `TASKLY_IMAGE` to the published image, such as `docker.io/your-account/taskly`, and `TASKLY_TAG` to the released version, such as `1.2.3`. Pinning the version rather than `latest` means a restart brings back the same image. The application refuses to start while `SECRET_KEY`, `WEBHOOK_SECRET_KEY` or `POSTGRES_PASSWORD` is still `changethis`.
 
 For an image in a private Docker Hub repository, log in on the server first with `docker login`.
 
@@ -215,6 +218,16 @@ Accounts created with a password keep their data but lose their way in when you 
 2. As the superuser, open the users list and issue a recovery code to each other user, and hand it to them yourself. Each one spends theirs on a new passkey.
 
 `FIRST_SUPERUSER_PASSWORD` is no longer read; remove it from your environment and secrets.
+
+## Webhooks
+
+Taskly calls a bot user's webhook URLs when a task becomes ready for it or someone comments on a task it is involved in (ADR-0009). Three things are the operator's to know:
+
+* **Private addresses are refused by default.** A webhook URL that resolves to loopback or a private range (`127.0.0.1`, `10.x`, `192.168.x`, a Docker network, the cloud metadata address) is refused when it is set and again on every delivery, so a visitor cannot make the server probe its own network. When your bot users run on the same machine or LAN, which is the usual self-hosted case, set `OUTBOUND_ALLOW_PRIVATE_ADDRESSES=true`. Inside a container, `localhost` is the container itself: point the webhook at the host's LAN address or a service name instead.
+* **There is no worker to run.** Every API process drains the outbox itself and retries a failed delivery after 1, 5, 15, 60 and 60 minutes, so a restart loses nothing. Several processes never send the same delivery twice. To stop a process from sending, set `WEBHOOK_DELIVERY_LOOP=false` on it; `WEBHOOK_POLL_SECONDS` (default 5) is how often it looks for due deliveries.
+* **`WEBHOOK_SECRET_KEY` protects the webhook secrets.** Taskly signs each delivery with the bot user's webhook secret, so it keeps the secret encrypted under a key derived from `WEBHOOK_SECRET_KEY`, a setting of its own. Set it once and keep it, and back it up with your other secrets. Rotating `SECRET_KEY` does not affect webhook secrets. Changing `WEBHOOK_SECRET_KEY` makes every stored secret unreadable: deliveries then fail saying so, until each owner regenerates their secret in the bot user's settings, and each receiver is given the new one. The application refuses to start while it is still `changethis`.
+
+The delivery contract (body, headers, signature, a verifier to copy) is in the API documentation, under the `bots` tag.
 
 ## URLs
 

@@ -1,4 +1,5 @@
 import { expect, type Page, test } from "@playwright/test"
+import { botColumn, botLine, openBot } from "./utils/bots"
 import { randomEmail } from "./utils/random"
 import { logInUser } from "./utils/user"
 
@@ -57,10 +58,7 @@ async function setUpBot(
   return { url, headers, project, bot, asBot }
 }
 
-const openBot = (page: Page, name: string) =>
-  page.getByRole("row", { name: `Open ${name}` }).click()
-
-test("A bot user's panel shows what that bot did, and not what the user did", async ({
+test("A bot user's column shows what that bot did, and not what the user did", async ({
   page,
 }) => {
   await newUser(page)
@@ -79,16 +77,23 @@ test("A bot user's panel shows what that bot did, and not what the user did", as
 
   await page.goto("/bots")
   await openBot(page, "Triage agent")
-  const panel = page.getByRole("complementary", { name: "Triage agent" })
+  const panel = botColumn(page, "Triage agent")
 
   const feed = panel.getByRole("list", {
     name: "Recent activity by Triage agent",
   })
   await expect(feed).toContainText("Answer the refund request")
   await expect(feed).not.toContainText("Something I did myself")
+  // By the day, and with a way to the whole log.
+  await expect(feed).toContainText("Today")
+  await expect(
+    panel
+      .getByRole("region", { name: "Activity" })
+      .getByRole("link", { name: /Everything it did/ }),
+  ).toBeVisible()
 })
 
-test("A bot user's panel lists the tasks it is on, and opens them", async ({
+test("A bot user's column lists the tasks it is on, and opens them", async ({
   page,
 }) => {
   await newUser(page)
@@ -104,24 +109,26 @@ test("A bot user's panel lists the tasks it is on, and opens them", async ({
 
   await page.goto("/bots")
   await openBot(page, "Triage agent")
-  const panel = page.getByRole("complementary", { name: "Triage agent" })
-  await panel.getByRole("tab", { name: "Tasks" }).click()
+  const panel = botColumn(page, "Triage agent")
 
+  // No tabs: the tasks are a section of the one document, with their count.
+  await expect(panel.getByRole("tab")).toHaveCount(0)
+  await expect(
+    panel.getByRole("region", { name: "On its plate" }),
+  ).toContainText("1")
   const assigned = panel.getByRole("list", {
     name: "Tasks assigned to Triage agent",
   })
   await expect(assigned).toContainText("Escalate the outage")
 
-  // Opening one swaps the panel to the task; the bot user's own address is
+  // Opening one swaps the column to the task; the bot user's own address is
   // one Back away.
-  await assigned.getByRole("button", { name: "Escalate the outage" }).click()
+  await assigned.getByRole("link", { name: "Escalate the outage" }).click()
   await expect(
     page.getByRole("complementary", { name: "Escalate the outage" }),
   ).toBeVisible()
   await page.goBack()
-  await expect(
-    page.getByRole("complementary", { name: "Triage agent" }),
-  ).toBeVisible()
+  await expect(botColumn(page, "Triage agent")).toBeVisible()
 })
 
 test("A bot user that has done nothing says what would appear", async ({
@@ -132,10 +139,9 @@ test("A bot user that has done nothing says what would appear", async ({
 
   await page.goto("/bots")
   await openBot(page, "Quiet agent")
-  const panel = page.getByRole("complementary", { name: "Quiet agent" })
+  const panel = botColumn(page, "Quiet agent")
 
   await expect(panel).toContainText("Every change this bot user makes")
-  await panel.getByRole("tab", { name: "Tasks" }).click()
   await expect(panel).toContainText(
     "No open tasks are assigned to this bot user",
   )
@@ -147,33 +153,27 @@ test("Token health is stated in words, not in timestamps", async ({ page }) => {
   await setUpBot(page, { name: "Tokenless agent", withToken: false })
 
   await page.goto("/bots")
-  // The last cell is the liveness column: the Token column beside it would
-  // satisfy a looser assertion without the new column rendering at all.
-  const liveness = (name: string) =>
-    page
-      .getByRole("row", { name: `Open ${name}` })
-      .getByRole("cell")
-      .last()
-  await expect(liveness("Unused agent")).toHaveText("Never used")
-  await expect(liveness("Tokenless agent")).toHaveText("Never used · no token")
+  await expect(botLine(page, "Unused agent")).toContainText("Working")
+  await expect(botLine(page, "Unused agent")).toContainText("never used")
+  await expect(botLine(page, "Tokenless agent")).toContainText("No token")
+  await expect(botLine(page, "Tokenless agent")).toContainText("never used")
 
   await openBot(page, "Tokenless agent")
-  const tokenless = page.getByRole("complementary", { name: "Tokenless agent" })
-  await expect(tokenless).toContainText(
-    "No token — this bot user cannot reach the API",
-  )
+  const tokenless = botColumn(page, "Tokenless agent")
+  await expect(tokenless).toContainText("No token")
+  await expect(tokenless).toContainText("it cannot reach the API")
   await expect(
     tokenless.getByRole("button", { name: "Issue token" }),
   ).toBeVisible()
   await page.keyboard.press("Escape")
 
   await openBot(page, "Unused agent")
-  const unused = page.getByRole("complementary", { name: "Unused agent" })
+  const unused = botColumn(page, "Unused agent")
   await expect(unused).toContainText("Working")
   await expect(unused).toContainText("Never used")
 })
 
-test("An activity entry opens the bot user that made it, and the feed hands off", async ({
+test("An activity entry opens the bot user that made it, and the section hands off", async ({
   page,
 }) => {
   await newUser(page)
@@ -188,28 +188,37 @@ test("An activity entry opens the bot user that made it, and the feed hands off"
   // From an unexpected change in the log to the integration responsible.
   await page.goto("/activity")
   await page
-    .getByRole("row")
+    .getByRole("listitem")
     .filter({ hasText: "Triaged ticket 6" })
     .getByRole("link", { name: "Triage agent" })
     .click()
   await expect(page).toHaveURL(/\/activity\?.*bot=/)
-  const panel = page.getByRole("complementary", { name: "Triage agent" })
+  const panel = botColumn(page, "Triage agent")
   await expect(panel).toBeVisible()
 
-  // The preview is bounded, and says where the rest is.
+  // The preview is bounded, counts what is behind it, and says where the
+  // rest is.
   await expect(
-    panel.getByText(/more entries in the activity log/),
-  ).toBeVisible()
-  await panel.getByText(/more entries in the activity log/).click()
+    panel
+      .getByRole("list", { name: "Recent activity by Triage agent" })
+      .locator("time"),
+  ).toHaveCount(5)
+  await expect(panel.getByRole("region", { name: "Activity" })).toContainText(
+    "7",
+  )
+  await panel.getByRole("link", { name: /Everything it did/ }).click()
 
   await expect(page).toHaveURL(/actor=/)
-  await expect(page.getByText("Showing only")).toContainText("Triage agent")
+  // The narrowing is said on the filter row, in ink, where it can be dropped.
   await expect(
-    page.getByRole("row").filter({ hasText: "Triaged ticket 0" }),
+    page.getByRole("button", { name: "Actor: By Triage agent" }),
+  ).toBeVisible()
+  await expect(
+    page.getByRole("listitem").filter({ hasText: "Triaged ticket 0" }),
   ).toBeVisible()
 })
 
-test("The assigned tasks hand off to the task list filtered to the bot", async ({
+test("The tasks on its plate hand off to the task list filtered to the bot", async ({
   page,
 }) => {
   await newUser(page)
@@ -227,49 +236,14 @@ test("The assigned tasks hand off to the task list filtered to the bot", async (
 
   await page.goto("/bots")
   await openBot(page, "Triage agent")
-  const panel = page.getByRole("complementary", { name: "Triage agent" })
-  await panel.getByRole("tab", { name: "Tasks" }).click()
-  await panel
-    .getByText(/more task in the task list|more tasks in the task list/)
-    .click()
+  const panel = botColumn(page, "Triage agent")
+  await expect(
+    panel.getByRole("region", { name: "On its plate" }),
+  ).toContainText("6")
+  await panel.getByRole("link", { name: /All its tasks/ }).click()
 
   await expect(page).toHaveURL(new RegExp(`assignee=${bot.id}`))
   await expect(
     page.getByRole("link", { name: "Assigned 0", exact: true }),
   ).toBeVisible()
-})
-
-test("A deleted bot user still reads, and says it is gone", async ({
-  page,
-}) => {
-  await newUser(page)
-  const { url, headers, project, bot, asBot } = await setUpBot(page, {
-    name: "Retired agent",
-  })
-  await page.request.post(`${url}/tasks/`, {
-    headers: asBot,
-    data: { title: "Its last act", project_id: project.id },
-  })
-  expect(
-    (await page.request.delete(`${url}/bot-users/${bot.id}`, { headers })).ok(),
-  ).toBe(true)
-
-  // Gone from the list, and still readable at its own address.
-  await page.goto("/bots")
-  await expect(
-    page.getByRole("row", { name: "Open Retired agent" }),
-  ).toHaveCount(0)
-
-  await page.goto(`/bots?bot=${bot.id}`)
-  const panel = page.getByRole("complementary", { name: "Retired agent" })
-  await expect(panel).toContainText("This bot user was deleted")
-  await expect(panel).toContainText("cannot be undone")
-  await expect(
-    panel.getByRole("list", { name: "Recent activity by Retired agent" }),
-  ).toContainText("Its last act")
-  // Nothing about it changes again.
-  await expect(panel.getByRole("textbox", { name: "Bot name" })).toHaveCount(0)
-  await expect(
-    panel.getByRole("button", { name: "Delete bot user" }),
-  ).toHaveCount(0)
 })

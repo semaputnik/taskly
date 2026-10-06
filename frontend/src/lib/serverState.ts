@@ -269,11 +269,27 @@ export const tagQuery = (tagId: string | null | undefined) =>
     enabled: Boolean(tagId),
   })
 
+/** The live bot users. Under a segment of its own, beside the deleted ones. */
 export const botsQuery = () =>
   queryOptions({
-    queryKey: [ROOT.bots],
+    queryKey: [ROOT.bots, "live"],
     queryFn: async () =>
       (await BotsService.readBotUsers({ query: FIRST_PAGE })).data,
+  })
+
+/**
+ * The bot users that were deleted, most recently deleted first: kept so that
+ * what they did and what they were given still names them (FR-08.19).
+ */
+export const deletedBotsQuery = () =>
+  queryOptions({
+    queryKey: [ROOT.bots, "deleted"],
+    queryFn: async () =>
+      (
+        await BotsService.readBotUsers({
+          query: { deleted: true, ...FIRST_PAGE },
+        })
+      ).data,
   })
 
 export const botQuery = (botId: string | null | undefined) =>
@@ -358,6 +374,10 @@ export type Change =
   /** A bot user was created, renamed, rescoped or deleted. */
   | { type: "bot user changed"; botId?: string }
   | { type: "bot token changed"; botId?: string }
+  /** A bot user's scope was replaced: the projects it reaches, or what it may do there. */
+  | { type: "bot scope changed"; botId: string }
+  /** A bot user's webhook was set, changed, cleared or tested, or its secret renewed. */
+  | { type: "bot webhooks changed"; botId: string }
   | { type: "deletion restored" }
   | { type: "comments changed"; taskId: string }
   | { type: "attachments changed"; taskId: string }
@@ -372,6 +392,12 @@ export type Change =
 // most changes reach both of those and the activity log.
 const COUNTS: Root[] = [ROOT.projects, ROOT.project, ROOT.tags, ROOT.tag]
 
+// A deleted bot user says how many tasks still name it, so a task that is
+// created, reassigned or deleted moves that count. The live bot users carry no
+// such number and are left alone.
+const DELETED_BOTS: QueryKey = [ROOT.bots, "deleted"]
+const LIVE_BOTS: QueryKey = botsQuery().queryKey
+
 /** The query keys a change makes stale, as prefixes of the keys they cover. */
 export function staleKeys(change: Change): QueryKey[] {
   const roots = (...roots: Root[]): QueryKey[] => roots.map((root) => [root])
@@ -381,11 +407,15 @@ export function staleKeys(change: Change): QueryKey[] {
       return [
         ...roots(ROOT.tasks, ROOT.activity, ...COUNTS),
         [ROOT.task, change.taskId],
+        DELETED_BOTS,
       ]
     case "task created":
-      return roots(ROOT.tasks, ROOT.activity, ...COUNTS)
+      return [...roots(ROOT.tasks, ROOT.activity, ...COUNTS), DELETED_BOTS]
     case "deletion restored":
-      return roots(ROOT.tasks, ROOT.task, ROOT.activity, ...COUNTS)
+      return [
+        ...roots(ROOT.tasks, ROOT.task, ROOT.activity, ...COUNTS),
+        DELETED_BOTS,
+      ]
     case "tag created":
       return roots(ROOT.tags, ROOT.activity)
     case "tag changed":
@@ -409,6 +439,12 @@ export function staleKeys(change: Change): QueryKey[] {
       ]
     case "bot token changed":
       return [[ROOT.bots], change.botId ? [ROOT.bot, change.botId] : [ROOT.bot]]
+    case "bot scope changed":
+    case "bot webhooks changed":
+      // Neither is in the log and no task names them: the bot user's line
+      // and its column are all that show them. A deleted bot user has
+      // neither, so its list is left alone.
+      return [LIVE_BOTS, [ROOT.bot, change.botId]]
     case "comments changed":
       return [[ROOT.comments, change.taskId], [ROOT.activity]]
     case "attachments changed":

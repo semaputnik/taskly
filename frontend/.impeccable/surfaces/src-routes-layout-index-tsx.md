@@ -63,7 +63,7 @@ STORY: The owner reads today as a page: the date, one sentence of what needs the
 Due today, In my hands grouped by status, then the agents' changes with the author first. They
 act inline: tick a ring, close a review, restore a deletion, type a task at the top.
 
-FIRST VIEWPORT: Left, a 200px text navigation. Main column max 820px: the capture line on top;
+FIRST VIEWPORT: Left, a 200px text navigation. Main column max 820px, centred in the main area while no record is open: the capture line on top;
 the day number at 56px with the weekday and month beside it; one muted sentence of counts; the
 Overdue group (red heading) and Due today, each a list of task lines (glyph, title, meta line);
 In my hands with its four status groups; the Changes log beneath. On a phone the navigation

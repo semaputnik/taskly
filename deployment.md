@@ -18,6 +18,8 @@ Add these required [environment variables](https://fastapicloud.com/docs/builds-
 * `FIRST_SUPERUSER`: The email address of the first superuser. Whoever registers it while there is no superuser becomes one.
 * `FRONTEND_HOST`: The public URL of the application, such as the generated `https://your-app.fastapicloud.dev` URL or a custom domain. Passkeys are bound to its hostname: changing it later makes every passkey unusable (see [Passkeys and the Hostname](deployment-docker-compose.md#passkeys-and-the-hostname)).
 
+To let webhooks point at loopback and private addresses, set `OUTBOUND_ALLOW_PRIVATE_ADDRESSES` to `true`. It is off by default (see [Webhooks](deployment-docker-compose.md#webhooks)).
+
 To enable emails, add these optional environment variables with values from your email provider:
 
 * `SMTP_HOST`
@@ -31,11 +33,12 @@ To enable Sentry, configure `SENTRY_DSN`.
 Add these required values and mark them as secrets:
 
 * `SECRET_KEY`: A secret key used to sign security tokens.
+* `WEBHOOK_SECRET_KEY`: A separate secret key that encrypts bot users' webhook secrets. Set it once and keep it: changing it makes every owner regenerate their webhook secrets (see [Webhooks](deployment-docker-compose.md#webhooks)). Rotating `SECRET_KEY` does not affect them.
 * `DATABASE_URL`: The PostgreSQL connection URL, configured automatically when using a database integration.
 
 To enable emails with an authenticated provider, add `SMTP_PASSWORD` as a secret.
 
-You can generate a secure value for `SECRET_KEY` with:
+You can generate a secure value for `SECRET_KEY` and for `WEBHOOK_SECRET_KEY` (use a different value for each) with:
 
 ```bash
 python -c "import secrets; print(secrets.token_urlsafe(32))"
@@ -63,6 +66,7 @@ Add these repository secrets:
 
 * `DATABASE_URL`
 * `SECRET_KEY`
+* `WEBHOOK_SECRET_KEY`
 
 Use the same values configured in FastAPI Cloud. For `DATABASE_URL`, use the connection URL from your database provider. The database must be reachable from GitHub-hosted runners so the preparation step can connect to it.
 

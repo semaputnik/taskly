@@ -1,3 +1,4 @@
+import ipaddress
 from collections.abc import Generator
 
 import pytest
@@ -5,6 +6,7 @@ from fastapi.testclient import TestClient
 from sqlmodel import Session, delete
 
 from app.api.deps import get_attachment_storage
+from app.core import outbound
 from app.core.config import settings
 from app.core.db import engine
 from app.main import app
@@ -52,6 +54,24 @@ def normal_user_token_headers(client: TestClient, db: Session) -> dict[str, str]
     return authentication_token_from_email(
         client=client, email=settings.EMAIL_TEST_USER, db=db
     )
+
+
+@pytest.fixture(autouse=True)
+def public_names(monkeypatch: pytest.MonkeyPatch) -> None:
+    """
+    Every host name resolves to one public address, so no test needs a network
+    to set a webhook. An address given as a number is its own answer, and a
+    test that needs a name to resolve elsewhere patches `resolve_host` again.
+    """
+
+    def resolve(host: str) -> list[str]:
+        try:
+            ipaddress.ip_address(host)
+        except ValueError:
+            return ["93.184.216.34"]
+        return [host]
+
+    monkeypatch.setattr(outbound, "resolve_host", resolve)
 
 
 @pytest.fixture(autouse=True)

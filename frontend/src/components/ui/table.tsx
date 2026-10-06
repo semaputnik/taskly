@@ -2,30 +2,11 @@ import * as React from "react"
 
 import { cn } from "@/lib/utils"
 
-function Table({
-  className,
-  scrollLabel,
-  ...props
-}: React.ComponentProps<"table"> & {
-  /**
-   * Names the horizontal scroll, which makes it a region a screen reader can
-   * find and the keyboard can reach. Given it, the container also carries
-   * shadows at whichever edge has more content beyond it.
-   */
-  scrollLabel?: string
-}) {
+function Table({ className, ...props }: React.ComponentProps<"table">) {
   return (
     <div
       data-slot="table-container"
-      className={cn(
-        "relative w-full overflow-x-auto rounded-lg border",
-        // `scroll-shadows` paints the surface itself, so the two do not fight
-        // over the same background property.
-        scrollLabel ? "scroll-shadows" : "bg-card",
-      )}
-      role={scrollLabel ? "region" : undefined}
-      aria-label={scrollLabel}
-      tabIndex={scrollLabel ? 0 : undefined}
+      className="bg-card relative w-full overflow-x-auto rounded-lg border"
     >
       <table
         data-slot="table"

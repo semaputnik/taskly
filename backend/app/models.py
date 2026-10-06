@@ -1092,6 +1092,13 @@ class ActivityKind(StrEnum):
     TAGS = "tags"
 
 
+class ActivityOrder(StrEnum):
+    """Which end of the log a read starts from (FR-10.10)."""
+
+    NEWEST = "newest"
+    OLDEST = "oldest"
+
+
 class ActivityEntityType(StrEnum):
     TASK = "task"
     PROJECT = "project"
@@ -1117,7 +1124,8 @@ class ActivityEntry(SQLModel, table=True):
     """
 
     __table_args__ = (
-        # A user's log, newest first, is the only way entries are read.
+        # A user's log is read from either end (FR-10.10); the index serves
+        # both directions.
         Index("ix_activityentry_owner_id_position", "owner_id", "position"),
         # One bot user's own feed, newest first. Without it, reading a quiet
         # bot user means walking a log that is kept for ever (FR-10.5) until
@@ -1324,6 +1332,15 @@ class BotUser(SQLModel, table=True):
         default=None,
         sa_type=DateTime(timezone=True),  # type: ignore
     )
+    # The bot user's two webhooks (FR-11.1), each optional. Only the owner sets
+    # them, through the bot users' endpoints a bot user cannot call (FR-11.2).
+    task_webhook_url: str | None = Field(default=None, max_length=2048)
+    comment_webhook_url: str | None = Field(default=None, max_length=2048)
+    # The one secret both webhooks are signed with (FR-11.9), kept encrypted.
+    # A digest could not do: signing needs the secret itself, and it is shown
+    # to the owner only once. Encrypted under `WEBHOOK_SECRET_KEY`; see
+    # `app.webhooks.encrypt_secret`.
+    webhook_secret_encrypted: str | None = Field(default=None, max_length=512)
     # Set once the bot user is deleted. It is kept rather than removed, so
     # what it did and what it was assigned still name it (FR-08.19, FR-08.21).
     deleted_at: datetime | None = Field(
@@ -1347,6 +1364,134 @@ class BotUserProject(SQLModel, table=True):
     )
 
 
+class WebhookKind(StrEnum):
+    """The bot user's two webhooks (FR-11.1)."""
+
+    TASK = "task"
+    COMMENT = "comment"
+
+
+class WebhookEventType(StrEnum):
+    """What a delivery says happened (FR-11.8)."""
+
+    TASK_READY = "task.ready"
+    COMMENT_ADDED = "comment.added"
+    TEST = "test"
+
+
+class DeliveryState(StrEnum):
+    PENDING = "pending"
+    DELIVERED = "delivered"
+    FAILED = "failed"
+
+
+class WebhookDelivery(SQLModel, table=True):
+    """
+    One event on its way to one webhook: the outbox (ADR-0009, FR-11.10).
+
+    Written in the transaction of the change that caused it, so an event never
+    lands without its change and a change never lands without its event, and
+    drained by the API processes. All of a delivery's state is here, so it
+    survives a restart. Plain strings rather than database enums, like the
+    activity log: a new event type is a code change, not a migration.
+
+    Deliveries are not recorded anywhere else (FR-11.14). A finished one is
+    kept only until a newer finished one of the same webhook replaces it: what
+    the owner is shown is the last delivery of each webhook (FR-11.11).
+    """
+
+    __table_args__ = (
+        # What the loop asks for: pending rows that are due.
+        Index("ix_webhookdelivery_state_next_attempt_at", "state", "next_attempt_at"),
+        Index("ix_webhookdelivery_bot_user_id_webhook", "bot_user_id", "webhook"),
+        CheckConstraint(
+            "state IN ('pending', 'delivered', 'failed')",
+            name="webhookdelivery_state",
+        ),
+        CheckConstraint(
+            "webhook IN ('task', 'comment')", name="webhookdelivery_webhook"
+        ),
+    )
+
+    # Also the delivery id the receiver is sent (FR-11.8).
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    bot_user_id: uuid.UUID = Field(
+        foreign_key="botuser.id", nullable=False, ondelete="CASCADE"
+    )
+    # Which of the bot user's two URLs this goes to. The URL itself is read
+    # when the delivery is sent, so changing or clearing it reaches events
+    # that are still waiting.
+    webhook: str = Field(max_length=20)
+    event: str = Field(max_length=20)
+    # When the event happened, as the body says.
+    occurred_at: datetime = Field(
+        default_factory=get_datetime_utc,
+        sa_type=DateTime(timezone=True),  # type: ignore
+    )
+    # What the body names. Taken when the event is recorded, so a retry sends
+    # the title the event was about. A test event names no task.
+    task_id: uuid.UUID | None = Field(default=None)
+    task_title: str | None = Field(default=None, max_length=255)
+    comment_id: uuid.UUID | None = Field(default=None)
+    state: str = Field(default=DeliveryState.PENDING.value, max_length=20)
+    # Attempts made so far; the schedule is read off it (FR-11.10).
+    attempts: int = 0
+    # When the loop may next try it. While one process holds it, this is
+    # pushed out, so a crash mid-attempt only delays the retry.
+    next_attempt_at: datetime = Field(
+        default_factory=get_datetime_utc,
+        sa_type=DateTime(timezone=True),  # type: ignore
+    )
+    last_attempt_at: datetime | None = Field(
+        default=None,
+        sa_type=DateTime(timezone=True),  # type: ignore
+    )
+    last_status_code: int | None = None
+    last_error: str | None = Field(default=None, max_length=500)
+    last_duration_ms: int | None = None
+
+
+class WebhookUrl(SQLModel):
+    """The address a webhook is set to: http or https (FR-11.3)."""
+
+    url: Annotated[str, StringConstraints(strip_whitespace=True, max_length=2048)]
+
+
+class WebhookDeliveryPublic(SQLModel):
+    """
+    A delivery as the owner sees it: when it was attempted, whether it
+    succeeded, and the response status or the error (FR-11.11).
+    """
+
+    id: uuid.UUID
+    event: WebhookEventType
+    attempted_at: datetime
+    # True once the receiver has answered with a 2xx.
+    success: bool
+    # Where it stands: delivered, still being retried, or failed after the last
+    # attempt. A webhook is never disabled, however many fail.
+    state: DeliveryState
+    attempts: int
+    status_code: int | None = None
+    error: str | None = None
+    duration_ms: int | None = None
+    # When the next retry is due, while there is one.
+    next_attempt_at: datetime | None = None
+
+
+class WebhookPublic(SQLModel):
+    # None while the webhook is not set.
+    url: str | None = None
+    last_delivery: WebhookDeliveryPublic | None = None
+
+
+class BotWebhooks(SQLModel):
+    task: WebhookPublic
+    comment: WebhookPublic
+    # Whether a secret exists. It is never reported again after it is shown.
+    has_secret: bool
+
+
 class BotUserPublic(SQLModel):
     id: uuid.UUID
     name: str
@@ -1354,6 +1499,11 @@ class BotUserPublic(SQLModel):
     # A deleted bot user is kept, so its record still opens and still says
     # what it now is (FR-08.19). It is gone from the list either way.
     deleted: bool = False
+    # When it was deleted, for the section that keeps deleted bot users in view.
+    deleted_at: datetime | None = None
+    # The tasks that still name it as their assignee, deleted ones left out:
+    # what a deleted bot user is still on the record for (FR-08.21).
+    assigned_task_count: int = 0
     # Whether a token is out, revoked or not; the token itself is never
     # reported again. One that has expired is still out until it is revoked.
     has_token: bool
@@ -1361,12 +1511,32 @@ class BotUserPublic(SQLModel):
     token_expires_at: datetime | None = None
     token_last_used_at: datetime | None = None
     token_revoked_at: datetime | None = None
+    # Only the owner reads a bot user through this shape, and a bot user never
+    # does (FR-11.2).
+    webhooks: BotWebhooks
     created_at: datetime | None = None
 
 
 class BotUsersPublic(SQLModel):
     data: list[BotUserPublic]
     count: int
+
+
+class WebhookSet(SQLModel):
+    """
+    The result of setting a webhook. `secret` is set only when this call
+    generated it (the bot user's first webhook): it is shown once (FR-11.9).
+    """
+
+    bot_user: BotUserPublic
+    secret: str | None = None
+
+
+class WebhookSecretIssued(SQLModel):
+    """The one response that carries a regenerated secret (FR-11.9)."""
+
+    bot_user_id: uuid.UUID
+    secret: str
 
 
 class BotTokenIssue(SQLModel):

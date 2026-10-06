@@ -5,55 +5,81 @@ import { type BotScope, BotsService, type BotUserPublic } from "@/client"
 import { useRecordPanel } from "@/components/Records/panels"
 import {
   EditableText,
+  gutter,
   PropertyList,
   PropertyRow,
-  ReadOnlyValue,
-  RecordHeader,
   RecordPanel,
   titleFieldClass,
 } from "@/components/Records/RecordPanel"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Label } from "@/components/ui/label"
+import { useWalk } from "@/components/Records/walk"
 import { formatDateTime, formatDayOf } from "@/lib/dates"
 import { scopeProjectsQuery, useReportChange } from "@/lib/serverState"
 import { toastError } from "@/lib/toasts"
-import { BotConsole } from "./BotConsole"
+import { cn } from "@/lib/utils"
+import { BotPlate } from "./BotLine"
+import { BotActivity, OnItsPlate } from "./BotWork"
 import DeleteBotUser from "./DeleteBotUser"
-import { ago, until } from "./health"
+import { ago } from "./health"
 import IssueToken from "./IssueToken"
-import { PERMISSION_GROUPS } from "./permissions"
+import { NewBotUser } from "./NewBotUser"
 import RevokeToken from "./RevokeToken"
+import { PermissionsSection, ProjectsSection } from "./ScopeSections"
 import { tokenStatus } from "./tokens"
-
-// What the token state means for the integration, rather than what it is.
-const STATUS_TEXT = {
-  none: "No token — this bot user cannot reach the API",
-  active: "Working",
-  revoked: "Revoked — its requests are refused",
-  expired: "Expired — its requests are refused",
-} as const
+import { WebhooksSection } from "./Webhooks"
+import { reachInWords } from "./words"
 
 /**
- * A bot user as a record: what it may reach, what it may do, and the one
- * credential that lets it in.
+ * A bot user as one document: what it is, what it may reach and do, and the
+ * one credential that lets it in, then what it is on and what it has done.
  *
- * Its row used to stack token status, last-used text and an action button in
- * one cell, with the rest of its actions in an overflow menu 260 pixels away.
- * Here each of those is a property, read where it is changed.
+ * There are no tabs. The column reads top to bottom like a task's does — the
+ * name in place, a property list, then sections under hairline headings — and
+ * every change saves as it is made, with no Save anywhere (FR-08.9).
  */
 export function BotPanel() {
-  const { record: bot, shell } = useRecordPanel("bot")
+  const { id, capturing, record: bot, panels, shell } = useRecordPanel("bot")
+  // The bot users listed on the page behind, so ↓ and ↑ walk them.
+  const walk = useWalk(id)
 
   return (
     <RecordPanel
       {...shell}
+      walk={walk}
+      onWalk={(to) => panels.walkTo(to, "bot")}
       destructive={
-        bot && !bot.deleted ? (
+        bot && !bot.deleted && !capturing ? (
           <DeleteBotUser bot={bot} onSuccess={shell.onClose} />
         ) : undefined
       }
+      bar={
+        capturing ? (
+          <>
+            <span className="shrink-0">New bot user</span>
+            <span aria-hidden>·</span>
+            <span className="truncate">Not saved yet</span>
+          </>
+        ) : bot ? (
+          <>
+            <span className="shrink-0">Bot user</span>
+            {bot.deleted && (
+              <>
+                <span aria-hidden>·</span>
+                <span className="shrink-0">Deleted</span>
+              </>
+            )}
+            {bot.created_at && (
+              <>
+                <span aria-hidden>·</span>
+                <span className="truncate">
+                  created {formatDayOf(bot.created_at)}
+                </span>
+              </>
+            )}
+          </>
+        ) : undefined
+      }
     >
-      {bot ? <BotRecord bot={bot} /> : null}
+      {capturing ? <NewBotUser /> : bot ? <BotRecord bot={bot} /> : null}
     </RecordPanel>
   )
 }
@@ -75,37 +101,40 @@ function BotRecord({ bot }: { bot: BotUserPublic }) {
   // follows the server without undoing an edit that has not landed yet.
   useEffect(() => setScope(bot.scope), [bot.scope])
 
-  const change = (next: BotScope) => {
+  const change = async (next: BotScope) => {
+    const previous = scope
     setScope(next)
-    return save(next)
+    const saved = await save(next)
+    // A refused save leaves the box as the server holds it: the toast says
+    // what went wrong, and a box that stayed ticked would say it was granted.
+    if (!saved) setScope((current) => (current === next ? previous : current))
   }
 
-  const toggleProject = (projectId: string, granted: boolean) => {
-    const project_ids = granted
-      ? [...scope.project_ids, projectId]
-      : scope.project_ids.filter((id) => id !== projectId)
-    change({ ...scope, project_ids })
-  }
+  const reach = reachInWords(
+    bot,
+    Object.fromEntries(
+      (projects ?? []).map((project) => [project.id, project]),
+    ),
+  )
 
   return (
     <>
-      <RecordHeader
-        breadcrumb={
-          <>
-            <span className="shrink-0">Bot user</span>
-            {bot.deleted && (
-              <>
-                <span aria-hidden>·</span>
-                <span className="shrink-0">Deleted</span>
-              </>
-            )}
-          </>
-        }
-        title={
+      <div
+        className={cn(
+          "grid grid-cols-[28px_minmax(0,1fr)] items-center gap-3 pt-2 pb-[18px]",
+          gutter,
+        )}
+      >
+        <BotPlate
+          name={bot.name}
+          off={bot.deleted || status !== "active"}
+          className="size-7 text-xs"
+        />
+        {
           // A deleted bot user is kept so that what it did still names it
           // (FR-08.19). Nothing about it changes again, so its name is prose.
           bot.deleted ? (
-            <p className="px-2 py-1.5 text-xl leading-snug font-semibold">
+            <p className="px-2 py-1.5 -ml-2 text-xl leading-snug font-semibold">
               {bot.name}
             </p>
           ) : (
@@ -115,14 +144,14 @@ function BotRecord({ bot }: { bot: BotUserPublic }) {
               onCommit={async (name) =>
                 name.trim() ? save(undefined, name.trim()) : false
               }
-              className={titleFieldClass}
+              className={cn(titleFieldClass, "-ml-2")}
             />
           )
         }
-      />
+      </div>
 
       {bot.deleted && (
-        <p className="text-muted-foreground border-b px-6 pb-5 text-sm text-pretty">
+        <p className="text-ink-3 px-4 pb-4 text-sm text-pretty md:px-9">
           This bot user was deleted, and deleting cannot be undone. Its token
           stopped working at once, it takes no new tasks, and everything below —
           what it did and what it was assigned — still names it.
@@ -130,129 +159,113 @@ function BotRecord({ bot }: { bot: BotUserPublic }) {
       )}
 
       <PropertyList>
-        <PropertyRow label="Token">
-          <div className="flex flex-wrap items-center gap-2">
-            <span>{STATUS_TEXT[status]}</span>
-            {/* Issuing keeps its dialog: the token is shown once and cannot be
-                read back, so it is a deliberate step, not a click (FR-08.13). */}
-            {bot.deleted ? null : bot.has_token ? (
-              <RevokeToken bot={bot} />
-            ) : (
-              <IssueToken bot={bot} />
-            )}
-          </div>
-        </PropertyRow>
-
-        <PropertyRow label="Expires">
-          <ReadOnlyValue>
-            {/* Only a token that still works has an expiry worth counting
-                down to; a revoked one stopped before its date, and an expired
-                one is past it. */}
-            {!bot.token_expires_at
-              ? bot.has_token
-                ? "Never — it works until revoked"
-                : "—"
-              : status === "active"
-                ? `${until(bot.token_expires_at)} — ${formatDayOf(bot.token_expires_at)}`
-                : formatDayOf(bot.token_expires_at)}
-          </ReadOnlyValue>
-        </PropertyRow>
+        {bot.deleted ? null : (
+          <PropertyRow label="Token">
+            <div className="flex flex-wrap items-center gap-x-3.5 gap-y-1">
+              <TokenState bot={bot} />
+              {/* Issuing keeps its dialog: the token is shown once and cannot
+                  be read back, so it is a deliberate step, not a click
+                  (FR-08.13). */}
+              {bot.has_token ? (
+                <RevokeToken bot={bot} />
+              ) : (
+                <IssueToken bot={bot} />
+              )}
+            </div>
+          </PropertyRow>
+        )}
 
         <PropertyRow label="Last used">
           {/* An empty timestamp and a never-used integration are different
               facts, so the second one is said in words. */}
-          <ReadOnlyValue>
-            {bot.token_last_used_at ? (
-              <>
-                {ago(bot.token_last_used_at)}
-                <span className="text-xs">
-                  {" "}
-                  ({formatDateTime(bot.token_last_used_at)})
-                </span>
-              </>
-            ) : (
-              "Never used"
-            )}
-          </ReadOnlyValue>
+          <span className="text-ink-2 text-sm">
+            {bot.token_last_used_at
+              ? `${ago(bot.token_last_used_at)} · ${formatDateTime(bot.token_last_used_at)}`
+              : "Never used"}
+          </span>
         </PropertyRow>
 
-        <PropertyRow label="Projects">
-          <div className="flex flex-col gap-2 py-1">
-            {(projects ?? []).map((project) => {
-              const id = `scope-${bot.id}-${project.id}`
-              return (
-                <div key={project.id} className="flex items-center gap-2">
-                  <Checkbox
-                    id={id}
-                    disabled={bot.deleted}
-                    checked={scope.project_ids.includes(project.id)}
-                    onCheckedChange={(checked) =>
-                      toggleProject(project.id, checked === true)
-                    }
-                  />
-                  <Label htmlFor={id} className="font-normal">
-                    {project.name}
-                    {project.archived && (
-                      <span className="text-muted-foreground">(archived)</span>
-                    )}
-                  </Label>
-                </div>
-              )
-            })}
-            {projects?.length === 0 && (
-              <ReadOnlyValue>No projects to grant yet</ReadOnlyValue>
-            )}
-            <p className="text-muted-foreground text-xs text-pretty">
-              A bot user reaches only the projects named here, and never an
-              archived one.
-            </p>
-          </div>
-        </PropertyRow>
-
-        <PropertyRow label="Permissions">
-          <div className="flex flex-col gap-3 py-1">
-            {PERMISSION_GROUPS.map((group) => (
-              <fieldset key={group.title} className="flex flex-col gap-2">
-                <legend className="text-muted-foreground text-xs">
-                  {group.title}
-                </legend>
-                {group.permissions.map(({ key, label }) => {
-                  const id = `permission-${bot.id}-${key}`
-                  return (
-                    <div key={key} className="flex items-center gap-2">
-                      <Checkbox
-                        id={id}
-                        disabled={bot.deleted}
-                        checked={Boolean(scope.permissions[key])}
-                        onCheckedChange={(checked) =>
-                          change({
-                            ...scope,
-                            permissions: {
-                              ...scope.permissions,
-                              [key]: checked === true,
-                            },
-                          })
-                        }
-                      />
-                      <Label htmlFor={id} className="font-normal">
-                        {label}
-                      </Label>
-                    </div>
-                  )
-                })}
-              </fieldset>
-            ))}
-          </div>
-        </PropertyRow>
-
-        <PropertyRow label="Created">
-          <ReadOnlyValue>
-            {bot.created_at ? formatDayOf(bot.created_at) : "Unknown"}
-          </ReadOnlyValue>
+        <PropertyRow label="Reach">
+          <span className="text-ink-2 py-1 text-sm text-pretty">{reach}</span>
         </PropertyRow>
       </PropertyList>
 
-      <BotConsole bot={bot} />
+      {/* A deleted bot user reaches nothing and is changed by nothing: its
+          reach is the sentence above, and there is nothing to tick. */}
+      {bot.deleted ? null : (
+        <>
+          <ProjectsSection
+            idPrefix={`scope-${bot.id}`}
+            projects={projects ?? []}
+            selected={scope.project_ids}
+            onToggle={(projectId, granted) =>
+              change({
+                ...scope,
+                project_ids: granted
+                  ? [...scope.project_ids, projectId]
+                  : scope.project_ids.filter((id) => id !== projectId),
+              })
+            }
+          />
+          <PermissionsSection
+            idPrefix={`scope-${bot.id}`}
+            permissions={scope.permissions}
+            onToggle={(key, granted) =>
+              change({
+                ...scope,
+                permissions: { ...scope.permissions, [key]: granted },
+              })
+            }
+          />
+        </>
+      )}
+
+      {/* Read-only for a deleted bot user, whose webhooks were cleared. */}
+      <WebhooksSection key={`webhooks-${bot.id}`} bot={bot} />
+
+      <OnItsPlate key={`plate-${bot.id}`} bot={bot} />
+      <BotActivity key={`activity-${bot.id}`} bot={bot} />
+    </>
+  )
+}
+
+/** Where the token stands, in the words the integration lives by. */
+function TokenState({ bot }: { bot: BotUserPublic }) {
+  const status = tokenStatus(bot)
+  const quiet = "text-ink-2 text-sm"
+
+  if (status === "active") {
+    return (
+      <>
+        <span className="text-done font-medium">Working</span>
+        <span className={quiet}>
+          {bot.token_expires_at
+            ? `expires ${formatDayOf(bot.token_expires_at)}`
+            : "never expires"}
+        </span>
+      </>
+    )
+  }
+  if (status === "expired") {
+    return (
+      <>
+        <span className="text-late font-medium">Expired</span>
+        <span className={quiet}>its requests are refused</span>
+      </>
+    )
+  }
+  if (status === "revoked") {
+    return (
+      <>
+        <span className="font-medium">Revoked</span>
+        <span className={quiet}>its requests are refused</span>
+      </>
+    )
+  }
+  return (
+    <>
+      <span className="font-medium">No token</span>
+      <span className={quiet}>it cannot reach the API</span>
     </>
   )
 }
@@ -274,8 +287,14 @@ function useBotUpdate(bot: BotUserPublic) {
         body: { scope, name },
       }),
     onError: (error) => toastError(error),
-    // A renamed bot user is named on its tasks and in the log.
-    onSettled: () => reportChange({ type: "bot user changed", botId: bot.id }),
+    // A renamed bot user is named on its tasks and in the log; a new scope
+    // shows only on the bot user itself.
+    onSettled: (_data, _error, { name }) =>
+      reportChange(
+        name === undefined
+          ? { type: "bot scope changed", botId: bot.id }
+          : { type: "bot user changed", botId: bot.id },
+      ),
   })
 
   return async (scope?: BotScope, name?: string) => {

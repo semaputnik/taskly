@@ -1,72 +1,44 @@
 import { useQuery } from "@tanstack/react-query"
 import { createFileRoute } from "@tanstack/react-router"
-import { z } from "zod"
+import { useEffect } from "react"
 
-import type { ActivityEntryPublic, ActivityKind } from "@/client"
-import { ActivityDescription } from "@/components/Activity/ActivityDescription"
-import { ActorLabel } from "@/components/Activity/ActorLabel"
-import { RestoreDeletion } from "@/components/Activity/RestoreDeletion"
-import { Button } from "@/components/ui/button"
+import { ActivityFilters } from "@/components/Activity/ActivityFilters"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import { Skeleton } from "@/components/ui/skeleton"
+  ActivityLog,
+  ActivityLogPending,
+  PagerButton,
+} from "@/components/Activity/ActivityLog"
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
+  activitySearchSchema,
+  byBotsQuery,
+  everythingQuery,
+  logRequest,
+  prefetchActivity,
+} from "@/components/Activity/queries"
+import {
+  emptyMessage,
+  type LogOrder,
+  lede,
+  PAGE_SIZE,
+  pagerLabels,
+  pagerText,
+} from "@/components/Activity/words"
+import { textLink } from "@/components/Dashboard/shared"
 import useAuth from "@/hooks/useAuth"
-import { formatDateTime } from "@/lib/dates"
-import { activityQuery, botQuery } from "@/lib/serverState"
-
-const PAGE_SIZE = 50
-
-// The kinds of change, in the order the log offers them, and the words the
-// reader picks them by. The API groups the actions behind each one; the log
-// never shows a reader an action name.
-const KINDS = [
-  "completed",
-  "created",
-  "changed",
-  "deleted",
-  "comments",
-  "tags",
-] as const satisfies readonly ActivityKind[]
-
-const KIND_LABELS: Record<ActivityKind, string> = {
-  completed: "Completed",
-  created: "Created",
-  changed: "Changed",
-  deleted: "Deleted & restored",
-  comments: "Comments & files",
-  tags: "Tags",
-}
-
-// A Select cannot hold an empty value, so "no filter" needs a name of its
-// own. The kinds are a fixed vocabulary, so nothing can collide with it.
-const ANYTHING = "anything"
-
-const activitySearchSchema = z.object({
-  page: z.number().int().min(1).optional().catch(undefined),
-  // The log narrowed to one bot user: what its panel hands off to when its
-  // feed runs past the preview.
-  actor: z.string().uuid().optional().catch(undefined),
-  // The log narrowed to one kind of change. Not a sort and not a page: it is
-  // which of its questions the log is answering.
-  kind: z.enum(KINDS).optional().catch(undefined),
-})
+import { activityQuery, deletedBotsQuery } from "@/lib/serverState"
+import { cn } from "@/lib/utils"
 
 export const Route = createFileRoute("/_layout/activity")({
   component: Activity,
   validateSearch: activitySearchSchema,
+  // The requests start as soon as the route is matched, beside the download
+  // of the page's own code rather than after it. Nothing waits on them here,
+  // and what is cached is left alone. The address is read as the page will
+  // read it, so both ask under the same key.
+  loader: ({ context, location }) => {
+    const search = activitySearchSchema.safeParse(location.search)
+    if (search.success) prefetchActivity(context.queryClient, search.data)
+  },
   head: () => ({
     meta: [
       {
@@ -76,109 +48,39 @@ export const Route = createFileRoute("/_layout/activity")({
   }),
 })
 
-function ActivityRows({
-  entries,
-  currentUserId,
-  empty,
-}: {
-  entries: ActivityEntryPublic[]
-  currentUserId?: string
-  empty: string
-}) {
-  if (entries.length === 0) {
-    return (
-      <TableRow className="hover:bg-transparent">
-        <TableCell
-          colSpan={4}
-          className="h-32 text-center text-muted-foreground"
-        >
-          {empty}
-        </TableCell>
-      </TableRow>
-    )
-  }
-  return entries.map((entry) => (
-    <TableRow key={entry.id}>
-      <TableCell className="whitespace-nowrap text-muted-foreground">
-        {entry.created_at ? formatDateTime(entry.created_at) : ""}
-      </TableCell>
-      <TableCell className="whitespace-nowrap">
-        <ActorLabel entry={entry} currentUserId={currentUserId} />
-      </TableCell>
-      <TableCell>
-        <ActivityDescription entry={entry} currentUserId={currentUserId} />
-      </TableCell>
-      <TableCell className="text-right">
-        {entry.restorable && <RestoreDeletion entry={entry} />}
-      </TableCell>
-    </TableRow>
-  ))
-}
-
-// What each kind says when it has gathered nothing. An empty narrowed log
-// must never claim the account is empty: the reader narrowed it, and the
-// message has to name what they narrowed it to.
-const KIND_EMPTY: Record<ActivityKind, string> = {
-  completed: "Nothing has been completed yet.",
-  created: "Nothing has been created yet.",
-  changed: "Nothing has been changed yet.",
-  deleted: "Nothing has been deleted or restored yet.",
-  comments: "No comments or files yet.",
-  tags: "Nothing has happened to your tags yet.",
-}
-
-function emptyMessage(
-  actor: string | undefined,
-  kind: ActivityKind | undefined,
-): string {
-  if (actor && kind) {
-    return `This bot user has nothing under “${KIND_LABELS[kind]}”.`
-  }
-  if (actor) return "This bot user has not changed anything yet."
-  if (kind) return KIND_EMPTY[kind]
-  return "Nothing has happened in your account yet."
-}
-
-function PendingRows() {
-  return Array.from({ length: 5 }).map((_, index) => (
-    <TableRow key={index}>
-      <TableCell>
-        <Skeleton className="h-4 w-32" />
-      </TableCell>
-      <TableCell>
-        <Skeleton className="h-4 w-12" />
-      </TableCell>
-      <TableCell>
-        <Skeleton className="h-4 w-64" />
-      </TableCell>
-      <TableCell />
-    </TableRow>
-  ))
-}
-
 /**
- * The user's activity log, newest first (FR-10.1). Only ever their own
- * entries: the API offers no way to ask for anyone else's (FR-10.7).
+ * The user's activity log (FR-10.1), as day groups of lines: when, who, what
+ * happened to which record, and Restore where a deletion can be undone. Only
+ * ever their own entries: the API offers no way to ask for anyone else's
+ * (FR-10.7).
  */
 function Activity() {
-  const { page = 1, actor, kind } = Route.useSearch()
+  const search = Route.useSearch()
   const navigate = Route.useNavigate()
   const { user: currentUser } = useAuth()
+  const page = search.page ?? 1
+  const order: LogOrder = search.order ?? "newest"
 
-  const query = {
-    skip: (page - 1) * PAGE_SIZE,
-    limit: PAGE_SIZE,
-    actor_bot_user_id: actor,
-    kind,
-  }
-  const { data, isPending } = useQuery(activityQuery(query))
-  // Named from the bot user itself rather than from the feed: a filter that
-  // matches nothing still has to say whose nothing it is. A deleted bot user
-  // reads here too (FR-08.19).
-  const { data: actorBot } = useQuery(botQuery(actor))
+  const { data, isPending, isError, refetch } = useQuery(
+    activityQuery(logRequest(search)),
+  )
+  // The sentence counts the whole log. Whether it could be counted is the
+  // sentence's affair alone: a count that fails costs it that half.
+  const { data: everything } = useQuery(everythingQuery())
+  const { data: byBots } = useQuery(byBotsQuery())
+  const { data: deleted } = useQuery(deletedBotsQuery())
 
   const count = data?.count ?? 0
   const lastPage = Math.max(1, Math.ceil(count / PAGE_SIZE))
+  const words = lede(everything?.count ?? null, byBots?.count ?? null, order)
+  const labels = pagerLabels(order)
+
+  // Changing what is shown returns to the first page: the page a reader was
+  // on may not exist under the new narrowing.
+  const show = (next: Partial<typeof search>) =>
+    navigate({
+      search: (previous) => ({ ...previous, ...next, page: undefined }),
+    })
   const goTo = (next: number) =>
     navigate({
       search: (previous) => ({
@@ -186,119 +88,77 @@ function Activity() {
         page: next === 1 ? undefined : next,
       }),
     })
-  // Narrowing to another kind returns to the first page: the page the reader
-  // was on may not exist under the new one.
-  const showKind = (next: ActivityKind | undefined) =>
-    navigate({
-      search: (previous) => ({ ...previous, kind: next, page: undefined }),
-    })
+  const turn = (next: LogOrder) =>
+    show({ order: next === "newest" ? undefined : next })
+
+  // A restore can empty the last page under a reader who changed nothing.
+  useEffect(() => {
+    if (data && page > lastPage) goTo(lastPage)
+  })
 
   return (
-    <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Activity</h1>
-        <p className="text-muted-foreground">
-          Every change in your account, newest first
-        </p>
-      </div>
+    <div className="page-column">
+      <h1 className="mb-1 text-[22px] leading-[1.2] font-semibold tracking-[-0.015em]">
+        Activity
+      </h1>
+      <p className="text-ink-3 mb-5">
+        <span className="text-ink font-medium">{words.lead}</span>
+        {words.rest && ` ${words.rest}`}
+      </p>
 
       {/* The narrowing is a control the reader can see and undo. A log that
           quietly answers a narrower question than the one being asked is
           worse than a log with no filter at all. */}
-      <Select
-        value={kind ?? ANYTHING}
-        onValueChange={(next) =>
-          showKind(next === ANYTHING ? undefined : (next as ActivityKind))
-        }
-      >
-        <SelectTrigger className="w-full sm:w-64" aria-label="Show">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value={ANYTHING}>Anything that happened</SelectItem>
-          {KINDS.map((value) => (
-            <SelectItem key={value} value={value}>
-              {KIND_LABELS[value]}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      <ActivityFilters search={search} onChange={show} onOrder={turn} />
 
-      {actor && (
-        // A narrowed log says so where it is read, and offers the way back:
-        // a filter that is not visible is a log that looks wrong.
-        <div className="bg-card flex flex-wrap items-center gap-3 rounded-lg border px-4 py-3">
-          <span className="text-sm">
-            Showing only what{" "}
-            <span className="font-medium">
-              {actorBot?.name ?? "this bot user"}
-            </span>{" "}
-            did
-          </span>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() =>
-              navigate({
-                search: (previous) => ({
-                  ...previous,
-                  actor: undefined,
-                  page: undefined,
-                }),
-              })
-            }
-          >
-            Show everything
-          </Button>
+      {isPending ? (
+        <ActivityLogPending />
+      ) : isError || !data ? (
+        // A failed fetch is not an empty log: say so, and offer the retry.
+        <div role="alert" className="border-rule border-b py-8">
+          <p className="font-medium">The activity could not be loaded</p>
+          <p className="text-ink-3 mt-1">
+            Nothing is lost.{" "}
+            <button
+              type="button"
+              onClick={() => void refetch()}
+              className={cn(textLink, "text-ink underline")}
+            >
+              Try again
+            </button>
+          </p>
         </div>
+      ) : data.data.length === 0 ? (
+        <p className="text-ink-3 border-rule border-b py-8">
+          {emptyMessage(search.actor, search.kind)}
+        </p>
+      ) : (
+        <ActivityLog
+          entries={data.data}
+          currentUserId={currentUser?.id}
+          deletedBotIds={new Set((deleted?.data ?? []).map((bot) => bot.id))}
+        />
       )}
 
-      <Table>
-        <TableHeader>
-          <TableRow className="hover:bg-transparent">
-            <TableHead>When</TableHead>
-            <TableHead>Who</TableHead>
-            <TableHead>What</TableHead>
-            <TableHead>
-              <span className="sr-only">Actions</span>
-            </TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {isPending || !data ? (
-            <PendingRows />
-          ) : (
-            <ActivityRows
-              entries={data.data}
-              currentUserId={currentUser?.id}
-              empty={emptyMessage(actor, kind)}
-            />
-          )}
-        </TableBody>
-      </Table>
-
-      {count > PAGE_SIZE && (
-        <div className="flex items-center justify-between gap-4">
-          <p className="text-sm text-muted-foreground">
-            Page {page} of {lastPage}
-          </p>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={page <= 1}
-              onClick={() => goTo(page - 1)}
-            >
-              Newer
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
+      {count > 0 && (
+        <div className="text-ink-3 flex items-center gap-[18px] pt-3.5 text-[13px]">
+          {/* The number the server counted under these narrowings, not the
+              size of the window that was fetched. */}
+          <p aria-live="polite">{pagerText(count, page, lastPage)}</p>
+          <div
+            className={cn("ml-auto flex gap-3.5", lastPage === 1 && "hidden")}
+          >
+            <PagerButton disabled={page <= 1} onClick={() => goTo(page - 1)}>
+              <span aria-hidden>← </span>
+              {labels.back}
+            </PagerButton>
+            <PagerButton
               disabled={page >= lastPage}
               onClick={() => goTo(page + 1)}
             >
-              Older
-            </Button>
+              {labels.on}
+              <span aria-hidden> →</span>
+            </PagerButton>
           </div>
         </div>
       )}

@@ -102,6 +102,13 @@ export type ActivityEntryPublic = {
 export type ActivityKind = 'completed' | 'created' | 'changed' | 'deleted' | 'comments' | 'tags';
 
 /**
+ * ActivityOrder
+ *
+ * Which end of the log a read starts from (FR-10.10).
+ */
+export type ActivityOrder = 'newest' | 'oldest';
+
+/**
  * AttachmentPublic
  */
 export type AttachmentPublic = {
@@ -273,6 +280,14 @@ export type BotUserPublic = {
      */
     deleted?: boolean;
     /**
+     * Deleted At
+     */
+    deleted_at?: string | null;
+    /**
+     * Assigned Task Count
+     */
+    assigned_task_count?: number;
+    /**
      * Has Token
      */
     has_token: boolean;
@@ -292,6 +307,7 @@ export type BotUserPublic = {
      * Token Revoked At
      */
     token_revoked_at?: string | null;
+    webhooks: BotWebhooks;
     /**
      * Created At
      */
@@ -347,6 +363,18 @@ export type BotUsersPublic = {
      * Count
      */
     count: number;
+};
+
+/**
+ * BotWebhooks
+ */
+export type BotWebhooks = {
+    task: WebhookPublic;
+    comment: WebhookPublic;
+    /**
+     * Has Secret
+     */
+    has_secret: boolean;
 };
 
 /**
@@ -436,6 +464,11 @@ export type Confirmation = {
         [key: string]: unknown;
     };
 };
+
+/**
+ * DeliveryState
+ */
+export type DeliveryState = 'pending' | 'delivered' | 'failed';
 
 /**
  * DueDateScope
@@ -1175,6 +1208,116 @@ export type ValidationError = {
     ctx?: {
         [key: string]: unknown;
     };
+};
+
+/**
+ * WebhookDeliveryPublic
+ *
+ * A delivery as the owner sees it: when it was attempted, whether it
+ * succeeded, and the response status or the error (FR-11.11).
+ */
+export type WebhookDeliveryPublic = {
+    /**
+     * Id
+     */
+    id: string;
+    event: WebhookEventType;
+    /**
+     * Attempted At
+     */
+    attempted_at: string;
+    /**
+     * Success
+     */
+    success: boolean;
+    state: DeliveryState;
+    /**
+     * Attempts
+     */
+    attempts: number;
+    /**
+     * Status Code
+     */
+    status_code?: number | null;
+    /**
+     * Error
+     */
+    error?: string | null;
+    /**
+     * Duration Ms
+     */
+    duration_ms?: number | null;
+    /**
+     * Next Attempt At
+     */
+    next_attempt_at?: string | null;
+};
+
+/**
+ * WebhookEventType
+ *
+ * What a delivery says happened (FR-11.8).
+ */
+export type WebhookEventType = 'task.ready' | 'comment.added' | 'test';
+
+/**
+ * WebhookKind
+ *
+ * The bot user's two webhooks (FR-11.1).
+ */
+export type WebhookKind = 'task' | 'comment';
+
+/**
+ * WebhookPublic
+ */
+export type WebhookPublic = {
+    /**
+     * Url
+     */
+    url?: string | null;
+    last_delivery?: WebhookDeliveryPublic | null;
+};
+
+/**
+ * WebhookSecretIssued
+ *
+ * The one response that carries a regenerated secret (FR-11.9).
+ */
+export type WebhookSecretIssued = {
+    /**
+     * Bot User Id
+     */
+    bot_user_id: string;
+    /**
+     * Secret
+     */
+    secret: string;
+};
+
+/**
+ * WebhookSet
+ *
+ * The result of setting a webhook. `secret` is set only when this call
+ * generated it (the bot user's first webhook): it is shown once (FR-11.9).
+ */
+export type WebhookSet = {
+    bot_user: BotUserPublic;
+    /**
+     * Secret
+     */
+    secret?: string | null;
+};
+
+/**
+ * WebhookUrl
+ *
+ * The address a webhook is set to: http or https (FR-11.3).
+ */
+export type WebhookUrl = {
+    /**
+     * Url
+     */
+    url: string;
 };
 
 export type loginRegistrationOptionsData = {
@@ -2608,6 +2751,10 @@ export type activityReadActivityLogData = {
          */
         by_bots?: boolean;
         /**
+         * By User
+         */
+        by_user?: boolean;
+        /**
          * Since
          */
         since?: string | null;
@@ -2615,6 +2762,7 @@ export type activityReadActivityLogData = {
          * Task Id
          */
         task_id?: string | null;
+        order?: ActivityOrder;
     };
     url: '/api/v1/activity-log/';
 };
@@ -2679,6 +2827,10 @@ export type botsReadBotUsersData = {
          * Limit
          */
         limit?: number;
+        /**
+         * Deleted
+         */
+        deleted?: boolean;
     };
     url: '/api/v1/bot-users/';
 };
@@ -2878,6 +3030,129 @@ export type botsIssueBotUserTokenResponses = {
 };
 
 export type botsIssueBotUserTokenResponse = botsIssueBotUserTokenResponses[keyof botsIssueBotUserTokenResponses];
+
+export type botsClearBotUserWebhookData = {
+    body?: never;
+    path: {
+        /**
+         * Bot User Id
+         */
+        bot_user_id: string;
+        kind: WebhookKind;
+    };
+    query?: never;
+    url: '/api/v1/bot-users/{bot_user_id}/webhooks/{kind}';
+};
+
+export type botsClearBotUserWebhookErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type botsClearBotUserWebhookError = botsClearBotUserWebhookErrors[keyof botsClearBotUserWebhookErrors];
+
+export type botsClearBotUserWebhookResponses = {
+    /**
+     * Successful Response
+     */
+    200: BotUserPublic;
+};
+
+export type botsClearBotUserWebhookResponse = botsClearBotUserWebhookResponses[keyof botsClearBotUserWebhookResponses];
+
+export type botsSetBotUserWebhookData = {
+    body: WebhookUrl;
+    path: {
+        /**
+         * Bot User Id
+         */
+        bot_user_id: string;
+        kind: WebhookKind;
+    };
+    query?: never;
+    url: '/api/v1/bot-users/{bot_user_id}/webhooks/{kind}';
+};
+
+export type botsSetBotUserWebhookErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type botsSetBotUserWebhookError = botsSetBotUserWebhookErrors[keyof botsSetBotUserWebhookErrors];
+
+export type botsSetBotUserWebhookResponses = {
+    /**
+     * Successful Response
+     */
+    200: WebhookSet;
+};
+
+export type botsSetBotUserWebhookResponse = botsSetBotUserWebhookResponses[keyof botsSetBotUserWebhookResponses];
+
+export type botsRegenerateBotUserWebhookSecretData = {
+    body?: never;
+    path: {
+        /**
+         * Bot User Id
+         */
+        bot_user_id: string;
+    };
+    query?: never;
+    url: '/api/v1/bot-users/{bot_user_id}/webhook-secret';
+};
+
+export type botsRegenerateBotUserWebhookSecretErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type botsRegenerateBotUserWebhookSecretError = botsRegenerateBotUserWebhookSecretErrors[keyof botsRegenerateBotUserWebhookSecretErrors];
+
+export type botsRegenerateBotUserWebhookSecretResponses = {
+    /**
+     * Successful Response
+     */
+    200: WebhookSecretIssued;
+};
+
+export type botsRegenerateBotUserWebhookSecretResponse = botsRegenerateBotUserWebhookSecretResponses[keyof botsRegenerateBotUserWebhookSecretResponses];
+
+export type botsTestBotUserWebhookData = {
+    body?: never;
+    path: {
+        /**
+         * Bot User Id
+         */
+        bot_user_id: string;
+        kind: WebhookKind;
+    };
+    query?: never;
+    url: '/api/v1/bot-users/{bot_user_id}/webhooks/{kind}/test';
+};
+
+export type botsTestBotUserWebhookErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type botsTestBotUserWebhookError = botsTestBotUserWebhookErrors[keyof botsTestBotUserWebhookErrors];
+
+export type botsTestBotUserWebhookResponses = {
+    /**
+     * Successful Response
+     */
+    200: WebhookDeliveryPublic;
+};
+
+export type botsTestBotUserWebhookResponse = botsTestBotUserWebhookResponses[keyof botsTestBotUserWebhookResponses];
 
 export type utilsTestEmailData = {
     body?: never;

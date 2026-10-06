@@ -1,6 +1,6 @@
 import { expect, type Page, test } from "@playwright/test"
 import { newUser, userApi } from "./utils/account"
-import { storeTokenAndClose } from "./utils/tokenDialog"
+import { storeSecretAndClose } from "./utils/secretDialog"
 
 test.use({ storageState: { cookies: [], origins: [] } })
 
@@ -76,7 +76,7 @@ test("Leaving needs the token stored, and warns when it was never copied", async
 
 test("A copied and stored token closes without a warning", async ({ page }) => {
   const { dialog } = await revealToken(page)
-  await storeTokenAndClose(dialog)
+  await storeSecretAndClose(dialog)
 })
 
 test("Copying from the field by keyboard counts as copied", async ({
@@ -98,15 +98,23 @@ test("Every other dialog still closes on Escape and a click outside", async ({
   page,
 }) => {
   await newUser(page)
-  await page.goto("/bots")
-  const dialog = page.getByRole("dialog", { name: "Add Bot" })
+  const api = await userApi(page)
+  const bot = await api.create("/bot-users/", {
+    name: "Nightly sync",
+    scope: { project_ids: [], permissions: {} },
+  })
+  await page.goto(`/bots?bot=${bot.id}`)
+  const dialog = page.getByRole("dialog", { name: "Delete Nightly sync?" })
+  const open = page
+    .getByRole("complementary", { name: "Nightly sync", exact: true })
+    .getByRole("button", { name: "Delete bot user" })
 
-  await page.getByRole("button", { name: "Add Bot" }).click()
+  await open.click()
   await expect(dialog).toBeVisible()
   await page.keyboard.press("Escape")
   await expect(dialog).toBeHidden()
 
-  await page.getByRole("button", { name: "Add Bot" }).click()
+  await open.click()
   await expect(dialog).toBeVisible()
   await page.mouse.click(5, 5)
   await expect(dialog).toBeHidden()

@@ -59,6 +59,22 @@ def _bot_with_work(
 # --- What the filter narrows to ------------------------------------------------
 
 
+def test_by_user_keeps_only_the_owners_own_changes(
+    client: TestClient, owner: Headers
+) -> None:
+    """The reader's own side of "By anyone": what they did, not their bots."""
+    bot_id, _, project_id = _bot_with_work(client, owner)
+    create_task(client, owner, project_id=project_id, title="Mine")
+
+    page = _log(client, owner, by_user=True)
+
+    assert "Mine" in _titles(page)
+    assert "Triage bot did this" not in _titles(page)
+    assert all(entry["actor_bot_user_id"] is None for entry in page["data"])
+    assert page["count"] == len(page["data"])
+    assert bot_id not in {entry["actor_bot_user_id"] for entry in page["data"]}
+
+
 def test_the_filter_returns_only_that_bot_users_entries(
     client: TestClient, owner: Headers
 ) -> None:

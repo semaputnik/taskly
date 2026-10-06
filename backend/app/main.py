@@ -1,5 +1,8 @@
+import asyncio
+import contextlib
 import re
-from collections.abc import Awaitable, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 import sentry_sdk
@@ -9,7 +12,7 @@ from fastapi.routing import APIRoute
 from starlette.middleware.cors import CORSMiddleware
 from starlette.middleware.gzip import GZipMiddleware
 
-from app import passkeys
+from app import passkeys, webhooks
 from app.api.main import api_router
 from app.core.config import settings
 
@@ -44,10 +47,37 @@ def custom_generate_unique_id(route: APIRoute) -> str:
 if settings.SENTRY_DSN and settings.FASTAPI_ENV != "development":
     sentry_sdk.init(dsn=str(settings.SENTRY_DSN), enable_tracing=True)
 
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+    """
+    Run the webhook delivery loop for as long as this process serves requests
+    (ADR-0009). There is no separate worker: every API process drains the
+    outbox, and the table is the only state, so a restart loses nothing.
+    """
+    loop = None
+    if settings.WEBHOOK_DELIVERY_LOOP:
+        loop = asyncio.create_task(webhooks.drain_forever())
+    try:
+        yield
+    finally:
+        if loop is not None:
+            loop.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await loop
+
+
 app = FastAPI(
     title=settings.PROJECT_NAME,
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
     generate_unique_id_function=custom_generate_unique_id,
+    lifespan=lifespan,
+    openapi_tags=[
+        {
+            "name": "bots",
+            "description": webhooks.DELIVERY_CONTRACT,
+        }
+    ],
 )
 
 app.add_middleware(

@@ -19,6 +19,7 @@ from app.models import (
     ActivityEntry,
     ActivityEntryPublic,
     ActivityKind,
+    ActivityOrder,
     Attachment,
     BotUser,
     Comment,
@@ -149,11 +150,14 @@ def read_activity_log(
     actor_bot_user_id: uuid.UUID | None = Query(default=None),
     kind: ActivityKind | None = Query(default=None),
     by_bots: bool = Query(default=False),
+    by_user: bool = Query(default=False),
     since: datetime | None = Query(default=None),
     task_id: uuid.UUID | None = Query(default=None),
+    order: ActivityOrder = Query(default=ActivityOrder.NEWEST),
 ) -> Any:
     """
-    Retrieve the current user's activity log, newest first.
+    Retrieve the current user's activity log, newest first unless `order` says
+    `oldest` (FR-10.10).
 
     `actor_bot_user_id` narrows it to one bot user's own changes — what an
     operator asks when they want to read an integration rather than their
@@ -165,6 +169,9 @@ def read_activity_log(
     can still answer one question at a time. The groups do not overlap. The
     two narrowings are independent and combine: what this integration
     finished is both of them at once.
+
+    `by_user` keeps the user's own changes, the other side of `by_bots`: what
+    "You" is in the log's actor menu.
 
     `by_bots` keeps the changes any of the user's bot users made, and `since`
     the entries written after a moment. Together they are what the dashboard
@@ -178,6 +185,10 @@ def read_activity_log(
     records, so one that is not theirs, or does not exist, is a 404 — the
     same answer for both — rather than a history that looks empty. A deleted
     task's history still reads.
+
+    `order` turns the log around. It changes which end a page starts from and
+    nothing about what the log holds, so it combines with every narrowing and
+    with `skip` and `limit`.
 
     Always the requesting user's own entries and nothing wider: there is no
     parameter or role that reaches another user's log, the superuser's
@@ -200,6 +211,8 @@ def read_activity_log(
         where.append(_of_kind(kind))
     if by_bots:
         where.append(col(ActivityEntry.actor_bot_user_id).is_not(None))
+    if by_user:
+        where.append(col(ActivityEntry.actor_bot_user_id).is_(None))
     if since is not None:
         if since.tzinfo is None:
             since = since.replace(tzinfo=UTC)
@@ -211,7 +224,11 @@ def read_activity_log(
     entries = session.exec(
         select(ActivityEntry)
         .where(*where)
-        .order_by(col(ActivityEntry.position).desc())
+        .order_by(
+            col(ActivityEntry.position).asc()
+            if order is ActivityOrder.OLDEST
+            else col(ActivityEntry.position).desc()
+        )
         .offset(skip)
         .limit(limit)
     ).all()

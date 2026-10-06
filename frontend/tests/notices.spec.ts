@@ -6,7 +6,12 @@ test.use({ storageState: { cookies: [], origins: [] } })
 /** A notice, raised by writing a task into the day page's line. */
 async function raiseNotice(page: Page, title: string) {
   await page.goto("/")
+  // A phone has no line on the page: the bar's add control raises the sheet
+  // that carries it.
+  const add = page.getByRole("button", { name: "Add a task" })
   const line = page.getByRole("combobox", { name: "Add a task" })
+  await expect(add.or(line)).toBeVisible()
+  if (await add.isVisible()) await add.click()
   await line.fill(title)
   await line.press("Enter")
   const notice = page.locator("[data-sonner-toast]").filter({ hasText: title })

@@ -196,6 +196,16 @@ export const ActivityKindSchema = {
     description: 'How a reader groups the log\'s actions in order to narrow it.\n\nCoarser than `ActivityAction` on purpose: someone asks the log what they\nfinished, filed or threw away — not which of two dozen action names an\nentry happens to carry. The groups do not overlap, so an entry answers to\nexactly one of them and a reader never meets the same change twice.\n\nThe grouping is the server\'s rather than a set of actions the client\nsends, because `COMPLETED` is not a set of actions at all: closing tasks\nin a batch writes one `TASKS_BULK_CHANGED` entry naming the new status,\nnot a completion per task, so the group has to read that entry\'s details.'
 } as const;
 
+export const ActivityOrderSchema = {
+    type: 'string',
+    enum: [
+        'newest',
+        'oldest'
+    ],
+    title: 'ActivityOrder',
+    description: 'Which end of the log a read starts from (FR-10.10).'
+} as const;
+
 export const AttachmentPublicSchema = {
     properties: {
         filename: {
@@ -436,6 +446,23 @@ export const BotUserPublicSchema = {
             title: 'Deleted',
             default: false
         },
+        deleted_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Deleted At'
+        },
+        assigned_task_count: {
+            type: 'integer',
+            title: 'Assigned Task Count',
+            default: 0
+        },
         has_token: {
             type: 'boolean',
             title: 'Has Token'
@@ -488,6 +515,9 @@ export const BotUserPublicSchema = {
             ],
             title: 'Token Revoked At'
         },
+        webhooks: {
+            $ref: '#/components/schemas/BotWebhooks'
+        },
         created_at: {
             anyOf: [
                 {
@@ -506,7 +536,8 @@ export const BotUserPublicSchema = {
         'id',
         'name',
         'scope',
-        'has_token'
+        'has_token',
+        'webhooks'
     ],
     title: 'BotUserPublic'
 } as const;
@@ -588,6 +619,28 @@ export const BotUsersPublicSchema = {
         'count'
     ],
     title: 'BotUsersPublic'
+} as const;
+
+export const BotWebhooksSchema = {
+    properties: {
+        task: {
+            $ref: '#/components/schemas/WebhookPublic'
+        },
+        comment: {
+            $ref: '#/components/schemas/WebhookPublic'
+        },
+        has_secret: {
+            type: 'boolean',
+            title: 'Has Secret'
+        }
+    },
+    type: 'object',
+    required: [
+        'task',
+        'comment',
+        'has_secret'
+    ],
+    title: 'BotWebhooks'
 } as const;
 
 export const BulkResultSchema = {
@@ -725,6 +778,16 @@ export const ConfirmationSchema = {
     ],
     title: 'Confirmation',
     description: 'A fresh assertion with one of the caller\'s own passkeys, answering a\nconfirmation challenge (FR-12.7, FR-12.16).'
+} as const;
+
+export const DeliveryStateSchema = {
+    type: 'string',
+    enum: [
+        'pending',
+        'delivered',
+        'failed'
+    ],
+    title: 'DeliveryState'
 } as const;
 
 export const DueDateScopeSchema = {
@@ -2140,4 +2203,200 @@ export const ValidationErrorSchema = {
         'type'
     ],
     title: 'ValidationError'
+} as const;
+
+export const WebhookDeliveryPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        event: {
+            $ref: '#/components/schemas/WebhookEventType'
+        },
+        attempted_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Attempted At'
+        },
+        success: {
+            type: 'boolean',
+            title: 'Success'
+        },
+        state: {
+            $ref: '#/components/schemas/DeliveryState'
+        },
+        attempts: {
+            type: 'integer',
+            title: 'Attempts'
+        },
+        status_code: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Status Code'
+        },
+        error: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Error'
+        },
+        duration_ms: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Duration Ms'
+        },
+        next_attempt_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Next Attempt At'
+        }
+    },
+    type: 'object',
+    required: [
+        'id',
+        'event',
+        'attempted_at',
+        'success',
+        'state',
+        'attempts'
+    ],
+    title: 'WebhookDeliveryPublic',
+    description: 'A delivery as the owner sees it: when it was attempted, whether it\nsucceeded, and the response status or the error (FR-11.11).'
+} as const;
+
+export const WebhookEventTypeSchema = {
+    type: 'string',
+    enum: [
+        'task.ready',
+        'comment.added',
+        'test'
+    ],
+    title: 'WebhookEventType',
+    description: 'What a delivery says happened (FR-11.8).'
+} as const;
+
+export const WebhookKindSchema = {
+    type: 'string',
+    enum: [
+        'task',
+        'comment'
+    ],
+    title: 'WebhookKind',
+    description: 'The bot user\'s two webhooks (FR-11.1).'
+} as const;
+
+export const WebhookPublicSchema = {
+    properties: {
+        url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Url'
+        },
+        last_delivery: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/WebhookDeliveryPublic'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        }
+    },
+    type: 'object',
+    title: 'WebhookPublic'
+} as const;
+
+export const WebhookSecretIssuedSchema = {
+    properties: {
+        bot_user_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Bot User Id'
+        },
+        secret: {
+            type: 'string',
+            title: 'Secret'
+        }
+    },
+    type: 'object',
+    required: [
+        'bot_user_id',
+        'secret'
+    ],
+    title: 'WebhookSecretIssued',
+    description: 'The one response that carries a regenerated secret (FR-11.9).'
+} as const;
+
+export const WebhookSetSchema = {
+    properties: {
+        bot_user: {
+            $ref: '#/components/schemas/BotUserPublic'
+        },
+        secret: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Secret'
+        }
+    },
+    type: 'object',
+    required: [
+        'bot_user'
+    ],
+    title: 'WebhookSet',
+    description: 'The result of setting a webhook. `secret` is set only when this call\ngenerated it (the bot user\'s first webhook): it is shown once (FR-11.9).'
+} as const;
+
+export const WebhookUrlSchema = {
+    properties: {
+        url: {
+            type: 'string',
+            maxLength: 2048,
+            title: 'Url'
+        }
+    },
+    type: 'object',
+    required: [
+        'url'
+    ],
+    title: 'WebhookUrl',
+    description: 'The address a webhook is set to: http or https (FR-11.3).'
 } as const;

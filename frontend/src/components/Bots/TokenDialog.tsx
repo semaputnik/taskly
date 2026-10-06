@@ -25,29 +25,87 @@ interface TokenDialogProps {
 }
 
 /**
+ * What a one-time reveal calls the thing it shows, and says about it. A
+ * token and a webhook's secret are shown the same way and for the same
+ * reason, so they share the dialog and differ only in these words.
+ */
+export interface Secret {
+  title: string
+  description: string
+  /** "token" or "secret": what the buttons and the warnings call it. */
+  noun: string
+  /** The accessible name of the field the value is in. */
+  fieldLabel: string
+  /** What follows once it is gone, finishing "it cannot be shown again and …". */
+  consequence: string
+  /** A line under the value: when a token expires. */
+  note?: string
+  value: string
+}
+
+/**
  * The one time a bot user's token is on screen. Only its digest is stored, so
  * once this closes nothing can show it again (FR-08.13).
- *
- * It is the only dialog in the product whose dismissal cannot be taken back,
- * so it is not dismissed like the others: Escape and a click outside leave it
- * open, there is no corner control, and moving on takes an explicit word that
- * the token is stored — plus a second, deliberate step if it was never copied.
  */
-const TokenDialog = (props: TokenDialogProps) => (
-  <Dialog open={props.token !== null}>
-    {props.token !== null && (
-      // Keyed by the token, so a new one starts with nothing acknowledged.
-      <TokenReveal key={props.token} {...props} token={props.token} />
-    )}
-  </Dialog>
-)
-
-function TokenReveal({
+const TokenDialog = ({
   botName,
   token,
   expiresAt,
   onClose,
-}: TokenDialogProps & { token: string }) {
+}: TokenDialogProps) => (
+  <SecretDialog
+    onClose={onClose}
+    secret={
+      token === null
+        ? null
+        : {
+            title: `Token for ${botName}`,
+            description:
+              "The bot user sends this token as a bearer token to the REST API.",
+            noun: "token",
+            fieldLabel: "Bot token",
+            consequence: "the bot user needs a new one",
+            note: expiresAt
+              ? `It expires ${formatDateTime(expiresAt)}.`
+              : "It works until you revoke it.",
+            value: token,
+          }
+    }
+  />
+)
+
+/**
+ * The reveal of anything shown once and never again.
+ *
+ * It is the only dialog in the product whose dismissal cannot be taken back,
+ * so it is not dismissed like the others: Escape and a click outside leave it
+ * open, there is no corner control, and moving on takes an explicit word that
+ * the value is stored — plus a second, deliberate step if it was never copied.
+ */
+export const SecretDialog = ({
+  secret,
+  onClose,
+}: {
+  secret: Secret | null
+  onClose: () => void
+}) => (
+  <Dialog open={secret !== null}>
+    {secret !== null && (
+      // Keyed by the value, so a new one starts with nothing acknowledged.
+      <SecretReveal key={secret.value} secret={secret} onClose={onClose} />
+    )}
+  </Dialog>
+)
+
+function SecretReveal({
+  secret,
+  onClose,
+}: {
+  secret: Secret
+  onClose: () => void
+}) {
+  const { title, description, noun, fieldLabel, consequence, note, value } =
+    secret
   const [copiedText, copy] = useCopyToClipboard()
   // "Copied" on the button fades after a moment; having copied does not.
   const [everCopied, setEverCopied] = useState(false)
@@ -77,16 +135,14 @@ function TokenReveal({
       onInteractOutside={refuseDismissal}
     >
       <DialogHeader>
-        <DialogTitle>Token for {botName}</DialogTitle>
-        <DialogDescription>
-          The bot user sends this token as a bearer token to the REST API.
-        </DialogDescription>
+        <DialogTitle>{title}</DialogTitle>
+        <DialogDescription>{description}</DialogDescription>
       </DialogHeader>
 
       <Alert variant="destructive">
         <TriangleAlert />
         <AlertDescription>
-          Copy the token now. It won't be shown again, and it cannot be
+          Copy the {noun} now. It won't be shown again, and it cannot be
           retrieved later.
         </AlertDescription>
       </Alert>
@@ -94,9 +150,9 @@ function TokenReveal({
       <div className="flex items-center gap-2">
         <Input
           readOnly
-          aria-label="Bot token"
-          value={token}
-          className="font-mono text-xs"
+          aria-label={fieldLabel}
+          value={value}
+          className="font-mono text-base md:text-xs"
           onFocus={(event) => event.target.select()}
           onCopy={() => setEverCopied(true)}
         />
@@ -104,19 +160,15 @@ function TokenReveal({
           type="button"
           variant="outline"
           onClick={async () => {
-            if (await copy(token)) setEverCopied(true)
+            if (await copy(value)) setEverCopied(true)
           }}
         >
-          {copiedText === token ? <Check /> : <Copy />}
-          {copiedText === token ? "Copied" : "Copy"}
+          {copiedText === value ? <Check /> : <Copy />}
+          {copiedText === value ? "Copied" : "Copy"}
         </Button>
       </div>
 
-      <p className="text-muted-foreground text-sm">
-        {expiresAt
-          ? `It expires ${formatDateTime(expiresAt)}.`
-          : "It works until you revoke it."}
-      </p>
+      {note && <p className="text-muted-foreground text-sm">{note}</p>}
 
       <div className="flex items-center gap-2">
         <Checkbox
@@ -128,7 +180,7 @@ function TokenReveal({
           }}
         />
         <Label htmlFor={storedId} className="font-normal">
-          I have stored this token somewhere safe
+          I have stored this {noun} somewhere safe
         </Label>
       </div>
 
@@ -137,13 +189,13 @@ function TokenReveal({
           <Alert variant="destructive">
             <TriangleAlert />
             <AlertDescription>
-              You have not copied the token. Once this closes, it cannot be
-              shown again and the bot user needs a new one.
+              You have not copied the {noun}. Once this closes, it cannot be
+              shown again and {consequence}.
             </AlertDescription>
           </Alert>
         ) : dismissalRefused && !stored ? (
           <p className="text-muted-foreground text-sm">
-            This stays open until you confirm the token is stored.
+            This stays open until you confirm the {noun} is stored.
           </p>
         ) : null}
       </div>
@@ -156,7 +208,7 @@ function TokenReveal({
               variant="outline"
               onClick={() => setConfirmingUncopied(false)}
             >
-              Back to the token
+              Back to the {noun}
             </Button>
             <Button type="button" variant="destructive" onClick={leave}>
               Close without copying

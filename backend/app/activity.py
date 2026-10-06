@@ -28,7 +28,7 @@ from sqlalchemy import event
 from sqlalchemy.orm import Session
 from sqlmodel import col, select
 
-from app import deletions
+from app import deletions, webhook_events
 from app.deletions import DeletionKind
 from app.models import (
     ActivityAction,
@@ -371,6 +371,49 @@ def _write(session: Session) -> None:
             entry.actor_id = actor.user_id
             entry.actor_bot_user_id = actor.bot_user_id
     session.add_all(entries)
+
+    # Webhook events come from the same before-and-after reading, so they
+    # share its transaction (FR-11.10).
+    webhook_events.stage_events(
+        session,
+        ready=_ready_for_bots(pending, after),
+        comment_ids=[
+            comment_id
+            for comment_id, body_before in pending.comments.items()
+            if body_before is None
+        ],
+        actor_bot_user_id=actor.bot_user_id if actor else None,
+    )
+
+
+def _ready_for_bots(
+    pending: _Pending, after: dict[uuid.UUID, _TaskState]
+) -> list[tuple[uuid.UUID, uuid.UUID]]:
+    """
+    The (task, bot user) pairs where a task has just come to be ready for the
+    bot user: in To do with it as assignee, and not so before (FR-11.4).
+
+    A task being deleted, or coming back from a deletion, is never one: a
+    restore is not an event (FR-11.5), and a task that is gone has nobody to
+    act on it.
+    """
+    ready = []
+    for task_id, before in pending.before.items():
+        state = after.get(task_id)
+        if state is None or state.deletion_id is not None:
+            continue
+        if before is not None and before.deletion_id is not None:
+            continue
+        bot_user_id = state.assignee_bot_user_id
+        if state.status is not TaskStatus.TODO or bot_user_id is None:
+            continue
+        if (
+            before is None
+            or before.status is not TaskStatus.TODO
+            or before.assignee_bot_user_id != bot_user_id
+        ):
+            ready.append((task_id, bot_user_id))
+    return ready
 
 
 @event.listens_for(Session, "after_transaction_end")

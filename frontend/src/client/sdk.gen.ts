@@ -2,7 +2,7 @@
 
 import { type Client, formDataBodySerializer, type Options as Options2, type TDataShape } from './client';
 import { client } from './client.gen';
-import type { activityReadActivityLogData, activityReadActivityLogErrors, activityReadActivityLogResponses, activityRestoreFromActivityEntryData, activityRestoreFromActivityEntryErrors, activityRestoreFromActivityEntryResponses, attachmentsDeleteAttachmentData, attachmentsDeleteAttachmentErrors, attachmentsDeleteAttachmentResponses, attachmentsDownloadAttachmentData, attachmentsDownloadAttachmentErrors, attachmentsDownloadAttachmentResponses, attachmentsReadAttachmentsData, attachmentsReadAttachmentsErrors, attachmentsReadAttachmentsResponses, attachmentsUploadAttachmentData, attachmentsUploadAttachmentErrors, attachmentsUploadAttachmentResponses, botsCreateBotUserData, botsCreateBotUserErrors, botsCreateBotUserResponses, botsDeleteBotUserData, botsDeleteBotUserErrors, botsDeleteBotUserResponses, botsIssueBotUserTokenData, botsIssueBotUserTokenErrors, botsIssueBotUserTokenResponses, botsReadBotUserData, botsReadBotUserErrors, botsReadBotUserResponses, botsReadBotUsersData, botsReadBotUsersErrors, botsReadBotUsersResponses, botsRevokeBotUserTokenData, botsRevokeBotUserTokenErrors, botsRevokeBotUserTokenResponses, botsUpdateBotUserData, botsUpdateBotUserErrors, botsUpdateBotUserResponses, commentsCreateCommentData, commentsCreateCommentErrors, commentsCreateCommentResponses, commentsDeleteCommentData, commentsDeleteCommentErrors, commentsDeleteCommentResponses, commentsReadCommentsData, commentsReadCommentsErrors, commentsReadCommentsResponses, commentsUpdateCommentData, commentsUpdateCommentErrors, commentsUpdateCommentResponses, loginRecoverData, loginRecoverErrors, loginRecoverResponses, loginRecoveryOptionsData, loginRecoveryOptionsErrors, loginRecoveryOptionsResponses, loginRegisterData, loginRegisterErrors, loginRegisterResponses, loginRegistrationOptionsData, loginRegistrationOptionsErrors, loginRegistrationOptionsResponses, loginSignInData, loginSignInErrors, loginSignInOptionsData, loginSignInOptionsResponses, loginSignInResponses, loginTestTokenData, loginTestTokenResponses, privateCreateUserData, privateCreateUserErrors, privateCreateUserResponses, privateIssueRecoveryCodeData, privateIssueRecoveryCodeErrors, privateIssueRecoveryCodeResponses, projectsArchiveProjectData, projectsArchiveProjectErrors, projectsArchiveProjectResponses, projectsCreateProjectData, projectsCreateProjectErrors, projectsCreateProjectResponses, projectsDeleteProjectData, projectsDeleteProjectErrors, projectsDeleteProjectResponses, projectsReadProjectData, projectsReadProjectErrors, projectsReadProjectResponses, projectsReadProjectsData, projectsReadProjectsErrors, projectsReadProjectsResponses, projectsUnarchiveProjectData, projectsUnarchiveProjectErrors, projectsUnarchiveProjectResponses, projectsUpdateProjectData, projectsUpdateProjectErrors, projectsUpdateProjectResponses, tagsCreateTagData, tagsCreateTagErrors, tagsCreateTagResponses, tagsDeleteTagData, tagsDeleteTagErrors, tagsDeleteTagResponses, tagsDismissTagDuplicatesData, tagsDismissTagDuplicatesErrors, tagsDismissTagDuplicatesResponses, tagsMergeTagsData, tagsMergeTagsErrors, tagsMergeTagsResponses, tagsPreviewTagMergeData, tagsPreviewTagMergeErrors, tagsPreviewTagMergeResponses, tagsReadTagData, tagsReadTagDuplicatesData, tagsReadTagDuplicatesResponses, tagsReadTagErrors, tagsReadTagResponses, tagsReadTagsData, tagsReadTagsErrors, tagsReadTagsResponses, tagsRenameTagData, tagsRenameTagErrors, tagsRenameTagResponses, tasksBulkDeleteTasksData, tasksBulkDeleteTasksErrors, tasksBulkDeleteTasksResponses, tasksBulkUpdateTasksData, tasksBulkUpdateTasksErrors, tasksBulkUpdateTasksResponses, tasksCreateTaskData, tasksCreateTaskErrors, tasksCreateTaskResponses, tasksDeleteTaskData, tasksDeleteTaskErrors, tasksDeleteTaskResponses, tasksReadTaskData, tasksReadTaskErrors, tasksReadTaskResponses, tasksReadTasksData, tasksReadTasksErrors, tasksReadTasksResponses, tasksUpdateTaskData, tasksUpdateTaskErrors, tasksUpdateTaskResponses, usersAddPasskeyData, usersAddPasskeyErrors, usersAddPasskeyResponses, usersConfirmationOptionsData, usersConfirmationOptionsResponses, usersDeleteUserMeData, usersDeleteUserMeResponses, usersIssueRecoveryCodeData, usersIssueRecoveryCodeErrors, usersIssueRecoveryCodeResponses, usersNewPasskeyOptionsData, usersNewPasskeyOptionsErrors, usersNewPasskeyOptionsResponses, usersReadPasskeysData, usersReadPasskeysResponses, usersReadUserMeData, usersReadUserMeResponses, usersReadUsersData, usersReadUsersErrors, usersReadUsersResponses, usersRemovePasskeyData, usersRemovePasskeyErrors, usersRemovePasskeyResponses, usersSignOutEverywhereData, usersSignOutEverywhereResponses, usersUpdateUserMeData, usersUpdateUserMeErrors, usersUpdateUserMeResponses, utilsHealthCheckData, utilsHealthCheckResponses, utilsTestEmailData, utilsTestEmailErrors, utilsTestEmailResponses } from './types.gen';
+import type { activityReadActivityLogData, activityReadActivityLogErrors, activityReadActivityLogResponses, activityRestoreFromActivityEntryData, activityRestoreFromActivityEntryErrors, activityRestoreFromActivityEntryResponses, attachmentsDeleteAttachmentData, attachmentsDeleteAttachmentErrors, attachmentsDeleteAttachmentResponses, attachmentsDownloadAttachmentData, attachmentsDownloadAttachmentErrors, attachmentsDownloadAttachmentResponses, attachmentsReadAttachmentsData, attachmentsReadAttachmentsErrors, attachmentsReadAttachmentsResponses, attachmentsUploadAttachmentData, attachmentsUploadAttachmentErrors, attachmentsUploadAttachmentResponses, botsClearBotUserWebhookData, botsClearBotUserWebhookErrors, botsClearBotUserWebhookResponses, botsCreateBotUserData, botsCreateBotUserErrors, botsCreateBotUserResponses, botsDeleteBotUserData, botsDeleteBotUserErrors, botsDeleteBotUserResponses, botsIssueBotUserTokenData, botsIssueBotUserTokenErrors, botsIssueBotUserTokenResponses, botsReadBotUserData, botsReadBotUserErrors, botsReadBotUserResponses, botsReadBotUsersData, botsReadBotUsersErrors, botsReadBotUsersResponses, botsRegenerateBotUserWebhookSecretData, botsRegenerateBotUserWebhookSecretErrors, botsRegenerateBotUserWebhookSecretResponses, botsRevokeBotUserTokenData, botsRevokeBotUserTokenErrors, botsRevokeBotUserTokenResponses, botsSetBotUserWebhookData, botsSetBotUserWebhookErrors, botsSetBotUserWebhookResponses, botsTestBotUserWebhookData, botsTestBotUserWebhookErrors, botsTestBotUserWebhookResponses, botsUpdateBotUserData, botsUpdateBotUserErrors, botsUpdateBotUserResponses, commentsCreateCommentData, commentsCreateCommentErrors, commentsCreateCommentResponses, commentsDeleteCommentData, commentsDeleteCommentErrors, commentsDeleteCommentResponses, commentsReadCommentsData, commentsReadCommentsErrors, commentsReadCommentsResponses, commentsUpdateCommentData, commentsUpdateCommentErrors, commentsUpdateCommentResponses, loginRecoverData, loginRecoverErrors, loginRecoverResponses, loginRecoveryOptionsData, loginRecoveryOptionsErrors, loginRecoveryOptionsResponses, loginRegisterData, loginRegisterErrors, loginRegisterResponses, loginRegistrationOptionsData, loginRegistrationOptionsErrors, loginRegistrationOptionsResponses, loginSignInData, loginSignInErrors, loginSignInOptionsData, loginSignInOptionsResponses, loginSignInResponses, loginTestTokenData, loginTestTokenResponses, privateCreateUserData, privateCreateUserErrors, privateCreateUserResponses, privateIssueRecoveryCodeData, privateIssueRecoveryCodeErrors, privateIssueRecoveryCodeResponses, projectsArchiveProjectData, projectsArchiveProjectErrors, projectsArchiveProjectResponses, projectsCreateProjectData, projectsCreateProjectErrors, projectsCreateProjectResponses, projectsDeleteProjectData, projectsDeleteProjectErrors, projectsDeleteProjectResponses, projectsReadProjectData, projectsReadProjectErrors, projectsReadProjectResponses, projectsReadProjectsData, projectsReadProjectsErrors, projectsReadProjectsResponses, projectsUnarchiveProjectData, projectsUnarchiveProjectErrors, projectsUnarchiveProjectResponses, projectsUpdateProjectData, projectsUpdateProjectErrors, projectsUpdateProjectResponses, tagsCreateTagData, tagsCreateTagErrors, tagsCreateTagResponses, tagsDeleteTagData, tagsDeleteTagErrors, tagsDeleteTagResponses, tagsDismissTagDuplicatesData, tagsDismissTagDuplicatesErrors, tagsDismissTagDuplicatesResponses, tagsMergeTagsData, tagsMergeTagsErrors, tagsMergeTagsResponses, tagsPreviewTagMergeData, tagsPreviewTagMergeErrors, tagsPreviewTagMergeResponses, tagsReadTagData, tagsReadTagDuplicatesData, tagsReadTagDuplicatesResponses, tagsReadTagErrors, tagsReadTagResponses, tagsReadTagsData, tagsReadTagsErrors, tagsReadTagsResponses, tagsRenameTagData, tagsRenameTagErrors, tagsRenameTagResponses, tasksBulkDeleteTasksData, tasksBulkDeleteTasksErrors, tasksBulkDeleteTasksResponses, tasksBulkUpdateTasksData, tasksBulkUpdateTasksErrors, tasksBulkUpdateTasksResponses, tasksCreateTaskData, tasksCreateTaskErrors, tasksCreateTaskResponses, tasksDeleteTaskData, tasksDeleteTaskErrors, tasksDeleteTaskResponses, tasksReadTaskData, tasksReadTaskErrors, tasksReadTaskResponses, tasksReadTasksData, tasksReadTasksErrors, tasksReadTasksResponses, tasksUpdateTaskData, tasksUpdateTaskErrors, tasksUpdateTaskResponses, usersAddPasskeyData, usersAddPasskeyErrors, usersAddPasskeyResponses, usersConfirmationOptionsData, usersConfirmationOptionsResponses, usersDeleteUserMeData, usersDeleteUserMeResponses, usersIssueRecoveryCodeData, usersIssueRecoveryCodeErrors, usersIssueRecoveryCodeResponses, usersNewPasskeyOptionsData, usersNewPasskeyOptionsErrors, usersNewPasskeyOptionsResponses, usersReadPasskeysData, usersReadPasskeysResponses, usersReadUserMeData, usersReadUserMeResponses, usersReadUsersData, usersReadUsersErrors, usersReadUsersResponses, usersRemovePasskeyData, usersRemovePasskeyErrors, usersRemovePasskeyResponses, usersSignOutEverywhereData, usersSignOutEverywhereResponses, usersUpdateUserMeData, usersUpdateUserMeErrors, usersUpdateUserMeResponses, utilsHealthCheckData, utilsHealthCheckResponses, utilsTestEmailData, utilsTestEmailErrors, utilsTestEmailResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -953,7 +953,8 @@ export class ActivityService {
     /**
      * Read Activity Log
      *
-     * Retrieve the current user's activity log, newest first.
+     * Retrieve the current user's activity log, newest first unless `order` says
+     * `oldest` (FR-10.10).
      *
      * `actor_bot_user_id` narrows it to one bot user's own changes — what an
      * operator asks when they want to read an integration rather than their
@@ -965,6 +966,9 @@ export class ActivityService {
      * can still answer one question at a time. The groups do not overlap. The
      * two narrowings are independent and combine: what this integration
      * finished is both of them at once.
+     *
+     * `by_user` keeps the user's own changes, the other side of `by_bots`: what
+     * "You" is in the log's actor menu.
      *
      * `by_bots` keeps the changes any of the user's bot users made, and `since`
      * the entries written after a moment. Together they are what the dashboard
@@ -978,6 +982,10 @@ export class ActivityService {
      * records, so one that is not theirs, or does not exist, is a 404 — the
      * same answer for both — rather than a history that looks empty. A deleted
      * task's history still reads.
+     *
+     * `order` turns the log around. It changes which end a page starts from and
+     * nothing about what the log holds, so it combines with every narrowing and
+     * with `skip` and `limit`.
      *
      * Always the requesting user's own entries and nothing wider: there is no
      * parameter or role that reaches another user's log, the superuser's
@@ -1022,7 +1030,8 @@ export class BotsService {
      * Read Bot Users
      *
      * Retrieve the current user's bot users, with their scopes, oldest first.
-     * Deleted bot users are not among them.
+     * Deleted bot users are not among them, unless `deleted` asks for them
+     * instead: then it is only those, the most recently deleted first.
      */
     public static readBotUsers<ThrowOnError extends boolean = true>(options?: Options<botsReadBotUsersData, ThrowOnError>) {
         return (options?.client ?? client).get<botsReadBotUsersResponses, botsReadBotUsersErrors, ThrowOnError>({
@@ -1155,6 +1164,82 @@ export class BotsService {
                 'Content-Type': 'application/json',
                 ...options.headers
             }
+        });
+    }
+    
+    /**
+     * Clear Bot User Webhook
+     *
+     * Clear one of the bot user's webhooks (FR-11.2). Events still waiting for
+     * it are discarded, and so is its last delivery. Clearing the second one
+     * also drops the secret: the next webhook set generates and shows a new one.
+     *
+     * Clearing a webhook that is not set changes nothing.
+     */
+    public static clearBotUserWebhook<ThrowOnError extends boolean = true>(options: Options<botsClearBotUserWebhookData, ThrowOnError>) {
+        return (options.client ?? client).delete<botsClearBotUserWebhookResponses, botsClearBotUserWebhookErrors, ThrowOnError>({
+            responseType: 'json',
+            security: [{ scheme: 'bearer', type: 'http' }],
+            url: '/api/v1/bot-users/{bot_user_id}/webhooks/{kind}',
+            ...options
+        });
+    }
+    
+    /**
+     * Set Bot User Webhook
+     *
+     * Set or change one of the bot user's two webhooks (FR-11.1): `task` for tasks that become ready for it, `comment` for comments on tasks it is involved in. Owner only; the bot user itself cannot call this (FR-11.2).
+     *
+     * The address has to be http or https, and is refused with the rule it breaks if it resolves to loopback or a private range (FR-11.3). The bot user's first webhook generates its secret, which this response carries and no other does; later calls return `secret: null`.
+     *
+     * What a delivery looks like, and how to verify it, is in the delivery contract under the `bots` tag.
+     */
+    public static setBotUserWebhook<ThrowOnError extends boolean = true>(options: Options<botsSetBotUserWebhookData, ThrowOnError>) {
+        return (options.client ?? client).put<botsSetBotUserWebhookResponses, botsSetBotUserWebhookErrors, ThrowOnError>({
+            responseType: 'json',
+            security: [{ scheme: 'bearer', type: 'http' }],
+            url: '/api/v1/bot-users/{bot_user_id}/webhooks/{kind}',
+            ...options,
+            headers: {
+                'Content-Type': 'application/json',
+                ...options.headers
+            }
+        });
+    }
+    
+    /**
+     * Regenerate Bot User Webhook Secret
+     *
+     * Replace the bot user's webhook secret (FR-11.9). The new secret is in this
+     * response and nowhere else, and signs every delivery attempted from now on,
+     * including retries of events that are already waiting.
+     *
+     * A bot user with no webhook set has no secret to regenerate.
+     */
+    public static regenerateBotUserWebhookSecret<ThrowOnError extends boolean = true>(options: Options<botsRegenerateBotUserWebhookSecretData, ThrowOnError>) {
+        return (options.client ?? client).post<botsRegenerateBotUserWebhookSecretResponses, botsRegenerateBotUserWebhookSecretErrors, ThrowOnError>({
+            responseType: 'json',
+            security: [{ scheme: 'bearer', type: 'http' }],
+            url: '/api/v1/bot-users/{bot_user_id}/webhook-secret',
+            ...options
+        });
+    }
+    
+    /**
+     * Test Bot User Webhook
+     *
+     * Send a `test` event to the webhook at once, without retries, and return
+     * how it went (FR-11.12): `success`, and the response `status_code` or the
+     * `error`. It is the webhook's last delivery from then on.
+     *
+     * A test that fails is still a 200: what the receiver did is the answer.
+     */
+    public static testBotUserWebhook<ThrowOnError extends boolean = true>(options: Options<botsTestBotUserWebhookData, ThrowOnError>) {
+        return (options.client ?? client).post<botsTestBotUserWebhookResponses, botsTestBotUserWebhookErrors, ThrowOnError>({
+            responseType: 'json',
+            security: [{ scheme: 'bearer', type: 'http' }],
+            url: '/api/v1/bot-users/{bot_user_id}/webhooks/{kind}/test',
+            ...options
         });
     }
 }
