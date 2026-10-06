@@ -28,7 +28,7 @@ test("Registering makes a passkey and signs in", async ({ page }) => {
   const [passkey] = await authenticator.credentials()
   // Discoverable, so signing in can ask for nothing (FR-12.3).
   expect(passkey.isResidentCredential).toBe(true)
-  await page.goto("/settings?tab=passkeys")
+  await page.goto("/settings")
   await expect(
     page.getByTestId("passkey-list").getByRole("listitem"),
   ).toHaveCount(1)

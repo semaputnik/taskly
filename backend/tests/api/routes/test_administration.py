@@ -56,7 +56,25 @@ def test_the_account_list_carries_account_fields_only(
             "is_active",
             "is_superuser",
             "created_at",
+            "passkey_count",
+            "last_sign_in_at",
         }
+
+
+def test_the_account_list_counts_passkeys_and_says_when_one_last_signed_in(
+    client: TestClient, db: Session, superuser_token_headers: dict[str, str]
+) -> None:
+    held, _ = _new_user(client, db)
+    lost = create_random_user(db)
+
+    r = client.get(f"{API}/users/", headers=superuser_token_headers)
+
+    accounts = {account["email"]: account for account in r.json()["data"]}
+    assert accounts[held.email]["passkey_count"] == 1
+    # Signing in is what last used the passkey.
+    assert accounts[held.email]["last_sign_in_at"] is not None
+    assert accounts[lost.email]["passkey_count"] == 0
+    assert accounts[lost.email]["last_sign_in_at"] is None
 
 
 # --- Everything else a template superuser could do is gone --------------------

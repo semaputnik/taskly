@@ -1,23 +1,38 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router"
+import { createFileRoute } from "@tanstack/react-router"
 import { z } from "zod"
 
-import DeleteAccount from "@/components/UserSettings/DeleteAccount"
-import Passkeys from "@/components/UserSettings/Passkeys"
-import UserInformation from "@/components/UserSettings/UserInformation"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Account } from "@/components/Settings/Account"
+import { PaperlessSection } from "@/components/Settings/Paperless"
+import { Passkeys } from "@/components/Settings/Passkeys"
+import { Profile } from "@/components/Settings/Profile"
+import { Sessions } from "@/components/Settings/Sessions"
+import { Users } from "@/components/Settings/Users"
 import useAuth from "@/hooks/useAuth"
-
-const TABS = ["my-profile", "passkeys", "danger-zone"] as const
+import {
+  currentUserQuery,
+  passkeysQuery,
+  usersQuery,
+  warmQuery,
+} from "@/lib/serverState"
 
 const settingsSearch = z.object({
-  tab: z.enum(TABS).optional(),
   // Set after a recovery code was spent (FR-12.17).
   recovered: z.boolean().optional(),
 })
 
 export const Route = createFileRoute("/_layout/settings")({
-  component: UserSettings,
+  component: Settings,
   validateSearch: settingsSearch,
+  // The requests start as soon as the route is matched, beside the download
+  // of the page's own code. The users' list is asked for only once the
+  // account is known to be the superuser's.
+  loader: ({ context }) => {
+    const { queryClient } = context
+    void warmQuery(queryClient, passkeysQuery())
+    void warmQuery(queryClient, currentUserQuery()).then((user) => {
+      if (user?.is_superuser) void warmQuery(queryClient, usersQuery())
+    })
+  },
   head: () => ({
     meta: [
       {
@@ -27,52 +42,35 @@ export const Route = createFileRoute("/_layout/settings")({
   }),
 })
 
-function UserSettings() {
-  const { user: currentUser } = useAuth()
-  const { tab = "my-profile", recovered } = Route.useSearch()
-  const navigate = useNavigate({ from: Route.fullPath })
+/**
+ * One document, in the order a person reaches for things: who I am, what
+ * signs me in, what ends it, where my PDFs go, who else is here (the
+ * superuser's only) and the one act with no way back. Each section saves in
+ * place; there are no tabs.
+ */
+function Settings() {
+  const { user } = useAuth()
+  const { recovered } = Route.useSearch()
 
-  if (!currentUser) {
+  if (!user) {
     return null
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
-        <p className="text-muted-foreground">
-          Manage your account settings and preferences
-        </p>
-      </div>
-
-      <Tabs
-        value={tab}
-        onValueChange={(value) =>
-          navigate({
-            search: (prev) => ({
-              ...prev,
-              tab: value as (typeof TABS)[number],
-              recovered: undefined,
-            }),
-          })
-        }
-        className="gap-4"
-      >
-        <TabsList>
-          <TabsTrigger value="my-profile">My profile</TabsTrigger>
-          <TabsTrigger value="passkeys">Passkeys</TabsTrigger>
-          <TabsTrigger value="danger-zone">Danger zone</TabsTrigger>
-        </TabsList>
-        <TabsContent value="my-profile">
-          <UserInformation />
-        </TabsContent>
-        <TabsContent value="passkeys">
-          <Passkeys recovered={recovered} />
-        </TabsContent>
-        <TabsContent value="danger-zone">
-          <DeleteAccount />
-        </TabsContent>
-      </Tabs>
+    <div className="page-column">
+      <h1 className="mb-1 text-[22px] leading-[1.2] font-semibold tracking-[-0.015em]">
+        Settings
+      </h1>
+      <p className="text-ink-3">
+        Your account on this installation, and what signs you in.
+      </p>
+      <Profile />
+      <Passkeys recovered={recovered} />
+      <Sessions />
+      {/* Reserved for the Paperless connection (#211). */}
+      <PaperlessSection />
+      <Users />
+      <Account />
     </div>
   )
 }

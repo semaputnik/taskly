@@ -21,7 +21,11 @@ import { toastError, toastSuccess } from "@/lib/toasts"
 // What the confirming button says, and what the instruction above it names.
 const CONFIRM = "Delete my account"
 
-const DeleteConfirmation = () => {
+const DeleteConfirmation = ({
+  triggerClassName,
+}: {
+  triggerClassName?: string
+}) => {
   const reportChange = useReportChange()
   const { handleSubmit } = useForm()
   const { logout } = useAuth()
@@ -43,9 +47,9 @@ const DeleteConfirmation = () => {
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <Button variant="destructive" className="mt-3">
-          Delete Account
-        </Button>
+        <button type="button" className={triggerClassName}>
+          Delete my account
+        </button>
       </DialogTrigger>
       <DialogContent>
         <form onSubmit={handleSubmit(onSubmit)}>

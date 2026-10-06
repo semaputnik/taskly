@@ -452,7 +452,8 @@ export function staleKeys(change: Change): QueryKey[] {
     case "account changed":
       return [[]]
     case "passkeys changed":
-      return [[ROOT.passkeys]]
+      // The superuser's list of users counts each account's passkeys.
+      return [[ROOT.passkeys], [ROOT.users]]
     case "users changed":
       return [[ROOT.users]]
   }

@@ -539,6 +539,16 @@ export type PasskeyPublic = {
 };
 
 /**
+ * PasskeyRename
+ */
+export type PasskeyRename = {
+    /**
+     * Name
+     */
+    name: string;
+};
+
+/**
  * PasskeysPublic
  */
 export type PasskeysPublic = {
@@ -1149,6 +1159,48 @@ export type Token = {
 };
 
 /**
+ * UserListed
+ *
+ * An account as the superuser's list shows it: the account fields, how many
+ * passkeys it holds, and when one of them last signed it in (FR-09.2). Nothing
+ * about what the account holds or does (FR-10.7).
+ */
+export type UserListed = {
+    /**
+     * Email
+     */
+    email: string;
+    /**
+     * Is Active
+     */
+    is_active?: boolean;
+    /**
+     * Is Superuser
+     */
+    is_superuser?: boolean;
+    /**
+     * Full Name
+     */
+    full_name?: string | null;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Created At
+     */
+    created_at?: string | null;
+    /**
+     * Passkey Count
+     */
+    passkey_count: number;
+    /**
+     * Last Sign In At
+     */
+    last_sign_in_at?: string | null;
+};
+
+/**
  * UserPublic
  */
 export type UserPublic = {
@@ -1199,7 +1251,7 @@ export type UsersPublic = {
     /**
      * Data
      */
-    data: Array<UserPublic>;
+    data: Array<UserListed>;
     /**
      * Count
      */
@@ -1721,6 +1773,36 @@ export type usersRemovePasskeyResponses = {
 };
 
 export type usersRemovePasskeyResponse = usersRemovePasskeyResponses[keyof usersRemovePasskeyResponses];
+
+export type usersRenamePasskeyData = {
+    body: PasskeyRename;
+    path: {
+        /**
+         * Passkey Id
+         */
+        passkey_id: string;
+    };
+    query?: never;
+    url: '/api/v1/users/me/passkeys/{passkey_id}';
+};
+
+export type usersRenamePasskeyErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type usersRenamePasskeyError = usersRenamePasskeyErrors[keyof usersRenamePasskeyErrors];
+
+export type usersRenamePasskeyResponses = {
+    /**
+     * Successful Response
+     */
+    200: PasskeyPublic;
+};
+
+export type usersRenamePasskeyResponse = usersRenamePasskeyResponses[keyof usersRenamePasskeyResponses];
 
 export type usersSignOutEverywhereData = {
     body?: never;

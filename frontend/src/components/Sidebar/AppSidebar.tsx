@@ -80,10 +80,6 @@ export function Navigation() {
   const { user: currentUser } = useAuth()
   const counts = useNavCounts()
 
-  const items = currentUser?.is_superuser
-    ? [...baseItems, { title: "Admin", path: "/admin" }]
-    : baseItems
-
   return (
     <nav
       aria-label="Main"
@@ -93,7 +89,7 @@ export function Navigation() {
     >
       <Wordmark className={cn(navItemFocus, "self-start rounded-sm")} />
       <ul className="flex flex-col gap-0.5">
-        {items.map((item) => (
+        {baseItems.map((item) => (
           <Item key={item.path} item={item} count={counts[item.path]} />
         ))}
       </ul>

@@ -56,7 +56,8 @@ const useAuth = () => {
       // (FR-12.17).
       navigate({
         to: "/settings",
-        search: { tab: "passkeys", recovered: true },
+        search: { recovered: true },
+        hash: "passkeys",
       })
     },
     onError: reportUnlessDismissed,

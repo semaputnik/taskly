@@ -2,14 +2,11 @@ import { Link as RouterLink } from "@tanstack/react-router"
 import { ChevronDown, LogOut, Settings } from "lucide-react"
 
 import type { UserPublic } from "@/client"
-import { type Theme, useTheme } from "@/components/theme-provider"
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
@@ -17,46 +14,9 @@ import useAuth from "@/hooks/useAuth"
 import { cn } from "@/lib/utils"
 import { navItemFocus } from "./styles"
 
-const THEMES: { value: Theme; label: string; testId?: string }[] = [
-  { value: "light", label: "Light", testId: "light-mode" },
-  { value: "dark", label: "Dark", testId: "dark-mode" },
-  { value: "system", label: "System" },
-]
-
-/**
- * The appearance choice as it sits in an account menu: a label and the three
- * themes as a radio group. The desktop's account row and the phone's account
- * control share it.
- */
-export function AppearanceItems({ itemClassName }: { itemClassName?: string }) {
-  const { theme, setTheme } = useTheme()
-  return (
-    <>
-      <DropdownMenuLabel className="text-muted-foreground text-xs font-normal">
-        Appearance
-      </DropdownMenuLabel>
-      <DropdownMenuRadioGroup
-        value={theme}
-        onValueChange={(value) => setTheme(value as Theme)}
-      >
-        {THEMES.map(({ value, label, testId }) => (
-          <DropdownMenuRadioItem
-            key={value}
-            value={value}
-            data-testid={testId}
-            className={itemClassName}
-          >
-            {label}
-          </DropdownMenuRadioItem>
-        ))}
-      </DropdownMenuRadioGroup>
-    </>
-  )
-}
-
 /**
  * The account row at the foot of the navigation: an initial avatar and the
- * name, which open the account menu (appearance, log out), beside a settings
+ * name, which open the account menu (log out), beside a settings
  * glyph. Settings is a place, so it is a link and not a menu entry.
  */
 export function User({ user }: { user: UserPublic | null | undefined }) {
@@ -100,8 +60,6 @@ export function User({ user }: { user: UserPublic | null | undefined }) {
               </p>
             )}
           </DropdownMenuLabel>
-          <DropdownMenuSeparator />
-          <AppearanceItems />
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={logout}>
             <LogOut />

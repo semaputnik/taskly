@@ -226,6 +226,58 @@ def test_adding_a_passkey_the_account_already_holds_is_excluded(
     assert excluded == [b64(current.credential_id)]
 
 
+# --- Renaming ---------------------------------------------------------------
+
+
+def test_renaming_a_passkey_needs_only_the_session(
+    client: TestClient, db: Session
+) -> None:
+    _, _, headers = _signed_in(client, db)
+    [passkey_id] = _passkey_ids(client, headers)
+
+    r = client.patch(
+        f"{API}/users/me/passkeys/{passkey_id}",
+        headers=headers,
+        json={"name": "  Work laptop "},
+    )
+
+    assert r.status_code == 200, r.text
+    assert r.json()["name"] == "Work laptop"
+    [listed] = client.get(f"{API}/users/me/passkeys", headers=headers).json()["data"]
+    assert listed["name"] == "Work laptop"
+
+
+def test_a_blank_passkey_name_is_refused(client: TestClient, db: Session) -> None:
+    _, _, headers = _signed_in(client, db)
+    [passkey_id] = _passkey_ids(client, headers)
+
+    r = client.patch(
+        f"{API}/users/me/passkeys/{passkey_id}", headers=headers, json={"name": "  "}
+    )
+
+    assert r.status_code == 422
+    [listed] = client.get(f"{API}/users/me/passkeys", headers=headers).json()["data"]
+    assert listed["name"] == "Test passkey"
+
+
+def test_someone_elses_passkey_cannot_be_renamed(
+    client: TestClient, db: Session
+) -> None:
+    _, _, headers = _signed_in(client, db)
+    _, _, their_headers = _signed_in(client, db)
+    [their_id] = _passkey_ids(client, their_headers)
+
+    r = client.patch(
+        f"{API}/users/me/passkeys/{their_id}", headers=headers, json={"name": "Mine"}
+    )
+
+    assert r.status_code == 404
+    [listed] = client.get(f"{API}/users/me/passkeys", headers=their_headers).json()[
+        "data"
+    ]
+    assert listed["name"] == "Test passkey"
+
+
 # --- Removing ---------------------------------------------------------------
 
 
