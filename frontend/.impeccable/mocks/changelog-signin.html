@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Taskly · Sign in, sign up, recover (slice 5 mock)</title>
+<style>
+  :root { --page:#ffffff; --ink:#0b0e11; --ink-2:#3d444d; --ink-3:#656d76; --rule:#e6e8eb; --rule-strong:#c9cdd2; --hover:#f3f4f6; --late:#cf222e;
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", "Noto Sans", Arial, sans-serif; --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:#dcdfe3; font-family:var(--font); color:var(--ink); -webkit-font-smoothing:antialiased; }
+  a { color:inherit; text-decoration:none; }
+  .foot a { text-decoration:underline; text-underline-offset:3px; }
+  .stage { display:flex; gap:32px; justify-content:center; align-items:stretch; padding:40px 24px 60px; flex-wrap:wrap; }
+  .shot { width:420px; min-height:560px; background:var(--page); border-radius:10px; box-shadow:0 20px 50px -20px rgba(0,0,0,.3); padding:40px 44px; display:flex; flex-direction:column; }
+  .label { text-align:center; font-size:13px; color:#555; margin-top:12px; }
+  .wordmark { font-weight:600; letter-spacing:-.01em; font-size:15px; }
+  .mid { flex:1; display:flex; flex-direction:column; justify-content:center; gap:12px; }
+  h1 { margin:0; font-size:26px; font-weight:600; letter-spacing:-.02em; line-height:1.2; }
+  p { margin:0; color:var(--ink-3); line-height:1.5; }
+  .btn { display:flex; align-items:center; justify-content:center; gap:10px; height:44px; border-radius:8px; background:var(--ink); color:var(--page); font-weight:500; margin-top:12px; }
+  .btn svg { width:18px; height:18px; }
+  .field { border-bottom:1px solid var(--rule-strong); height:44px; display:flex; align-items:center; font-size:16px; color:var(--ink); }
+  .field.empty { color:var(--ink-3); }
+  .field .lbl { font-size:12.5px; color:var(--ink-3); margin-right:12px; min-width:88px; }
+  .field.code { font-family:var(--mono); letter-spacing:.12em; }
+  .foot { font-size:13.5px; color:var(--ink-3); display:flex; flex-direction:column; gap:6px; margin-top:8px; }
+  .foot a { color:var(--ink); font-weight:500; }
+  .err { color:var(--late); font-size:13.5px; font-weight:500; }
+  .unsupported { font-size:13.5px; color:var(--ink-3); padding:12px 0 0; border-top:1px solid var(--rule); margin-top:16px; }
+  .bottom { font-size:12.5px; color:var(--ink-3); display:flex; justify-content:space-between; }
+</style>
+</head>
+<body>
+<div class="stage">
+  <div>
+    <div class="shot">
+      <div class="wordmark">Taskly</div>
+      <div class="mid">
+        <h1>Sign in</h1>
+        <p>Your browser will offer the passkeys it holds for this installation. Nothing to type.</p>
+        <a href="#" class="btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="4"/><path d="M2 20c0-3.5 3-6 7-6 1.2 0 2.3.2 3.3.6M17 12a3 3 0 0 1 1 5.8V21l-2 2-2-2v-3.2A3 3 0 0 1 17 12z"/></svg>Sign in with a passkey</a>
+        <div class="foot"><span>Lost every passkey? <a href="#">Use a recovery code</a></span><span>New here? <a href="#">Create an account</a></span></div>
+      </div>
+      <div class="bottom"><span>Self-hosted at taskly.local</span><span>Appearance: System</span></div>
+    </div>
+    <div class="label">Sign in: one action, no fields</div>
+  </div>
+
+  <div>
+    <div class="shot">
+      <div class="wordmark">Taskly</div>
+      <div class="mid">
+        <h1>Create an account</h1>
+        <p>Your e-mail names the account. The passkey your browser creates next is how you will sign in.</p>
+        <div class="field"><span class="lbl">Email</span>mara@example.org</div>
+        <div class="field empty"><span class="lbl">Name</span>Optional</div>
+        <a href="#" class="btn">Create a passkey and sign in</a>
+        <div class="foot"><span>Already have an account? <a href="#">Sign in</a></span></div>
+        <div class="unsupported">This browser cannot create passkeys. Taskly signs in with passkeys only, so use a browser that supports them.</div>
+      </div>
+      <div class="bottom"><span>Self-hosted at taskly.local</span><span></span></div>
+    </div>
+    <div class="label">Sign up, with the unsupported-browser note shown beneath for reference</div>
+  </div>
+
+  <div>
+    <div class="shot">
+      <div class="wordmark">Taskly</div>
+      <div class="mid">
+        <h1>Recover your account</h1>
+        <p>Enter the code the superuser gave you. It creates a new passkey and signs you out everywhere else.</p>
+        <div class="field"><span class="lbl">Email</span>tomas@example.org</div>
+        <div class="field code"><span class="lbl" style="font-family:var(--font);letter-spacing:0">Code</span>K7PX-4QH2-ZM</div>
+        <span class="err">That code is not right. 3 tries left before it burns.</span>
+        <a href="#" class="btn">Create a new passkey</a>
+        <div class="foot"><span><a href="#">Back to sign in</a></span></div>
+      </div>
+      <div class="bottom"><span>Self-hosted at taskly.local</span><span></span></div>
+    </div>
+    <div class="label">Recovery, with a wrong code</div>
+  </div>
+</div>
+</body>
+</html>

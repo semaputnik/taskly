@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Taskly · Settings and Users (slice 5 mock)</title>
+<style>
+  :root { color-scheme: light; --page:#ffffff; --ink:#0b0e11; --ink-2:#3d444d; --ink-3:#656d76; --rule:#e6e8eb; --rule-strong:#c9cdd2; --hover:#f3f4f6; --done:#1a7f37; --late:#cf222e;
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", "Noto Sans", Arial, sans-serif; --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--page); color:var(--ink); font-family:var(--font); font-size:15px; line-height:1.45; -webkit-font-smoothing:antialiased; }
+  a { color:inherit; text-decoration:none; } a:hover { text-decoration:underline; text-underline-offset:3px; }
+  .app { display:grid; grid-template-columns:200px minmax(0,1fr); min-height:100vh; }
+  .nav { padding:28px 20px 28px 28px; display:flex; flex-direction:column; gap:26px; position:sticky; top:0; height:100vh; }
+  .wordmark { font-weight:600; letter-spacing:-.01em; }
+  .nav ul { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:2px; }
+  .nav li a { display:flex; justify-content:space-between; align-items:center; height:30px; padding:0 8px; margin:0 -8px; border-radius:6px; color:var(--ink-2); } .nav li a .n { font-family:var(--mono); font-size:12px; color:var(--ink-3); }
+  .nav .foot { margin-top:auto; display:flex; align-items:center; gap:8px; font-size:13px; color:var(--ink); font-weight:600; } .nav .foot .av { width:20px; height:20px; border-radius:50%; background:var(--ink); color:var(--page); font-size:11px; font-weight:600; display:grid; place-items:center; }
+  /* the page column: 820px, centred in the main area while no record is open, as the app does since PR #204 */
+  main { padding:36px 48px 96px; min-width:0; }
+  main > * { width:min(100%, 820px); margin-left:auto; margin-right:auto; }
+  h1 { margin:0 0 4px; font-size:22px; font-weight:600; letter-spacing:-.015em; line-height:1.2; }
+  .lede { margin:0 0 8px; color:var(--ink-3); }
+  .sec { padding:22px 0 6px; }
+  .sec h2 { font-size:13px; font-weight:600; margin:0 0 6px; padding:0 0 8px; border-bottom:1px solid var(--rule-strong); display:flex; gap:8px; align-items:baseline; } .sec h2 .act { margin-left:auto; font-weight:400; font-size:13px; color:var(--ink-3); } .sec h2 .n { font-family:var(--mono); font-weight:400; font-size:12px; color:var(--ink-3); }
+  .props { display:grid; grid-template-columns:140px 1fr; row-gap:2px; column-gap:16px; }
+  .props dt { color:var(--ink-3); font-size:13px; min-height:30px; display:flex; align-items:center; margin:0; }
+  .props dd { margin:0; min-height:30px; display:flex; align-items:center; gap:14px; flex-wrap:wrap; font-size:14px; color:var(--ink-2); }
+  .props .v { color:var(--ink); } .props .act { font-size:13.5px; font-weight:500; color:var(--ink); } .props .act.danger:hover { color:var(--late); }
+  .props .ok { color:var(--done); font-weight:500; } .props .muted { color:var(--ink-3); }
+  .props .mono { font-family:var(--mono); font-size:12.5px; }
+  .line { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:12px; align-items:center; min-height:38px; border-bottom:1px solid var(--rule); font-size:14px; }
+  .line .t { font-weight:500; } .line .m { color:var(--ink-3); font-size:12.5px; } .line .r { font-size:13px; color:var(--ink-3); display:flex; gap:14px; } .line .r a { color:var(--ink); font-weight:500; }
+  .note { font-size:12.5px; color:var(--ink-3); margin:8px 0 0; }
+  .seg { display:inline-flex; gap:14px; } .seg a { color:var(--ink-3); } .seg a.on { color:var(--ink); font-weight:600; }
+  .user { display:grid; grid-template-columns:26px minmax(0,1fr) auto; gap:0 12px; align-items:start; padding:10px 0; border-bottom:1px solid var(--rule); }
+  .user .av { width:26px; height:26px; border-radius:50%; background:var(--ink); color:var(--page); font-size:12px; font-weight:600; display:grid; place-items:center; } .user .av.o { background:var(--rule-strong); color:var(--ink-2); }
+  .user .t { font-weight:500; } .user .m { color:var(--ink-3); font-size:12.5px; margin-top:2px; display:flex; gap:12px; }
+  .user .r { font-size:13px; } .user .r a { font-weight:500; } .user .r .none { color:var(--ink-3); }
+</style>
+</head>
+<body>
+<div class="app">
+  <nav class="nav" aria-label="Main">
+    <div class="wordmark">Taskly</div>
+    <ul><li><a href="#">Today</a></li><li><a href="#">Tasks <span class="n">23</span></a></li><li><a href="#">Projects <span class="n">4</span></a></li><li><a href="#">Tags</a></li><li><a href="#">Bots <span class="n">4</span></a></li><li><a href="#">Activity</a></li><li><a href="#">Archive</a></li></ul>
+    <div class="foot"><span class="av">S</span> Sam</div>
+  </nav>
+
+  <main>
+    <h1>Settings</h1>
+    <p class="lede">Your account on this installation, and what signs you in.</p>
+
+    <div class="sec"><h2>Profile</h2>
+      <dl class="props">
+        <dt>Name</dt><dd><span class="v">Sam Putnikov</span><a href="#" class="act">Change</a></dd>
+        <dt>Email</dt><dd><span class="v">sam@taskly.app</span><a href="#" class="act">Change</a></dd>
+        <dt>Appearance</dt><dd><span class="seg"><a href="#" class="on">System</a><a href="#">Light</a><a href="#">Dark</a></span></dd>
+      </dl>
+    </div>
+
+    <div class="sec"><h2>Passkeys <span class="n">2</span><a href="#" class="act">Add a passkey</a></h2>
+      <div class="line"><div><div class="t">MacBook Pro · Touch ID</div><div class="m">added 24 Sept · last used today 07:40</div></div><div class="r"><a href="#">Rename</a><a href="#" style="color:var(--ink-3);font-weight:400">Remove</a></div></div>
+      <div class="line"><div><div class="t">iPhone</div><div class="m">added 1 Oct · last used yesterday</div></div><div class="r"><a href="#">Rename</a><a href="#" style="color:var(--ink-3);font-weight:400">Remove</a></div></div>
+      <p class="note">A passkey is the only way in; the last one cannot be removed. Lost every passkey? The superuser can issue you a recovery code.</p>
+    </div>
+
+    <div class="sec"><h2>Sessions</h2>
+      <dl class="props">
+        <dt>Signed in</dt><dd><span class="v">this browser and 2 others</span><a href="#" class="act">Sign out everywhere</a></dd>
+      </dl>
+    </div>
+
+    <div class="sec"><h2>Paperless</h2>
+      <dl class="props">
+        <dt>Connection</dt><dd><span class="ok">Connected</span><span class="mono">https://paperless.sam.dev</span><a href="#" class="act">Test</a><a href="#" class="act">Change</a><a href="#" class="act danger">Disconnect</a></dd>
+        <dt>Token</dt><dd><span class="muted">set 1 Oct, never shown again</span><a href="#" class="act">Replace</a></dd>
+        <dt>Kept there</dt><dd><span class="v">12 PDFs</span><span class="muted">every PDF attached from now on goes to Paperless; everything else stays here</span></dd>
+      </dl>
+    </div>
+
+    <div class="sec"><h2>Users <span class="n">3</span><a href="#" class="act">You are the superuser</a></h2>
+      <div class="user"><span class="av">S</span><div><div class="t">Sam Putnikov</div><div class="m"><span>sam@taskly.app</span><span>superuser · you</span><span>2 passkeys</span></div></div><div class="r"><span class="none">Recovery: not for your own account</span></div></div>
+      <div class="user"><span class="av o">M</span><div><div class="t">Mara Lind</div><div class="m"><span>mara@example.org</span><span>1 passkey</span><span>last signed in 3 days ago</span></div></div><div class="r"><a href="#">Issue a recovery code</a></div></div>
+      <div class="user"><span class="av o">T</span><div><div class="t">Tomas Reyes</div><div class="m"><span>tomas@example.org</span><span style="color:var(--late);font-weight:500">no passkeys</span><span>code issued 2 h ago, unused</span></div></div><div class="r"><a href="#">Issue another</a></div></div>
+      <p class="note">A recovery code is shown once, works for one hour and burns after five wrong tries. Spending it signs that account out everywhere.</p>
+    </div>
+
+    <div class="sec"><h2>Account</h2>
+      <dl class="props">
+        <dt>Delete</dt><dd><a href="#" class="act danger">Delete my account</a><span class="muted">removes your tasks, projects, bot users and passkeys; nothing leaves Paperless</span></dd>
+      </dl>
+    </div>
+  </main>
+</div>
+</body>
+</html>

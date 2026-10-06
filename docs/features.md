@@ -296,7 +296,13 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
   (see [FR-08.6](#f-08-bot-users)).
 - **FR-05.14** An archived project and its tasks are hidden from the default
   task list and from filters (see [F-06](#f-06-task-list-and-filtering))
-  unless the user explicitly asks to see the archive.
+  unless the user explicitly asks to see the archive. Archived projects are
+  read on the Projects page, in a section of their own after the live ones,
+  each with the way to its kept tasks; there is no separate archive screen.
+- **FR-05.15** The Projects page lists every live project with its open-task
+  count, and that count is the one-click way into the task list narrowed to
+  the project. A project's own panel repeats the way in and shows its first
+  open tasks with a capture line that files into the project.
 
 ### F-06. Task list and filtering
 
@@ -474,7 +480,9 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
 ### F-09. Administration
 
 - **FR-09.1** The system has exactly one superuser.
-- **FR-09.2** The superuser can view the list of registered users.
+- **FR-09.2** The superuser can view the list of registered users. The list
+  is a section of the superuser's own Settings, not a screen of its own, and
+  the code of FR-12.16 is issued from the user's line there.
 - **FR-09.3** The superuser's one other administrative function is issuing
   recovery codes to users who have lost every passkey
   (see [F-12](#f-12-sign-in)). There are no others for now.
