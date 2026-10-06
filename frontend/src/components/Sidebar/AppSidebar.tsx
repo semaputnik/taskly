@@ -35,11 +35,9 @@ const itemClass = cn(
 function Item({
   item,
   count,
-  onNavigate,
 }: {
   item: NavItem
   count: NavCount | null | undefined
-  onNavigate?: () => void
 }) {
   const descriptionId = useId()
   return (
@@ -48,7 +46,6 @@ function Item({
         to={item.path}
         // The dashboard is the root, which every path starts with.
         activeOptions={{ exact: item.path === "/", includeSearch: false }}
-        onClick={onNavigate}
         aria-describedby={count ? descriptionId : undefined}
         className={cn(
           itemClass,
@@ -77,11 +74,10 @@ function Item({
 /**
  * The navigation, as plain text: the wordmark, the list of screens
  * with counts where a count means something, and the account at the foot.
- * Nothing marks the current screen but weight. The same list sits in the
- * left column on a wide screen and in the menu sheet on a phone;
- * `onNavigate` closes that sheet when a choice is made in it.
+ * Nothing marks the current screen but weight. It is the left column of a
+ * wide screen; a phone's navigation is the bar at the bottom (`PhoneNav`).
  */
-export function Navigation({ onNavigate }: { onNavigate?: () => void }) {
+export function Navigation() {
   const { user: currentUser } = useAuth()
   const counts = useNavCounts()
 
@@ -99,16 +95,11 @@ export function Navigation({ onNavigate }: { onNavigate?: () => void }) {
       <Wordmark className={cn(navItemFocus, "self-start rounded-sm")} />
       <ul className="flex flex-col gap-0.5">
         {items.map((item) => (
-          <Item
-            key={item.path}
-            item={item}
-            count={counts[item.path]}
-            onNavigate={onNavigate}
-          />
+          <Item key={item.path} item={item} count={counts[item.path]} />
         ))}
       </ul>
       <div className="mt-auto">
-        <User user={currentUser} onNavigate={onNavigate} />
+        <User user={currentUser} />
       </div>
     </nav>
   )

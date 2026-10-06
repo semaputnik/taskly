@@ -392,7 +392,7 @@ test.describe("on a phone", () => {
     isMobile: true,
   })
 
-  test("The date, then the bands, with the capture line pinned beneath them and no sideways scroll", async ({
+  test("The date, then the bands, with no capture line on the page and no sideways scroll", async ({
     page,
   }) => {
     await newUser(page)
@@ -412,14 +412,14 @@ test.describe("on a phone", () => {
 
     const top = async (locator: Locator) =>
       (await locator.boundingBox())?.y ?? Number.NaN
-    const capture = await top(
-      page.getByRole("combobox", { name: "Add a task" }),
-    )
     const date = await top(page.getByRole("heading", { level: 1 }))
     const overdue = await top(page.getByRole("heading", { name: /^Overdue/ }))
     const today = await top(page.getByRole("heading", { name: /^Due today/ }))
-    // The line is not at the top on a phone: it is the bottom bar (FR-06.15).
-    expect(capture).toBeGreaterThan(812 - 90)
+    // The page carries no line on a phone: the bar's add control raises the
+    // capture sheet instead (FR-06.15).
+    await expect(
+      page.getByRole("combobox", { name: "Add a task" }),
+    ).toHaveCount(0)
     expect(date).toBeLessThan(overdue)
     expect(overdue).toBeLessThan(today)
 

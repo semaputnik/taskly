@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router"
 import { Suspense, useEffect, useState } from "react"
 
-import { CaptureLine } from "@/components/Dashboard/CaptureLine"
+import { PageCaptureLine } from "@/components/Dashboard/CaptureLine"
 import { Changes, ChangesPending } from "@/components/Dashboard/Changes"
 import { Day, DayHeading, DayPending } from "@/components/Dashboard/DayPage"
 import {
@@ -95,9 +95,7 @@ function Dashboard() {
 
   return (
     <div className="max-w-[820px]">
-      <div className="md:mb-9">
-        <CaptureLine />
-      </div>
+      <PageCaptureLine className="mb-9" />
       {/* Needs nothing from the server, so it is never a skeleton. */}
       <DayHeading />
 

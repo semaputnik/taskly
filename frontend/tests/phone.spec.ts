@@ -50,6 +50,10 @@ test("A tap on the due date lands on the native date field, and the day it picks
 })
 
 const line = (page: Page) => page.getByRole("combobox", { name: /^Add a task/ })
+const addControl = (page: Page) =>
+  page.getByRole("button", { name: "Add a task" })
+const bar = (page: Page) => page.getByRole("navigation", { name: "Main" })
+const sheet = (page: Page) => page.getByRole("dialog", { name: "Add a task" })
 
 /** The box of something that must be on screen. */
 async function boxOf(locator: ReturnType<Page["locator"]>) {
@@ -74,7 +78,85 @@ async function raiseKeyboard(page: Page, height: number) {
   }, height)
 }
 
-test("The capture line is pinned to the bottom of the task list and the day page, and there is no floating button", async ({
+const SCREENS = [
+  "/",
+  "/tasks",
+  "/bots",
+  "/activity",
+  "/projects",
+  "/tags",
+  "/archive",
+  "/settings",
+]
+
+test("The bar at the bottom has five items on every screen, and nothing else adds a task", async ({
+  page,
+}) => {
+  await newUser(page)
+
+  for (const path of SCREENS) {
+    await page.goto(path)
+    const items = bar(page)
+    await expect(items).toBeVisible()
+    for (const name of ["Today", "Tasks", "Bots", "Activity"]) {
+      await expect(items.getByRole("link", { name })).toBeVisible()
+    }
+    await expect(items.getByRole("listitem")).toHaveCount(5)
+
+    // It is the foot of the screen, 56px tall, its targets 44px or more.
+    const place = await boxOf(items)
+    expect(place.y + place.height).toBe(812)
+    expect(place.height).toBe(57) // 56px and its hairline
+    for (const control of await items
+      .getByRole("link")
+      .or(items.getByRole("button"))
+      .all()) {
+      const target = await boxOf(control)
+      expect(target.height).toBeGreaterThanOrEqual(44)
+      expect(target.width).toBeGreaterThanOrEqual(44)
+    }
+
+    // The line and the floating button are gone: the bar's control is the
+    // only way to add, and it is one control.
+    await expect(line(page)).toHaveCount(0)
+    await expect(addControl(page)).toHaveCount(1)
+  }
+})
+
+test("The current screen is stated and marked by weight, not by colour", async ({
+  page,
+}) => {
+  await newUser(page)
+  const weight = (name: string) =>
+    bar(page)
+      .getByRole("link", { name })
+      .evaluate((element) => Number(getComputedStyle(element).fontWeight))
+
+  await page.goto("/bots")
+  const bots = bar(page).getByRole("link", { name: "Bots" })
+  await expect(bots).toHaveAttribute("aria-current", "page")
+  await expect(
+    bar(page).getByRole("link", { name: "Today" }),
+  ).not.toHaveAttribute("aria-current", "page")
+  expect(await weight("Bots")).toBeGreaterThan(await weight("Today"))
+
+  // Today is the root, which every path starts with: it is current only on
+  // the day page.
+  await page.goto("/tasks")
+  await expect(bar(page).getByRole("link", { name: "Tasks" })).toHaveAttribute(
+    "aria-current",
+    "page",
+  )
+  await expect(
+    bar(page).getByRole("link", { name: "Today" }),
+  ).not.toHaveAttribute("aria-current", "page")
+
+  // A tap goes there.
+  await bar(page).getByRole("link", { name: "Activity" }).tap()
+  await expect(page).toHaveURL(/\/activity/)
+})
+
+test("The add control raises a capture sheet on any screen, and the page has no pinned line", async ({
   page,
 }) => {
   await newUser(page)
@@ -83,61 +165,81 @@ test("The capture line is pinned to the bottom of the task list and the day page
     await api.create("/tasks/", { title: `Task number ${n}` })
   }
 
-  for (const path of ["/tasks", "/"]) {
-    await page.goto(path)
-    await expect(line(page)).toBeVisible()
-    // Nothing floats: the line is the way to add a task.
-    await expect(page.getByRole("button", { name: "Add a task" })).toHaveCount(
-      0,
-    )
+  await page.goto("/")
+  await expect(line(page)).toHaveCount(0)
 
-    const box = await boxOf(line(page))
-    expect(box.y).toBeGreaterThan(812 - 90)
-    expect(box.y + box.height).toBeLessThanOrEqual(812)
-    expect(box.height).toBeGreaterThanOrEqual(44)
-    // A field set smaller than 16px makes iOS zoom the page in on focus.
-    const size = await line(page).evaluate(
-      (element) => getComputedStyle(element).fontSize,
-    )
-    expect(Number.parseFloat(size)).toBeGreaterThanOrEqual(16)
+  await page.goto("/tasks")
+  await expect(line(page)).toHaveCount(0)
+  // Scrolled to the foot, the last row is clear of the bar.
+  await expect(page.locator("main").getByRole("link").nth(20)).toBeVisible()
+  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight))
+  await page.waitForTimeout(150)
+  const last = await boxOf(page.locator("main").getByRole("link").last())
+  expect(last.y + last.height).toBeLessThan((await boxOf(bar(page))).y)
 
-    // Scrolled to the foot, it has not moved.
-    await page.mouse.wheel(0, 5000)
-    await page.waitForTimeout(150)
-    expect((await boxOf(line(page))).y).toBe(box.y)
-  }
+  await addControl(page).tap()
+  await expect(sheet(page)).toBeVisible()
+  // Focus is moved in, to the line, which keeps the 16px iOS needs.
+  await expect(line(page)).toBeFocused()
+  const size = await line(page).evaluate(
+    (element) => getComputedStyle(element).fontSize,
+  )
+  expect(Number.parseFloat(size)).toBeGreaterThanOrEqual(16)
+  expect((await boxOf(line(page))).height).toBeGreaterThanOrEqual(44)
+  // The sheet rests on the bottom edge, over a dimmed page.
+  await expect
+    .poll(async () => {
+      const place = await boxOf(sheet(page))
+      return place.y + place.height
+    })
+    .toBeCloseTo(812, 0)
 })
 
-test("The pinned line follows the keyboard, and writing a task from it files it", async ({
+test("The sheet follows the keyboard, and Return writes a task from Bots", async ({
   page,
 }) => {
   await newUser(page)
-  await page.goto("/tasks")
-  const rest = await boxOf(line(page))
+  await page.goto("/bots")
+  await addControl(page).tap()
+  await expect(sheet(page)).toBeVisible()
+  const rest = await boxOf(sheet(page))
+  await expect
+    .poll(async () => (await boxOf(sheet(page))).y)
+    .toBeCloseTo(rest.y, 0)
 
-  await line(page).tap()
   await raiseKeyboard(page, 300)
   await expect
-    .poll(async () => (await boxOf(line(page))).y)
-    .toBeCloseTo(rest.y - 300, 0)
+    .poll(async () => {
+      const place = await boxOf(sheet(page))
+      return place.y + place.height
+    })
+    .toBeCloseTo(812 - 300, 0)
 
   // Nothing to send while nothing is written.
   await expect(page.getByRole("button", { name: "Create task" })).toHaveCount(0)
   await line(page).fill("Buy milk")
   await page.getByRole("button", { name: "Create task" }).tap()
   await expect(page.getByText("“Buy milk” created")).toBeVisible()
-  await expect(line(page)).toHaveValue("")
-  await expect(page.getByRole("list", { name: "Tasks" })).toContainText(
-    "Buy milk",
-  )
+  // Done: the sheet gives way to the screen, which stays where it was, and
+  // focus goes back to the control that raised it.
+  await expect(sheet(page)).toBeHidden()
+  await expect(page).toHaveURL(/\/bots/)
+  await expect(addControl(page)).toBeFocused()
+
+  const api = await userApi(page)
+  await expect
+    .poll(async () => (await (await api.get("/tasks/")).json()).count)
+    .toBe(1)
 
   // Return does the same.
+  await addControl(page).tap()
   await line(page).fill("Call the bank")
   await line(page).press("Enter")
   await expect(page.getByText("“Call the bank” created")).toBeVisible()
+  await expect(sheet(page)).toBeHidden()
 })
 
-test("The matches open upward from the pinned line, above the keyboard", async ({
+test("The sheet's matches stand above the line and above the keyboard, and a tap opens one", async ({
   page,
 }) => {
   await newUser(page)
@@ -145,9 +247,9 @@ test("The matches open upward from the pinned line, above the keyboard", async (
   for (const title of ["Redirect the old URLs", "Check the redirect map"]) {
     await api.create("/tasks/", { title })
   }
-  await page.goto("/tasks")
+  await page.goto("/activity")
 
-  await line(page).tap()
+  await addControl(page).tap()
   await raiseKeyboard(page, 300)
   await line(page).fill("redirect")
   const list = page.getByRole("listbox", { name: /^Open tasks matching/ })
@@ -157,27 +259,127 @@ test("The matches open upward from the pinned line, above the keyboard", async (
   const field = await boxOf(line(page))
   expect(above.y + above.height).toBeLessThanOrEqual(field.y)
   expect(above.y).toBeGreaterThanOrEqual(0)
-  // A tap on a match opens it.
+  for (const option of await list.getByRole("option").all()) {
+    expect((await boxOf(option)).height).toBeGreaterThanOrEqual(44)
+  }
+
+  // A tap on a match opens it, and the sheet is done.
   await list.getByRole("option").first().tap()
   await expect(page.locator("[data-record-column]")).toBeVisible()
+  await expect(sheet(page)).toBeHidden()
 })
 
-test("The pinned line gives way to a record's full-screen column", async ({
+test("Escape or a tap outside closes the sheet and keeps the words", async ({
   page,
 }) => {
+  await newUser(page)
+  await page.goto("/bots")
+  await addControl(page).tap()
+  await line(page).fill("Ring the plumber")
+
+  // The first Escape closes the matches, the second the sheet.
+  await page.keyboard.press("Escape")
+  await expect(sheet(page)).toBeVisible()
+  await page.keyboard.press("Escape")
+  await expect(sheet(page)).toBeHidden()
+  await expect(addControl(page)).toBeFocused()
+
+  await addControl(page).tap()
+  await expect(line(page)).toHaveValue("Ring the plumber")
+
+  // A tap on the dimmed page above it does the same.
+  await page.touchscreen.tap(190, 100)
+  await expect(sheet(page)).toBeHidden()
+  await addControl(page).tap()
+  await expect(line(page)).toHaveValue("Ring the plumber")
+})
+
+test("More options opens the full draft with what was typed", async ({
+  page,
+}) => {
+  await newUser(page)
+  await page.goto("/activity")
+  await addControl(page).tap()
+  await line(page).fill("Write the report")
+  await sheet(page).getByRole("button", { name: "More options…" }).tap()
+
+  await expect(sheet(page)).toBeHidden()
+  await expect(page).toHaveURL(/capture=task/)
+  const draft = page.getByRole("complementary", { name: "New task" })
+  await expect(draft).toBeVisible()
+  await expect(draft.getByRole("textbox", { name: "Task title" })).toHaveValue(
+    "Write the report",
+  )
+  // The draft covers the screen and takes the bar with it.
+  await expect(bar(page)).toBeHidden()
+
+  // The sheet's words went with it: raised again, the line is empty.
+  await draft.getByRole("textbox", { name: "Task title" }).fill("")
+  await page.getByRole("button", { name: "Close" }).tap()
+  await expect(page.locator("[data-record-column]")).toHaveCount(0)
+  await addControl(page).tap()
+  await expect(line(page)).toHaveValue("")
+})
+
+test("The bar gives way to a record's full-screen column", async ({ page }) => {
   await newUser(page)
   const api = await userApi(page)
   const task = await api.create("/tasks/", { title: "Pay the invoice" })
   await page.goto("/tasks")
-  await expect(line(page)).toBeVisible()
+  await expect(bar(page)).toBeVisible()
 
   await page.goto(`/tasks?task=${task.id}`)
   await expect(page.locator("[data-record-column]")).toBeVisible()
-  await expect(line(page)).toBeHidden()
+  await expect(bar(page)).toBeHidden()
 
   await page.getByRole("button", { name: "Close" }).tap()
   await expect(page.locator("[data-record-column]")).toHaveCount(0)
-  await expect(line(page)).toBeVisible()
+  await expect(bar(page)).toBeVisible()
+})
+
+test("The account control holds the other screens, appearance and signing out", async ({
+  page,
+}) => {
+  await newUser(page)
+  await page.goto("/")
+  const account = page.getByRole("button", { name: "Account" })
+  // The top bar keeps the wordmark and gains the avatar, a target for a thumb.
+  await expect(page.getByRole("link", { name: "Taskly" })).toBeVisible()
+  expect((await boxOf(account)).height).toBeGreaterThanOrEqual(44)
+  expect((await boxOf(account)).width).toBeGreaterThanOrEqual(44)
+  await expect(page.getByRole("button", { name: "Menu" })).toHaveCount(0)
+
+  await account.tap()
+  const menu = page.getByRole("menu")
+  for (const name of ["Projects", "Tags", "Archive", "Settings", "Log out"]) {
+    const item = menu.getByRole("menuitem", { name })
+    await expect(item).toBeVisible()
+    // The menu grows into place; it is measured once it has.
+    await expect
+      .poll(async () => (await boxOf(item)).height)
+      .toBeGreaterThanOrEqual(44)
+  }
+  for (const name of ["Light", "Dark", "System"]) {
+    await expect(menu.getByRole("menuitemradio", { name })).toBeVisible()
+  }
+
+  // Appearance is chosen here.
+  await menu.getByRole("menuitemradio", { name: "Dark" }).tap()
+  await expect(page.locator("html")).toHaveClass(/dark/)
+  await account.tap()
+  await page.getByRole("menuitemradio", { name: "Light" }).tap()
+  await expect(page.locator("html")).toHaveClass(/light/)
+
+  // The screens that are not tabs are a tap away, and none of the tabs is
+  // current there.
+  await account.tap()
+  await page.getByRole("menuitem", { name: "Projects" }).tap()
+  await expect(page).toHaveURL(/\/projects/)
+  await expect(bar(page).locator('[aria-current="page"]')).toHaveCount(0)
+
+  await account.tap()
+  await page.getByRole("menuitem", { name: "Log out" }).tap()
+  await expect(page).toHaveURL(/\/login/)
 })
 
 test("The filter row keeps three filters and the order, and folds the rest behind More", async ({
@@ -286,7 +488,7 @@ test("The task list never scrolls sideways, however long a title or a project na
 
   for (const path of ["/tasks", "/"]) {
     await page.goto(path)
-    await expect(line(page)).toBeVisible()
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible()
     const overflow = await page.evaluate(
       () =>
         document.documentElement.scrollWidth -

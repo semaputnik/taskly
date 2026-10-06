@@ -23,7 +23,7 @@ import {
 import { Textarea } from "@/components/ui/textarea"
 import { projectsQuery } from "@/lib/serverState"
 import { cn } from "@/lib/utils"
-import type { CaptureTarget } from "./capture"
+import { type CaptureTarget, titleHandedOff } from "./capture"
 import { carryOver, emptyDraft, isTouched, type TaskFields } from "./draft"
 import { descriptionClass, TaskPropertyRows } from "./TaskProperties"
 import { useTaskCapture } from "./useTaskWrites"
@@ -61,7 +61,12 @@ export function NewTask({
 }) {
   const capture = useTaskCapture(target, onCreated)
   const [defaults, setDefaults] = useState(() => emptyDraft(target))
-  const [draft, setDraft] = useState(defaults)
+  // Words written in the capture sheet before "More options…" are the title.
+  const [draft, setDraft] = useState(() => ({
+    ...defaults,
+    title: titleHandedOff.peek(),
+  }))
+  useEffect(() => titleHandedOff.clear(), [])
   const touched = isTouched(draft, defaults)
   const titleRef = useCaptureFocus<HTMLTextAreaElement>()
   // Set while a commit is taking the reader onto the new record, which is a

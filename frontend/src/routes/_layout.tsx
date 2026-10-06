@@ -1,20 +1,17 @@
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router"
-import { Menu } from "lucide-react"
-import { useState } from "react"
+import { useRef, useState } from "react"
 
 import { Wordmark } from "@/components/Common/Wordmark"
 import { preloadPanel } from "@/components/Records/panelModules"
 import { openPanelKind, panelSearchSchema } from "@/components/Records/panels"
 import { RecordPanels } from "@/components/Records/RecordPanels"
 import { Navigation } from "@/components/Sidebar/AppSidebar"
-import { navItemFocus } from "@/components/Sidebar/styles"
 import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet"
+  AccountMenu,
+  CaptureSheet,
+  TabBar,
+} from "@/components/Sidebar/PhoneNav"
+import { navItemFocus } from "@/components/Sidebar/styles"
 import { isLoggedIn } from "@/hooks/useAuth"
 import { cn } from "@/lib/utils"
 
@@ -40,41 +37,24 @@ export const Route = createFileRoute("/_layout")({
 })
 
 /**
- * Below the tablet width the navigation folds into a top bar: the wordmark,
- * and a menu button that opens the same list in a sheet from the left.
+ * Below the tablet width the navigation moves to the bottom of the screen
+ * (`TabBar`), and the top bar keeps the wordmark and gains the account
+ * control, which holds what the bar has no room for.
  */
 function TopBar() {
-  const [open, setOpen] = useState(false)
-  const close = () => setOpen(false)
   return (
-    <header className="bg-page border-rule sticky top-0 z-10 flex h-14 items-center gap-3 border-b px-4 md:hidden">
+    <header className="bg-page border-rule sticky top-0 z-10 flex h-11 items-center gap-3 border-b px-4 md:hidden">
       <Wordmark className={cn(navItemFocus, "rounded-sm")} />
-      <Sheet open={open} onOpenChange={setOpen}>
-        <SheetTrigger
-          aria-label="Menu"
-          className={cn(
-            navItemFocus,
-            "hover:bg-hover -mr-2 ml-auto grid size-11 place-items-center rounded-md",
-          )}
-        >
-          <Menu aria-hidden className="size-[18px]" strokeWidth={1.6} />
-        </SheetTrigger>
-        <SheetContent
-          side="left"
-          className="bg-page w-[264px] gap-0 px-7 py-7 shadow-none"
-        >
-          <SheetTitle className="sr-only">Navigation</SheetTitle>
-          <SheetDescription className="sr-only">
-            The screens of Taskly and your account.
-          </SheetDescription>
-          <Navigation onNavigate={close} />
-        </SheetContent>
-      </Sheet>
+      <AccountMenu />
     </header>
   )
 }
 
 function Layout() {
+  // The add control raises the capture sheet from any screen; the bar and the
+  // sheet share it, and the sheet hands focus back to the control.
+  const [adding, setAdding] = useState(false)
+  const addControl = useRef<HTMLButtonElement>(null)
   return (
     <>
       <a
@@ -100,12 +80,12 @@ function Layout() {
         {/* `min-w-0`: a grid item never shrinks below its content by default,
             so one long table row would widen the whole page instead of
             scrolling inside its own container. On a phone the foot is kept
-            clear of the capture line pinned to the bottom of the screen, so
-            the last row can always be scrolled out from under it. */}
+            clear of the tab bar at the bottom of the screen, so the last row
+            can always be scrolled out from under it. */}
         <main
           id="main"
           tabIndex={-1}
-          className="min-w-0 px-4 pt-5 pb-28 outline-none md:px-12 md:pt-9 md:pb-24 min-[1200px]:group-has-[[data-record-column]]/shell:px-8"
+          className="min-w-0 px-4 pt-5 pb-[calc(5rem+env(safe-area-inset-bottom))] outline-none md:px-12 md:pt-9 md:pb-24 min-[1200px]:group-has-[[data-record-column]]/shell:px-8"
         >
           <div className="max-w-7xl">
             <Outlet />
@@ -114,6 +94,16 @@ function Layout() {
         {/* Mounted once: a record opens beside whatever screen the reader is
             on, and capture starts from any of them. */}
         <RecordPanels />
+        <TabBar
+          onAdd={() => setAdding(true)}
+          addRef={addControl}
+          adding={adding}
+        />
+        <CaptureSheet
+          open={adding}
+          onOpenChange={setAdding}
+          returnFocusTo={addControl}
+        />
       </div>
     </>
   )

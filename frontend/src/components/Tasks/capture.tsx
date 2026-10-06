@@ -36,6 +36,23 @@ export interface CaptureTarget {
 }
 
 /**
+ * Words typed in the capture sheet that its "More options…" line carries on
+ * to the full draft, so the title is not written twice. Held outside React:
+ * the sheet and the draft are different panels, and the words are used once.
+ */
+let handedOff = ""
+export const titleHandedOff = {
+  set: (title: string) => {
+    handedOff = title
+  },
+  /** Read without clearing, so a render that runs twice reads the same. */
+  peek: () => handedOff,
+  clear: () => {
+    handedOff = ""
+  },
+}
+
+/**
  * Where a task captured now lands: the project the list is narrowed to, or
  * the Inbox.
  *

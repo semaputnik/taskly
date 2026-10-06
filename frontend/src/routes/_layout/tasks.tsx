@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query"
 import { createFileRoute, Link as RouterLink } from "@tanstack/react-router"
 import { useEffect } from "react"
 
-import { CaptureLine } from "@/components/Dashboard/CaptureLine"
+import { PageCaptureLine } from "@/components/Dashboard/CaptureLine"
 import { textLink } from "@/components/Dashboard/shared"
 import { useRecordList } from "@/components/Records/walk"
 import {
@@ -142,9 +142,7 @@ function Tasks() {
 
   return (
     <div className="max-w-[820px]">
-      <div className="md:mb-7">
-        <CaptureLine />
-      </div>
+      <PageCaptureLine className="mb-7" />
       <h1 className="mb-1 text-[22px] leading-[1.2] font-semibold tracking-[-0.015em]">
         Tasks
       </h1>

@@ -51,6 +51,6 @@ The full draft above is unchanged. It stays the one capture with an explicit
 commit, for a task whose day, priority, project or tags are known at the moment
 of writing it down, and it is what the `c` key opens. (The navigation's **Add a
 task** entry and the phone's floating button once opened it too; the capture line
-replaced both, FR-06.15. On a phone, which has no `c`, a task that needs more
-than a title is made with the line and finished in its panel, which the notice's
-**Open** reaches.)
+replaced both, FR-06.15. A phone has no `c`: its capture sheet, raised from the
+bottom bar's add control, carries the same line and a **More options…** line
+that opens the full draft, with what was typed already in its title.)
