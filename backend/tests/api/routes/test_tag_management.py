@@ -223,6 +223,8 @@ def test_renaming_a_tag_renames_it_on_every_task(
         "task_count": 2,
         "archived_task_count": 0,
         "created_by_bot_user": None,
+        # Renaming does not change when the tag was made.
+        "created_at": tag["created_at"],
     }
 
     assert _task_tags(client, owner, first) == ["housework", "work"]

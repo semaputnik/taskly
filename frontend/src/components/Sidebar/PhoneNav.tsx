@@ -24,7 +24,6 @@ import { useIsPhone } from "@/hooks/useIsPhone"
 import { useVisualViewport } from "@/hooks/useVisualViewport"
 import { cn } from "@/lib/utils"
 import { navItemFocus } from "./styles"
-import { AppearanceItems } from "./User"
 
 const tabClass = cn(
   navItemFocus,
@@ -36,7 +35,7 @@ const tabClass = cn(
  * thumb rests. Today and Tasks, the add control as a filled circle in the
  * middle, Bots and Activity. The screen the reader is on is marked by weight
  * and ink and never by colour, and is stated to a screen reader as the
- * current page. Projects, Tags, Archive and the rest are behind the account
+ * current page. Projects, Tags and the rest are behind the account
  * control in the top bar (`AccountMenu`).
  *
  * The add control raises the capture sheet from any screen (FR-06.15). A
@@ -127,9 +126,11 @@ export function AccountMenu() {
   const places = [
     { title: "Projects", to: "/projects" },
     { title: "Tags", to: "/tags" },
-    { title: "Archive", to: "/archive" },
     { title: "Settings", to: "/settings" },
-    ...(user.is_superuser ? [{ title: "Admin", to: "/admin" }] : []),
+    // The superuser's users are a section of Settings, not a screen.
+    ...(user.is_superuser
+      ? [{ title: "Users", to: "/settings", hash: "users" }]
+      : []),
   ]
 
   return (
@@ -161,11 +162,11 @@ export function AccountMenu() {
         <DropdownMenuSeparator />
         {places.map((place) => (
           <DropdownMenuItem key={place.to} asChild className={menuItemClass}>
-            <RouterLink to={place.to}>{place.title}</RouterLink>
+            <RouterLink to={place.to} hash={place.hash}>
+              {place.title}
+            </RouterLink>
           </DropdownMenuItem>
         ))}
-        <DropdownMenuSeparator />
-        <AppearanceItems itemClassName={menuItemClass} />
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={logout} className={menuItemClass}>
           <LogOut />

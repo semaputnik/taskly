@@ -21,6 +21,7 @@ jobs:
       PROJECT_NAME: ${{ vars.PROJECT_NAME }}
       SECRET_KEY: ${{ secrets.SECRET_KEY }}
       WEBHOOK_SECRET_KEY: ${{ secrets.WEBHOOK_SECRET_KEY }}
+      PAPERLESS_TOKEN_KEY: ${{ secrets.PAPERLESS_TOKEN_KEY }}
       FIRST_SUPERUSER: ${{ vars.FIRST_SUPERUSER }}
       SMTP_HOST: ${{ vars.SMTP_HOST }}
       SMTP_USER: ${{ vars.SMTP_USER }}

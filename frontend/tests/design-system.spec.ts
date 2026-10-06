@@ -24,12 +24,27 @@ for (const theme of ["light", "dark"] as const) {
     })
 
     test("The primary action is readable on its fill", async ({ page }) => {
-      // The Projects page's own button is the filled one.
+      // The one filled button left on a page of the Changelog world is the
+      // commit of a new record's draft in the column: Create tag, enabled
+      // once the draft has a name.
+      await page.goto("/tags")
+      await page.getByRole("button", { name: "New tag" }).click()
+      await page.getByRole("textbox", { name: "Tag name" }).fill("errands")
+      const create = page.getByRole("button", { name: "Create tag" })
+      await expect(create).toBeEnabled()
+      expect(await textOnFill(create)).toBeGreaterThanOrEqual(AA)
+    })
+
+    test("The Projects page's quiet text is readable", async ({ page }) => {
       await page.goto("/projects")
-      const add = page
-        .getByRole("main")
-        .getByRole("button", { name: "Add Project" })
-      expect(await textOnFill(add)).toBeGreaterThanOrEqual(AA)
+      const ground = await pageGround(page)
+      // The page's action is text, and the sentence of counts is quiet.
+      const add = page.getByRole("button", { name: "New project" })
+      await expect(add).toBeVisible()
+      expect(await textOn(add, ground)).toBeGreaterThanOrEqual(AA)
+      const counts = page.getByText("Nothing is overdue.")
+      await expect(counts).toBeVisible()
+      expect(await textOn(counts, ground)).toBeGreaterThanOrEqual(AA)
     })
 
     test("The task list's quiet text is readable", async ({ page }) => {
@@ -71,9 +86,8 @@ for (const theme of ["light", "dark"] as const) {
       // A record's column is no modal layer, so the one opened here is a
       // confirmation: the sort a reader must answer before going on.
       await page.goto("/settings")
-      await page.getByRole("tab", { name: "Danger zone" }).click()
       const ground = await pageGround(page)
-      await page.getByRole("button", { name: "Delete Account" }).click()
+      await page.getByRole("button", { name: "Delete my account" }).click()
       const overlay = page.locator("[data-slot=dialog-overlay]")
       await expect(overlay).toBeVisible()
       await overlay.evaluate((node) =>

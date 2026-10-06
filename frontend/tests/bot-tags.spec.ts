@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test"
 import { botLine } from "./utils/bots"
 import { randomEmail } from "./utils/random"
 import { storeSecretAndClose } from "./utils/secretDialog"
+import { tagLine } from "./utils/tags"
 import { logInUser } from "./utils/user"
 
 test.use({ storageState: { cookies: [], origins: [] } })
@@ -94,12 +95,8 @@ test("Granting a bot user “Create tags” lets it add to the vocabulary", asyn
 
   // Both show on the Tags page, among the user's own vocabulary.
   await page.goto("/tags")
-  await expect(
-    page.getByRole("row").filter({ hasText: "billing" }),
-  ).toContainText("No tasks")
-  await expect(
-    page.getByRole("row").filter({ hasText: "refund" }),
-  ).toContainText("1 task")
+  await expect(tagLine(page, "billing")).toContainText("No open tasks")
+  await expect(tagLine(page, "refund")).toContainText("1 open")
 
   // And the tags are the bot user's doing, not its owner's.
   await page.goto("/activity")

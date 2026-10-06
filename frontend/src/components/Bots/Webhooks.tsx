@@ -2,17 +2,9 @@ import { useMutation } from "@tanstack/react-query"
 import { type FormEvent, useEffect, useId, useRef, useState } from "react"
 
 import { BotsService, type BotUserPublic, type WebhookKind } from "@/client"
+import { ConfirmDialog } from "@/components/Common/ConfirmDialog"
 import { RecordSection } from "@/components/Records/RecordPanel"
 import { Button } from "@/components/ui/button"
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { LoadingButton } from "@/components/ui/loading-button"
 import { isRefusal, refusalMessage } from "@/lib/apiErrors"
@@ -430,57 +422,5 @@ function RegenerateSecret({ bot }: { bot: BotUserPublic }) {
       receiver still checking the old one will refuse them. The new secret is
       shown once.
     </ConfirmDialog>
-  )
-}
-
-/**
- * The question both irreversible webhook steps ask first: what is about to
- * be lost, said before the button that does it.
- */
-function ConfirmDialog({
-  isOpen,
-  onOpenChange,
-  trigger,
-  title,
-  children,
-  confirm,
-  destructive = false,
-  pending,
-  onConfirm,
-}: {
-  isOpen: boolean
-  onOpenChange: (open: boolean) => void
-  trigger: React.ReactNode
-  title: string
-  children: React.ReactNode
-  confirm: string
-  destructive?: boolean
-  pending: boolean
-  onConfirm: () => void
-}) {
-  return (
-    <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      {trigger}
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
-          <DialogDescription>{children}</DialogDescription>
-        </DialogHeader>
-        <DialogFooter>
-          <DialogClose asChild>
-            <Button variant="outline" disabled={pending}>
-              Cancel
-            </Button>
-          </DialogClose>
-          <LoadingButton
-            variant={destructive ? "destructive" : undefined}
-            loading={pending}
-            onClick={onConfirm}
-          >
-            {confirm}
-          </LoadingButton>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
   )
 }

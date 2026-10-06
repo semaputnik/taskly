@@ -1,7 +1,6 @@
 import { Flag } from "lucide-react"
 
 import type { TaskPriority } from "@/client"
-import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import { type PriorityTone, priorityTone } from "./priorityTone"
 
@@ -13,31 +12,6 @@ export const PRIORITY_TEXT: Record<PriorityTone, string> = {
   p1: "text-priority-p1",
   p2: "text-priority-p2",
   p3: "text-priority-p3",
-}
-
-const PRIORITY_BADGE: Record<PriorityTone, string> = {
-  p1: "text-priority-p1 border-priority-p1/40",
-  p2: "text-priority-p2 border-priority-p2/40",
-  p3: "text-priority-p3 border-priority-p3/40",
-}
-
-/** A priority as the metadata pill it has always been, in its hue. */
-export function PriorityBadge({
-  priority,
-  className,
-}: {
-  priority: TaskPriority
-  className?: string
-}) {
-  const tone = priorityTone(priority)
-  return (
-    <Badge
-      variant="outline"
-      className={cn(tone && PRIORITY_BADGE[tone], className)}
-    >
-      {priority}
-    </Badge>
-  )
 }
 
 /**

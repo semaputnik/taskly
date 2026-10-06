@@ -15,6 +15,7 @@ import { isoDay } from "@/lib/dates"
 import { cn } from "@/lib/utils"
 import { CompleteTask } from "./CompleteTask"
 import { type DueTone, type MetaFact, metaLine } from "./compact"
+import { StatusMark } from "./status"
 
 /**
  * Only a missed day is coloured; today is ink. Both are set a weight up, as
@@ -58,6 +59,7 @@ export function CompactTaskRow({
   flush = false,
   depth = 0,
   asItem = false,
+  readOnly = false,
   children,
 }: {
   task: TaskPublic
@@ -82,6 +84,12 @@ export function CompactTaskRow({
   depth?: number
   /** Set where the line sits in a list: it is the list's item itself. */
   asItem?: boolean
+  /**
+   * Set for a task nothing can change, one of an archived project's (FR-05.12):
+   * the status is shown, not a control, and the title is text, not a way into
+   * a panel whose every field would refuse an edit.
+   */
+  readOnly?: boolean
   /** Set under the meta line, in the title's column: a line about the task. */
   children?: React.ReactNode
 }) {
@@ -118,12 +126,18 @@ export function CompactTaskRow({
       {/* Held to the title's line, not centred on the whole task line, and
           nudged so the two share a centre: the mark itself sits a pixel
           down, inside its larger target. */}
-      <CompleteTask
-        task={task}
-        asMark
-        receipt={receipt}
-        className="-mt-[3px] self-start"
-      />
+      {readOnly ? (
+        <span className="mt-px flex self-start">
+          <StatusMark status={task.status} priority={task.priority} labelled />
+        </span>
+      ) : (
+        <CompleteTask
+          task={task}
+          asMark
+          receipt={receipt}
+          className="-mt-[3px] self-start"
+        />
+      )}
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           {task.parent_id && !branch && (
@@ -132,15 +146,26 @@ export function CompactTaskRow({
               aria-label="Subtask"
             />
           )}
-          <RouterLink
-            {...recordLink("task", task.id)}
-            className={cn(
-              "focus-visible:ring-ring/50 min-w-0 truncate rounded-sm leading-snug font-medium underline-offset-4 outline-none hover:underline focus-visible:ring-[3px]",
-              done && "text-ink-3 line-through",
-            )}
-          >
-            {task.title}
-          </RouterLink>
+          {readOnly ? (
+            <span
+              className={cn(
+                "min-w-0 truncate leading-snug font-medium",
+                done && "text-ink-3 line-through",
+              )}
+            >
+              {task.title}
+            </span>
+          ) : (
+            <RouterLink
+              {...recordLink("task", task.id)}
+              className={cn(
+                "focus-visible:ring-ring/50 min-w-0 truncate rounded-sm leading-snug font-medium underline-offset-4 outline-none hover:underline focus-visible:ring-[3px]",
+                done && "text-ink-3 line-through",
+              )}
+            >
+              {task.title}
+            </RouterLink>
+          )}
         </div>
 
         {(facts.length > 0 || project) && (

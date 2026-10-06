@@ -69,8 +69,19 @@ class UserPublic(UserBase):
     created_at: datetime | None = None
 
 
+class UserListed(UserPublic):
+    """
+    An account as the superuser's list shows it: the account fields, how many
+    passkeys it holds, and when one of them last signed it in (FR-09.2). Nothing
+    about what the account holds or does (FR-10.7).
+    """
+
+    passkey_count: int
+    last_sign_in_at: datetime | None = None
+
+
 class UsersPublic(SQLModel):
-    data: list[UserPublic]
+    data: list[UserListed]
     count: int
 
 
@@ -109,6 +120,17 @@ class PasskeyPublic(SQLModel):
     name: str
     created_at: datetime
     last_used_at: datetime | None
+
+
+# A passkey's name is given from the browser and device that made it, and the
+# owner may replace it with words they recognise (FR-12.6). Blank is refused.
+PasskeyName = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=255)
+]
+
+
+class PasskeyRename(SQLModel):
+    name: PasskeyName
 
 
 class PasskeysPublic(SQLModel):
@@ -300,6 +322,16 @@ class ProjectPublic(ProjectBase):
     # The tasks resolving to it that are not deleted — what archiving takes out
     # of view and what deleting takes down with it (FR-05.9, FR-05.11).
     task_count: int = 0
+    # What the Projects page says about the tasks, so it reads one list rather
+    # than a list of tasks per project (FR-05.15). Subtasks count with their
+    # root's project, like `task_count`; `open_count` is the number the task
+    # list narrowed to the project shows, and `overdue_count`, `backlog_count`
+    # and `review_count` are parts of it.
+    open_count: int = 0
+    overdue_count: int = 0
+    backlog_count: int = 0
+    review_count: int = 0
+    done_count: int = 0
     created_at: datetime | None = None
 
 
@@ -396,9 +428,10 @@ class TagPublic(TagBase):
     # list, but deleting or merging the tag reaches them too.
     archived_task_count: int = 0
     # The bot user that brought the tag into being, if one did — through the
-    # API or by typing a new name onto a task — so an agent's vocabulary can
+    # API or by typing a new name onto a task — so a bot user's vocabulary can
     # be told from the user's own (FR-01.28).
     created_by_bot_user: BotUserRef | None = None
+    created_at: datetime | None = None
 
 
 class TagDuplicateDismissal(SQLModel, table=True):
@@ -1022,12 +1055,50 @@ class Attachment(AttachmentBase, table=True):
         default_factory=get_datetime_utc,
         sa_type=DateTime(timezone=True),  # type: ignore
     )
+    # The document in the owner's Paperless that holds this file, once it has
+    # been handed over and Taskly has released its own copy (ADR-0010). Set
+    # means the file is kept in Paperless and nowhere else; unset means the
+    # bytes are in Taskly's storage.
+    paperless_document_id: int | None = Field(
+        default=None,
+        sa_type=BigInteger,
+    )
+
+
+class AttachmentLocation(StrEnum):
+    """Where an attachment is kept (FR-04.11)."""
+
+    TASKLY = "taskly"
+    PAPERLESS = "paperless"
+
+
+class PaperlessHandoverPublic(SQLModel):
+    """
+    A PDF on its way to Paperless: still kept in Taskly, and downloadable from
+    there (FR-04.6). `failed` means every attempt was used; `error` says why
+    and the owner can send it again.
+    """
+
+    state: str
+    error: str | None = None
+    attempts: int
+    # When the next attempt is due, while there is one.
+    next_attempt_at: datetime | None = None
 
 
 class AttachmentPublic(AttachmentBase):
     id: uuid.UUID
     task_id: uuid.UUID
     created_at: datetime | None = None
+    # Where the file is kept (FR-04.11).
+    kept_in: AttachmentLocation = AttachmentLocation.TASKLY
+    # For a file kept in Paperless: its document there, and the address of that
+    # document. The address is null while the owner has no connection, which
+    # is when the file is out of reach (FR-04.8).
+    paperless_document_id: int | None = None
+    paperless_url: str | None = None
+    # Set while a PDF is being handed to Paperless, or when that failed.
+    paperless_handover: PaperlessHandoverPublic | None = None
 
 
 class AttachmentsPublic(SQLModel):
@@ -1580,3 +1651,133 @@ class TokenPayload(SQLModel):
     # The user's session version when the token was issued. A token from
     # before the account last signed out everywhere carries a lower one.
     sv: int | None = None
+
+
+class PaperlessConnection(SQLModel, table=True):
+    """
+    A user's own Paperless-ngx instance (FR-04.4, ADR-0010): one per user, off
+    until set. The token is encrypted under `PAPERLESS_TOKEN_KEY` because
+    Taskly has to send it back to Paperless; it is never returned by the API.
+    """
+
+    user_id: uuid.UUID = Field(
+        foreign_key="user.id", primary_key=True, ondelete="CASCADE"
+    )
+    url: str = Field(max_length=2048)
+    token_encrypted: str = Field(max_length=1024)
+    created_at: datetime = Field(
+        default_factory=get_datetime_utc,
+        sa_type=DateTime(timezone=True),  # type: ignore
+    )
+    updated_at: datetime = Field(
+        default_factory=get_datetime_utc,
+        sa_type=DateTime(timezone=True),  # type: ignore
+    )
+
+
+class PaperlessHandoverStage(StrEnum):
+    """What a hand-over does next."""
+
+    # Look for the document by checksum, and send the file if Paperless does
+    # not hold it.
+    SEND = "send"
+    # Wait for Paperless to consume the file it was sent.
+    POLL = "poll"
+    # The document is known: tag it, note the task, release the local copy.
+    FINISH = "finish"
+
+
+class PaperlessHandover(SQLModel, table=True):
+    """
+    The outbox row of a PDF being handed to Paperless: the sibling of
+    `webhookdelivery`, drained by the same loop on the same retry schedule
+    (FR-04.6, FR-11.10). It exists only while the hand-over is unfinished or
+    failed; a finished one is deleted, and the attachment carries the result.
+    All of its state is here, so a restart loses nothing.
+    """
+
+    __table_args__ = (
+        Index("ix_paperlesshandover_state_next_attempt_at", "state", "next_attempt_at"),
+        CheckConstraint(
+            "state IN ('pending', 'failed')", name="paperlesshandover_state"
+        ),
+        CheckConstraint(
+            "stage IN ('send', 'poll', 'finish')", name="paperlesshandover_stage"
+        ),
+    )
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    attachment_id: uuid.UUID = Field(
+        foreign_key="attachment.id", nullable=False, ondelete="CASCADE", unique=True
+    )
+    state: str = Field(default=DeliveryState.PENDING.value, max_length=20)
+    stage: str = Field(default=PaperlessHandoverStage.SEND.value, max_length=20)
+    # Paperless's id for the consumption of the file we sent, and the document
+    # it made (or the one that was already there).
+    paperless_task_id: str | None = Field(default=None, max_length=100)
+    paperless_document_id: int | None = Field(
+        default=None,
+        sa_type=BigInteger,
+    )
+    # When the file was sent: how long Paperless has had to consume it.
+    sent_at: datetime | None = Field(
+        default=None,
+        sa_type=DateTime(timezone=True),  # type: ignore
+    )
+    # Failed attempts so far; the retry schedule is read off it.
+    attempts: int = 0
+    next_attempt_at: datetime = Field(
+        default_factory=get_datetime_utc,
+        sa_type=DateTime(timezone=True),  # type: ignore
+    )
+    last_attempt_at: datetime | None = Field(
+        default=None,
+        sa_type=DateTime(timezone=True),  # type: ignore
+    )
+    last_error: str | None = Field(default=None, max_length=500)
+
+
+class PaperlessConnect(SQLModel):
+    """What the owner types: the instance's address and an API token. On a
+    change the token may be left out, which keeps the one stored."""
+
+    url: Annotated[str, StringConstraints(strip_whitespace=True, max_length=2048)]
+    token: Annotated[
+        str | None, StringConstraints(strip_whitespace=True, max_length=512)
+    ] = None
+
+
+class PaperlessConnectionPublic(SQLModel):
+    """The connection as Settings shows it. There is no token: it is never
+    shown again, only replaced (FR-04.4)."""
+
+    connected: bool
+    url: str | None = None
+    # How many attachments are kept in Paperless, so Settings can say what
+    # disconnecting makes unreachable (FR-04.8).
+    documents_kept: int = 0
+
+
+class PaperlessTest(SQLModel):
+    """Values to try before saving them; whatever is left out is taken from the
+    saved connection."""
+
+    url: Annotated[
+        str | None, StringConstraints(strip_whitespace=True, max_length=2048)
+    ] = None
+    token: Annotated[
+        str | None, StringConstraints(strip_whitespace=True, max_length=512)
+    ] = None
+
+
+class PaperlessTestResult(SQLModel):
+    ok: bool
+    # Why it did not work, when it did not.
+    error: str | None = None
+
+
+class PaperlessDisconnected(SQLModel):
+    connected: bool = False
+    # Attachments kept in Paperless, which are out of reach until a connection
+    # is set again (FR-04.8). Nothing in Paperless is touched.
+    unreachable_documents: int

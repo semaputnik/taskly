@@ -206,6 +206,16 @@ export const ActivityOrderSchema = {
     description: 'Which end of the log a read starts from (FR-10.10).'
 } as const;
 
+export const AttachmentLocationSchema = {
+    type: 'string',
+    enum: [
+        'taskly',
+        'paperless'
+    ],
+    title: 'AttachmentLocation',
+    description: 'Where an attachment is kept (FR-04.11).'
+} as const;
+
 export const AttachmentPublicSchema = {
     properties: {
         filename: {
@@ -243,6 +253,42 @@ export const AttachmentPublicSchema = {
                 }
             ],
             title: 'Created At'
+        },
+        kept_in: {
+            $ref: '#/components/schemas/AttachmentLocation',
+            default: 'taskly'
+        },
+        paperless_document_id: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Paperless Document Id'
+        },
+        paperless_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Paperless Url'
+        },
+        paperless_handover: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/PaperlessHandoverPublic'
+                },
+                {
+                    type: 'null'
+                }
+            ]
         }
     },
     type: 'object',
@@ -828,6 +874,184 @@ export const MessageSchema = {
     title: 'Message'
 } as const;
 
+export const PaperlessConnectSchema = {
+    properties: {
+        url: {
+            type: 'string',
+            maxLength: 2048,
+            title: 'Url'
+        },
+        token: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 512
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Token'
+        }
+    },
+    type: 'object',
+    required: [
+        'url'
+    ],
+    title: 'PaperlessConnect',
+    description: 'What the owner types: the instance\'s address and an API token. On a\nchange the token may be left out, which keeps the one stored.'
+} as const;
+
+export const PaperlessConnectionPublicSchema = {
+    properties: {
+        connected: {
+            type: 'boolean',
+            title: 'Connected'
+        },
+        url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Url'
+        },
+        documents_kept: {
+            type: 'integer',
+            title: 'Documents Kept',
+            default: 0
+        }
+    },
+    type: 'object',
+    required: [
+        'connected'
+    ],
+    title: 'PaperlessConnectionPublic',
+    description: 'The connection as Settings shows it. There is no token: it is never\nshown again, only replaced (FR-04.4).'
+} as const;
+
+export const PaperlessDisconnectedSchema = {
+    properties: {
+        connected: {
+            type: 'boolean',
+            title: 'Connected',
+            default: false
+        },
+        unreachable_documents: {
+            type: 'integer',
+            title: 'Unreachable Documents'
+        }
+    },
+    type: 'object',
+    required: [
+        'unreachable_documents'
+    ],
+    title: 'PaperlessDisconnected'
+} as const;
+
+export const PaperlessHandoverPublicSchema = {
+    properties: {
+        state: {
+            type: 'string',
+            title: 'State'
+        },
+        error: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Error'
+        },
+        attempts: {
+            type: 'integer',
+            title: 'Attempts'
+        },
+        next_attempt_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Next Attempt At'
+        }
+    },
+    type: 'object',
+    required: [
+        'state',
+        'attempts'
+    ],
+    title: 'PaperlessHandoverPublic',
+    description: 'A PDF on its way to Paperless: still kept in Taskly, and downloadable from\nthere (FR-04.6). `failed` means every attempt was used; `error` says why\nand the owner can send it again.'
+} as const;
+
+export const PaperlessTestSchema = {
+    properties: {
+        url: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 2048
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Url'
+        },
+        token: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 512
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Token'
+        }
+    },
+    type: 'object',
+    title: 'PaperlessTest',
+    description: 'Values to try before saving them; whatever is left out is taken from the\nsaved connection.'
+} as const;
+
+export const PaperlessTestResultSchema = {
+    properties: {
+        ok: {
+            type: 'boolean',
+            title: 'Ok'
+        },
+        error: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Error'
+        }
+    },
+    type: 'object',
+    required: [
+        'ok'
+    ],
+    title: 'PaperlessTestResult'
+} as const;
+
 export const PasskeyCredentialSchema = {
     properties: {
         credential: {
@@ -881,6 +1105,22 @@ export const PasskeyPublicSchema = {
         'last_used_at'
     ],
     title: 'PasskeyPublic'
+} as const;
+
+export const PasskeyRenameSchema = {
+    properties: {
+        name: {
+            type: 'string',
+            maxLength: 255,
+            minLength: 1,
+            title: 'Name'
+        }
+    },
+    type: 'object',
+    required: [
+        'name'
+    ],
+    title: 'PasskeyRename'
 } as const;
 
 export const PasskeysPublicSchema = {
@@ -1029,6 +1269,31 @@ export const ProjectPublicSchema = {
         task_count: {
             type: 'integer',
             title: 'Task Count',
+            default: 0
+        },
+        open_count: {
+            type: 'integer',
+            title: 'Open Count',
+            default: 0
+        },
+        overdue_count: {
+            type: 'integer',
+            title: 'Overdue Count',
+            default: 0
+        },
+        backlog_count: {
+            type: 'integer',
+            title: 'Backlog Count',
+            default: 0
+        },
+        review_count: {
+            type: 'integer',
+            title: 'Review Count',
+            default: 0
+        },
+        done_count: {
+            type: 'integer',
+            title: 'Done Count',
             default: 0
         },
         created_at: {
@@ -1363,6 +1628,18 @@ export const TagPublicSchema = {
                     type: 'null'
                 }
             ]
+        },
+        created_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Created At'
         }
     },
     type: 'object',
@@ -2054,6 +2331,80 @@ export const TokenSchema = {
     title: 'Token'
 } as const;
 
+export const UserListedSchema = {
+    properties: {
+        email: {
+            type: 'string',
+            maxLength: 255,
+            format: 'email',
+            title: 'Email'
+        },
+        is_active: {
+            type: 'boolean',
+            title: 'Is Active',
+            default: true
+        },
+        is_superuser: {
+            type: 'boolean',
+            title: 'Is Superuser',
+            default: false
+        },
+        full_name: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 255
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Full Name'
+        },
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        created_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Created At'
+        },
+        passkey_count: {
+            type: 'integer',
+            title: 'Passkey Count'
+        },
+        last_sign_in_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Last Sign In At'
+        }
+    },
+    type: 'object',
+    required: [
+        'email',
+        'id',
+        'passkey_count'
+    ],
+    title: 'UserListed',
+    description: 'An account as the superuser\'s list shows it: the account fields, how many\npasskeys it holds, and when one of them last signed it in (FR-09.2). Nothing\nabout what the account holds or does (FR-10.7).'
+} as const;
+
 export const UserPublicSchema = {
     properties: {
         email: {
@@ -2146,7 +2497,7 @@ export const UsersPublicSchema = {
     properties: {
         data: {
             items: {
-                $ref: '#/components/schemas/UserPublic'
+                $ref: '#/components/schemas/UserListed'
             },
             type: 'array',
             title: 'Data'

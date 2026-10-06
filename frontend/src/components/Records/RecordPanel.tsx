@@ -442,27 +442,6 @@ export function DeleteTrigger({
 }
 
 /**
- * Where the record sits, and its name as a control: the two things every
- * panel opens with, bordered off from the properties below.
- */
-export function RecordHeader({
-  breadcrumb,
-  title,
-}: {
-  breadcrumb: React.ReactNode
-  title?: React.ReactNode
-}) {
-  return (
-    <header className={cn("flex flex-col gap-3 border-b py-6 pt-2", gutter)}>
-      <p className="text-muted-foreground flex min-w-0 items-center gap-1 text-sm">
-        {breadcrumb}
-      </p>
-      {title}
-    </header>
-  )
-}
-
-/**
  * One property: its label in a 96px column, ink-3, and the value beside it.
  *
  * The label names its value. Where the value is one control, the label is that

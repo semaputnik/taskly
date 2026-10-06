@@ -20,3 +20,7 @@ export const changesQuery = (since: string | null) =>
 /** A text action: underlined on hover, ringed on keyboard focus. */
 export const textLink =
   "focus-visible:ring-ring/50 rounded-sm underline-offset-[3px] outline-none hover:underline focus-visible:ring-[3px]"
+
+/** A line's count as a link: quiet at rest, tinted under the pointer. */
+export const countLink =
+  "focus-visible:ring-ring/50 hover:bg-rule -my-1 -mr-2 inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[13.5px] font-medium whitespace-nowrap outline-none focus-visible:ring-[3px] pointer-coarse:-my-3 pointer-coarse:py-3"

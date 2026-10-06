@@ -4,13 +4,27 @@ from urllib.parse import quote
 
 from fastapi import APIRouter, HTTPException, UploadFile
 from fastapi.responses import Response
+from sqlmodel import select
 
-from app import crud
+from app import crud, paperless
 from app.api import access
 from app.api.access import TaskAction
-from app.api.deps import AttachmentStorageDep, CallerDep, SessionDep
+from app.api.deps import (
+    AttachmentStorageDep,
+    Caller,
+    CallerDep,
+    CurrentUser,
+    PaperlessClientDep,
+    SessionDep,
+)
 from app.core.config import settings
-from app.models import AttachmentPublic, AttachmentsPublic, Message
+from app.models import (
+    AttachmentPublic,
+    AttachmentsPublic,
+    DeliveryState,
+    Message,
+    PaperlessHandover,
+)
 
 router = APIRouter(tags=["attachments"])
 
@@ -83,7 +97,9 @@ def read_attachments(
     """
     access.get_task(session, caller, task_id, TaskAction.READ)
     attachments, count = crud.get_attachments(session=session, task_id=task_id)
-    return AttachmentsPublic(data=attachments, count=count)
+    return AttachmentsPublic(
+        data=paperless.attachments_public(session, list(attachments)), count=count
+    )
 
 
 @router.post("/tasks/{task_id}/attachments/", response_model=AttachmentPublic)
@@ -122,7 +138,12 @@ def upload_attachment(
     # worst a metadata row with nothing to download rather than orphaned bytes
     # nothing points at.
     storage.put(str(attachment.id), data)
-    return attachment
+    # A PDF of a user with a Paperless connection is kept there: it is handed
+    # over in the background, and meanwhile it is kept, and downloadable, here
+    # (FR-04.5, FR-04.6). A bot user's upload is its owner's (FR-04.5).
+    if paperless.is_pdf(data) and paperless.get_connection(session, caller.owner_id):
+        paperless.queue_handover(session, attachment)
+    return paperless.attachments_public(session, [attachment])[0]
 
 
 @router.get("/attachments/{attachment_id}")
@@ -131,13 +152,31 @@ def download_attachment(
     session: SessionDep,
     caller: CallerDep,
     storage: AttachmentStorageDep,
+    paperless_client: PaperlessClientDep,
     attachment_id: uuid.UUID,
 ) -> Response:
     """
     Download an attachment's exact bytes. A bot user downloads wherever it can
     read the task (FR-08.11).
+
+    One kept in Paperless comes from there, as the original file and not
+    Paperless's archived copy; if Paperless cannot be reached the download
+    fails saying so (FR-04.10).
     """
     attachment = access.get_attachment(session, caller, attachment_id, TaskAction.READ)
+    if attachment.paperless_document_id is not None:
+        try:
+            data = paperless.fetch_original(session, attachment, paperless_client)
+        except paperless.PaperlessError as error:
+            raise HTTPException(
+                status_code=error.status,
+                detail={"code": error.code, "message": error.message},
+            ) from error
+        return Response(
+            content=data,
+            media_type=_safe_media_type(attachment.content_type),
+            headers={"Content-Disposition": _content_disposition(attachment.filename)},
+        )
     try:
         data = storage.get(str(attachment.id))
     except FileNotFoundError:
@@ -150,6 +189,35 @@ def download_attachment(
         media_type=_safe_media_type(attachment.content_type),
         headers={"Content-Disposition": _content_disposition(attachment.filename)},
     )
+
+
+@router.post("/attachments/{attachment_id}/resend", response_model=AttachmentPublic)
+def resend_attachment(
+    *, session: SessionDep, current_user: CurrentUser, attachment_id: uuid.UUID
+) -> Any:
+    """
+    Send a PDF to Paperless again after its hand-over failed (FR-04.6). The
+    owner only: a bot user cannot call this. Only an attachment whose
+    hand-over failed can be sent again.
+    """
+    attachment = access.get_attachment(
+        session, Caller(owner_id=current_user.id), attachment_id, TaskAction.UPDATE
+    )
+    handover = session.exec(
+        select(PaperlessHandover).where(
+            PaperlessHandover.attachment_id == attachment.id
+        )
+    ).first()
+    if handover is None or handover.state != DeliveryState.FAILED.value:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "attachment_not_failed",
+                "message": "Only a file whose hand-over to Paperless failed can be sent again.",
+            },
+        )
+    paperless.resend(session, handover)
+    return paperless.attachments_public(session, [attachment])[0]
 
 
 @router.delete("/attachments/{attachment_id}")

@@ -229,7 +229,10 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
 - **FR-04.4** A user can connect their own Paperless-ngx instance in Settings
   by giving its address and an API token, and can test the connection there.
   The connection is optional and off until set; one per user. The token is
-  kept so that it can be used but never shown again, only replaced. The
+  kept so that it can be used but never shown again, only replaced. It is
+  stored encrypted, under the installation's own `PAPERLESS_TOKEN_KEY`
+  setting rather than a key derived from `SECRET_KEY`: changing that key
+  makes stored tokens unreadable until each user enters theirs again. The
   address follows the same rule as a webhook URL on loopback and private
   ranges (FR-11.3), under the same installation setting.
 - **FR-04.5** While a user has a Paperless connection, every PDF attached to
@@ -482,7 +485,9 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
 - **FR-09.1** The system has exactly one superuser.
 - **FR-09.2** The superuser can view the list of registered users. The list
   is a section of the superuser's own Settings, not a screen of its own, and
-  the code of FR-12.16 is issued from the user's line there.
+  the code of FR-12.16 is issued from the user's line there. Each line shows
+  the account's name and email, how many passkeys it holds (said plainly when
+  there are none) and when one of them last signed it in.
 - **FR-09.3** The superuser's one other administrative function is issuing
   recovery codes to users who have lost every passkey
   (see [F-12](#f-12-sign-in)). There are no others for now.
@@ -546,6 +551,12 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
 - **FR-10.10** The log reads newest first, and can be turned to oldest
   first; the order lives in the URL beside the narrowings and the page, and
   the REST API's log accepts it.
+- **FR-10.11** The log can be narrowed to one project's chronology: entries
+  about the project itself, about a task in it, about a comment or file on
+  such a task, and the deletion or restore of one of its tasks. The narrowing
+  lives in the URL beside the others, the REST API's log accepts it
+  (`project_id`), it combines with them, and it never widens the log past the
+  reader's own entries (FR-10.7).
 
 ### F-11. Webhooks
 
@@ -640,7 +651,8 @@ Taskly calls a bot user back when there is something for it to act on
   the device — both when it is created and every time it is used.
 - **FR-12.6** A user holds one or more passkeys. Settings lists them, each
   with a name, when it was created and when it was last used. The name is
-  given automatically from the browser and device that made it.
+  given automatically from the browser and device that made it, and the user
+  can rename it; a name is a label, so renaming asks for no confirmation.
 - **FR-12.7** The user can add a passkey and remove one. Either takes a fresh
   confirmation with one of the account's passkeys at that moment; the session
   alone is not enough.

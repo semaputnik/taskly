@@ -6,7 +6,12 @@ import {
   OrderMenu as CommonOrderMenu,
   control,
 } from "@/components/Common/FilterRow"
-import { botQuery, botsQuery, deletedBotsQuery } from "@/lib/serverState"
+import {
+  botQuery,
+  botsQuery,
+  deletedBotsQuery,
+  scopeProjectsQuery,
+} from "@/lib/serverState"
 import { cn } from "@/lib/utils"
 import type { ActivitySearch } from "./queries"
 import {
@@ -79,7 +84,15 @@ export function ActivityFilters({
         ? `By ${known.find((b) => b.id === actor)?.name ?? single?.name ?? "a bot user"}`
         : undefined
 
-  const filtered = Boolean(search.kind || search.actor)
+  // Live and archived projects alike: a project's chronology reads after it
+  // is archived too.
+  const { data: projects } = useQuery(scopeProjectsQuery())
+  const projectName = search.project_id
+    ? (projects?.find((project) => project.id === search.project_id)?.name ??
+      "A project")
+    : undefined
+
+  const filtered = Boolean(search.kind || search.actor || search.project_id)
 
   return (
     <fieldset className="border-rule-strong text-ink-3 m-0 min-w-0 border-0 border-b p-0 pb-2.5 text-[13.5px]">
@@ -119,11 +132,30 @@ export function ActivityFilters({
           ]}
           onChange={(next) => onChange({ actor: next })}
         />
+        <ChoiceFilter
+          noun="Project"
+          anyLabel="In any project"
+          value={projectName && `In ${projectName}`}
+          selected={search.project_id}
+          choices={(projects ?? []).map((project) => ({
+            value: project.id,
+            label: project.archived
+              ? `${project.name} (archived)`
+              : project.name,
+          }))}
+          onChange={(project_id) => onChange({ project_id })}
+        />
         {filtered && (
           <button
             type="button"
             aria-label="Clear all filters"
-            onClick={() => onChange({ kind: undefined, actor: undefined })}
+            onClick={() =>
+              onChange({
+                kind: undefined,
+                actor: undefined,
+                project_id: undefined,
+              })
+            }
             className={cn(control, "-ml-1")}
           >
             Clear

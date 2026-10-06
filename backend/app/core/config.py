@@ -29,6 +29,14 @@ class Settings(BaseSettings):
     # set it once and keep it. Like SECRET_KEY, "changethis" only warns in
     # development and is refused everywhere else.
     WEBHOOK_SECRET_KEY: str = "changethis"
+    # What users' Paperless API tokens are encrypted under (FR-04.4, ADR-0010).
+    # Its own key, like WEBHOOK_SECRET_KEY and for the same reason: rotating
+    # SECRET_KEY must not make stored tokens unreadable. Any string will do (it
+    # is run through HKDF). Changing it makes every stored token unreadable
+    # until its owner enters it again, so set it once and keep it. Like
+    # SECRET_KEY, "changethis" only warns in development and is refused
+    # everywhere else.
+    PAPERLESS_TOKEN_KEY: str = "changethis"
     # 60 minutes * 24 hours * 8 days = 8 days
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 8
     # The installation's public address. Passkeys are bound to its hostname
@@ -111,6 +119,7 @@ class Settings(BaseSettings):
     def _enforce_non_default_secrets(self) -> Self:
         self._check_default_secret("SECRET_KEY", self.SECRET_KEY)
         self._check_default_secret("WEBHOOK_SECRET_KEY", self.WEBHOOK_SECRET_KEY)
+        self._check_default_secret("PAPERLESS_TOKEN_KEY", self.PAPERLESS_TOKEN_KEY)
         for host in self.DATABASE_URL.hosts():
             self._check_default_secret("DATABASE_URL password", host["password"])
 

@@ -253,7 +253,7 @@ test("The shortcut never steals a keystroke from a field being typed into", asyn
 
   // The project panel's own name field is a field like any other: the key
   // that starts capture is a letter in it.
-  await page.getByRole("button", { name: "Add Project" }).click()
+  await page.getByRole("button", { name: "New project" }).click()
   const name = page.getByRole("textbox", { name: "Project name" })
   await name.fill("Coastal route")
   await name.press("c")

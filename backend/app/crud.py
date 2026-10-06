@@ -773,6 +773,7 @@ def tag_publics(
             name=tag.name,
             task_count=counts.get(tag.id, (0, 0))[0],
             archived_task_count=counts.get(tag.id, (0, 0))[1],
+            created_at=tag.created_at,
             created_by_bot_user=bots.get(creators[tag.id])
             if tag.id in creators
             else None,
@@ -1125,20 +1126,33 @@ def get_task_project_ids(
     return dict(rows)
 
 
-def get_project_task_counts(
+class ProjectTaskStats(NamedTuple):
+    """What one project holds, by where its tasks stand."""
+
+    total: int = 0
+    open: int = 0
+    overdue: int = 0
+    backlog: int = 0
+    review: int = 0
+    done: int = 0
+
+
+def get_project_task_stats(
     *,
     session: Session,
     owner_id: uuid.UUID,
     project_ids: Sequence[uuid.UUID] | None = None,
-) -> dict[uuid.UUID, int]:
+) -> dict[uuid.UUID, ProjectTaskStats]:
     """
-    How many tasks resolve to each of a user's projects, keyed by project id,
-    narrowed to `project_ids` where the caller only needs some of them.
+    What each of a user's projects holds, keyed by project id, narrowed to
+    `project_ids` where the caller only needs some of them.
 
     A subtask holds no project of its own, so the count follows each tree down
     from its root: what a project holds is its whole trees, not their tops
     (FR-02.4). Deleted tasks are not counted — the user cannot see them, and
     deleting the project again would be what brings them back into play.
+    Open and overdue mean what they mean in the task list (FR-01.4), so the
+    open count is the number of rows the list narrowed to the project shows.
     """
     roots: list[Any] = [
         Task.owner_id == owner_id,
@@ -1153,14 +1167,39 @@ def get_project_task_counts(
         roots.append(col(Task.project_id).in_(project_ids))
 
     tree = _tree_walk(and_(*roots), name="project_task_counts")
-    rows = session.exec(
-        select(tree.c.project_id, func.count()).group_by(tree.c.project_id)
-    ).all()
-    return {project_id: count for project_id, count in rows if project_id}
+    open_task = tree.c.status != TaskStatus.DONE
+
+    def counted(*conditions: Any) -> Any:
+        return func.count(case((and_(*conditions), 1))) if conditions else func.count()
+
+    columns: list[Any] = [
+        tree.c.project_id,
+        counted(),
+        counted(open_task),
+        counted(open_task, tree.c.due_date < date.today()),
+        counted(tree.c.status == TaskStatus.BACKLOG),
+        counted(tree.c.status == TaskStatus.REVIEW),
+        counted(tree.c.status == TaskStatus.DONE),
+    ]
+    rows = session.exec(select(*columns).group_by(tree.c.project_id)).all()
+    return {row[0]: ProjectTaskStats(*row[1:]) for row in rows if row[0]}
 
 
-def project_public(project: Project, task_count: int = 0) -> ProjectPublic:
-    return ProjectPublic.model_validate(project, update={"task_count": task_count})
+def project_public(
+    project: Project, stats: ProjectTaskStats | None = None
+) -> ProjectPublic:
+    stats = stats or ProjectTaskStats()
+    return ProjectPublic.model_validate(
+        project,
+        update={
+            "task_count": stats.total,
+            "open_count": stats.open,
+            "overdue_count": stats.overdue,
+            "backlog_count": stats.backlog,
+            "review_count": stats.review,
+            "done_count": stats.done,
+        },
+    )
 
 
 def has_open_subtasks(*, session: Session, task: Task) -> bool:
@@ -1302,7 +1341,7 @@ def _tree_walk(start_condition: Any, *, name: str) -> Any:
     """
     The one walk down the task tree: the tasks matching `start_condition` and
     every task under them, leaving deleted ones out, as (id, status,
-    project_id) rows. `project_id` is carried down from the starting task, so
+    project_id, due_date) rows. `project_id` is carried down from the starting task, so
     a walk that starts at root tasks says which project each row resolves to.
 
     Subtasks hold no project of their own, so the tasks of a project are only
@@ -1310,13 +1349,13 @@ def _tree_walk(start_condition: Any, *, name: str) -> Any:
     has to be unique among the ones a single statement uses.
     """
     tree = (
-        select(Task.id, Task.status, Task.project_id)
+        select(Task.id, Task.status, col(Task.project_id), col(Task.due_date))
         .where(start_condition, not_deleted(Task))
         .cte(name, recursive=True)
     )
     child = aliased(Task)
     return tree.union_all(
-        select(child.id, child.status, tree.c.project_id)
+        select(child.id, child.status, tree.c.project_id, col(child.due_date))
         .join(tree, col(child.parent_id) == tree.c.id)
         .where(not_deleted(child))
     )

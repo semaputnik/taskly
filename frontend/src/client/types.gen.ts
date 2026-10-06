@@ -109,6 +109,13 @@ export type ActivityKind = 'completed' | 'created' | 'changed' | 'deleted' | 'co
 export type ActivityOrder = 'newest' | 'oldest';
 
 /**
+ * AttachmentLocation
+ *
+ * Where an attachment is kept (FR-04.11).
+ */
+export type AttachmentLocation = 'taskly' | 'paperless';
+
+/**
  * AttachmentPublic
  */
 export type AttachmentPublic = {
@@ -136,6 +143,16 @@ export type AttachmentPublic = {
      * Created At
      */
     created_at?: string | null;
+    kept_in?: AttachmentLocation;
+    /**
+     * Paperless Document Id
+     */
+    paperless_document_id?: number | null;
+    /**
+     * Paperless Url
+     */
+    paperless_url?: string | null;
+    paperless_handover?: PaperlessHandoverPublic | null;
 };
 
 /**
@@ -502,6 +519,115 @@ export type Message = {
 };
 
 /**
+ * PaperlessConnect
+ *
+ * What the owner types: the instance's address and an API token. On a
+ * change the token may be left out, which keeps the one stored.
+ */
+export type PaperlessConnect = {
+    /**
+     * Url
+     */
+    url: string;
+    /**
+     * Token
+     */
+    token?: string | null;
+};
+
+/**
+ * PaperlessConnectionPublic
+ *
+ * The connection as Settings shows it. There is no token: it is never
+ * shown again, only replaced (FR-04.4).
+ */
+export type PaperlessConnectionPublic = {
+    /**
+     * Connected
+     */
+    connected: boolean;
+    /**
+     * Url
+     */
+    url?: string | null;
+    /**
+     * Documents Kept
+     */
+    documents_kept?: number;
+};
+
+/**
+ * PaperlessDisconnected
+ */
+export type PaperlessDisconnected = {
+    /**
+     * Connected
+     */
+    connected?: boolean;
+    /**
+     * Unreachable Documents
+     */
+    unreachable_documents: number;
+};
+
+/**
+ * PaperlessHandoverPublic
+ *
+ * A PDF on its way to Paperless: still kept in Taskly, and downloadable from
+ * there (FR-04.6). `failed` means every attempt was used; `error` says why
+ * and the owner can send it again.
+ */
+export type PaperlessHandoverPublic = {
+    /**
+     * State
+     */
+    state: string;
+    /**
+     * Error
+     */
+    error?: string | null;
+    /**
+     * Attempts
+     */
+    attempts: number;
+    /**
+     * Next Attempt At
+     */
+    next_attempt_at?: string | null;
+};
+
+/**
+ * PaperlessTest
+ *
+ * Values to try before saving them; whatever is left out is taken from the
+ * saved connection.
+ */
+export type PaperlessTest = {
+    /**
+     * Url
+     */
+    url?: string | null;
+    /**
+     * Token
+     */
+    token?: string | null;
+};
+
+/**
+ * PaperlessTestResult
+ */
+export type PaperlessTestResult = {
+    /**
+     * Ok
+     */
+    ok: boolean;
+    /**
+     * Error
+     */
+    error?: string | null;
+};
+
+/**
  * PasskeyCredential
  *
  * The browser's answer to a passkey ceremony, as WebAuthn's
@@ -536,6 +662,16 @@ export type PasskeyPublic = {
      * Last Used At
      */
     last_used_at: string | null;
+};
+
+/**
+ * PasskeyRename
+ */
+export type PasskeyRename = {
+    /**
+     * Name
+     */
+    name: string;
 };
 
 /**
@@ -633,6 +769,26 @@ export type ProjectPublic = {
      * Task Count
      */
     task_count?: number;
+    /**
+     * Open Count
+     */
+    open_count?: number;
+    /**
+     * Overdue Count
+     */
+    overdue_count?: number;
+    /**
+     * Backlog Count
+     */
+    backlog_count?: number;
+    /**
+     * Review Count
+     */
+    review_count?: number;
+    /**
+     * Done Count
+     */
+    done_count?: number;
     /**
      * Created At
      */
@@ -835,6 +991,10 @@ export type TagPublic = {
      */
     archived_task_count?: number;
     created_by_bot_user?: BotUserRef | null;
+    /**
+     * Created At
+     */
+    created_at?: string | null;
 };
 
 /**
@@ -1125,6 +1285,48 @@ export type Token = {
 };
 
 /**
+ * UserListed
+ *
+ * An account as the superuser's list shows it: the account fields, how many
+ * passkeys it holds, and when one of them last signed it in (FR-09.2). Nothing
+ * about what the account holds or does (FR-10.7).
+ */
+export type UserListed = {
+    /**
+     * Email
+     */
+    email: string;
+    /**
+     * Is Active
+     */
+    is_active?: boolean;
+    /**
+     * Is Superuser
+     */
+    is_superuser?: boolean;
+    /**
+     * Full Name
+     */
+    full_name?: string | null;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Created At
+     */
+    created_at?: string | null;
+    /**
+     * Passkey Count
+     */
+    passkey_count: number;
+    /**
+     * Last Sign In At
+     */
+    last_sign_in_at?: string | null;
+};
+
+/**
  * UserPublic
  */
 export type UserPublic = {
@@ -1175,7 +1377,7 @@ export type UsersPublic = {
     /**
      * Data
      */
-    data: Array<UserPublic>;
+    data: Array<UserListed>;
     /**
      * Count
      */
@@ -1697,6 +1899,36 @@ export type usersRemovePasskeyResponses = {
 };
 
 export type usersRemovePasskeyResponse = usersRemovePasskeyResponses[keyof usersRemovePasskeyResponses];
+
+export type usersRenamePasskeyData = {
+    body: PasskeyRename;
+    path: {
+        /**
+         * Passkey Id
+         */
+        passkey_id: string;
+    };
+    query?: never;
+    url: '/api/v1/users/me/passkeys/{passkey_id}';
+};
+
+export type usersRenamePasskeyErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type usersRenamePasskeyError = usersRenamePasskeyErrors[keyof usersRenamePasskeyErrors];
+
+export type usersRenamePasskeyResponses = {
+    /**
+     * Successful Response
+     */
+    200: PasskeyPublic;
+};
+
+export type usersRenamePasskeyResponse = usersRenamePasskeyResponses[keyof usersRenamePasskeyResponses];
 
 export type usersSignOutEverywhereData = {
     body?: never;
@@ -2463,6 +2695,36 @@ export type attachmentsDownloadAttachmentResponses = {
     200: unknown;
 };
 
+export type attachmentsResendAttachmentData = {
+    body?: never;
+    path: {
+        /**
+         * Attachment Id
+         */
+        attachment_id: string;
+    };
+    query?: never;
+    url: '/api/v1/attachments/{attachment_id}/resend';
+};
+
+export type attachmentsResendAttachmentErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type attachmentsResendAttachmentError = attachmentsResendAttachmentErrors[keyof attachmentsResendAttachmentErrors];
+
+export type attachmentsResendAttachmentResponses = {
+    /**
+     * Successful Response
+     */
+    200: AttachmentPublic;
+};
+
+export type attachmentsResendAttachmentResponse = attachmentsResendAttachmentResponses[keyof attachmentsResendAttachmentResponses];
+
 export type tagsReadTagsData = {
     body?: never;
     path?: never;
@@ -2762,6 +3024,10 @@ export type activityReadActivityLogData = {
          * Task Id
          */
         task_id?: string | null;
+        /**
+         * Project Id
+         */
+        project_id?: string | null;
         order?: ActivityOrder;
     };
     url: '/api/v1/activity-log/';
@@ -3153,6 +3419,91 @@ export type botsTestBotUserWebhookResponses = {
 };
 
 export type botsTestBotUserWebhookResponse = botsTestBotUserWebhookResponses[keyof botsTestBotUserWebhookResponses];
+
+export type paperlessDisconnectData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/paperless/';
+};
+
+export type paperlessDisconnectResponses = {
+    /**
+     * Successful Response
+     */
+    200: PaperlessDisconnected;
+};
+
+export type paperlessDisconnectResponse = paperlessDisconnectResponses[keyof paperlessDisconnectResponses];
+
+export type paperlessReadConnectionData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/paperless/';
+};
+
+export type paperlessReadConnectionResponses = {
+    /**
+     * Successful Response
+     */
+    200: PaperlessConnectionPublic;
+};
+
+export type paperlessReadConnectionResponse = paperlessReadConnectionResponses[keyof paperlessReadConnectionResponses];
+
+export type paperlessSetConnectionData = {
+    body: PaperlessConnect;
+    path?: never;
+    query?: never;
+    url: '/api/v1/paperless/';
+};
+
+export type paperlessSetConnectionErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type paperlessSetConnectionError = paperlessSetConnectionErrors[keyof paperlessSetConnectionErrors];
+
+export type paperlessSetConnectionResponses = {
+    /**
+     * Successful Response
+     */
+    200: PaperlessConnectionPublic;
+};
+
+export type paperlessSetConnectionResponse = paperlessSetConnectionResponses[keyof paperlessSetConnectionResponses];
+
+export type paperlessTestConnectionData = {
+    /**
+     * Test In
+     */
+    body?: PaperlessTest | null;
+    path?: never;
+    query?: never;
+    url: '/api/v1/paperless/test';
+};
+
+export type paperlessTestConnectionErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type paperlessTestConnectionError = paperlessTestConnectionErrors[keyof paperlessTestConnectionErrors];
+
+export type paperlessTestConnectionResponses = {
+    /**
+     * Successful Response
+     */
+    200: PaperlessTestResult;
+};
+
+export type paperlessTestConnectionResponse = paperlessTestConnectionResponses[keyof paperlessTestConnectionResponses];
 
 export type utilsTestEmailData = {
     body?: never;

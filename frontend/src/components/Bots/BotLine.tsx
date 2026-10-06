@@ -80,7 +80,7 @@ export function BotLine({
         <RouterLink
           {...recordLink("bot", bot.id)}
           className={cn(
-            "focus-visible:ring-ring/50 block truncate rounded-sm leading-snug font-medium underline-offset-4 outline-none hover:underline focus-visible:ring-[3px]",
+            "focus-visible:ring-ring/50 block truncate rounded-sm leading-snug font-medium underline-offset-4 outline-none hover:underline focus-visible:ring-[3px] pointer-coarse:-my-3 pointer-coarse:py-3",
             bot.deleted && "text-ink-3",
           )}
         >

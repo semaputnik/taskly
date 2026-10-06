@@ -3,12 +3,14 @@ import { partialMatchKey, type QueryKey } from "@tanstack/react-query"
 
 import {
   activityQuery,
+  attachmentsQuery,
   botQuery,
   botsQuery,
   type Change,
   currentUserQuery,
   deletedBotsQuery,
   nearTagsQuery,
+  paperlessQuery,
   projectQuery,
   projectsQuery,
   scopeProjectsQuery,
@@ -161,6 +163,15 @@ describe("what a change refreshes", () => {
     const change: Change = { type: "tag duplicates dismissed" }
     expect(refreshes(change, tagDuplicatesQuery().queryKey)).toBe(true)
     expect(refreshes(change, keys.tags)).toBe(false)
+  })
+
+  test("a Paperless change refreshes the connection and where every file is kept", () => {
+    const change: Change = { type: "paperless changed" }
+    expect(refreshes(change, paperlessQuery().queryKey)).toBe(true)
+    expect(refreshes(change, attachmentsQuery("t1").queryKey)).toBe(true)
+    expect(refreshes(change, attachmentsQuery("t2").queryKey)).toBe(true)
+    expect(refreshes(change, keys.tasks)).toBe(false)
+    expect(refreshes(change, keys.projects)).toBe(false)
   })
 
   test("an account change refreshes everything", () => {

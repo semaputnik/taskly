@@ -92,7 +92,7 @@ test("A compact row shows subtasks, due day, tags and project, and its status ma
   ).toHaveClass(/text-priority-p3/)
 })
 
-test("A priority badge in the archive's table carries its hue; P4 stays ink", async ({
+test("A kept task's status mark carries its priority's hue, and is not a control", async ({
   page,
 }) => {
   await newUser(page)
@@ -109,14 +109,14 @@ test("A priority badge in the archive's table carries its hue; P4 stays ink", as
     project_id: project.id,
   })
   expect((await api.post(`/projects/${project.id}/archive`)).ok()).toBe(true)
-  await page.goto("/archive")
+  await page.goto(`/projects/${project.id}/tasks`)
 
-  const urgent = page.getByRole("row").filter({ hasText: "Urgent" })
-  await expect(urgent.getByText("P1", { exact: true })).toHaveClass(
-    /text-priority-p1/,
-  )
-  const someday = page.getByRole("row").filter({ hasText: "Someday" })
-  await expect(someday.getByText("P4", { exact: true })).not.toHaveClass(
-    /text-priority/,
-  )
+  // Read-only: the mark says the status, and there is nothing to tick.
+  await expect(page.getByRole("checkbox")).toHaveCount(0)
+  await expect(
+    page.getByRole("img", { name: "Backlog, priority P1" }),
+  ).toHaveClass(/text-priority-p1/)
+  await expect(
+    page.getByRole("img", { name: "Backlog, priority P4" }),
+  ).not.toHaveClass(/text-priority/)
 })

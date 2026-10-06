@@ -45,8 +45,11 @@ test("A captured task counts on the Projects list at once", async ({
   await newUser(page)
 
   await page.goto("/projects")
-  const inbox = page.getByRole("row", { name: /Inbox/ })
-  await expect(inbox).toContainText("No tasks")
+  const inbox = page
+    .getByRole("list", { name: "Projects", exact: true })
+    .getByRole("listitem")
+    .filter({ has: page.getByRole("link", { name: "Inbox", exact: true }) })
+  await expect(inbox).toContainText("No open tasks")
 
   // Captured over the list, which lands the task in the Inbox.
   await openDraft(page)
@@ -59,7 +62,7 @@ test("A captured task counts on the Projects list at once", async ({
   ).toBeVisible()
   await page.keyboard.press("Escape")
 
-  await expect(inbox).toContainText("1 task")
+  await expect(inbox).toContainText("1 open")
 })
 
 test("Signing in as someone else in the same tab shows none of the first account's data", async ({
@@ -77,17 +80,23 @@ test("Signing in as someone else in the same tab shows none of the first account
   await page.waitForURL("/login")
 
   await addVirtualAuthenticator(page)
-  await page.getByRole("link", { name: "Create account" }).click()
+  await page.getByRole("link", { name: "Create an account" }).click()
   // The sign-in screen has an email field too: fill the one on sign-up.
   await expect(
     page.getByRole("heading", { name: "Create an account" }),
   ).toBeVisible()
   await page.getByTestId("email-input").fill(randomEmail())
-  await page.getByRole("button", { name: "Create account" }).click()
+  await page
+    .getByRole("button", { name: "Create a passkey and sign in" })
+    .click()
   await page.waitForURL("/")
 
   await goVia(page, "Projects")
-  await expect(page.getByRole("heading", { name: "Projects" })).toBeVisible()
-  await expect(page.getByRole("row", { name: /Inbox/ })).toBeVisible()
+  await expect(
+    page.getByRole("heading", { name: "Projects", exact: true }),
+  ).toBeVisible()
+  await expect(
+    page.getByRole("main").getByRole("link", { name: "Inbox", exact: true }),
+  ).toBeVisible()
   await expect(page.getByText("First account's secret")).toHaveCount(0)
 })

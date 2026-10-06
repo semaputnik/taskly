@@ -69,9 +69,9 @@ export function DeleteAttachment({
             Delete {attachment.filename}?
           </DialogTitle>
           <DialogDescription>
-            The file is removed from this task and its contents are deleted, so
-            it cannot be restored — the activity log only notes that it was
-            removed. The task and its comments stay as they are.
+            {attachment.kept_in === "paperless"
+              ? "The file is removed from this task. It stays in Paperless, which Taskly never deletes from, so only the link is dropped and it cannot be restored here — the activity log only notes that it was removed. The task and its comments stay as they are."
+              : "The file is removed from this task and its contents are deleted, so it cannot be restored — the activity log only notes that it was removed. The task and its comments stay as they are."}
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>

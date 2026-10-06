@@ -1,15 +1,16 @@
-import {
-  createFileRoute,
-  Link as RouterLink,
-  redirect,
-} from "@tanstack/react-router"
+import { createFileRoute, redirect } from "@tanstack/react-router"
 import { KeyRound } from "lucide-react"
 import { type FormEvent, useEffect } from "react"
 
-import { AuthLayout } from "@/components/Common/AuthLayout"
-import { PasskeysUnsupported } from "@/components/Common/PasskeysUnsupported"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+import {
+  AuthLink,
+  AuthLinks,
+  AuthScreen,
+  authAction,
+  FieldLine,
+  fieldInput,
+  PasskeysUnsupported,
+} from "@/components/Auth/AuthScreen"
 import { LoadingButton } from "@/components/ui/loading-button"
 import useAuth, { isLoggedIn } from "@/hooks/useAuth"
 import {
@@ -40,17 +41,20 @@ function Login() {
   const supported = passkeysSupported()
 
   return (
-    <AuthLayout>
-      <div className="flex flex-col gap-6">
-        <div className="flex flex-col items-center gap-2 text-center">
-          <h1 className="text-2xl font-bold">Sign in to Taskly</h1>
-          <p className="text-muted-foreground text-sm">
-            With the passkey on this device or in your password manager.
-          </p>
-        </div>
-        {supported ? <PasskeySignIn /> : <PasskeysUnsupported />}
-      </div>
-    </AuthLayout>
+    <AuthScreen
+      heading="Sign in"
+      lede="Your browser will offer the passkeys it holds for this installation, in the email field or by the button."
+    >
+      {supported ? <PasskeySignIn /> : <PasskeysUnsupported />}
+      <AuthLinks>
+        <AuthLink lead="Lost every passkey?" to="/recover">
+          Use a recovery code
+        </AuthLink>
+        <AuthLink lead="New here?" to="/signup">
+          Create an account
+        </AuthLink>
+      </AuthLinks>
+    </AuthScreen>
   )
 }
 
@@ -79,44 +83,33 @@ function PasskeySignIn() {
   }
 
   return (
-    <form onSubmit={signIn} className="flex flex-col gap-6">
-      <div className="grid gap-4">
-        <div className="grid gap-2">
-          <Label htmlFor="email">Email</Label>
-          <Input
-            id="email"
-            name="email"
-            data-testid="email-input"
-            placeholder="user@example.com"
-            type="email"
-            // "webauthn" puts the passkeys among the field's suggestions.
-            autoComplete="username webauthn"
-          />
-        </div>
-        <LoadingButton
-          type="submit"
-          loading={
-            signInMutation.isPending && !signInMutation.variables?.autofill
-          }
-        >
-          <KeyRound />
-          Sign in with passkey
-        </LoadingButton>
-      </div>
-
-      <div className="flex flex-col gap-2 text-center text-sm">
-        <p>
-          New to Taskly?{" "}
-          <RouterLink to="/signup" className="underline underline-offset-4">
-            Create account
-          </RouterLink>
-        </p>
-        <p>
-          <RouterLink to="/recover" className="underline underline-offset-4">
-            Have a recovery code?
-          </RouterLink>
-        </p>
-      </div>
+    <form onSubmit={signIn}>
+      {/* The browser's passkey suggestions attach to an email field (FR-12.3).
+          Nothing typed here is read: the ceremony finds the account from the
+          passkey, so the field is where the suggestions are offered and the
+          button below is the same sign-in asked for by hand. */}
+      <FieldLine label="Email" htmlFor="email">
+        <input
+          id="email"
+          data-testid="email-input"
+          name="email"
+          type="email"
+          // "webauthn" puts the passkeys among the field's suggestions.
+          autoComplete="username webauthn"
+          placeholder="Pick a passkey here"
+          className={fieldInput}
+        />
+      </FieldLine>
+      <LoadingButton
+        type="submit"
+        className={authAction}
+        loading={
+          signInMutation.isPending && !signInMutation.variables?.autofill
+        }
+      >
+        <KeyRound />
+        Sign in with a passkey
+      </LoadingButton>
     </form>
   )
 }

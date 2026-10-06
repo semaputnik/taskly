@@ -230,3 +230,16 @@ def test_tags_of_another_users_task_cannot_be_set(
 
     r = _set_tags(client, headers_b, task["id"], ["hijacked"])
     assert r.status_code == 404
+
+
+def test_a_tag_reports_when_it_was_created(client: TestClient, db: Session) -> None:
+    headers = new_user_headers(client, db)
+    created = client.post(
+        f"{settings.API_V1_STR}/tags/", headers=headers, json={"name": "dated"}
+    ).json()
+    assert created["created_at"]
+
+    read = client.get(f"{settings.API_V1_STR}/tags/{created['id']}", headers=headers)
+    assert read.json()["created_at"] == created["created_at"]
+    listed = client.get(f"{settings.API_V1_STR}/tags/", headers=headers).json()
+    assert listed["data"][0]["created_at"] == created["created_at"]

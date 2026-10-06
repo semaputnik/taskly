@@ -1,5 +1,6 @@
 import { expect, type Page, test } from "@playwright/test"
 import { newUser, userApi } from "./utils/account"
+import { lookAlike, tagLine, tagLink } from "./utils/tags"
 
 test.use({ storageState: { cookies: [], origins: [] } })
 
@@ -13,7 +14,7 @@ async function vocabulary(page: Page) {
     .sort()
 }
 
-test("Merging from a tag's panel moves its tasks and removes it", async ({
+test("Folding another tag in from a tag's column moves its tasks and removes it", async ({
   page,
 }) => {
   await newUser(page)
@@ -30,15 +31,18 @@ test("Merging from a tag's panel moves its tasks and removes it", async ({
   await api.post(`/projects/${old.id}/archive`)
 
   await page.goto("/tags")
-  await page.getByRole("row", { name: "Open Deploy", exact: true }).click()
+  await tagLink(page, "Deploy").click()
   const panel = page.getByRole("complementary", { name: "Deploy", exact: true })
   const startMerge = async () => {
-    await panel.getByRole("button", { name: "Merge…" }).click()
-    const start = page.getByRole("dialog", { name: "Merge with Deploy" })
-    await expect(start).toContainText("Add the tags to fold into this one.")
-    await start.getByRole("combobox", { name: "Add a tag to merge" }).click()
+    await expect(panel).toContainText("Fold another tag into this one:")
+    await panel
+      .getByRole("combobox", { name: "Choose a tag to fold in" })
+      .click()
     await page.getByRole("option", { name: "deploy", exact: true }).click()
-    // The reader picks which name survives.
+    // Choosing is the first step: the confirmation follows, with this tag
+    // as the name that stays, and the reader free to pick the other.
+    const start = page.getByRole("dialog", { name: "Merge into Deploy?" })
+    await expect(start).toBeVisible()
     await page.getByRole("radio", { name: /^deploy 2 tasks/ }).check()
   }
   await startMerge()
@@ -63,23 +67,19 @@ test("Merging from a tag's panel moves its tasks and removes it", async ({
   await startMerge()
   await confirm.getByRole("button", { name: "Merge into deploy" }).click()
 
-  // The panel moves onto the tag that now carries the tasks.
+  // The column moves onto the tag that now carries the tasks.
   const survivor = page.getByRole("complementary", {
     name: "deploy",
     exact: true,
   })
   await expect(survivor).toBeVisible()
-  await expect(survivor).toContainText("3 tasks")
-  await expect(survivor).toContainText("+ 1 in archived projects")
+  await expect(survivor).toContainText("3 open · 1 in an archived project")
   expect(await vocabulary(page)).toEqual([["deploy", 3]])
 
   await page.keyboard.press("Escape")
-  await expect(
-    page.getByRole("row", { name: "Open Deploy", exact: true }),
-  ).toHaveCount(0)
-  await page
-    .getByRole("row", { name: "Open deploy", exact: true })
-    .getByRole("link")
+  await expect(tagLink(page, "Deploy")).toHaveCount(0)
+  await tagLine(page, "deploy")
+    .getByRole("link", { name: /3 open/ })
     .click()
   for (const title of ["Ship 1.2", "Ship 1.3", "Ship 1.4"]) {
     await expect(
@@ -111,10 +111,14 @@ test("A refused rename offers a merge instead, as its own confirmed act", async 
   await name.fill("deploy")
   await name.press("Enter")
 
-  await expect(page.getByText("You already have a tag named")).toBeVisible()
+  // The reason is said under the name, which keeps what was typed.
+  await expect(page.locator("[role=alert]")).toContainText(
+    "You already have a tag named",
+  )
   const confirm = page.getByRole("dialog", { name: "Merge into deploy?" })
   await expect(confirm).toContainText("The tag “deploys” is removed.")
   await confirm.getByRole("button", { name: "Cancel" }).click()
+  await expect(name).toHaveValue("deploy")
   expect(await vocabulary(page)).toEqual([
     ["deploy", 0],
     ["deploys", 1],
@@ -122,7 +126,7 @@ test("A refused rename offers a merge instead, as its own confirmed act", async 
   expect(tag.name).toBe("deploy")
 })
 
-test("The Tags page offers likely duplicates, and merges only on confirmation", async ({
+test("The Tags page offers look-alike groups, and merges only on confirmation", async ({
   page,
 }) => {
   await newUser(page)
@@ -142,16 +146,22 @@ test("The Tags page offers likely duplicates, and merges only on confirmation", 
   await api.create("/tasks/", { title: "Ship 1.2", tags: ["deploy", "report"] })
 
   await page.goto("/tags")
-  const groups = page.getByRole("region", { name: /Likely duplicates/ })
-  const group = (names: string) =>
-    groups.getByRole("listitem", { name: `Likely duplicates: ${names}` })
+  const groups = page.getByRole("region", { name: "Look alike" })
   await expect(groups.getByRole("listitem")).toHaveCount(3)
-  await expect(group("deploy, Deploy")).toBeVisible()
-  await expect(group("deploy bot, deploy-bot, deploy_bot")).toBeVisible()
-  await expect(group("report, reports")).toBeVisible()
+  await expect(page.getByRole("main")).toContainText("8 tags. 7 look alike.")
+  // Each group is one line: the names, their open counts, what can be done.
+  await expect(lookAlike(page, "deploy, Deploy")).toContainText("0 and 1 tasks")
+  await expect(
+    lookAlike(page, "deploy bot, deploy-bot, deploy_bot"),
+  ).toBeVisible()
+  await expect(lookAlike(page, "report, reports")).toContainText(
+    "Merge into report",
+  )
 
   // Opening the merge is not merging: cancelling leaves every tag.
-  await group("report, reports").getByRole("button", { name: "Merge…" }).click()
+  await lookAlike(page, "report, reports")
+    .getByRole("button", { name: "Merge into report" })
+    .click()
   const confirm = page.getByRole("dialog", { name: "Merge into report?" })
   await expect(confirm).toContainText("The tag “reports” is removed.")
   await confirm.getByRole("button", { name: "Cancel" }).click()
@@ -160,10 +170,10 @@ test("The Tags page offers likely duplicates, and merges only on confirmation", 
   )
 
   // Kept apart, a group is not offered again, and nothing was merged.
-  await group("deploy, Deploy")
+  await lookAlike(page, "deploy, Deploy")
     .getByRole("button", { name: "Keep apart" })
     .click()
-  await expect(group("deploy, Deploy")).toHaveCount(0)
+  await expect(lookAlike(page, "deploy, Deploy")).toHaveCount(0)
   await page.reload()
   await expect(groups.getByRole("listitem")).toHaveCount(2)
   expect((await vocabulary(page)).map(([name]: [string]) => name)).toEqual(
@@ -171,8 +181,8 @@ test("The Tags page offers likely duplicates, and merges only on confirmation", 
   )
 
   // Merging a group of three keeps the chosen spelling and removes the rest.
-  await group("deploy bot, deploy-bot, deploy_bot")
-    .getByRole("button", { name: "Merge…" })
+  await lookAlike(page, "deploy bot, deploy-bot, deploy_bot")
+    .getByRole("button", { name: /^Merge into / })
     .click()
   const three = page.getByRole("dialog", { name: /^Merge into / })
   await three.getByRole("radio", { name: /deploy-bot/ }).check()
@@ -186,6 +196,18 @@ test("The Tags page offers likely duplicates, and merges only on confirmation", 
   expect(names).toContain("deploy-bot")
   expect(names).not.toContain("deploy_bot")
   expect(names).not.toContain("deploy  bot")
+
+  // A kept-apart group returns once one of its tags is renamed.
+  await tagLink(page, "Deploy").click()
+  const name = page
+    .getByRole("complementary", { name: "Deploy", exact: true })
+    .getByRole("textbox", { name: "Tag name" })
+  await name.fill("Deploys")
+  await name.press("Enter")
+  await expect(page.getByRole("region", { name: "Look alike" })).toBeVisible()
+  await expect(
+    groups.getByRole("listitem", { name: "Look alike: deploy, Deploys" }),
+  ).toBeVisible()
 })
 
 test("A tag a bot user created says which one", async ({ page }) => {
@@ -208,16 +230,17 @@ test("A tag a bot user created says which one", async ({ page }) => {
   await api.create("/tags/", { name: "mine" })
 
   await page.goto("/tags")
-  await expect(
-    page.getByRole("row", { name: "Open needs-triage" }),
-  ).toContainText("Triage agent")
-  await expect(page.getByRole("row", { name: "Open mine" })).not.toContainText(
-    "Triage agent",
+  await expect(tagLine(page, "needs-triage")).toContainText(
+    "created by Triage agent",
   )
-  await page.getByRole("row", { name: "Open needs-triage" }).click()
+  await expect(tagLine(page, "mine")).toContainText("created by you")
+  await tagLink(page, "needs-triage").click()
   await expect(
     page.getByRole("complementary", { name: "needs-triage" }),
-  ).toContainText("Created by the bot user Triage agent")
+  ).toContainText("created")
+  await expect(
+    page.getByRole("complementary", { name: "needs-triage" }),
+  ).toContainText("by Triage agent")
 })
 
 test.describe("on a phone", () => {
@@ -227,7 +250,7 @@ test.describe("on a phone", () => {
     isMobile: true,
   })
 
-  test("Several spellings are merged from a tag's panel in one act", async ({
+  test("Several spellings are merged from a tag's column in one act", async ({
     page,
   }) => {
     await newUser(page)
@@ -241,9 +264,12 @@ test.describe("on a phone", () => {
 
     await page.goto(`/tags?tag_id=${ship.id}`)
     const panel = page.getByRole("complementary", { name: "ship", exact: true })
-    await panel.getByRole("button", { name: "Merge…" }).click()
+    await panel
+      .getByRole("combobox", { name: "Choose a tag to fold in" })
+      .click()
+    await page.getByRole("option", { name: "Ship", exact: true }).click()
     const dialog = page.getByRole("dialog", { name: /^Merge / })
-    for (const name of ["Ship", "ships", "shipping"]) {
+    for (const name of ["ships", "shipping"]) {
       await dialog.getByRole("combobox", { name: "Add a tag to merge" }).click()
       await page.getByRole("option", { name, exact: true }).click()
     }

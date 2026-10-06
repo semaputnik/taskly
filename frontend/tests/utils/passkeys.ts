@@ -6,7 +6,11 @@ import { expect, type Page } from "@playwright/test"
  * phone or laptop with a fingerprint reader does (FR-12.5). Every prompt is
  * answered at once.
  */
-export async function addVirtualAuthenticator(page: Page) {
+export async function addVirtualAuthenticator(
+  page: Page,
+  /** Chrome allows one internal authenticator; a second device is a USB key. */
+  transport: "internal" | "usb" = "internal",
+) {
   const cdp = await page.context().newCDPSession(page)
   await cdp.send("WebAuthn.enable")
   const { authenticatorId } = await cdp.send(
@@ -14,7 +18,7 @@ export async function addVirtualAuthenticator(page: Page) {
     {
       options: {
         protocol: "ctap2",
-        transport: "internal",
+        transport,
         hasResidentKey: true,
         hasUserVerification: true,
         isUserVerified: true,
@@ -36,7 +40,9 @@ export async function addVirtualAuthenticator(page: Page) {
 export async function registerWithPasskey(page: Page, email: string) {
   await page.goto("/signup")
   await page.getByTestId("email-input").fill(email)
-  await page.getByRole("button", { name: "Create account" }).click()
+  await page
+    .getByRole("button", { name: "Create a passkey and sign in" })
+    .click()
   await page.waitForURL("/")
   await expect(page.getByRole("combobox", { name: "Add a task" })).toBeVisible()
 }
@@ -54,12 +60,13 @@ export async function withoutPasskeyAutofill(page: Page) {
 }
 
 /**
- * Sign in from the sign-in screen with the "Sign in with passkey" button and
- * whichever passkey the browser holds. Call `withoutPasskeyAutofill` first.
+ * Sign in from the sign-in screen with the "Sign in with a passkey" button
+ * and whichever passkey the browser holds. Call `withoutPasskeyAutofill`
+ * first.
  */
 export async function signInWithPasskey(page: Page) {
   await page.goto("/login")
-  await page.getByRole("button", { name: "Sign in with passkey" }).click()
+  await page.getByRole("button", { name: "Sign in with a passkey" }).click()
   await page.waitForURL("/")
   await expect(page.getByRole("combobox", { name: "Add a task" })).toBeVisible()
 }

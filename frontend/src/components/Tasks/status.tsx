@@ -1,25 +1,9 @@
-import { ChevronDown } from "lucide-react"
 import type { ReactNode } from "react"
 
-import type { TaskPriority, TaskPublic, TaskStatus } from "@/client"
-import { Button } from "@/components/ui/button"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+import type { TaskPriority, TaskStatus } from "@/client"
 import { cn } from "@/lib/utils"
 import { PRIORITY_TEXT } from "./priority"
-import {
-  type MarkTone,
-  markName,
-  markTone,
-  STATUS_LABELS,
-  STATUSES,
-} from "./statuses"
-import { useTaskStatus } from "./useTaskWrites"
+import { type MarkTone, markName, markTone } from "./statuses"
 
 export { OPEN_STATUSES, STATUS_LABELS, STATUSES } from "./statuses"
 
@@ -117,79 +101,5 @@ export function StatusMark({
     >
       {STATUS_SHAPES[status]}
     </svg>
-  )
-}
-
-/**
- * The six statuses as menu rows, the current one checked. Shared by every
- * menu that sets a status, so there is one list to read.
- */
-export function StatusMenuItems({
-  value,
-  onChoose,
-}: {
-  value?: TaskStatus
-  onChoose: (status: TaskStatus) => void
-}) {
-  return (
-    <DropdownMenuRadioGroup
-      value={value ?? ""}
-      onValueChange={(next) => onChoose(next as TaskStatus)}
-    >
-      {STATUSES.map((status) => (
-        <DropdownMenuRadioItem
-          key={status}
-          value={status}
-          className="pointer-coarse:min-h-11"
-        >
-          <StatusMark status={status} />
-          {STATUS_LABELS[status]}
-        </DropdownMenuRadioItem>
-      ))}
-    </DropdownMenuRadioGroup>
-  )
-}
-
-/**
- * A task's status in the list: mark and label, and the menu that changes it.
- * The mark carries the task's priority as its colour.
- *
- * On a narrow screen the label goes and the mark carries the status alone,
- * still named for assistive technology and still a full-size target.
- */
-export function StatusMenu({ task }: { task: TaskPublic }) {
-  const status = useTaskStatus(task)
-  const label = STATUS_LABELS[task.status]
-
-  return (
-    <>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            size="sm"
-            disabled={status.isPending}
-            aria-label={`Status: ${markName(task.status, task.priority)}. Change status of ${task.title}`}
-            className="-ml-2 size-11 gap-1.5 sm:h-8 sm:w-auto sm:px-2 sm:pointer-coarse:h-11"
-          >
-            <StatusMark status={task.status} priority={task.priority} />
-            <span className="hidden sm:inline">{label}</span>
-            <ChevronDown
-              className="text-muted-foreground hidden size-3.5 sm:inline"
-              aria-hidden
-            />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent
-          align="start"
-          // The menu is portalled, but React still bubbles its clicks to the
-          // row, which would open the task behind the choice.
-          onClick={(event) => event.stopPropagation()}
-        >
-          <StatusMenuItems value={task.status} onChoose={status.change} />
-        </DropdownMenuContent>
-      </DropdownMenu>
-      {status.prompt}
-    </>
   )
 }
