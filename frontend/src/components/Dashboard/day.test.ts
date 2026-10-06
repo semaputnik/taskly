@@ -1,6 +1,13 @@
 import { describe, expect, test } from "bun:test"
 
-import { dayHeading, lede, markSeen, type VisitStore, visitSince } from "./day"
+import {
+  dayHeading,
+  lede,
+  markSeen,
+  peekVisitSince,
+  type VisitStore,
+  visitSince,
+} from "./day"
 
 describe("the date at the top of the day page", () => {
   test("is the day of the month, two digits, and the rest beside it", () => {
@@ -148,5 +155,33 @@ describe("the last visit", () => {
     expect(visitSince({ local: refusing, session: refusing }, MONDAY)).toBe(
       null,
     )
+  })
+
+  test("can be read ahead of the page without moving anything", () => {
+    const first = stores()
+    expect(peekVisitSince(first)).toBeNull()
+    expect(first.dump()).toEqual({ local: {}, session: {} })
+    expect(visitSince(first, MONDAY)).toBeNull()
+
+    const tuesday = { ...stores(), local: first.local }
+    const before = tuesday.dump()
+    // What the page will count from, said before the page fixes it.
+    expect(peekVisitSince(tuesday)).toBe(MONDAY.toISOString())
+    expect(tuesday.dump()).toEqual(before)
+    expect(visitSince(tuesday, TUESDAY)).toBe(MONDAY.toISOString())
+    // And once fixed, the same answer for the rest of the session.
+    expect(peekVisitSince(tuesday)).toBe(MONDAY.toISOString())
+  })
+
+  test("read ahead from storage that refuses, is a first visit", () => {
+    const refusing = {
+      getItem: () => {
+        throw new Error("blocked")
+      },
+      setItem: () => {
+        throw new Error("blocked")
+      },
+    }
+    expect(peekVisitSince({ local: refusing, session: refusing })).toBeNull()
   })
 })

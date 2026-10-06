@@ -103,6 +103,14 @@ export const panelSearchSchema = z.object({
 
 export type PanelSearch = z.infer<typeof panelSearchSchema>
 
+/**
+ * The kind of record whose panel the search has open, on a record or on a
+ * capture. One panel is open at a time, so there is at most one.
+ */
+export function openPanelKind(search: PanelSearch): RecordKind | undefined {
+  return kinds.find((kind) => search[KEYS[kind]]) ?? search.capture
+}
+
 /** Every panel closed, as search params. */
 const NONE = Object.fromEntries(
   Object.keys(panelSearchSchema.shape).map((key) => [key, undefined]),
@@ -175,6 +183,8 @@ export function useRecordPanels() {
   return {
     idOf: (kind: RecordKind): string | null => search[KEYS[kind]] ?? null,
     capturing: search.capture,
+    /** The kind whose panel is open, on a record or a capture. */
+    openKind: openPanelKind(search),
     /** The project the current list is narrowed to, if it is narrowed at all. */
     filteredProjectId: search.project_id,
     open,

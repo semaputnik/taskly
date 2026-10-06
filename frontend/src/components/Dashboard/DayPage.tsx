@@ -8,13 +8,12 @@ import {
   CompactTaskRow,
   CompactTaskRowPending,
 } from "@/components/Tasks/CompactTaskRow"
-import { OPEN_STATUSES, type OpenStatus } from "@/components/Tasks/statuses"
 import { Skeleton } from "@/components/ui/skeleton"
-import { activityQuery, projectsQuery, tasksQuery } from "@/lib/serverState"
 import { cn } from "@/lib/utils"
 import { dayHeading, lede } from "./day"
+import { BANDS, botChangesQuery, dayQueries } from "./queries"
 import { changesQuery, PREVIEW_ROWS, textLink } from "./shared"
-import { inAWeek, today, tomorrow } from "./when"
+import { today } from "./when"
 
 /**
  * The top of the day page: the date, the sentence of what needs the reader,
@@ -22,49 +21,6 @@ import { inAWeek, today, tomorrow } from "./when"
  * week. Everything here is read straight off the page, with hairlines and
  * whitespace for structure rather than frames.
  */
-
-// The bands take every open status but Waiting, Backlog included: a due date
-// counts whatever the task's status, and a waiting task's next move is
-// someone else's (FR-06.11). Nor are they narrowed to the reader as
-// assignee: a late task on a bot user is late all the same.
-const BAND_STATUSES: OpenStatus[] = OPEN_STATUSES.filter(
-  (status) => status !== "waiting",
-)
-
-type TasksQuery = Parameters<typeof tasksQuery>[0]
-
-/** Each band, as the task list is narrowed to show the whole of it. */
-const BANDS = {
-  overdue: () => ({ overdue: true, status: BAND_STATUSES }),
-  today: () => ({ due_from: today(), due_to: today(), status: BAND_STATUSES }),
-  week: () => ({
-    due_from: tomorrow(),
-    due_to: inAWeek(),
-    status: BAND_STATUSES,
-  }),
-} satisfies Record<string, () => TasksQuery>
-
-/**
- * The bands' requests, shared with the sentence's first half through the
- * cache. The week asks for a count alone.
- */
-const dayQueries = () =>
-  [
-    // The most pressing first: the list's own order is newest filed, which
-    // is not what a band is for.
-    tasksQuery({ ...BANDS.overdue(), sort: "priority", limit: PREVIEW_ROWS }),
-    tasksQuery({ ...BANDS.today(), sort: "priority", limit: PREVIEW_ROWS }),
-    tasksQuery({ ...BANDS.week(), limit: 1 }),
-    projectsQuery(),
-  ] as const
-
-/**
- * The sentence's second half reads the activity log: the bot users' changes
- * as a count alone, and the Changes log's own request, so the sentence
- * counts what the log counts. Started by the page beside the bands.
- */
-export const botChangesQuery = (since: string | null) =>
-  activityQuery({ by_bots: true, since: since ?? undefined, limit: 1 })
 
 function useDay() {
   // One hook, so the requests run side by side and the page is drawn once
