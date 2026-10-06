@@ -70,6 +70,12 @@ services:
       # Passkeys are bound to this hostname (FR-12.4). The end-to-end tests
       # reach the app on localhost:8000 and set it to that.
       FRONTEND_HOST: ${FRONTEND_HOST:-http://localhost:5173}
+      # The webhook specs run a receiver of their own in the Playwright
+      # container, which shares this service's network, so the backend
+      # reaches it on a loopback address, which is refused otherwise
+      # (FR-11.3). This file is for local development and CI only: the deploy
+      # files do not load it, so a deployment keeps the default.
+      OUTBOUND_ALLOW_PRIVATE_ADDRESSES: "true"
       SMTP_HOST: "mailpit"
       SMTP_PORT: "1025"
       SMTP_TLS: "false"

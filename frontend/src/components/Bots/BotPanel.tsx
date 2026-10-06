@@ -25,6 +25,7 @@ import { NewBotUser } from "./NewBotUser"
 import RevokeToken from "./RevokeToken"
 import { PermissionsSection, ProjectsSection } from "./ScopeSections"
 import { tokenStatus } from "./tokens"
+import { WebhooksSection } from "./Webhooks"
 import { reachInWords } from "./words"
 
 /**
@@ -219,10 +220,8 @@ function BotRecord({ bot }: { bot: BotUserPublic }) {
         </>
       )}
 
-      {/* WEBHOOKS SLOT (#191): the Webhooks section goes here, between
-          Permissions and On its plate — each of the two webhooks with its URL,
-          its last delivery, Send a test, Change and Clear, and Regenerate
-          secret at the heading. */}
+      {/* Read-only for a deleted bot user, whose webhooks were cleared. */}
+      <WebhooksSection key={`webhooks-${bot.id}`} bot={bot} />
 
       <OnItsPlate key={`plate-${bot.id}`} bot={bot} />
       <BotActivity key={`activity-${bot.id}`} bot={bot} />

@@ -373,6 +373,8 @@ export type Change =
   /** A bot user was created, renamed, rescoped or deleted. */
   | { type: "bot user changed"; botId?: string }
   | { type: "bot token changed"; botId?: string }
+  /** A bot user's webhook was set, changed, cleared or tested, or its secret renewed. */
+  | { type: "bot webhooks changed"; botId: string }
   | { type: "deletion restored" }
   | { type: "comments changed"; taskId: string }
   | { type: "attachments changed"; taskId: string }
@@ -433,6 +435,10 @@ export function staleKeys(change: Change): QueryKey[] {
       ]
     case "bot token changed":
       return [[ROOT.bots], change.botId ? [ROOT.bot, change.botId] : [ROOT.bot]]
+    case "bot webhooks changed":
+      // Webhooks are not in the log and no task names them: the bot user's
+      // line and its column are all that show them.
+      return [[ROOT.bots], [ROOT.bot, change.botId]]
     case "comments changed":
       return [[ROOT.comments, change.taskId], [ROOT.activity]]
     case "attachments changed":
