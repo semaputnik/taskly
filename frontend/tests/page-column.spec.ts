@@ -125,10 +125,14 @@ test("A walk with the arrow keys leaves the page column where it is", async ({
 
   const column = page.locator("[data-record-column]")
   await column.focus()
-  const first = await page.getByRole("link", { name: "Book the vet" }).boundingBox()
+  const first = await page
+    .getByRole("link", { name: "Book the vet" })
+    .boundingBox()
   await page.keyboard.press("ArrowDown")
   await page.keyboard.press("ArrowUp")
-  const after = await page.getByRole("link", { name: "Book the vet" }).boundingBox()
+  const after = await page
+    .getByRole("link", { name: "Book the vet" })
+    .boundingBox()
   expect(after?.x).toBeCloseTo(first?.x ?? 0, 0)
   expect(after?.y).toBeCloseTo(first?.y ?? 0, 0)
 })
