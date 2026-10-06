@@ -57,6 +57,8 @@ export function RecordPanels() {
     <IssuedTokenProvider>
       {KINDS.filter((kind) => kind === open || opened.includes(kind)).map(
         (kind) => (
+          // Code that fails to arrive is said by the app's error screen, as
+          // it is for a page's own code.
           <Suspense key={kind} fallback={null}>
             <Panel kind={kind} />
           </Suspense>

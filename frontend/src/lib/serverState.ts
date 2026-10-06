@@ -506,12 +506,6 @@ export function configureServerState(queryClient: QueryClient) {
     staleTime: 5 * 60 * 1000,
   })
   queryClient.setQueryDefaults([ROOT.projects], { staleTime: 10 * 1000 })
-  // The bot users name the actors in every task's history, which the column
-  // mounts afresh for each task it walks to: without this, each step down a
-  // list asked for the same list of bot users again. Their names and scopes
-  // change only through the reader, who reports each change; when a token
-  // was last used may be read these few seconds late.
-  queryClient.setQueryDefaults([ROOT.bots], { staleTime: 10 * 1000 })
   // A screen mounting on what its route has just read asks for nothing
   // again; every other mount refreshes stale data as before.
   const defaults = queryClient.getDefaultOptions()
