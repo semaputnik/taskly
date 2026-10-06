@@ -45,6 +45,7 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           PROJECT_NAME: ${{ vars.PROJECT_NAME }}
           SECRET_KEY: ${{ secrets.SECRET_KEY }}
+          WEBHOOK_SECRET_KEY: ${{ secrets.WEBHOOK_SECRET_KEY }}
           FIRST_SUPERUSER: ${{ vars.FIRST_SUPERUSER }}
       - name: Deploy to FastAPI Cloud
         run: uv run fastapi deploy

@@ -1338,7 +1338,8 @@ class BotUser(SQLModel, table=True):
     comment_webhook_url: str | None = Field(default=None, max_length=2048)
     # The one secret both webhooks are signed with (FR-11.9), kept encrypted.
     # A digest could not do: signing needs the secret itself, and it is shown
-    # to the owner only once. See `app.webhooks.encrypt_secret`.
+    # to the owner only once. Encrypted under `WEBHOOK_SECRET_KEY`; see
+    # `app.webhooks.encrypt_secret`.
     webhook_secret_encrypted: str | None = Field(default=None, max_length=512)
     # Set once the bot user is deleted. It is kept rather than removed, so
     # what it did and what it was assigned still name it (FR-08.19, FR-08.21).
