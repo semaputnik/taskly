@@ -76,7 +76,19 @@ app = FastAPI(
         {
             "name": "bots",
             "description": webhooks.DELIVERY_CONTRACT,
-        }
+        },
+        {
+            "name": "paperless",
+            "description": (
+                "The owner's Paperless-ngx connection (FR-04.4). While one is "
+                "set, every PDF attached to their tasks is kept in Paperless: "
+                "attachments report `kept_in` (`taskly` or `paperless`), the "
+                "document link, and, while a PDF is on its way or its "
+                "hand-over failed, `paperless_handover` with the reason. A "
+                "failed hand-over is sent again with "
+                "`POST /attachments/{id}/resend`. The token is never returned."
+            ),
+        },
     ],
 )
 

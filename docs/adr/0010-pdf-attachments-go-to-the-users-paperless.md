@@ -58,3 +58,23 @@ installation setting (ADR-0009) and allowed by the same flip.
 local PDFs keeps them local; only new PDFs go. Moving an archive without being
 asked is what ADR-0002 declined to do, and a "send existing PDFs" action is
 recorded as a future idea instead.
+
+**The token is stored encrypted, under a key of its own.** Taskly sends the
+user's Paperless API token with every request, so like a webhook secret it
+cannot be kept as a digest. It is encrypted under `PAPERLESS_TOKEN_KEY`, an
+installation setting of its own, for the reason ADR-0009 gives for
+`WEBHOOK_SECRET_KEY`: rotating `SECRET_KEY` must not make stored tokens
+unreadable. It is any string (run through HKDF into a Fernet key, with its own
+`info`, so it does not matter if two keys are equal), checked at startup like
+`SECRET_KEY`, and never changed by Taskly. Changing it means each user enters
+their token again; a token that cannot be decrypted is not guessed at, and the
+hand-over or test fails saying so. The API never returns the token.
+
+**The hand-over shares the webhook outbox's machinery, not its table.** A
+hand-over has a stage (send, wait for Paperless to consume the file, finish)
+and links to an attachment, not a bot user, so it waits in a sibling table.
+The loop that drains it is the one the webhooks brought: the same claim under
+a lease, the same wake-up on commit, the same retry schedule. Waiting for
+Paperless to consume the file is not a failed attempt; only the file not being
+consumed in fifteen minutes is, and the retry then starts from the top, finds
+the document by checksum if it arrived after all, and so cannot send it twice.

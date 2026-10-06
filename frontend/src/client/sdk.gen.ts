@@ -2,7 +2,7 @@
 
 import { type Client, formDataBodySerializer, type Options as Options2, type TDataShape } from './client';
 import { client } from './client.gen';
-import type { activityReadActivityLogData, activityReadActivityLogErrors, activityReadActivityLogResponses, activityRestoreFromActivityEntryData, activityRestoreFromActivityEntryErrors, activityRestoreFromActivityEntryResponses, attachmentsDeleteAttachmentData, attachmentsDeleteAttachmentErrors, attachmentsDeleteAttachmentResponses, attachmentsDownloadAttachmentData, attachmentsDownloadAttachmentErrors, attachmentsDownloadAttachmentResponses, attachmentsReadAttachmentsData, attachmentsReadAttachmentsErrors, attachmentsReadAttachmentsResponses, attachmentsUploadAttachmentData, attachmentsUploadAttachmentErrors, attachmentsUploadAttachmentResponses, botsClearBotUserWebhookData, botsClearBotUserWebhookErrors, botsClearBotUserWebhookResponses, botsCreateBotUserData, botsCreateBotUserErrors, botsCreateBotUserResponses, botsDeleteBotUserData, botsDeleteBotUserErrors, botsDeleteBotUserResponses, botsIssueBotUserTokenData, botsIssueBotUserTokenErrors, botsIssueBotUserTokenResponses, botsReadBotUserData, botsReadBotUserErrors, botsReadBotUserResponses, botsReadBotUsersData, botsReadBotUsersErrors, botsReadBotUsersResponses, botsRegenerateBotUserWebhookSecretData, botsRegenerateBotUserWebhookSecretErrors, botsRegenerateBotUserWebhookSecretResponses, botsRevokeBotUserTokenData, botsRevokeBotUserTokenErrors, botsRevokeBotUserTokenResponses, botsSetBotUserWebhookData, botsSetBotUserWebhookErrors, botsSetBotUserWebhookResponses, botsTestBotUserWebhookData, botsTestBotUserWebhookErrors, botsTestBotUserWebhookResponses, botsUpdateBotUserData, botsUpdateBotUserErrors, botsUpdateBotUserResponses, commentsCreateCommentData, commentsCreateCommentErrors, commentsCreateCommentResponses, commentsDeleteCommentData, commentsDeleteCommentErrors, commentsDeleteCommentResponses, commentsReadCommentsData, commentsReadCommentsErrors, commentsReadCommentsResponses, commentsUpdateCommentData, commentsUpdateCommentErrors, commentsUpdateCommentResponses, loginRecoverData, loginRecoverErrors, loginRecoverResponses, loginRecoveryOptionsData, loginRecoveryOptionsErrors, loginRecoveryOptionsResponses, loginRegisterData, loginRegisterErrors, loginRegisterResponses, loginRegistrationOptionsData, loginRegistrationOptionsErrors, loginRegistrationOptionsResponses, loginSignInData, loginSignInErrors, loginSignInOptionsData, loginSignInOptionsResponses, loginSignInResponses, loginTestTokenData, loginTestTokenResponses, privateCreateUserData, privateCreateUserErrors, privateCreateUserResponses, privateIssueRecoveryCodeData, privateIssueRecoveryCodeErrors, privateIssueRecoveryCodeResponses, projectsArchiveProjectData, projectsArchiveProjectErrors, projectsArchiveProjectResponses, projectsCreateProjectData, projectsCreateProjectErrors, projectsCreateProjectResponses, projectsDeleteProjectData, projectsDeleteProjectErrors, projectsDeleteProjectResponses, projectsReadProjectData, projectsReadProjectErrors, projectsReadProjectResponses, projectsReadProjectsData, projectsReadProjectsErrors, projectsReadProjectsResponses, projectsUnarchiveProjectData, projectsUnarchiveProjectErrors, projectsUnarchiveProjectResponses, projectsUpdateProjectData, projectsUpdateProjectErrors, projectsUpdateProjectResponses, tagsCreateTagData, tagsCreateTagErrors, tagsCreateTagResponses, tagsDeleteTagData, tagsDeleteTagErrors, tagsDeleteTagResponses, tagsDismissTagDuplicatesData, tagsDismissTagDuplicatesErrors, tagsDismissTagDuplicatesResponses, tagsMergeTagsData, tagsMergeTagsErrors, tagsMergeTagsResponses, tagsPreviewTagMergeData, tagsPreviewTagMergeErrors, tagsPreviewTagMergeResponses, tagsReadTagData, tagsReadTagDuplicatesData, tagsReadTagDuplicatesResponses, tagsReadTagErrors, tagsReadTagResponses, tagsReadTagsData, tagsReadTagsErrors, tagsReadTagsResponses, tagsRenameTagData, tagsRenameTagErrors, tagsRenameTagResponses, tasksBulkDeleteTasksData, tasksBulkDeleteTasksErrors, tasksBulkDeleteTasksResponses, tasksBulkUpdateTasksData, tasksBulkUpdateTasksErrors, tasksBulkUpdateTasksResponses, tasksCreateTaskData, tasksCreateTaskErrors, tasksCreateTaskResponses, tasksDeleteTaskData, tasksDeleteTaskErrors, tasksDeleteTaskResponses, tasksReadTaskData, tasksReadTaskErrors, tasksReadTaskResponses, tasksReadTasksData, tasksReadTasksErrors, tasksReadTasksResponses, tasksUpdateTaskData, tasksUpdateTaskErrors, tasksUpdateTaskResponses, usersAddPasskeyData, usersAddPasskeyErrors, usersAddPasskeyResponses, usersConfirmationOptionsData, usersConfirmationOptionsResponses, usersDeleteUserMeData, usersDeleteUserMeResponses, usersIssueRecoveryCodeData, usersIssueRecoveryCodeErrors, usersIssueRecoveryCodeResponses, usersNewPasskeyOptionsData, usersNewPasskeyOptionsErrors, usersNewPasskeyOptionsResponses, usersReadPasskeysData, usersReadPasskeysResponses, usersReadUserMeData, usersReadUserMeResponses, usersReadUsersData, usersReadUsersErrors, usersReadUsersResponses, usersRemovePasskeyData, usersRemovePasskeyErrors, usersRemovePasskeyResponses, usersRenamePasskeyData, usersRenamePasskeyErrors, usersRenamePasskeyResponses, usersSignOutEverywhereData, usersSignOutEverywhereResponses, usersUpdateUserMeData, usersUpdateUserMeErrors, usersUpdateUserMeResponses, utilsHealthCheckData, utilsHealthCheckResponses, utilsTestEmailData, utilsTestEmailErrors, utilsTestEmailResponses } from './types.gen';
+import type { activityReadActivityLogData, activityReadActivityLogErrors, activityReadActivityLogResponses, activityRestoreFromActivityEntryData, activityRestoreFromActivityEntryErrors, activityRestoreFromActivityEntryResponses, attachmentsDeleteAttachmentData, attachmentsDeleteAttachmentErrors, attachmentsDeleteAttachmentResponses, attachmentsDownloadAttachmentData, attachmentsDownloadAttachmentErrors, attachmentsDownloadAttachmentResponses, attachmentsReadAttachmentsData, attachmentsReadAttachmentsErrors, attachmentsReadAttachmentsResponses, attachmentsResendAttachmentData, attachmentsResendAttachmentErrors, attachmentsResendAttachmentResponses, attachmentsUploadAttachmentData, attachmentsUploadAttachmentErrors, attachmentsUploadAttachmentResponses, botsClearBotUserWebhookData, botsClearBotUserWebhookErrors, botsClearBotUserWebhookResponses, botsCreateBotUserData, botsCreateBotUserErrors, botsCreateBotUserResponses, botsDeleteBotUserData, botsDeleteBotUserErrors, botsDeleteBotUserResponses, botsIssueBotUserTokenData, botsIssueBotUserTokenErrors, botsIssueBotUserTokenResponses, botsReadBotUserData, botsReadBotUserErrors, botsReadBotUserResponses, botsReadBotUsersData, botsReadBotUsersErrors, botsReadBotUsersResponses, botsRegenerateBotUserWebhookSecretData, botsRegenerateBotUserWebhookSecretErrors, botsRegenerateBotUserWebhookSecretResponses, botsRevokeBotUserTokenData, botsRevokeBotUserTokenErrors, botsRevokeBotUserTokenResponses, botsSetBotUserWebhookData, botsSetBotUserWebhookErrors, botsSetBotUserWebhookResponses, botsTestBotUserWebhookData, botsTestBotUserWebhookErrors, botsTestBotUserWebhookResponses, botsUpdateBotUserData, botsUpdateBotUserErrors, botsUpdateBotUserResponses, commentsCreateCommentData, commentsCreateCommentErrors, commentsCreateCommentResponses, commentsDeleteCommentData, commentsDeleteCommentErrors, commentsDeleteCommentResponses, commentsReadCommentsData, commentsReadCommentsErrors, commentsReadCommentsResponses, commentsUpdateCommentData, commentsUpdateCommentErrors, commentsUpdateCommentResponses, loginRecoverData, loginRecoverErrors, loginRecoverResponses, loginRecoveryOptionsData, loginRecoveryOptionsErrors, loginRecoveryOptionsResponses, loginRegisterData, loginRegisterErrors, loginRegisterResponses, loginRegistrationOptionsData, loginRegistrationOptionsErrors, loginRegistrationOptionsResponses, loginSignInData, loginSignInErrors, loginSignInOptionsData, loginSignInOptionsResponses, loginSignInResponses, loginTestTokenData, loginTestTokenResponses, paperlessDisconnectData, paperlessDisconnectResponses, paperlessReadConnectionData, paperlessReadConnectionResponses, paperlessSetConnectionData, paperlessSetConnectionErrors, paperlessSetConnectionResponses, paperlessTestConnectionData, paperlessTestConnectionErrors, paperlessTestConnectionResponses, privateCreateUserData, privateCreateUserErrors, privateCreateUserResponses, privateIssueRecoveryCodeData, privateIssueRecoveryCodeErrors, privateIssueRecoveryCodeResponses, projectsArchiveProjectData, projectsArchiveProjectErrors, projectsArchiveProjectResponses, projectsCreateProjectData, projectsCreateProjectErrors, projectsCreateProjectResponses, projectsDeleteProjectData, projectsDeleteProjectErrors, projectsDeleteProjectResponses, projectsReadProjectData, projectsReadProjectErrors, projectsReadProjectResponses, projectsReadProjectsData, projectsReadProjectsErrors, projectsReadProjectsResponses, projectsUnarchiveProjectData, projectsUnarchiveProjectErrors, projectsUnarchiveProjectResponses, projectsUpdateProjectData, projectsUpdateProjectErrors, projectsUpdateProjectResponses, tagsCreateTagData, tagsCreateTagErrors, tagsCreateTagResponses, tagsDeleteTagData, tagsDeleteTagErrors, tagsDeleteTagResponses, tagsDismissTagDuplicatesData, tagsDismissTagDuplicatesErrors, tagsDismissTagDuplicatesResponses, tagsMergeTagsData, tagsMergeTagsErrors, tagsMergeTagsResponses, tagsPreviewTagMergeData, tagsPreviewTagMergeErrors, tagsPreviewTagMergeResponses, tagsReadTagData, tagsReadTagDuplicatesData, tagsReadTagDuplicatesResponses, tagsReadTagErrors, tagsReadTagResponses, tagsReadTagsData, tagsReadTagsErrors, tagsReadTagsResponses, tagsRenameTagData, tagsRenameTagErrors, tagsRenameTagResponses, tasksBulkDeleteTasksData, tasksBulkDeleteTasksErrors, tasksBulkDeleteTasksResponses, tasksBulkUpdateTasksData, tasksBulkUpdateTasksErrors, tasksBulkUpdateTasksResponses, tasksCreateTaskData, tasksCreateTaskErrors, tasksCreateTaskResponses, tasksDeleteTaskData, tasksDeleteTaskErrors, tasksDeleteTaskResponses, tasksReadTaskData, tasksReadTaskErrors, tasksReadTaskResponses, tasksReadTasksData, tasksReadTasksErrors, tasksReadTasksResponses, tasksUpdateTaskData, tasksUpdateTaskErrors, tasksUpdateTaskResponses, usersAddPasskeyData, usersAddPasskeyErrors, usersAddPasskeyResponses, usersConfirmationOptionsData, usersConfirmationOptionsResponses, usersDeleteUserMeData, usersDeleteUserMeResponses, usersIssueRecoveryCodeData, usersIssueRecoveryCodeErrors, usersIssueRecoveryCodeResponses, usersNewPasskeyOptionsData, usersNewPasskeyOptionsErrors, usersNewPasskeyOptionsResponses, usersReadPasskeysData, usersReadPasskeysResponses, usersReadUserMeData, usersReadUserMeResponses, usersReadUsersData, usersReadUsersErrors, usersReadUsersResponses, usersRemovePasskeyData, usersRemovePasskeyErrors, usersRemovePasskeyResponses, usersRenamePasskeyData, usersRenamePasskeyErrors, usersRenamePasskeyResponses, usersSignOutEverywhereData, usersSignOutEverywhereResponses, usersUpdateUserMeData, usersUpdateUserMeErrors, usersUpdateUserMeResponses, utilsHealthCheckData, utilsHealthCheckResponses, utilsTestEmailData, utilsTestEmailErrors, utilsTestEmailResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -774,12 +774,32 @@ export class AttachmentsService {
      *
      * Download an attachment's exact bytes. A bot user downloads wherever it can
      * read the task (FR-08.11).
+     *
+     * One kept in Paperless comes from there, as the original file and not
+     * Paperless's archived copy; if Paperless cannot be reached the download
+     * fails saying so (FR-04.10).
      */
     public static downloadAttachment<ThrowOnError extends boolean = true>(options: Options<attachmentsDownloadAttachmentData, ThrowOnError>) {
         return (options.client ?? client).get<attachmentsDownloadAttachmentResponses, attachmentsDownloadAttachmentErrors, ThrowOnError>({
             responseType: 'json',
             security: [{ scheme: 'bearer', type: 'http' }],
             url: '/api/v1/attachments/{attachment_id}',
+            ...options
+        });
+    }
+    
+    /**
+     * Resend Attachment
+     *
+     * Send a PDF to Paperless again after its hand-over failed (FR-04.6). The
+     * owner only: a bot user cannot call this. Only an attachment whose
+     * hand-over failed can be sent again.
+     */
+    public static resendAttachment<ThrowOnError extends boolean = true>(options: Options<attachmentsResendAttachmentData, ThrowOnError>) {
+        return (options.client ?? client).post<attachmentsResendAttachmentResponses, attachmentsResendAttachmentErrors, ThrowOnError>({
+            responseType: 'json',
+            security: [{ scheme: 'bearer', type: 'http' }],
+            url: '/api/v1/attachments/{attachment_id}/resend',
             ...options
         });
     }
@@ -1264,6 +1284,89 @@ export class BotsService {
             security: [{ scheme: 'bearer', type: 'http' }],
             url: '/api/v1/bot-users/{bot_user_id}/webhooks/{kind}/test',
             ...options
+        });
+    }
+}
+
+export class PaperlessService {
+    /**
+     * Disconnect
+     *
+     * Disconnect Paperless (FR-04.8). Nothing in Paperless is deleted, and the
+     * attachments kept there stay as they are, out of reach until a connection
+     * is set again; the answer says how many. PDFs still waiting to be handed
+     * over stay in Taskly.
+     */
+    public static disconnect<ThrowOnError extends boolean = true>(options?: Options<paperlessDisconnectData, ThrowOnError>) {
+        return (options?.client ?? client).delete<paperlessDisconnectResponses, unknown, ThrowOnError>({
+            responseType: 'json',
+            security: [{ scheme: 'bearer', type: 'http' }],
+            url: '/api/v1/paperless/',
+            ...options
+        });
+    }
+    
+    /**
+     * Read Connection
+     *
+     * The caller's Paperless connection (FR-04.4): whether there is one, its
+     * address, and how many attachments are kept there, which is what
+     * disconnecting would put out of reach (FR-04.8). The token is never
+     * returned.
+     */
+    public static readConnection<ThrowOnError extends boolean = true>(options?: Options<paperlessReadConnectionData, ThrowOnError>) {
+        return (options?.client ?? client).get<paperlessReadConnectionResponses, unknown, ThrowOnError>({
+            responseType: 'json',
+            security: [{ scheme: 'bearer', type: 'http' }],
+            url: '/api/v1/paperless/',
+            ...options
+        });
+    }
+    
+    /**
+     * Set Connection
+     *
+     * Connect a Paperless-ngx instance, or change the connection (FR-04.4): its
+     * address and an API token. The address is refused, naming the rule, if it
+     * resolves to loopback or a private range and the installation does not
+     * allow those. The token is kept encrypted and only ever replaced; it may be
+     * left out to keep the stored one, but only while the address stays the same,
+     * so a token is never sent anywhere its owner did not type it for.
+     *
+     * Connecting moves nothing: PDFs already kept in Taskly stay there
+     * (FR-04.12). New PDFs go to Paperless from now on (FR-04.5).
+     */
+    public static setConnection<ThrowOnError extends boolean = true>(options: Options<paperlessSetConnectionData, ThrowOnError>) {
+        return (options.client ?? client).put<paperlessSetConnectionResponses, paperlessSetConnectionErrors, ThrowOnError>({
+            responseType: 'json',
+            security: [{ scheme: 'bearer', type: 'http' }],
+            url: '/api/v1/paperless/',
+            ...options,
+            headers: {
+                'Content-Type': 'application/json',
+                ...options.headers
+            }
+        });
+    }
+    
+    /**
+     * Test Connection
+     *
+     * Try a Paperless connection (FR-04.4): the saved one, or an address and
+     * token typed but not saved yet. It answers `ok`, or says why not; a refused
+     * address is a failed test, not an error. The saved token is only tried
+     * against the saved address.
+     */
+    public static testConnection<ThrowOnError extends boolean = true>(options?: Options<paperlessTestConnectionData, ThrowOnError>) {
+        return (options?.client ?? client).post<paperlessTestConnectionResponses, paperlessTestConnectionErrors, ThrowOnError>({
+            responseType: 'json',
+            security: [{ scheme: 'bearer', type: 'http' }],
+            url: '/api/v1/paperless/test',
+            ...options,
+            headers: {
+                'Content-Type': 'application/json',
+                ...options?.headers
+            }
         });
     }
 }

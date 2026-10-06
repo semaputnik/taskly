@@ -1,4 +1,4 @@
-"""How the settings treat the installation's secrets (FR-11.9)."""
+"""How the settings treat the installation's secrets (FR-11.9, FR-04.4)."""
 
 import pytest
 from pydantic import ValidationError
@@ -13,6 +13,7 @@ def _clean_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     """The test run itself is a development process: do not let that leak in."""
     monkeypatch.delenv("FASTAPI_ENV", raising=False)
     monkeypatch.delenv("WEBHOOK_SECRET_KEY", raising=False)
+    monkeypatch.delenv("PAPERLESS_TOKEN_KEY", raising=False)
 
 
 def _settings(**overrides: object) -> Settings:
@@ -20,6 +21,7 @@ def _settings(**overrides: object) -> Settings:
         "PROJECT_NAME": "Taskly",
         "SECRET_KEY": "a-real-secret-key",
         "WEBHOOK_SECRET_KEY": "a-real-webhook-key",
+        "PAPERLESS_TOKEN_KEY": "a-real-paperless-key",
         "FIRST_SUPERUSER": "admin@example.com",
         "DATABASE_URL": DATABASE_URL,
     }
@@ -65,3 +67,37 @@ def test_a_deployed_installation_that_leaves_the_key_unset_is_refused() -> None:
 
 def test_a_deployed_installation_accepts_a_real_webhook_secret_key() -> None:
     assert _settings().WEBHOOK_SECRET_KEY == "a-real-webhook-key"
+
+
+def test_a_development_installation_only_warns_about_the_default_paperless_key() -> (
+    None
+):
+    with pytest.warns(UserWarning, match="PAPERLESS_TOKEN_KEY"):
+        settings = _settings(
+            PAPERLESS_TOKEN_KEY="changethis", FASTAPI_ENV="development"
+        )
+
+    assert settings.PAPERLESS_TOKEN_KEY == "changethis"
+
+
+def test_a_deployed_installation_refuses_the_default_paperless_token_key() -> None:
+    with pytest.raises(ValidationError, match="PAPERLESS_TOKEN_KEY"):
+        _settings(PAPERLESS_TOKEN_KEY="changethis")
+
+
+def test_a_deployed_installation_that_leaves_the_paperless_key_unset_is_refused() -> (
+    None
+):
+    values = {
+        "PROJECT_NAME": "Taskly",
+        "SECRET_KEY": "a-real-secret-key",
+        "WEBHOOK_SECRET_KEY": "a-real-webhook-key",
+        "FIRST_SUPERUSER": "admin@example.com",
+        "DATABASE_URL": DATABASE_URL,
+    }
+    with pytest.raises(ValidationError, match="PAPERLESS_TOKEN_KEY"):
+        Settings(_env_file=None, **values)  # type: ignore[arg-type, call-arg]
+
+
+def test_a_deployed_installation_accepts_a_real_paperless_token_key() -> None:
+    assert _settings().PAPERLESS_TOKEN_KEY == "a-real-paperless-key"

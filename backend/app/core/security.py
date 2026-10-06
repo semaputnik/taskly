@@ -1,3 +1,4 @@
+import base64
 import hashlib
 import secrets
 import uuid
@@ -5,10 +6,25 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import jwt
+from cryptography.fernet import Fernet
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 
 from app.core.config import settings
 
 ALGORITHM = "HS256"
+
+
+def fernet_for(key: str, info: bytes) -> Fernet:
+    """
+    A Fernet cipher for an installation key, which can be any string: it is run
+    through HKDF, with `info` naming what it protects so two keys that happen
+    to be equal still give unrelated ciphers.
+    """
+    derived = HKDF(algorithm=hashes.SHA256(), length=32, salt=None, info=info).derive(
+        key.encode()
+    )
+    return Fernet(base64.urlsafe_b64encode(derived))
 
 
 def create_access_token(

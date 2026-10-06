@@ -229,7 +229,10 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
 - **FR-04.4** A user can connect their own Paperless-ngx instance in Settings
   by giving its address and an API token, and can test the connection there.
   The connection is optional and off until set; one per user. The token is
-  kept so that it can be used but never shown again, only replaced. The
+  kept so that it can be used but never shown again, only replaced. It is
+  stored encrypted, under the installation's own `PAPERLESS_TOKEN_KEY`
+  setting rather than a key derived from `SECRET_KEY`: changing that key
+  makes stored tokens unreadable until each user enters theirs again. The
   address follows the same rule as a webhook URL on loopback and private
   ranges (FR-11.3), under the same installation setting.
 - **FR-04.5** While a user has a Paperless connection, every PDF attached to
