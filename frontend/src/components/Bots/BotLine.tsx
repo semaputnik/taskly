@@ -5,6 +5,7 @@ import { recordLink, useIsOpen } from "@/components/Records/panels"
 import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
 import { tokenStatus } from "./tokens"
+import { deliveryFailing, webhookStateInWords } from "./webhookWords"
 import {
   deletedInWords,
   lastUseInWords,
@@ -64,6 +65,8 @@ export function BotLine({
   const open = useIsOpen("bot", bot.id)
   const status = bot.deleted ? null : tokenStatus(bot)
   const working = status === "active"
+  const webhookState = webhookStateInWords(bot.webhooks)
+  const failing = deliveryFailing(bot.webhooks)
 
   return (
     <li
@@ -111,9 +114,12 @@ export function BotLine({
                 <span className="sr-only">Permissions: </span>
                 {permissionsInWords(bot.scope.permissions)}
               </span>
-              {/* #191 (the Webhooks section): the webhook state belongs here,
-                  in words after the permissions — "task webhook set", "both
-                  webhooks set", and "last delivery failed" in --late. */}
+              {webhookState && <span>{webhookState}</span>}
+              {failing && (
+                <span className="text-late font-medium">
+                  last delivery failed
+                </span>
+              )}
             </>
           )}
         </div>
