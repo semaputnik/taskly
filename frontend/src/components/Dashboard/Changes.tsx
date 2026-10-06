@@ -1,16 +1,18 @@
-import { useSuspenseQuery } from "@tanstack/react-query"
+import { useSuspenseQueries } from "@tanstack/react-query"
 import { Link as RouterLink } from "@tanstack/react-router"
 
 import type { ActivityEntryPublic } from "@/client"
 import { ActivityDescription } from "@/components/Activity/ActivityDescription"
 import { ActorLabel } from "@/components/Activity/ActorLabel"
 import { useRestoreDeletion } from "@/components/Activity/RestoreDeletion"
+import { ME } from "@/components/Activity/words"
 import { Skeleton } from "@/components/ui/skeleton"
 import useAuth from "@/hooks/useAuth"
 import { formatDateTime } from "@/lib/dates"
 import { cn } from "@/lib/utils"
 import { byDay, clock, windowLabel } from "./log"
-import { changesQuery, textLink } from "./shared"
+import { botChangesQuery, ownChangesQuery } from "./queries"
+import { textLink } from "./shared"
 
 // The time in a narrow column, the actor, then the sentence. On a phone the
 // sentence drops beneath the time and the actor rather than squeezing them.
@@ -60,38 +62,54 @@ export function ChangesPending() {
 }
 
 /**
- * The last section of the day page: the account's changes since the reader's
- * last visit, as log lines, newest first. A person and their bot users work
- * on the same tasks, so the actor is the first thing each line says — and a
- * line a bot user wrote is set in full ink, because it is news, while one the
- * reader wrote themselves is muted, because it is a reminder.
+ * The last section of the day page: what the reader's bot users changed
+ * since their last visit, as log lines, newest first. A person and their bot
+ * users work on the same tasks, so the actor is the first thing each line
+ * says. The reader's own changes are not listed — they know what they did —
+ * but folded into one muted line at the end that opens them in the Activity
+ * log, so the section is never a list of the reader's own actions.
  */
 export function Changes({ since }: { since: string | null }) {
   const { user } = useAuth()
-  const { data } = useSuspenseQuery(changesQuery(since))
+  const [bots, own] = useSuspenseQueries({
+    queries: [botChangesQuery(since), ownChangesQuery(since)],
+  })
   const now = new Date()
   const windowText = windowLabel(since ? new Date(since) : null, now)
+  const ownCount = own.data.count
 
   return (
     <section className="mb-9">
-      <Heading count={data.count} windowText={windowText} />
-      {data.data.length === 0 ? (
+      <Heading count={bots.data.count} windowText={windowText} />
+      {bots.data.count === 0 && ownCount === 0 ? (
         <Empty windowText={since ? windowText : null} />
+      ) : bots.data.data.length === 0 ? (
+        <p className="text-ink-3 pt-3">
+          Nothing from your bot users {windowText}.{" "}
+          <OwnChanges count={ownCount} />
+        </p>
       ) : (
-        byDay(data.data, now).map((day) => (
-          <div key={day.entries[0].id}>
-            {day.label && (
-              <h3 className="text-ink-3 pt-4 pb-1 text-[13px] font-medium">
-                {day.label}
-              </h3>
-            )}
-            <ol>
-              {day.entries.map((entry) => (
-                <Line key={entry.id} entry={entry} currentUserId={user?.id} />
-              ))}
-            </ol>
-          </div>
-        ))
+        <>
+          {byDay(bots.data.data, now).map((day) => (
+            <div key={day.entries[0].id}>
+              {day.label && (
+                <h3 className="text-ink-3 pt-4 pb-1 text-[13px] font-medium">
+                  {day.label}
+                </h3>
+              )}
+              <ol>
+                {day.entries.map((entry) => (
+                  <Line key={entry.id} entry={entry} currentUserId={user?.id} />
+                ))}
+              </ol>
+            </div>
+          ))}
+          {ownCount > 0 && (
+            <p className="text-ink-3 pt-2.5">
+              and <OwnChanges count={ownCount} />
+            </p>
+          )}
+        </>
       )}
       <RouterLink
         to="/activity"
@@ -103,6 +121,23 @@ export function Changes({ since }: { since: string | null }) {
   )
 }
 
+/** The reader's own changes as one link, into the log narrowed to them. */
+function OwnChanges({ count }: { count: number }) {
+  return (
+    <RouterLink
+      to="/activity"
+      search={{ actor: ME }}
+      className={cn(
+        textLink,
+        "decoration-rule-strong underline hover:decoration-current",
+      )}
+    >
+      {count} {count === 1 ? "change" : "changes"} of yours{" "}
+      <span aria-hidden>→</span>
+    </RouterLink>
+  )
+}
+
 function Line({
   entry,
   currentUserId,
@@ -110,8 +145,6 @@ function Line({
   entry: ActivityEntryPublic
   currentUserId?: string
 }) {
-  const byBot = Boolean(entry.actor_bot_user_id)
-
   return (
     <li className={lineGrid}>
       {entry.created_at ? (
@@ -125,12 +158,7 @@ function Line({
       ) : (
         <span />
       )}
-      <span
-        className={cn(
-          "truncate",
-          byBot ? "text-ink font-medium" : "text-ink-3",
-        )}
-      >
+      <span className="text-ink truncate font-medium">
         <ActorLabel
           entry={entry}
           currentUserId={currentUserId}
@@ -140,12 +168,7 @@ function Line({
       </span>
       {/* The sentence follows its actor, so its verb is not capitalised:
           "release-bot deleted …". The words themselves are the full log's. */}
-      <span
-        className={cn(
-          "col-start-2 break-words first-letter:lowercase md:col-start-3",
-          byBot ? "text-ink" : "text-ink-3",
-        )}
-      >
+      <span className="text-ink col-start-2 break-words first-letter:lowercase md:col-start-3">
         <ActivityDescription entry={entry} currentUserId={currentUserId} />
         {entry.restorable && <Restore entry={entry} />}
       </span>

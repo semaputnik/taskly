@@ -76,14 +76,22 @@ export function StatusMark({
   status,
   priority,
   labelled = false,
+  late = false,
   className,
 }: {
   status: TaskStatus
   priority?: TaskPriority | null
   labelled?: boolean
+  /**
+   * Set on the line of an overdue task: its due day is already in the alert
+   * red, so a P1 mark, which is that same red, is set in ink instead, and red
+   * is said once on the line. The priority is still in the mark's name.
+   */
+  late?: boolean
   className?: string
 }) {
   const tone = markTone(status, priority)
+  const colour = late && tone === "p1" ? null : tone
   return (
     <svg
       viewBox="0 0 18 18"
@@ -92,7 +100,7 @@ export function StatusMark({
       strokeWidth="1.5"
       className={cn(
         "size-[1.125rem] shrink-0",
-        tone ? MARK_TEXT[tone] : "text-foreground",
+        colour ? MARK_TEXT[colour] : "text-foreground",
         className,
       )}
       aria-hidden={labelled ? undefined : true}

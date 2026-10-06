@@ -1,10 +1,7 @@
-import { activityQuery } from "@/lib/serverState"
-
 /**
- * What the day page's sections share: their preview lengths, the text link
- * they end with, and the Changes log's request, which the sentence under the
- * date reads its total from. Kept apart from the sections so none of them
- * imports another.
+ * What the day page's sections share: their preview lengths and the text link
+ * they end with. Kept apart from the sections so none of them imports
+ * another.
  */
 
 /** How many rows a band shows before it hands off to the task list. */
@@ -12,10 +9,6 @@ export const PREVIEW_ROWS = 5
 
 /** How many lines the day page's Changes log shows before the full log. */
 export const LOG_LINES = 8
-
-/** The account's changes in the window the page counts from, newest first. */
-export const changesQuery = (since: string | null) =>
-  activityQuery({ since: since ?? undefined, limit: LOG_LINES })
 
 /** A text action: underlined on hover, ringed on keyboard focus. */
 export const textLink =
