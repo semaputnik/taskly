@@ -17,7 +17,7 @@ export const more = cn(
 /** A property's action, in words, as the mock sets it: ink, 13.5px, medium. */
 export const act = cn(
   textLink,
-  "text-ink text-[13.5px] font-medium disabled:opacity-50 pointer-coarse:-my-3 pointer-coarse:py-3",
+  "text-ink text-[13.5px] font-medium whitespace-nowrap disabled:opacity-50 pointer-coarse:-my-3 pointer-coarse:py-3",
 )
 
 export function Empty({ children }: { children: React.ReactNode }) {

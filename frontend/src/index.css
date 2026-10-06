@@ -9,7 +9,7 @@
     -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
     "Noto Sans", Arial, sans-serif;
   --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-  /* The measure of a page's one column: Today, Tasks, Bots and Activity. */
+  /* The measure of a page's one column, on every page of the app. */
   --container-page-column: 820px;
 }
 
@@ -28,8 +28,8 @@
   --color-hover: var(--hover);
   --color-done: var(--done);
   --color-late: var(--late);
-  /* The shadcn names, mapped onto the palette so the screens not yet
-     redesigned read as the same world until their own slice. */
+  /* The shadcn names (dialogs, menus, inputs, buttons), mapped onto the
+     palette so the kit reads as the same world as the screens. */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);

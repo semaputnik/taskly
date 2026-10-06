@@ -68,11 +68,11 @@ export function ProjectPanel() {
           </>
         ) : project ? (
           <>
-            <span className="shrink-0">Project</span>
+            <span className="truncate">Project</span>
             {project.created_at && (
               <>
                 <span aria-hidden>·</span>
-                <span className="truncate">
+                <span className="shrink-0 whitespace-nowrap">
                   created {formatDayOf(project.created_at)}
                 </span>
               </>

@@ -3,9 +3,6 @@ import { type FormEvent, useId, useState } from "react"
 
 import { type PaperlessConnectionPublic, PaperlessService } from "@/client"
 import { PropertyRow } from "@/components/Records/RecordPanel"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { LoadingButton } from "@/components/ui/loading-button"
 import { isRefusal, refusalCode, refusalMessage } from "@/lib/apiErrors"
 import { useReportChange } from "@/lib/serverState"
 import { toastError, toastSuccess } from "@/lib/toasts"
@@ -14,6 +11,7 @@ import {
   TestResult,
   useTestConnection,
 } from "./paperlessTest"
+import { actQuiet, EditActions, lineInput } from "./Section"
 
 const ADDRESS_MISSING =
   "Enter the address of your Paperless, starting with http:// or https://."
@@ -75,7 +73,7 @@ function useSaveConnection({
   })
 }
 
-const field = "h-[30px] md:text-sm"
+const field = lineInput
 
 /**
  * The address and the token, in place of the Connection line: to connect, or
@@ -145,13 +143,12 @@ export function ConnectionForm({
     >
       <PropertyRow label="Address" htmlFor={ids.address}>
         <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <Input
+          <input
             id={ids.address}
             inputMode="url"
             autoComplete="off"
             autoCapitalize="none"
             spellCheck={false}
-            autoFocus
             placeholder="https://"
             value={url}
             aria-invalid={addressProblem ? true : undefined}
@@ -170,7 +167,7 @@ export function ConnectionForm({
       </PropertyRow>
       <PropertyRow label="Token" htmlFor={ids.token}>
         <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <Input
+          <input
             id={ids.token}
             type="password"
             autoComplete="new-password"
@@ -194,14 +191,14 @@ export function ConnectionForm({
               ? "An API token from your Paperless profile. Leave it empty to keep the one stored, as long as the address stays the same."
               : "An API token from your Paperless profile. It is kept so Taskly can use it, and never shown again."}
           </p>
-          <div className="flex h-[30px] items-center gap-3 pointer-coarse:h-11">
-            <LoadingButton type="submit" size="sm" loading={save.isPending}>
-              {connection.connected ? "Save" : "Connect"}
-            </LoadingButton>
-            <Button
+          <EditActions
+            save={connection.connected ? "Save" : "Connect"}
+            pending={save.isPending}
+            onCancel={onDone}
+          >
+            <button
               type="button"
-              variant="ghost"
-              size="sm"
+              className={actQuiet}
               disabled={busy}
               onClick={() => {
                 const body = values()
@@ -209,17 +206,8 @@ export function ConnectionForm({
               }}
             >
               {test.isPending ? "Testing…" : "Test"}
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              disabled={save.isPending}
-              onClick={onDone}
-            >
-              Cancel
-            </Button>
-          </div>
+            </button>
+          </EditActions>
           <TestResult outcome={outcome} />
         </div>
       </PropertyRow>
@@ -273,12 +261,11 @@ export function TokenForm({
         className="flex min-w-0 flex-1 flex-wrap items-start gap-x-3 gap-y-1"
       >
         <div className="flex min-w-0 flex-1 basis-56 flex-col gap-1">
-          <Input
+          <input
             id={id}
             type="password"
             autoComplete="new-password"
             spellCheck={false}
-            autoFocus
             placeholder="New API token"
             value={token}
             aria-invalid={problem ? true : undefined}
@@ -291,20 +278,7 @@ export function TokenForm({
           />
           <Problem id={`${id}-problem`}>{problem}</Problem>
         </div>
-        <div className="flex h-[30px] items-center gap-3 pointer-coarse:h-11">
-          <LoadingButton type="submit" size="sm" loading={save.isPending}>
-            Save
-          </LoadingButton>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            disabled={save.isPending}
-            onClick={onDone}
-          >
-            Cancel
-          </Button>
-        </div>
+        <EditActions save="Save" pending={save.isPending} onCancel={onDone} />
       </form>
     </PropertyRow>
   )

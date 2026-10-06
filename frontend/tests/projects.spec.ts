@@ -278,7 +278,8 @@ test("Enter pressed right after a refusal sends the draft again", async ({
   const name = page.getByRole("textbox", { name: "Project name" })
   await name.fill("Garden")
   await name.press("Enter")
-  await expect.poll(() => refused).toBe(true)
+  // The refusal is said before the draft is sent again.
+  await expect(page.getByText("That name will not do.")).toBeVisible()
 
   await name.press("Enter")
   await expect(

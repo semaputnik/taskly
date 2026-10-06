@@ -4,14 +4,11 @@ import { z } from "zod"
 
 import { UsersService, type UserUpdateMe } from "@/client"
 import { PropertyRow } from "@/components/Records/RecordPanel"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { LoadingButton } from "@/components/ui/loading-button"
 import useAuth from "@/hooks/useAuth"
 import { useReportChange } from "@/lib/serverState"
 import { toastError, toastSuccess } from "@/lib/toasts"
 import { Appearance } from "./Appearance"
-import { act, SettingsSection } from "./Section"
+import { act, EditActions, lineInput, SettingsSection } from "./Section"
 
 const nameSchema = z.string().max(30, "The name is at most 30 characters")
 const emailSchema = z.email({ message: "Invalid email address" })
@@ -81,7 +78,7 @@ function Field({
     mutationFn: (next: string) =>
       UsersService.updateUserMe({ body: toBody(next) }),
     onSuccess: () => {
-      toastSuccess("User updated successfully")
+      toastSuccess(`${label} changed`)
       setEditing(false)
     },
     onError: (error) => toastError(error),
@@ -114,14 +111,13 @@ function Field({
           }}
         >
           <div className="flex min-w-0 flex-1 basis-56 flex-col gap-1">
-            <Input
+            <input
               id={id}
               type={type}
               value={draft}
-              autoFocus
               aria-invalid={problem !== null}
               aria-describedby={problem ? `${id}-problem` : undefined}
-              className="h-[30px] md:text-sm"
+              className={lineInput}
               onChange={(event) => setDraft(event.target.value)}
               onBlur={() => check(draft)}
               onKeyDown={(event) => {
@@ -138,20 +134,7 @@ function Field({
               </p>
             )}
           </div>
-          <div className="flex h-[30px] items-center gap-3 pointer-coarse:h-11">
-            <LoadingButton type="submit" size="sm" loading={save.isPending}>
-              Save
-            </LoadingButton>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              disabled={save.isPending}
-              onClick={close}
-            >
-              Cancel
-            </Button>
-          </div>
+          <EditActions save="Save" pending={save.isPending} onCancel={close} />
         </form>
       ) : (
         <>
