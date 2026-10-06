@@ -266,6 +266,21 @@ def test_a_refused_connection_is_a_failed_attempt_that_says_so(
     assert row.last_error == "ConnectError: Connection refused"
 
 
+def test_any_exception_while_sending_is_a_failed_attempt_not_a_lost_one(
+    client: TestClient, db: Session, receiver: Receiver
+) -> None:
+    _owner, bot, _task = _ready(client, db)
+    # Not an `httpx.HTTPError`: had it escaped, the delivery would never be
+    # recorded and would be claimed again for ever.
+    receiver.fail_with = RuntimeError("boom")
+
+    assert webhooks.deliver_due(client=receiver.client()) == 1
+
+    row = _last(db, bot)
+    assert (row.state, row.attempts) == ("pending", 1)
+    assert row.last_error == "RuntimeError: boom"
+
+
 def test_a_redirect_is_a_failure_and_is_not_followed(
     client: TestClient, db: Session
 ) -> None:

@@ -38,7 +38,7 @@ from sqlmodel import Session, col, select
 
 from app.core.config import settings
 from app.core.db import engine
-from app.core.outbound import Refusal, check_url
+from app.core.outbound import GuardedTransport, Refusal, check_url
 from app.models import (
     BotUser,
     DeliveryState,
@@ -273,9 +273,15 @@ class Outcome:
 
 
 def make_client() -> httpx.Client:
-    # A redirect is not followed: it would send a signed request somewhere the
-    # owner never named, past the address check.
-    return httpx.Client(follow_redirects=False)
+    """
+    The client deliveries go out through. A redirect is not followed: it would
+    send a signed request somewhere the owner never named, past the address
+    check. The environment's proxy settings are not read, for the same reason,
+    and the transport connects only to the address it checked (FR-11.3).
+    """
+    return httpx.Client(
+        transport=GuardedTransport(), follow_redirects=False, trust_env=False
+    )
 
 
 def _post(client: httpx.Client, job: _Job, *, now: datetime) -> Outcome:
@@ -305,7 +311,14 @@ def _post(client: httpx.Client, job: _Job, *, now: datetime) -> Outcome:
         )
     except httpx.TimeoutException:
         return Outcome(None, f"No answer within {TIMEOUT_SECONDS:g} seconds", took())
-    except httpx.HTTPError as error:
+    except Refusal as refusal:
+        # The transport's own check, made on the address it is about to use.
+        return Outcome(None, f"Refused: {refusal.message}"[:500], took())
+    except Exception as error:
+        # Whatever went wrong with this one request, it is a failed attempt: an
+        # exception that got out would leave the delivery unrecorded and
+        # claimed again for ever (an invalid URL is `httpx.InvalidURL`, not an
+        # `httpx.HTTPError`).
         return Outcome(None, f"{type(error).__name__}: {error}"[:500], took())
     answer_error = (
         None
@@ -468,11 +481,15 @@ def send_test(
     )
     url = webhook_url(bot, kind.value)
     assert url is not None
-    if bot.webhook_secret_encrypted is None:
+    stored_secret = bot.webhook_secret_encrypted
+    # Everything the request needs is in hand: end the transaction, so no
+    # connection is held while the receiver takes up to ten seconds to answer.
+    session.commit()
+    if stored_secret is None:
         outcome = Outcome(None, "The bot user has no webhook secret. Regenerate it.", 0)
     else:
         try:
-            secret = decrypt_secret(bot.webhook_secret_encrypted)
+            secret = decrypt_secret(stored_secret)
         except ValueError as error:
             outcome = Outcome(None, str(error), 0)
         else:
@@ -538,7 +555,12 @@ _wakeup: asyncio.Event | None = None
 def wake() -> None:
     """Tell this process's loop that a delivery is due now. Safe from any thread."""
     if _loop is not None and _wakeup is not None:
-        _loop.call_soon_threadsafe(_wakeup.set)
+        try:
+            _loop.call_soon_threadsafe(_wakeup.set)
+        except RuntimeError:
+            # The loop is shutting down; the change this follows is already
+            # committed, and its delivery waits for the next process to run.
+            pass
 
 
 async def drain_forever(
