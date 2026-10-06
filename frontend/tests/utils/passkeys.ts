@@ -40,7 +40,9 @@ export async function addVirtualAuthenticator(
 export async function registerWithPasskey(page: Page, email: string) {
   await page.goto("/signup")
   await page.getByTestId("email-input").fill(email)
-  await page.getByRole("button", { name: "Create account" }).click()
+  await page
+    .getByRole("button", { name: "Create a passkey and sign in" })
+    .click()
   await page.waitForURL("/")
   await expect(page.getByRole("combobox", { name: "Add a task" })).toBeVisible()
 }
@@ -58,12 +60,13 @@ export async function withoutPasskeyAutofill(page: Page) {
 }
 
 /**
- * Sign in from the sign-in screen with the "Sign in with passkey" button and
- * whichever passkey the browser holds. Call `withoutPasskeyAutofill` first.
+ * Sign in from the sign-in screen with the "Sign in with a passkey" button
+ * and whichever passkey the browser holds. Call `withoutPasskeyAutofill`
+ * first.
  */
 export async function signInWithPasskey(page: Page) {
   await page.goto("/login")
-  await page.getByRole("button", { name: "Sign in with passkey" }).click()
+  await page.getByRole("button", { name: "Sign in with a passkey" }).click()
   await page.waitForURL("/")
   await expect(page.getByRole("combobox", { name: "Add a task" })).toBeVisible()
 }

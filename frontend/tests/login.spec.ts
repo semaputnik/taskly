@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test"
+import { pageGround, textOn, textOnFill } from "./utils/colour.ts"
 import {
   addVirtualAuthenticator,
   registerWithPasskey,
@@ -14,19 +15,127 @@ test.use({ storageState: { cookies: [], origins: [] } })
 test("The sign-in screen asks for nothing but a passkey", async ({ page }) => {
   await page.goto("/login")
 
+  await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible()
   await expect(
-    page.getByRole("button", { name: "Sign in with passkey" }),
+    page.getByRole("button", { name: "Sign in with a passkey" }),
   ).toBeVisible()
-  // The email field is there for the browser's passkey suggestions only.
-  await expect(page.getByTestId("email-input")).toHaveAttribute(
-    "autocomplete",
-    "username webauthn",
-  )
-  await expect(page.getByRole("link", { name: "Create account" })).toBeVisible()
+  // The email field is the browser's passkey suggestions' anchor only: it is
+  // not shown and cannot be reached, so there is nothing to type.
+  const email = page.getByTestId("email-input")
+  await expect(email).toHaveAttribute("autocomplete", "username webauthn")
+  await expect(email).toHaveAttribute("tabindex", "-1")
+  await expect(email).toHaveAttribute("aria-hidden", "true")
   await expect(
-    page.getByRole("link", { name: "Have a recovery code?" }),
+    page.getByRole("link", { name: "Use a recovery code" }),
+  ).toBeVisible()
+  await expect(
+    page.getByRole("link", { name: "Create an account" }),
   ).toBeVisible()
   await expect(page.getByLabel(/password/i)).toHaveCount(0)
+})
+
+test("The sign-in screen is one card-less column with its host at the foot", async ({
+  page,
+}) => {
+  await page.goto("/login")
+
+  // No split layout, no logo mark: the wordmark, the heading and the action
+  // in a column no wider than 420px, centred.
+  const main = page.getByRole("main")
+  const box = await main.boundingBox()
+  const viewport = page.viewportSize()
+  expect(box?.width).toBeLessThanOrEqual(420)
+  const centre = (box?.x ?? 0) + (box?.width ?? 0) / 2
+  expect(Math.abs(centre - (viewport?.width ?? 0) / 2)).toBeLessThan(2)
+  await expect(main.getByText("Taskly", { exact: true })).toBeVisible()
+  await expect(main.locator("img")).toHaveCount(0)
+  // The page's own host, since every passkey is bound to it.
+  await expect(
+    main.getByText(`Self-hosted at ${new URL(page.url()).host}`),
+  ).toBeVisible()
+})
+
+test("The appearance chosen on the sign-in screen carries into the app", async ({
+  page,
+}) => {
+  await page.goto("/login")
+  const group = page.getByRole("radiogroup", { name: "Appearance" })
+
+  await group.getByRole("radio", { name: "Light" }).click()
+  await expect(page.locator("html")).toHaveClass(/light/)
+  await expect(group.getByRole("radio", { name: "Light" })).toHaveCSS(
+    "font-weight",
+    "600",
+  )
+  await expect(group.getByRole("radio", { name: "Dark" })).toHaveAttribute(
+    "aria-checked",
+    "false",
+  )
+
+  // It is the theme provider's own storage, the one Settings writes.
+  await addVirtualAuthenticator(page)
+  await registerWithPasskey(page, randomEmail())
+  await page.goto("/settings")
+  await expect(page.locator("html")).toHaveClass(/light/)
+  await expect(
+    page
+      .getByRole("radiogroup", { name: "Appearance" })
+      .getByRole("radio", { name: "Light" }),
+  ).toHaveAttribute("aria-checked", "true")
+})
+
+test("The sign-in screen is keyboard complete and readable", async ({
+  page,
+}) => {
+  await withoutPasskeyAutofill(page)
+  await page.goto("/login")
+  await expect(
+    page.getByRole("button", { name: "Sign in with a passkey" }),
+  ).toBeVisible()
+
+  // The action, the two links, then the appearance choice.
+  await page.keyboard.press("Tab")
+  await expect(
+    page.getByRole("button", { name: "Sign in with a passkey" }),
+  ).toBeFocused()
+  await page.keyboard.press("Tab")
+  await expect(
+    page.getByRole("link", { name: "Use a recovery code" }),
+  ).toBeFocused()
+  await page.keyboard.press("Tab")
+  await expect(
+    page.getByRole("link", { name: "Create an account" }),
+  ).toBeFocused()
+  await page.keyboard.press("Tab")
+  // The three are one stop; the arrow keys walk them.
+  await expect(page.getByRole("radio", { checked: true })).toBeFocused()
+
+  const ground = await pageGround(page)
+  for (const quiet of [
+    page.getByText("Your browser will offer the passkeys"),
+    page.getByText(/^Self-hosted at/),
+  ]) {
+    expect(await textOn(quiet, ground)).toBeGreaterThanOrEqual(4.5)
+  }
+  expect(
+    await textOnFill(
+      page.getByRole("button", { name: "Sign in with a passkey" }),
+    ),
+  ).toBeGreaterThanOrEqual(4.5)
+})
+
+test("The sign-in screen fits a phone", async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 667 })
+  await page.goto("/login")
+
+  await expect(
+    page.getByRole("button", { name: "Sign in with a passkey" }),
+  ).toBeVisible()
+  await expect(page.getByText(/^Self-hosted at/)).toBeVisible()
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - window.innerWidth,
+  )
+  expect(overflow).toBeLessThanOrEqual(0)
 })
 
 test("Sign in with a passkey made when registering", async ({ page }) => {
@@ -90,7 +199,7 @@ test("A passkey this installation does not know is refused", async ({
   expect(await stranger.credentials()).toHaveLength(1)
 
   await page.goto("/login")
-  await page.getByRole("button", { name: "Sign in with passkey" }).click()
+  await page.getByRole("button", { name: "Sign in with a passkey" }).click()
 
   await expect(
     page.getByText("This passkey could not sign you in. Try again."),
@@ -106,7 +215,7 @@ test("A browser without passkeys is told there is no way in", async ({
 
   await expect(page.getByTestId("passkeys-unsupported")).toBeVisible()
   await expect(
-    page.getByRole("button", { name: "Sign in with passkey" }),
+    page.getByRole("button", { name: "Sign in with a passkey" }),
   ).toHaveCount(0)
 })
 
