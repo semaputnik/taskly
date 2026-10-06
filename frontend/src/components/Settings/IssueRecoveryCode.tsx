@@ -47,7 +47,7 @@ export function IssueRecoveryCode({ user }: { user: UserPublic }) {
           issued && {
             title: `Recovery code for ${user.email}`,
             description:
-              "Give it to them yourself. They enter it with their email under “Have a recovery code?” and make a new passkey.",
+              "Give it to them yourself. They enter it with their email under “Use a recovery code” and make a new passkey.",
             noun: "code",
             fieldLabel: "Recovery code",
             consequence: "you would have to issue another",

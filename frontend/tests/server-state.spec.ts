@@ -80,13 +80,15 @@ test("Signing in as someone else in the same tab shows none of the first account
   await page.waitForURL("/login")
 
   await addVirtualAuthenticator(page)
-  await page.getByRole("link", { name: "Create account" }).click()
+  await page.getByRole("link", { name: "Create an account" }).click()
   // The sign-in screen has an email field too: fill the one on sign-up.
   await expect(
     page.getByRole("heading", { name: "Create an account" }),
   ).toBeVisible()
   await page.getByTestId("email-input").fill(randomEmail())
-  await page.getByRole("button", { name: "Create account" }).click()
+  await page
+    .getByRole("button", { name: "Create a passkey and sign in" })
+    .click()
   await page.waitForURL("/")
 
   await goVia(page, "Projects")

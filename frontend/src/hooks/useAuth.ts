@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
 
+import { UsersService } from "@/client"
 import {
   recoverAccount,
   registerAccount,
@@ -39,9 +40,18 @@ const useAuth = () => {
   })
 
   const registerMutation = useMutation({
-    mutationFn: (email: string) => registerAccount(email),
-    onSuccess: (token) => {
+    mutationFn: ({ email }: { email: string; name?: string }) =>
+      registerAccount(email),
+    onSuccess: async (token, { name }) => {
       startSession(token)
+      // The ceremony takes an email alone (FR-12.2); a name given beside it
+      // is set on the new account once it is signed in. Without it the
+      // account is as good: the name can be set in Settings.
+      if (name) {
+        await UsersService.updateUserMe({ body: { full_name: name } }).catch(
+          () => undefined,
+        )
+      }
       navigate({ to: "/" })
     },
     onError: reportUnlessDismissed,
@@ -60,7 +70,7 @@ const useAuth = () => {
         hash: "passkeys",
       })
     },
-    onError: reportUnlessDismissed,
+    // No notice: the recovery screen says the refusal beside the code.
   })
 
   const logout = () => {

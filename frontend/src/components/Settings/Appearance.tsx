@@ -10,59 +10,71 @@ const THEMES: { value: Theme; label: string; testId?: string }[] = [
 ]
 
 /**
- * How Taskly looks: System, Light or Dark, the chosen one by weight alone
- * (DESIGN.md: nothing but weight marks the current one). A radio group, so a
- * screen reader hears the three as one choice and the arrow keys walk them.
+ * How Taskly looks, as a row of Settings' Profile.
  */
 export function Appearance() {
+  return (
+    <PropertyRow label="Appearance">
+      <AppearanceChoice />
+    </PropertyRow>
+  )
+}
+
+/**
+ * System, Light or Dark, the chosen one by weight alone (DESIGN.md: nothing
+ * but weight marks the current one). A radio group, so a screen reader hears
+ * the three as one choice and the arrow keys walk them.
+ *
+ * On its own so that a place with no property list around it can use it:
+ * the sign-in screens set it at their foot, where there is no account to keep
+ * a preference on. Both write the theme provider's own storage, so a choice
+ * made at either carries to the other.
+ */
+export function AppearanceChoice({ className }: { className?: string }) {
   const { theme, setTheme } = useTheme()
 
   return (
-    <PropertyRow label="Appearance">
-      <div
-        role="radiogroup"
-        aria-label="Appearance"
-        className="flex gap-3.5 text-sm"
-      >
-        {THEMES.map(({ value, label, testId }) => {
-          const on = theme === value
-          return (
-            // biome-ignore lint/a11y/useSemanticElements: a styled text choice, not a native radio
-            <button
-              key={value}
-              type="button"
-              role="radio"
-              aria-checked={on}
-              data-testid={testId}
-              tabIndex={on ? 0 : -1}
-              onClick={() => setTheme(value)}
-              onKeyDown={(event) => {
-                const keys = ["ArrowRight", "ArrowDown", "ArrowLeft", "ArrowUp"]
-                if (!keys.includes(event.key)) return
-                event.preventDefault()
-                const step =
-                  event.key === "ArrowRight" || event.key === "ArrowDown"
-                    ? 1
-                    : -1
-                const at = THEMES.findIndex((t) => t.value === value)
-                const next = THEMES[(at + step + THEMES.length) % THEMES.length]
-                setTheme(next.value)
-                const group = event.currentTarget.parentElement
-                group
-                  ?.querySelectorAll<HTMLButtonElement>('[role="radio"]')
-                  [THEMES.indexOf(next)]?.focus()
-              }}
-              className={cn(
-                textLink,
-                "pointer-coarse:-my-3 pointer-coarse:py-3",
-                on ? "text-ink font-semibold" : "text-ink-3 hover:text-ink",
-              )}
-            >
-              {label}
-            </button>
-          )
-        })}
-      </div>
-    </PropertyRow>
+    <div
+      role="radiogroup"
+      aria-label="Appearance"
+      className={cn("flex gap-3.5 text-sm", className)}
+    >
+      {THEMES.map(({ value, label, testId }) => {
+        const on = theme === value
+        return (
+          // biome-ignore lint/a11y/useSemanticElements: a styled text choice, not a native radio
+          <button
+            key={value}
+            type="button"
+            role="radio"
+            aria-checked={on}
+            data-testid={testId}
+            tabIndex={on ? 0 : -1}
+            onClick={() => setTheme(value)}
+            onKeyDown={(event) => {
+              const keys = ["ArrowRight", "ArrowDown", "ArrowLeft", "ArrowUp"]
+              if (!keys.includes(event.key)) return
+              event.preventDefault()
+              const step =
+                event.key === "ArrowRight" || event.key === "ArrowDown" ? 1 : -1
+              const at = THEMES.findIndex((t) => t.value === value)
+              const next = THEMES[(at + step + THEMES.length) % THEMES.length]
+              setTheme(next.value)
+              const group = event.currentTarget.parentElement
+              group
+                ?.querySelectorAll<HTMLButtonElement>('[role="radio"]')
+                [THEMES.indexOf(next)]?.focus()
+            }}
+            className={cn(
+              textLink,
+              "pointer-coarse:-my-3 pointer-coarse:py-3",
+              on ? "text-ink font-semibold" : "text-ink-3 hover:text-ink",
+            )}
+          >
+            {label}
+          </button>
+        )
+      })}
+    </div>
   )
 }

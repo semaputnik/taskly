@@ -1,5 +1,8 @@
 import { expect, type Page, test } from "@playwright/test"
-import { addVirtualAuthenticator } from "./utils/passkeys.ts"
+import {
+  addVirtualAuthenticator,
+  withoutPasskeySupport,
+} from "./utils/passkeys.ts"
 import { createUser, recoveryCodeFor } from "./utils/privateApi.ts"
 import { randomEmail } from "./utils/random"
 
@@ -7,7 +10,7 @@ test.use({ storageState: { cookies: [], origins: [] } })
 
 async function recover(page: Page, email: string, code: string) {
   await page.goto("/login")
-  await page.getByRole("link", { name: "Have a recovery code?" }).click()
+  await page.getByRole("link", { name: "Use a recovery code" }).click()
   // The sign-in screen has an email field too: fill the one on recovery.
   await expect(
     page.getByRole("heading", { name: "Recover your account" }),
@@ -44,10 +47,36 @@ test("A wrong code is refused", async ({ page }) => {
 
   await recover(page, email, "AAAA-AAAA-AAAA-AAAA")
 
-  await expect(
-    page.getByText("This email and recovery code do not match a live code."),
-  ).toBeVisible()
+  // Said beside the code that was refused, not in a notice that fades.
+  await expect(page.getByRole("alert")).toHaveText(
+    "This email and recovery code do not match a live code.",
+  )
   await expect(page).toHaveURL(/\/recover/)
+})
+
+test("The recovery screen sets the code in mono and offers the way back", async ({
+  page,
+}) => {
+  await page.goto("/recover")
+
+  await expect(page.getByRole("textbox", { name: "Code" })).toHaveCSS(
+    "font-family",
+    /mono/i,
+  )
+  await expect(page.getByRole("textbox", { name: "Email" })).toBeVisible()
+  await page.getByRole("link", { name: "Back to sign in" }).click()
+  await expect(page).toHaveURL(/\/login/)
+})
+
+test("A browser without passkeys cannot recover", async ({ page }) => {
+  await withoutPasskeySupport(page)
+  await page.goto("/recover")
+
+  await expect(page.getByTestId("passkeys-unsupported")).toBeVisible()
+  await expect(page.getByTestId("recovery-code-input")).toHaveCount(0)
+  await expect(
+    page.getByRole("button", { name: "Create a new passkey" }),
+  ).toHaveCount(0)
 })
 
 test("The superuser issues a code that gets a user back in", async ({
