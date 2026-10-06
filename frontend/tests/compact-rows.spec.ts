@@ -134,12 +134,12 @@ test("An overdue line says how late up to a fortnight, then the date, and is red
 
   // Red is said once on an overdue line: the P1 mark is ink there, while
   // another priority keeps its hue.
-  await expect(
-    recent.getByRole("checkbox").locator("svg"),
-  ).not.toHaveClass(/text-priority-p1/)
-  await expect(
-    old.getByRole("checkbox").locator("svg"),
-  ).toHaveClass(/text-priority-p2/)
+  await expect(recent.getByRole("checkbox").locator("svg")).not.toHaveClass(
+    /text-priority-p1/,
+  )
+  await expect(old.getByRole("checkbox").locator("svg")).toHaveClass(
+    /text-priority-p2/,
+  )
 })
 
 test("A kept task's status mark carries its priority's hue, and is not a control", async ({

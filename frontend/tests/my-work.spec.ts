@@ -113,9 +113,9 @@ test("With nothing on the reader, one muted line stands in place of the panel", 
 
   // No heading and no rule over a count of zero: one line, and nothing else.
   await expect(page.getByText("Nothing is in your hands.")).toBeVisible()
-  await expect(
-    page.getByRole("heading", { name: /In my hands/ }),
-  ).toHaveCount(0)
+  await expect(page.getByRole("heading", { name: /In my hands/ })).toHaveCount(
+    0,
+  )
 })
 
 test("A bot user's hand-over is named, and Close it closes the task with an Undo", async ({

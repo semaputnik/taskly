@@ -335,8 +335,12 @@ test("Changes lists the bot users' entries newest first, folds the reader's own 
   await expect(own).toBeVisible()
   await expect(own.locator("xpath=..")).toHaveText(/^and 3 changes of yours/)
   expect(
-    await own.evaluate((node) => getComputedStyle(node.parentElement ?? node).color),
-  ).not.toBe(await lines.first().evaluate((node) => getComputedStyle(node).color))
+    await own.evaluate(
+      (node) => getComputedStyle(node.parentElement ?? node).color,
+    ),
+  ).not.toBe(
+    await lines.first().evaluate((node) => getComputedStyle(node).color),
+  )
 
   // In the dark theme too. A reload is the same visit, so the log holds.
   await page.evaluate(() => localStorage.setItem("vite-ui-theme", "dark"))
@@ -379,7 +383,9 @@ test("Changes with only the reader's own changes says so in one quiet line", asy
     log.getByRole("link", { name: /1 change of yours/ }),
   ).toBeVisible()
   await expect(log.getByRole("link", { name: "Full log" })).toBeVisible()
-  await expect(page.getByText("No bot user has changed anything yet.")).toBeVisible()
+  await expect(
+    page.getByText("No bot user has changed anything yet."),
+  ).toBeVisible()
 })
 
 test("An empty Changes log says so and points at bot users", async ({
