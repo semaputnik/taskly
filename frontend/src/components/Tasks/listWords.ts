@@ -26,7 +26,7 @@ export function counts({ open, backlog, onBots, overdue }: ListCounts): {
   if (open === 0) return { lead: "Nothing is open.", rest: "" }
   const parts = [
     backlog > 0 && `${backlog} in Backlog`,
-    onBots > 0 && `${onBots} on bot users`,
+    onBots > 0 && (onBots === 1 ? "1 on a bot user" : `${onBots} on bot users`),
     overdue > 0 && `${overdue} overdue`,
   ].filter(Boolean)
   return {

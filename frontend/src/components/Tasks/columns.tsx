@@ -18,17 +18,11 @@ interface ColumnOptions {
    * are read-only until it is unarchived (FR-05.12).
    */
   readOnly?: boolean
-  /**
-   * Completing a task takes its row out of this table, so the checkbox
-   * confirms the move and offers the way back (ADR-0006).
-   */
-  receipt?: boolean
 }
 
 export function getColumns(
   projectNames: Record<string, string>,
-  _depths: Record<string, number>,
-  { readOnly = false, receipt = false }: ColumnOptions = {},
+  { readOnly = false }: ColumnOptions = {},
 ): ColumnDef<DataTableFeatures, TaskPublic>[] {
   const columns: ColumnDef<DataTableFeatures, TaskPublic>[] = [
     {
@@ -36,9 +30,6 @@ export function getColumns(
       header: "Title",
       cell: ({ row }) => (
         <div className="flex items-center gap-2">
-          {/* Completion sits with the task it is about. The checkbox in the
-              first column selects the row for a batch, which is what a square
-              check means in a list that can act on many rows at once. */}
           {readOnly ? (
             <Checkbox
               className="rounded-full"
@@ -47,7 +38,7 @@ export function getColumns(
               aria-label={STATUS_LABELS[row.original.status]}
             />
           ) : (
-            <CompleteTask task={row.original} receipt={receipt} />
+            <CompleteTask task={row.original} />
           )}
           {/* A subtask says so for itself. Indenting it instead would claim a
               parent–child relationship the row above may not have: sorting or

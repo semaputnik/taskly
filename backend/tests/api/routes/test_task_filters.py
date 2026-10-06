@@ -616,3 +616,57 @@ def test_filter_by_an_empty_title_is_refused(client: TestClient, db: Session) ->
         f"{settings.API_V1_STR}/tasks/", headers=headers, params={"title": ""}
     )
     assert r.status_code == 422
+
+
+def test_filter_by_a_blank_title_is_refused(client: TestClient, db: Session) -> None:
+    headers = new_user_headers(client, db)
+
+    for blank in (" ", "   ", "\t"):
+        r = client.get(
+            f"{settings.API_V1_STR}/tasks/", headers=headers, params={"title": blank}
+        )
+        assert r.status_code == 422
+
+
+def test_filter_by_title_ignores_the_spaces_around_the_text(
+    client: TestClient, db: Session
+) -> None:
+    headers = new_user_headers(client, db)
+    create_task_record(client, headers, "Invoice the client")
+    create_task_record(client, headers, "Water the plants")
+
+    assert _titles(client, headers, title="  invoice ") == ["Invoice the client"]
+
+
+def test_being_on_a_bot_user_and_on_the_owner_at_once_is_refused(
+    client: TestClient, db: Session
+) -> None:
+    headers = new_user_headers(client, db)
+    user_id = my_id(client, headers)
+
+    r = client.get(
+        f"{settings.API_V1_STR}/tasks/",
+        headers=headers,
+        params={"assigned_to_bots": True, "assignee_id": user_id},
+    )
+    assert r.status_code == 422
+
+
+def test_being_on_bot_users_and_on_one_of_them_is_allowed(
+    client: TestClient, db: Session
+) -> None:
+    headers = new_user_headers(client, db)
+    project_id = create_project(client, headers, "Work")
+    bot = create_bot_user(
+        client,
+        headers,
+        project_ids=[project_id],
+        permissions=ALL_PERMISSIONS,
+        name="the-bot",
+    )
+    create_task_record(client, headers, "On the bot", assignee_id=bot["id"])
+    create_task_record(client, headers, "Nobody's")
+
+    assert _titles(client, headers, assigned_to_bots=True, assignee_id=bot["id"]) == [
+        "On the bot"
+    ]

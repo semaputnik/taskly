@@ -244,6 +244,7 @@ describe("the meta line", () => {
         kind: "assignee",
         text: "release-bot → you",
         handover: true,
+        name: "release-bot",
       })
     })
 

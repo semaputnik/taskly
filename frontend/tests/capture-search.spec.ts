@@ -229,7 +229,7 @@ test("A fast typist makes few requests, and a late answer never replaces a newer
   asked.length = 0
   await line(page).fill("")
   await line(page).pressSequentially("redirect", { delay: 10 })
-  await expect.poll(() => asked.at(-1)).toBe("redirect")
+  await expect.poll(() => asked[asked.length - 1]).toBe("redirect")
   await expect(matches(page).getByRole("option")).toHaveCount(2)
   // Eight keystrokes, at most two requests, never one per key.
   expect(asked.length).toBeLessThanOrEqual(2)

@@ -5,15 +5,9 @@ import {
   tableFeatures,
   useTable,
 } from "@tanstack/react-table"
-import {
-  ArrowDown,
-  ArrowUp,
-  ChevronsUpDown,
-  MoveHorizontal,
-} from "lucide-react"
+import { MoveHorizontal } from "lucide-react"
 
 import { type RecordKind, useRecordPanels } from "@/components/Records/panels"
-import { Checkbox } from "@/components/ui/checkbox"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
   Table,
@@ -31,26 +25,6 @@ import { cn } from "@/lib/utils"
 const features = tableFeatures({})
 
 export type DataTableFeatures = typeof features
-
-/** Selecting rows, for a table whose rows can be acted on as a batch. */
-export interface DataTableSelection<TData> {
-  /** The selected ids, which may reach beyond the page on screen. */
-  ids: ReadonlySet<string>
-  idOf: (row: TData) => string
-  label: (row: TData) => string
-  onToggle: (id: string, selected: boolean) => void
-  /** Select or clear every row on this page. */
-  onTogglePage: (ids: string[], selected: boolean) => void
-}
-
-/** Sorting a table by its headers, applied by the server. */
-export interface DataTableSorting {
-  /** Column id → the field the API sorts by. */
-  fields: Record<string, string>
-  field?: string
-  descending?: boolean
-  onSort: (field: string) => void
-}
 
 interface DataTableProps<TData extends RowData> {
   columns: ColumnDef<DataTableFeatures, TData, unknown>[]
@@ -81,8 +55,6 @@ interface DataTableProps<TData extends RowData> {
   pending?: boolean
   /** How many rows to expect, so the skeleton reserves the right height. */
   pendingRows?: number
-  selection?: DataTableSelection<TData>
-  sorting?: DataTableSorting
   /** Names the sideways scroll, for a table too wide for a narrow screen. */
   scrollLabel?: string
 }
@@ -93,7 +65,7 @@ interface DataTableProps<TData extends RowData> {
  * the rule in one place, rather than making every cell remember to stop
  * propagation.
  */
-const INTERACTIVE = 'button, a, input, select, textarea, [role="checkbox"]'
+const INTERACTIVE = "button, a, input, select, textarea"
 
 /**
  * A cell's content, called rather than mounted when it is a plain function.
@@ -126,17 +98,12 @@ export function DataTable<TData extends RowData>({
   rowLabel,
   pending = false,
   pendingRows = 5,
-  selection,
-  sorting,
   scrollLabel,
 }: DataTableProps<TData>) {
   const table = useTable({ features, data, columns })
   const { idOf } = useRecordPanels()
   const openId = opens ? idOf(opens) : null
-  const pageIds = selection ? data.map(selection.idOf) : []
-  const wholePage =
-    pageIds.length > 0 && pageIds.every((id) => selection?.ids.has(id))
-  const columnCount = columns.length + (selection ? 1 : 0)
+  const columnCount = columns.length
 
   return (
     <>
@@ -148,66 +115,16 @@ export function DataTable<TData extends RowData>({
         <TableHeader>
           {table.getHeaderGroups().map((headerGroup) => (
             <TableRow key={headerGroup.id} className="hover:bg-transparent">
-              {selection && (
-                <TableHead className="w-10">
-                  <Checkbox
-                    checked={wholePage}
-                    disabled={pageIds.length === 0}
-                    aria-label="Select every task on this page"
-                    onCheckedChange={(checked) =>
-                      selection.onTogglePage(pageIds, checked === true)
-                    }
-                  />
+              {headerGroup.headers.map((header) => (
+                <TableHead key={header.id}>
+                  {header.isPlaceholder
+                    ? null
+                    : flexRender(
+                        header.column.columnDef.header,
+                        header.getContext(),
+                      )}
                 </TableHead>
-              )}
-              {headerGroup.headers.map((header) => {
-                const field = sorting?.fields[header.column.id]
-                const active = field !== undefined && sorting?.field === field
-                const content = header.isPlaceholder
-                  ? null
-                  : flexRender(
-                      header.column.columnDef.header,
-                      header.getContext(),
-                    )
-                return (
-                  <TableHead
-                    key={header.id}
-                    aria-sort={
-                      active
-                        ? sorting?.descending
-                          ? "descending"
-                          : "ascending"
-                        : field
-                          ? "none"
-                          : undefined
-                    }
-                  >
-                    {field && sorting ? (
-                      <button
-                        type="button"
-                        onClick={() => sorting.onSort(field)}
-                        className="hover:text-foreground focus-visible:ring-ring -mx-1 flex items-center gap-1 rounded px-1 tracking-[inherit] uppercase outline-none focus-visible:ring-2"
-                      >
-                        {content}
-                        {active ? (
-                          sorting.descending ? (
-                            <ArrowDown className="size-3.5" aria-hidden />
-                          ) : (
-                            <ArrowUp className="size-3.5" aria-hidden />
-                          )
-                        ) : (
-                          <ChevronsUpDown
-                            className="size-3.5 opacity-50"
-                            aria-hidden
-                          />
-                        )}
-                      </button>
-                    ) : (
-                      content
-                    )}
-                  </TableHead>
-                )
-              })}
+              ))}
             </TableRow>
           ))}
         </TableHeader>
@@ -220,13 +137,9 @@ export function DataTable<TData extends RowData>({
             />
           ) : table.getRowModel().rows.length ? (
             table.getRowModel().rows.map((row) => {
-              const id = selection?.idOf(row.original)
-              const selected =
-                id !== undefined && Boolean(selection?.ids.has(id))
               return (
                 <TableRow
                   key={row.id}
-                  data-state={selected ? "selected" : undefined}
                   data-open={
                     openId !== null &&
                     (row.original as { id?: string }).id === openId
@@ -262,17 +175,6 @@ export function DataTable<TData extends RowData>({
                       : undefined
                   }
                 >
-                  {selection && id !== undefined && (
-                    <TableCell className="w-10">
-                      <Checkbox
-                        checked={selected}
-                        aria-label={selection.label(row.original)}
-                        onCheckedChange={(checked) =>
-                          selection.onToggle(id, checked === true)
-                        }
-                      />
-                    </TableCell>
-                  )}
                   {row.getAllCells().map((cell) => (
                     <TableCell key={cell.id}>
                       {renderCell(

@@ -524,7 +524,7 @@ export function TaskFilters({
     projects
       ? (projects.data.find((project) => project.id === id)?.name ??
         "Unknown project")
-      : "Project"
+      : "Loading…"
   // Tag names are free text, so a tag could be called "any". The menu holds
   // ids to keep the sentinel out of the reader's namespace; the URL keeps the
   // name, which is what the API filters by.

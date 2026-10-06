@@ -345,8 +345,6 @@ export type Change =
   | { type: "task changed"; taskId: string }
   | { type: "task created" }
   | { type: "task deleted"; taskId: string }
-  /** A batch changed or deleted a selection of tasks. */
-  | { type: "tasks changed in bulk" }
   | { type: "tag created" }
   /** A tag was renamed, merged or deleted. */
   | { type: "tag changed" }
@@ -384,7 +382,6 @@ export function staleKeys(change: Change): QueryKey[] {
       ]
     case "task created":
       return roots(ROOT.tasks, ROOT.activity, ...COUNTS)
-    case "tasks changed in bulk":
     case "deletion restored":
       return roots(ROOT.tasks, ROOT.task, ROOT.activity, ...COUNTS)
     case "tag created":

@@ -77,7 +77,7 @@ test("The page says how much is open, in Backlog, on bot users and overdue", asy
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Tasks")
   await expect(page.getByText("4 open.")).toBeVisible()
   await expect(
-    page.getByText("2 in Backlog, 1 on bot users, 1 overdue."),
+    page.getByText("2 in Backlog, 1 on a bot user, 1 overdue."),
   ).toBeVisible()
 })
 
@@ -561,4 +561,27 @@ test("Down and Up walk the list in the order the lines are drawn", async ({
   await expect(
     taskLines(page).getByRole("link", { name: "Root", exact: true }),
   ).toHaveAttribute("aria-current", "page")
+})
+
+test("A failed fetch says the tasks could not be loaded, not that there are none", async ({
+  page,
+}) => {
+  await newUser(page)
+  await seedTasks(page, 1)
+  let failing = true
+  await page.route("**/api/v1/tasks/?*", (route) =>
+    failing ? route.fulfill({ status: 500, body: "{}" }) : route.continue(),
+  )
+  await page.goto("/tasks")
+
+  const alert = page.getByRole("alert").filter({
+    hasText: "The tasks could not be loaded",
+  })
+  await expect(alert).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByText("No tasks yet")).toHaveCount(0)
+
+  failing = false
+  await alert.getByRole("button", { name: "Try again" }).click()
+  await expect(taskLine(page, "Task 00")).toBeVisible()
+  await expect(alert).toHaveCount(0)
 })

@@ -460,6 +460,10 @@ export class TasksService {
      * Retrieve the current user's tasks, across all of their projects, narrowed
      * and ordered by the query.
      *
+     * With no `sort`, the newest filed task comes first. (Before the task list
+     * became a list of lines this was the most pressing first; ask for
+     * `sort=priority` to get that order.)
+     *
      * A bot user gets only the tasks of the projects in its scope, and never the
      * archive.
      */

@@ -145,9 +145,21 @@ def read_tasks(
     Retrieve the current user's tasks, across all of their projects, narrowed
     and ordered by the query.
 
+    With no `sort`, the newest filed task comes first. (Before the task list
+    became a list of lines this was the most pressing first; ask for
+    `sort=priority` to get that order.)
+
     A bot user gets only the tasks of the projects in its scope, and never the
     archive.
     """
+    if query.assigned_to_bots and query.assignee_id == caller.owner_id:
+        # The owner is never a bot user, so the two could only list nothing;
+        # that is a question to refuse, not an empty answer. (A bot user's id
+        # alongside is fine: it narrows to that one.)
+        raise HTTPException(
+            status_code=422,
+            detail="Ask for tasks on bot users or for the owner's, not both",
+        )
     if query.archived:
         access.refuse_archived_for_bot(caller)
     if query.project_id is not None:
