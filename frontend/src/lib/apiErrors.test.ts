@@ -2,7 +2,6 @@ import { describe, expect, test } from "bun:test"
 import { AxiosError, AxiosHeaders } from "axios"
 
 import {
-  batchRefusals,
   isRefusal,
   isSessionGone,
   Refusal,
@@ -45,14 +44,6 @@ const responses = {
   invalid: answered(422, [
     { loc: ["body", "title"], msg: "Field required", type: "missing" },
   ]),
-  bulk: answered(409, {
-    code: "bulk_refused",
-    message: "2 of the tasks could not be changed, so none of them were.",
-    refusals: [
-      { task_id: "a", code: "project_archived", message: "“A” is archived." },
-      { task_id: "b", code: "not_found", message: "Gone." },
-    ],
-  }),
   rateLimited: answered(429, "Too many requests"),
   network: new AxiosError("Network Error", "ERR_NETWORK"),
   plain: new Error(""),
@@ -81,7 +72,6 @@ describe("was it refused for what was asked", () => {
       "notFound",
       "openSubtasks",
       "invalid",
-      "bulk",
     ])
   })
 })
@@ -90,7 +80,6 @@ describe("which code", () => {
   test("is the one the detail carries, if any", () => {
     expect(refusalCode(responses.outsideScope)).toBe("outside_scope")
     expect(refusalCode(responses.openSubtasks)).toBe(Refusal.OPEN_SUBTASKS)
-    expect(refusalCode(responses.bulk)).toBe(Refusal.BULK_REFUSED)
     for (const error of [
       responses.sessionGone,
       responses.notFound,
@@ -123,16 +112,5 @@ describe("what to tell the reader", () => {
     expect(refusalMessage(responses.plain)).toBe(
       "The request did not reach the server.",
     )
-  })
-})
-
-describe("per-item refusals", () => {
-  test("are a batch's, and nothing else's", () => {
-    expect(batchRefusals(responses.bulk)).toEqual([
-      { task_id: "a", code: "project_archived", message: "“A” is archived." },
-      { task_id: "b", code: "not_found", message: "Gone." },
-    ])
-    expect(batchRefusals(responses.openSubtasks)).toBeNull()
-    expect(batchRefusals(responses.network)).toBeNull()
   })
 })

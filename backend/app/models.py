@@ -590,8 +590,11 @@ class TaskQuery(SQLModel):
     reporter_id: uuid.UUID | None = None
     tag: str | None = None
     # Titles that contain this text, whatever its case (FR-06.14). Only the
-    # title is searched, and blank text is refused rather than matching all.
-    title: str | None = Field(default=None, min_length=1)
+    # title is searched. The spaces around the text are not part of it, and
+    # blank text is refused rather than matching all.
+    title: (
+        Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)] | None
+    ) = None
     priority: TaskPriority | None = None
     # Any of the listed statuses matches; none listed means every status. A
     # list rather than an "open" flag, so a client can ask for exactly the

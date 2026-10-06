@@ -13,7 +13,7 @@ describe("the counts sentence", () => {
   test("leaves out what there is none of", () => {
     expect(counts({ open: 5, backlog: 0, onBots: 1, overdue: 0 })).toEqual({
       lead: "5 open.",
-      rest: "1 on bot users.",
+      rest: "1 on a bot user.",
     })
     expect(counts({ open: 5, backlog: 0, onBots: 0, overdue: 0 })).toEqual({
       lead: "5 open.",

@@ -161,6 +161,13 @@ export function CaptureLine({ opens }: { opens?: "down" | "up" }) {
     panels.openTask(task.id)
   }
 
+  // A newer answer that no longer holds the highlighted task ends the
+  // highlight. It is not only hidden: left set, it would come back on the
+  // task if a later answer listed it again, and Enter would open a task the
+  // reader had not chosen.
+  if (activeId !== null && !matches.some((task) => task.id === activeId)) {
+    setActiveId(null)
+  }
   const active = open ? matches.findIndex((task) => task.id === activeId) : -1
   const chosen = active >= 0 ? matches[active] : undefined
   const optionId = (index: number) => `${listId}-${index}`
@@ -172,7 +179,7 @@ export function CaptureLine({ opens }: { opens?: "down" | "up" }) {
         // Pinned on a phone: the ground and a hairline over the list, the
         // keyboard's height as its offset, the home indicator's as its foot
         // (which a keyboard covers, so it counts for nothing then).
-        "max-md:bg-page max-md:border-rule-strong max-md:fixed max-md:inset-x-0 max-md:bottom-[var(--kb-inset,0px)] max-md:z-30 max-md:border-t max-md:px-4 max-md:pb-[max(0px,calc(env(safe-area-inset-bottom)-var(--kb-inset,0px)))]",
+        "max-md:bg-page max-md:border-rule-strong max-md:focus-within:border-ink max-md:fixed max-md:inset-x-0 max-md:bottom-[var(--kb-inset,0px)] max-md:z-30 max-md:border-t max-md:px-4 max-md:pb-[max(0px,calc(env(safe-area-inset-bottom)-var(--kb-inset,0px)))]",
         "max-md:group-has-[[data-record-column]]/shell:hidden",
       )}
     >
@@ -295,11 +302,15 @@ export function CaptureLine({ opens }: { opens?: "down" | "up" }) {
                 ))}
               </div>
             )}
-            <div className="text-ink-3 border-rule mt-1 flex justify-between gap-3 border-t px-3.5 pt-2 pb-1 text-xs">
-              <span className="min-w-0 truncate">
+            <div className="text-ink-3 border-rule mt-1 flex flex-wrap justify-between gap-x-3 gap-y-1 border-t px-3.5 pt-2 pb-1 text-xs">
+              <span className="min-w-0">
                 <KeyCap className="pointer-coarse:hidden">↵</KeyCap>
                 <span className="hidden pointer-coarse:inline">Return</span>{" "}
-                creates “{title.trim()}” in {target.projectName}
+                creates “
+                <span className="inline-block max-w-40 truncate align-bottom">
+                  {title.trim()}
+                </span>
+                ” in {target.projectName}
               </span>
               <span className="shrink-0 pointer-coarse:hidden">
                 <KeyCap>↑</KeyCap>

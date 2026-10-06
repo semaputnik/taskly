@@ -44,8 +44,8 @@ const FACT: Record<
  * beneath it a quiet meta line — subtask progress, due day, recurrence and
  * tags, each a small glyph and its value, then who the task is with, in
  * words, with the project at the far right
- * as a neutral square and its name. A line with nothing to say in its meta
- * is one line tall.
+ * as a neutral square and its name. The project is always there, so a line
+ * is two lines tall even when it has nothing else to say.
  *
  * It is the dashboard's line and the task list's compact view. It opens the
  * task from its title, never the whole line: the line also holds the mark,
@@ -205,14 +205,16 @@ export function Assignee({
   return (
     <span
       className={cn(
-        "max-w-32 min-w-0 truncate sm:max-w-64",
+        "flex max-w-32 min-w-0 sm:max-w-64",
         fact.handover && "text-ink-2",
       )}
     >
       <span className="sr-only">
         {fact.handover ? "Handed over by:" : "Assigned to:"}
       </span>
-      {fact.text}
+      {/* The arrow is the hand-over; a long name gives way before it does. */}
+      <span className="min-w-0 truncate">{fact.name ?? fact.text}</span>
+      {fact.name && <span className="shrink-0 whitespace-pre"> → you</span>}
     </span>
   )
 }

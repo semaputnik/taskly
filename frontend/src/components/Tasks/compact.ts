@@ -89,7 +89,7 @@ function describeAssignee(
     Partial<TaskPublic>,
     "status" | "assignee_id" | "assignee_bot_user" | "handover"
   >,
-): { text: string; handover: boolean } | null {
+): { text: string; handover: boolean; name?: string } | null {
   if (task.assignee_bot_user) {
     return { text: task.assignee_bot_user.name, handover: false }
   }
@@ -98,6 +98,8 @@ function describeAssignee(
     return {
       text: `${task.handover.bot_user.name} → you`,
       handover: true,
+      // The name alone, so a long one can give way before the arrow does.
+      name: task.handover.bot_user.name,
     }
   }
   return { text: "you", handover: false }
@@ -116,7 +118,7 @@ export type MetaFact =
    * Whose task it is (FR-06.13). `handover` is the "bot → you" form, which
    * the line sets in a heavier grey than the other two.
    */
-  | { kind: "assignee"; text: string; handover: boolean }
+  | { kind: "assignee"; text: string; handover: boolean; name?: string }
 
 /**
  * The line beneath a task's title: its facts, then the project it sits in,

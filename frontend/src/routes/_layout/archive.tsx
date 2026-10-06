@@ -60,11 +60,11 @@ function ArchivedTasksContent() {
   const projectNames = Object.fromEntries(
     projects.data.map((project) => [project.id, project.name]),
   )
-  const { tasks: ordered, depths } = buildTaskTree(tasks.data)
+  const { tasks: ordered } = buildTaskTree(tasks.data)
 
   return (
     <DataTable
-      columns={getColumns(projectNames, depths, { readOnly: true })}
+      columns={getColumns(projectNames, { readOnly: true })}
       data={ordered}
       empty={
         <EmptyState

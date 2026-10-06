@@ -94,7 +94,12 @@ function Tasks() {
   const waitingForMe =
     (search.assignee === "me" || search.reporter === "me") && !currentUser
   const filters = filtersQuery(search, currentUser?.id)
-  const { data: tasks, isPending } = useQuery({
+  const {
+    data: tasks,
+    isPending,
+    isError,
+    refetch,
+  } = useQuery({
     ...tasksQuery({
       ...filters,
       // The page the reader is on, asked for as such: a list that fetches a
@@ -186,6 +191,21 @@ function Tasks() {
             <CompactTaskRowPending key={index} flush />
           ))}
         </div>
+      ) : isError && !tasks ? (
+        // A failed fetch is not an empty account: say so, and offer the retry.
+        <div role="alert" className="border-rule border-b py-8">
+          <p className="font-medium">The tasks could not be loaded</p>
+          <p className="text-ink-3 mt-1">
+            Nothing is lost.{" "}
+            <button
+              type="button"
+              onClick={() => void refetch()}
+              className={cn(textLink, "text-ink underline")}
+            >
+              Try again
+            </button>
+          </p>
+        </div>
       ) : rows.length > 0 ? (
         // A list, so assistive technology hears how many tasks there are and
         // where each begins.
@@ -254,7 +274,7 @@ function PagerButton({
       onClick={onClick}
       className={cn(
         textLink,
-        "hover:text-ink focus-visible:text-ink disabled:pointer-events-none disabled:opacity-40",
+        "hover:text-ink focus-visible:text-ink disabled:pointer-events-none disabled:opacity-40 pointer-coarse:-my-3.5 pointer-coarse:px-2 pointer-coarse:py-3.5",
       )}
     >
       {children}
@@ -311,8 +331,8 @@ function Empty({
       : [
           "No tasks yet",
           <>
-            Writing one down takes a title: type it in the line above. Or let a
-            bot user file them for you through the REST API.{" "}
+            Writing one down takes a title: type it in the Add a task line. Or
+            let a bot user file them for you through the REST API.{" "}
             <RouterLink
               to="/bots"
               className={cn(textLink, "text-ink underline")}
