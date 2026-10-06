@@ -363,7 +363,7 @@ def passkey_summaries(
             func.max(col(Passkey.last_used_at)),
         )
         .where(col(Passkey.user_id).in_(user_ids))  # type: ignore[attr-defined]
-        .group_by(Passkey.user_id)
+        .group_by(col(Passkey.user_id))
     ).all()
     return {user_id: (count, last) for user_id, count, last in rows}
 
