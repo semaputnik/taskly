@@ -205,20 +205,37 @@ function Tasks() {
             {count === 1 ? "1 task" : `${count} tasks`}
             {count > PAGE_SIZE && ` · page ${page} of ${lastPage}`}
           </p>
-          <div className="ml-auto flex gap-3.5">
-            <PagerButton
-              disabled={page <= 1}
-              onClick={() => goToPage(page - 1)}
+          {/* Beside the count, where a reader looks to see how many tasks
+              are left: a narrowed list says so here, and can be widened. */}
+          {!noFilters && (
+            <button
+              type="button"
+              onClick={() => applyFilters(clearedFilters())}
+              className={cn(
+                textLink,
+                "hover:text-ink focus-visible:text-ink pointer-coarse:-my-3.5 pointer-coarse:px-2 pointer-coarse:py-3.5",
+              )}
             >
-              Previous
-            </PagerButton>
-            <PagerButton
-              disabled={page >= lastPage}
-              onClick={() => goToPage(page + 1)}
-            >
-              Next
-            </PagerButton>
-          </div>
+              Clear filters
+            </button>
+          )}
+          {/* Only past one page: with one, there is nowhere to go. */}
+          {count > PAGE_SIZE && (
+            <div className="ml-auto flex gap-3.5">
+              <PagerButton
+                disabled={page <= 1}
+                onClick={() => goToPage(page - 1)}
+              >
+                Previous
+              </PagerButton>
+              <PagerButton
+                disabled={page >= lastPage}
+                onClick={() => goToPage(page + 1)}
+              >
+                Next
+              </PagerButton>
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -92,6 +92,43 @@ test("A compact row shows subtasks, due day, tags and project, and its status ma
   ).toHaveClass(/text-priority-p3/)
 })
 
+test("A status mark names its status in a tip on hover and on keyboard focus, and its name is not said twice", async ({
+  page,
+}) => {
+  await newUser(page)
+  const api = await userApi(page)
+  await api.create("/tasks/", { title: "Look into it", status: "in_progress" })
+  await page.goto("/tasks")
+
+  const mark = page.getByRole("checkbox", {
+    name: /^Mark as done \(In progress/,
+  })
+  // The tip is drawn from an attribute, so it is not text a screen reader
+  // reads on top of the control's own name.
+  await expect(mark).toHaveAccessibleName("Mark as done (In progress)")
+  await expect(mark).toHaveAttribute("data-tip", "In progress")
+  const tip = () =>
+    mark.evaluate((element) => {
+      const style = getComputedStyle(element, "::after")
+      return { content: style.content, opacity: style.opacity }
+    })
+  await expect.poll(tip).toEqual({ content: '"In progress"', opacity: "0" })
+
+  // Hovering shows it (after a short pause).
+  await mark.hover()
+  await expect
+    .poll(async () => (await tip()).opacity, { timeout: 3000 })
+    .toBe("1")
+  await page.mouse.move(600, 400)
+  await expect.poll(async () => (await tip()).opacity).toBe("0")
+
+  // So does focus from the keyboard, which a pointer-only tip would miss.
+  await page.getByRole("link", { name: "Look into it" }).focus()
+  await page.keyboard.press("Shift+Tab")
+  await expect(mark).toBeFocused()
+  await expect.poll(async () => (await tip()).opacity).toBe("1")
+})
+
 test("A kept task's status mark carries its priority's hue, and is not a control", async ({
   page,
 }) => {

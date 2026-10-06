@@ -26,6 +26,7 @@ import { useBotUsers } from "./assignee"
 import { orderChoice, timeLabel } from "./listWords"
 import { PriorityOption } from "./priority"
 import { clearedFilters, hasActiveFilters, type TaskSearch } from "./search"
+import { StatusOption } from "./status"
 import {
   describeStatusFilter,
   isOpenFilter,
@@ -305,6 +306,7 @@ export function TaskFilters({
           choices={OPEN_STATUS_VALUES.map((value) => ({
             value,
             label: STATUS_LABELS[value],
+            display: <StatusOption status={value} />,
           }))}
           onChange={(value) =>
             onChange({
@@ -314,6 +316,12 @@ export function TaskFilters({
         />
         {phone ? (
           <>
+            {/* A phone's row is two rows by design, not by overflow: the
+                three filters that are always there, then More and Clear at
+                the left and the order at the right. Left to wrap, the order
+                would be stranded alone whenever More happened to fit above
+                it. */}
+            <span aria-hidden className="h-0 basis-full" />
             {/* The rarer filters are folded behind More, but a set one is
                 still said here, in ink, with its ×: opening it opens the
                 sheet it is set in. */}

@@ -4,9 +4,21 @@ import type { TaskPublic } from "@/client"
 import { Checkbox } from "@/components/ui/checkbox"
 import { toastSuccess } from "@/lib/toasts"
 import { cn } from "@/lib/utils"
-import { StatusMark } from "./status"
+import { STATUS_LABELS, StatusMark } from "./status"
 import { markName } from "./statuses"
 import { useTaskStatus } from "./useTaskWrites"
+
+/**
+ * The tip over a status mark: the status's name on a raised chip, above the
+ * mark and level with its left edge, where the column's gutter is clear. It
+ * has left the page plane, so it takes the menus' shadow. It shows after a
+ * short pause, on a hovering pointer (never a touch, which has no hover) and
+ * on keyboard focus.
+ */
+export const MARK_TIP = cn(
+  "relative after:pointer-events-none after:absolute after:bottom-full after:left-0 after:z-30 after:mb-1.5 after:rounded-md after:border after:bg-popover after:px-2 after:py-1 after:text-xs after:leading-none after:font-normal after:whitespace-nowrap after:text-popover-foreground after:shadow-md after:opacity-0 after:transition-opacity after:content-[attr(data-tip)]",
+  "hover:after:opacity-100 hover:after:delay-500 focus-visible:after:opacity-100",
+)
 
 interface CompleteTaskProps {
   task: TaskPublic
@@ -31,6 +43,13 @@ interface CompleteTaskProps {
   className?: string
   /** Resizes the drawn mark, for the title that is the status's biggest. */
   markClassName?: string
+  /**
+   * Names the status in a small tip over the mark, on hover and on keyboard
+   * focus, for a line whose mark has no label beside it. The tip is drawn
+   * from an attribute by CSS, so it is not in the page's text: the control's
+   * own name already says the status, and says it once.
+   */
+  tip?: boolean
 }
 
 /**
@@ -63,6 +82,7 @@ export function CompleteTask({
   receipt = false,
   className,
   markClassName,
+  tip = false,
 }: CompleteTaskProps) {
   const status = useTaskStatus(task, {
     onCompleted: receipt ? completionReceipt(task) : undefined,
@@ -82,10 +102,12 @@ export function CompleteTask({
           disabled={status.isPending}
           onCheckedChange={(checked) => toggle(checked === true)}
           aria-label={`${action} (${markName(task.status, task.priority)})`}
+          data-tip={tip ? STATUS_LABELS[task.status] : undefined}
           className={cn(
             // The mark is 18px; the padding takes the target to 26px without
             // moving it off the title's line.
             "focus-visible:ring-ring/50 -m-1 shrink-0 rounded-full p-1 outline-none focus-visible:ring-[3px] disabled:opacity-50",
+            tip && MARK_TIP,
             className,
           )}
         >

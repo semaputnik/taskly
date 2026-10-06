@@ -13,9 +13,9 @@ import { recordLink, useIsOpen } from "@/components/Records/panels"
 import { Skeleton } from "@/components/ui/skeleton"
 import { isoDay } from "@/lib/dates"
 import { cn } from "@/lib/utils"
-import { CompleteTask } from "./CompleteTask"
+import { CompleteTask, MARK_TIP } from "./CompleteTask"
 import { type DueTone, type MetaFact, metaLine } from "./compact"
-import { StatusMark } from "./status"
+import { STATUS_LABELS, StatusMark } from "./status"
 
 /**
  * Only a missed day is coloured; today is ink. Both are set a weight up, as
@@ -127,13 +127,17 @@ export function CompactTaskRow({
           nudged so the two share a centre: the mark itself sits a pixel
           down, inside its larger target. */}
       {readOnly ? (
-        <span className="mt-px flex self-start">
+        <span
+          data-tip={STATUS_LABELS[task.status]}
+          className={cn("mt-px flex self-start", MARK_TIP)}
+        >
           <StatusMark status={task.status} priority={task.priority} labelled />
         </span>
       ) : (
         <CompleteTask
           task={task}
           asMark
+          tip
           receipt={receipt}
           className="-mt-[3px] self-start"
         />
@@ -169,20 +173,16 @@ export function CompactTaskRow({
         </div>
 
         {(facts.length > 0 || project) && (
-          <div className="text-ink-3 mt-1 flex items-start gap-3 text-[0.8125rem] leading-tight tabular-nums">
-            {facts.length > 0 && (
-              <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
-                {facts.map((fact, index) => (
-                  <Fact key={`${fact.kind}-${index}`} fact={fact} />
-                ))}
-              </div>
-            )}
+          <div className="text-ink-3 mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.8125rem] leading-tight tabular-nums">
+            {facts.map((fact, index) => (
+              <Fact key={`${fact.kind}-${index}`} fact={fact} />
+            ))}
             {project && (
-              // Last and at the far right, and the first thing to give way:
-              // it shrinks a hundred times faster than the facts beside it,
-              // so a long project name truncates before the line has to wrap
-              // what it says about the task itself.
-              <span className="ml-auto flex max-w-[50%] min-w-16 shrink-[100] items-center justify-end gap-1.5">
+              // Last and at the far right. When the line is too narrow for it
+              // beside the facts it drops to a line of its own, still at the
+              // right, rather than being cut to a few letters: only a name
+              // longer than the line itself is truncated.
+              <span className="ml-auto flex max-w-full min-w-0 items-center justify-end gap-1.5">
                 <span
                   className="size-2 shrink-0 rounded-[2px] bg-current opacity-55"
                   aria-hidden
