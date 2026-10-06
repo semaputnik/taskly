@@ -102,9 +102,32 @@ def test_the_secret_is_stored_encrypted_and_can_be_read_back_to_sign(
     assert webhooks.decrypt_secret(stored) == bot["secret"]
 
 
-def test_a_secret_stored_under_another_secret_key_says_so_instead_of_signing() -> None:
+def test_an_unreadable_secret_says_so_instead_of_signing() -> None:
     with pytest.raises(ValueError, match="Regenerate the secret"):
         webhooks.decrypt_secret("not-a-token-this-key-made")
+
+
+def test_a_secret_stored_under_another_webhook_secret_key_says_so(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "WEBHOOK_SECRET_KEY", "the-key-it-was-stored-under")
+    stored = webhooks.encrypt_secret("whsec_example")
+    assert webhooks.decrypt_secret(stored) == "whsec_example"
+
+    monkeypatch.setattr(settings, "WEBHOOK_SECRET_KEY", "a-different-key")
+    with pytest.raises(ValueError, match="Regenerate the secret") as raised:
+        webhooks.decrypt_secret(stored)
+    assert "WEBHOOK_SECRET_KEY" in str(raised.value)
+
+
+def test_rotating_the_secret_key_leaves_stored_secrets_readable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    stored = webhooks.encrypt_secret("whsec_example")
+
+    monkeypatch.setattr(settings, "SECRET_KEY", "a-rotated-secret-key")
+
+    assert webhooks.decrypt_secret(stored) == "whsec_example"
 
 
 def test_the_secret_can_be_regenerated_and_the_old_one_stops_applying(

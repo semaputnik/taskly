@@ -87,19 +87,20 @@ def _fernet() -> Fernet:
         length=32,
         salt=None,
         info=b"taskly webhook secret",
-    ).derive(settings.SECRET_KEY.encode())
+    ).derive(settings.WEBHOOK_SECRET_KEY.encode())
     return Fernet(base64.urlsafe_b64encode(key))
 
 
 def encrypt_secret(secret: str) -> str:
     """
     The secret as it is stored: encrypted under a key derived from
-    `SECRET_KEY`, never in the clear.
+    `WEBHOOK_SECRET_KEY`, never in the clear.
 
     It cannot be a digest like a bot token's: a token is only ever compared,
     but a webhook is signed with the secret, so Taskly has to be able to get it
-    back. Changing `SECRET_KEY` therefore makes stored secrets unreadable; the
-    owner regenerates them, and deliveries say so until then.
+    back. The key is its own setting, not `SECRET_KEY`, so rotating that does
+    not touch these. Changing `WEBHOOK_SECRET_KEY` makes stored secrets
+    unreadable; the owner regenerates them, and deliveries say so until then.
     """
     return _fernet().encrypt(secret.encode()).decode()
 
@@ -109,8 +110,8 @@ def decrypt_secret(stored: str) -> str:
         return _fernet().decrypt(stored.encode()).decode()
     except InvalidToken as error:
         raise ValueError(
-            "The webhook secret cannot be read, probably because SECRET_KEY "
-            "changed. Regenerate the secret."
+            "The webhook secret cannot be read, probably because "
+            "WEBHOOK_SECRET_KEY changed. Regenerate the secret."
         ) from error
 
 

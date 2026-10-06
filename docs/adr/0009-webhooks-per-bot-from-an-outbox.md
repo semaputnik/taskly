@@ -52,3 +52,22 @@ own network. Loopback and private ranges are refused by default and allowed
 by one installation setting, because the common self-hosted case — an agent
 on the same machine or LAN — is the one the default forbids, and the operator
 is the one who knows which case theirs is.
+
+**The secret is stored encrypted, under a key of its own.** A bot token is
+stored as a digest because it is only ever compared. A webhook is *signed*
+with its secret, so Taskly has to get the secret back, and a digest cannot do
+that (used as the key it would simply be the secret). The secret is therefore
+kept encrypted, shown to the owner once, in the bot user's row.
+
+The key it is encrypted under is its own installation setting,
+`WEBHOOK_SECRET_KEY`, not one derived from `SECRET_KEY`. `SECRET_KEY` signs
+sessions, and an operator may reasonably rotate it after a leak; if the secrets
+hung off it, that rotation would silently break every webhook until each owner
+regenerated. With a separate key, rotating `SECRET_KEY` does not touch
+webhooks, and rotating `WEBHOOK_SECRET_KEY` is a deliberate act that the
+operator knows costs every owner a regeneration. The setting is any string
+(it is run through HKDF into a Fernet key), is checked at startup like
+`SECRET_KEY`, and is never changed by Taskly. A stored secret that cannot be
+decrypted is not guessed at: its deliveries fail with a message telling the
+owner to regenerate the secret. There is no migration from a key derived from
+`SECRET_KEY`, because that scheme was never released.

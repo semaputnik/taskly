@@ -33,11 +33,12 @@ To enable Sentry, configure `SENTRY_DSN`.
 Add these required values and mark them as secrets:
 
 * `SECRET_KEY`: A secret key used to sign security tokens.
+* `WEBHOOK_SECRET_KEY`: A separate secret key that encrypts bot users' webhook secrets. Set it once and keep it: changing it makes every owner regenerate their webhook secrets (see [Webhooks](deployment-docker-compose.md#webhooks)). Rotating `SECRET_KEY` does not affect them.
 * `DATABASE_URL`: The PostgreSQL connection URL, configured automatically when using a database integration.
 
 To enable emails with an authenticated provider, add `SMTP_PASSWORD` as a secret.
 
-You can generate a secure value for `SECRET_KEY` with:
+You can generate a secure value for `SECRET_KEY` and for `WEBHOOK_SECRET_KEY` (use a different value for each) with:
 
 ```bash
 python -c "import secrets; print(secrets.token_urlsafe(32))"
@@ -65,6 +66,7 @@ Add these repository secrets:
 
 * `DATABASE_URL`
 * `SECRET_KEY`
+* `WEBHOOK_SECRET_KEY`
 
 Use the same values configured in FastAPI Cloud. For `DATABASE_URL`, use the connection URL from your database provider. The database must be reachable from GitHub-hosted runners so the preparation step can connect to it.
 

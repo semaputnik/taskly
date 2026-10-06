@@ -21,6 +21,14 @@ class Settings(BaseSettings):
     )
     API_V1_STR: str = "/api/v1"
     SECRET_KEY: str
+    # What bot users' webhook secrets are encrypted under (FR-11.9, ADR-0009).
+    # A separate key, so rotating SECRET_KEY, which signs sessions, does not
+    # make them unreadable. Any string will do: it is run through HKDF to get
+    # the real key, so `secrets.token_urlsafe(32)` is a good value. Changing it
+    # makes every stored secret unreadable until its owner regenerates it, so
+    # set it once and keep it. Like SECRET_KEY, "changethis" only warns in
+    # development and is refused everywhere else.
+    WEBHOOK_SECRET_KEY: str = "changethis"
     # 60 minutes * 24 hours * 8 days = 8 days
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 8
     # The installation's public address. Passkeys are bound to its hostname
@@ -102,6 +110,7 @@ class Settings(BaseSettings):
     @model_validator(mode="after")
     def _enforce_non_default_secrets(self) -> Self:
         self._check_default_secret("SECRET_KEY", self.SECRET_KEY)
+        self._check_default_secret("WEBHOOK_SECRET_KEY", self.WEBHOOK_SECRET_KEY)
         for host in self.DATABASE_URL.hosts():
             self._check_default_secret("DATABASE_URL password", host["password"])
 

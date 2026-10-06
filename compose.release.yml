@@ -28,6 +28,7 @@ x-taskly: &taskly
   environment:
     PROJECT_NAME: ${PROJECT_NAME:?Variable not set}
     SECRET_KEY: ${SECRET_KEY:?Variable not set}
+    WEBHOOK_SECRET_KEY: ${WEBHOOK_SECRET_KEY:?Variable not set}
     FIRST_SUPERUSER: ${FIRST_SUPERUSER:?Variable not set}
     SMTP_HOST: ${SMTP_HOST}
     SMTP_USER: ${SMTP_USER:-}
