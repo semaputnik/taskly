@@ -3,7 +3,8 @@ import { Menu } from "lucide-react"
 import { useState } from "react"
 
 import { Wordmark } from "@/components/Common/Wordmark"
-import { panelSearchSchema } from "@/components/Records/panels"
+import { preloadPanel } from "@/components/Records/panelModules"
+import { openPanelKind, panelSearchSchema } from "@/components/Records/panels"
 import { RecordPanels } from "@/components/Records/RecordPanels"
 import { Navigation } from "@/components/Sidebar/AppSidebar"
 import { navItemFocus } from "@/components/Sidebar/styles"
@@ -28,6 +29,13 @@ export const Route = createFileRoute("/_layout")({
         to: "/login",
       })
     }
+  },
+  // An address that already has a record open fetches that panel's code
+  // beside the page's, rather than once the page has drawn.
+  loader: ({ location }) => {
+    const search = panelSearchSchema.safeParse(location.search)
+    const kind = search.success ? openPanelKind(search.data) : undefined
+    if (kind) preloadPanel(kind)
   },
 })
 

@@ -1,7 +1,7 @@
-import { useEffect } from "react"
+import { type RefObject, useEffect } from "react"
 
 /**
- * Publishes the visual viewport as two custom properties on the root, so a
+ * Publishes the visual viewport as two custom properties on `target`, so a
  * bar pinned to the bottom of the screen can follow it without re-rendering:
  *
  * - `--kb-inset`: how far the bottom of what is seen sits above the bottom of
@@ -12,30 +12,47 @@ import { useEffect } from "react"
  * - `--vv-height`: the height of what is seen, which bounds anything that
  *   opens above the bar.
  *
+ * They are set on the bar rather than the root: a custom property inherits,
+ * so one changed on the root restyles the whole page, and while a keyboard
+ * is up it changes on every frame the page scrolls. The events of one frame
+ * are written once, before that frame is drawn.
+ *
  * Both are removed when the hook's user goes.
  */
-export function useVisualViewport(enabled: boolean) {
+export function useVisualViewport(
+  target: RefObject<HTMLElement | null>,
+  enabled: boolean,
+) {
   useEffect(() => {
-    if (!enabled) return
+    const element = target.current
+    if (!enabled || !element) return
     const viewport = window.visualViewport
-    const root = document.documentElement
-    const update = () => {
+    const write = () => {
       const height = viewport?.height ?? window.innerHeight
       const top = viewport?.offsetTop ?? 0
       const inset = Math.max(0, window.innerHeight - (top + height))
-      root.style.setProperty("--kb-inset", `${Math.round(inset)}px`)
-      root.style.setProperty("--vv-height", `${Math.round(height)}px`)
+      element.style.setProperty("--kb-inset", `${Math.round(inset)}px`)
+      element.style.setProperty("--vv-height", `${Math.round(height)}px`)
     }
-    update()
+    let frame = 0
+    const update = () => {
+      if (frame) return
+      frame = requestAnimationFrame(() => {
+        frame = 0
+        write()
+      })
+    }
+    write()
     viewport?.addEventListener("resize", update)
     viewport?.addEventListener("scroll", update)
     window.addEventListener("resize", update)
     return () => {
+      cancelAnimationFrame(frame)
       viewport?.removeEventListener("resize", update)
       viewport?.removeEventListener("scroll", update)
       window.removeEventListener("resize", update)
-      root.style.removeProperty("--kb-inset")
-      root.style.removeProperty("--vv-height")
+      element.style.removeProperty("--kb-inset")
+      element.style.removeProperty("--vv-height")
     }
-  }, [enabled])
+  }, [target, enabled])
 }

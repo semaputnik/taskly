@@ -1,12 +1,8 @@
 import { useQueries } from "@tanstack/react-query"
 
 import { Skeleton } from "@/components/ui/skeleton"
-import { tasksQuery } from "@/lib/serverState"
+import { taskCountQueries } from "./listQueries"
 import { counts } from "./listWords"
-import { OPEN_STATUSES } from "./statuses"
-
-/** One row asked for, so the request is the count and nothing else. */
-const COUNT = { skip: 0, limit: 1 } as const
 
 /**
  * The one sentence under the page's heading: how much is open, and of that
@@ -20,12 +16,7 @@ const COUNT = { skip: 0, limit: 1 } as const
  */
 export function TaskCounts() {
   const [open, backlog, onBots, overdue] = useQueries({
-    queries: [
-      tasksQuery({ status: OPEN_STATUSES, ...COUNT }),
-      tasksQuery({ status: ["backlog"], ...COUNT }),
-      tasksQuery({ status: OPEN_STATUSES, assigned_to_bots: true, ...COUNT }),
-      tasksQuery({ status: OPEN_STATUSES, overdue: true, ...COUNT }),
-    ],
+    queries: taskCountQueries(),
   })
 
   if (!open.data || !backlog.data || !onBots.data || !overdue.data) {

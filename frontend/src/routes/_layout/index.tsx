@@ -1,26 +1,37 @@
-import { usePrefetchQuery } from "@tanstack/react-query"
 import { createFileRoute } from "@tanstack/react-router"
 import { Suspense, useEffect, useState } from "react"
 
 import { CaptureLine } from "@/components/Dashboard/CaptureLine"
 import { Changes, ChangesPending } from "@/components/Dashboard/Changes"
+import { Day, DayHeading, DayPending } from "@/components/Dashboard/DayPage"
 import {
-  botChangesQuery,
-  Day,
-  DayHeading,
-  DayPending,
-} from "@/components/Dashboard/DayPage"
-import { markSeen, visitSince } from "@/components/Dashboard/day"
+  markSeen,
+  peekVisitSince,
+  visitSince,
+} from "@/components/Dashboard/day"
 import {
   MyWork,
   MyWorkPending,
   usePrefetchMyWork,
 } from "@/components/Dashboard/MyWork"
+import { prefetchDay } from "@/components/Dashboard/queries"
 import { Section } from "@/components/Dashboard/Section"
-import { changesQuery } from "@/components/Dashboard/shared"
 
 export const Route = createFileRoute("/_layout/")({
   component: Dashboard,
+  // The requests start as soon as the route is matched, beside the download
+  // of the page's own code rather than after it: on a slow connection that
+  // is a round of requests the page no longer waits for. Nothing waits on
+  // them here, and what is cached is left alone.
+  loader: ({ context }) => {
+    let since: string | null = null
+    try {
+      since = peekVisitSince({ local: localStorage, session: sessionStorage })
+    } catch {
+      // Merely reaching for storage throws where site data is blocked.
+    }
+    prefetchDay(context.queryClient, since)
+  },
   head: () => ({
     meta: [
       {
@@ -75,11 +86,11 @@ function useVisitSince(): string | null {
  */
 function Dashboard() {
   const since = useVisitSince()
-  // Started here, beside the bands' own requests, rather than after the
-  // bands have suspended and resumed: the sections below them are not
-  // rendered until they resume.
-  usePrefetchQuery(changesQuery(since))
-  usePrefetchQuery(botChangesQuery(since))
+  // Every section's request was started by the route's loader. The page
+  // also watches My work, the last of them to answer, since it waits on
+  // knowing the reader: its answer re-renders the page, and the sections
+  // come in with that render. Left to resume on their own, React holds a
+  // boundary's content back until 300ms after its skeleton was drawn.
   usePrefetchMyWork()
 
   return (

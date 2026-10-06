@@ -4,18 +4,21 @@ import { useEffect } from "react"
 
 import { CaptureLine } from "@/components/Dashboard/CaptureLine"
 import { textLink } from "@/components/Dashboard/shared"
-import { withoutPanelState } from "@/components/Records/panels"
 import { useRecordList } from "@/components/Records/walk"
 import {
   CompactTaskRow,
   CompactTaskRowPending,
 } from "@/components/Tasks/CompactTaskRow"
+import {
+  needsReader,
+  PAGE_SIZE,
+  prefetchTaskList,
+  taskListQuery,
+} from "@/components/Tasks/listQueries"
 import { chooseOrder } from "@/components/Tasks/listWords"
 import {
   clearedFilters,
   hasActiveFilters,
-  listedStatuses,
-  type TaskListSearch,
   type TaskSearch,
   taskSearchSchema,
 } from "@/components/Tasks/search"
@@ -26,43 +29,18 @@ import useAuth from "@/hooks/useAuth"
 import { projectsQuery, tasksQuery } from "@/lib/serverState"
 import { cn } from "@/lib/utils"
 
-const PAGE_SIZE = 25
-
-/** What the list's filters ask the API for, before any paging. */
-function filtersQuery(search: TaskListSearch, currentUserId?: string) {
-  const {
-    assignee,
-    reporter,
-    page: _page,
-    ...filters
-  } = withoutPanelState(search)
-  return {
-    ...filters,
-    // A direction means something only for an order that was named: the
-    // list's own order has none to reverse.
-    order: search.sort ? search.order : undefined,
-    // Open work, always: the list holds what is left to do, and finished
-    // work is read in the activity log (ADR-0006). A chosen status narrows
-    // within that rather than reaching outside it.
-    status: listedStatuses(search),
-    // "Me" needs the id the API filters on, a bot user is named by its own
-    // id, and "unassigned" is a flag of its own.
-    assignee_id:
-      assignee === "me"
-        ? currentUserId
-        : assignee === "unassigned"
-          ? undefined
-          : assignee,
-    unassigned: assignee === "unassigned" ? true : undefined,
-    // The same shape as the assignee, minus the nobody case: a bot user is
-    // named by its own id, and "me" needs the id the API filters on.
-    reporter_id: reporter === "me" ? currentUserId : reporter,
-  }
-}
-
 export const Route = createFileRoute("/_layout/tasks")({
   component: Tasks,
   validateSearch: taskSearchSchema,
+  // The requests start as soon as the route is matched, beside the download
+  // of the page's own code rather than after it. Nothing waits on them here,
+  // and what is cached is left alone, so opening a task over the list or
+  // walking the column asks for nothing again. The address is read as the
+  // page will read it, so both ask under the same key.
+  loader: ({ context, location }) => {
+    const search = taskSearchSchema.safeParse(location.search)
+    if (search.success) prefetchTaskList(context.queryClient, search.data)
+  },
   head: () => ({
     meta: [
       {
@@ -91,23 +69,14 @@ function Tasks() {
 
   // Filtering by "me" needs the id to filter on: listing before it arrives
   // would show everything, which is the opposite of what was asked for.
-  const waitingForMe =
-    (search.assignee === "me" || search.reporter === "me") && !currentUser
-  const filters = filtersQuery(search, currentUser?.id)
+  const waitingForMe = needsReader(search) && !currentUser
   const {
     data: tasks,
     isPending,
     isError,
     refetch,
   } = useQuery({
-    ...tasksQuery({
-      ...filters,
-      // The page the reader is on, asked for as such: a list that fetches a
-      // window and then pages it in the browser can only page what it
-      // fetched, and would report that window as the total.
-      skip: (page - 1) * PAGE_SIZE,
-      limit: PAGE_SIZE,
-    }),
+    ...taskListQuery(search, currentUser?.id),
     enabled: !waitingForMe,
   })
   const { data: projects } = useQuery(projectsQuery())

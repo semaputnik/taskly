@@ -70,7 +70,8 @@ const MATCHES_HEIGHT = 360
 export function CaptureLine({ opens }: { opens?: "down" | "up" }) {
   const panels = useRecordPanels()
   const phone = useIsPhone()
-  useVisualViewport(phone)
+  const bar = useRef<HTMLDivElement>(null)
+  useVisualViewport(bar, phone)
   const side = opens ?? (phone ? "up" : undefined)
   const undo = useUndoCapture()
   const [title, setTitle] = useState("")
@@ -175,6 +176,7 @@ export function CaptureLine({ opens }: { opens?: "down" | "up" }) {
 
   return (
     <div
+      ref={bar}
       className={cn(
         // Pinned on a phone: the ground and a hairline over the list, the
         // keyboard's height as its offset, the home indicator's as its foot

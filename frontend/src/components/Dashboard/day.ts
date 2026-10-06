@@ -112,6 +112,23 @@ export function visitSince(store: VisitStore, now: Date): string | null {
 }
 
 /**
+ * What `visitSince` will answer, read without writing anything: the page's
+ * requests can be started before the page itself fixes the visit, under the
+ * same key it will ask with.
+ */
+export function peekVisitSince(
+  store: { [K in keyof VisitStore]: Pick<Storage, "getItem"> },
+): string | null {
+  try {
+    const since =
+      store.session.getItem(SINCE) ?? store.local.getItem(LAST_SEEN) ?? ""
+    return since || null
+  } catch {
+    return null
+  }
+}
+
+/**
  * Remember that the reader is looking at the day page now, without moving
  * what this session counts from. Called as the reader leaves the page, so a
  * tab left open all day still counts the next session from its last look.

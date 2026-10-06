@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 
 import {
+  openPanelKind,
   panelSearchSchema,
   RECORD_KINDS,
   recordLink,
@@ -89,4 +90,21 @@ test("a query leaves every panel key behind", () => {
       page: 2,
     }),
   ).toEqual({ tag: "errands", page: 2 })
+})
+
+describe("which panel is open", () => {
+  test("is the kind whose record the search names", () => {
+    expect(openPanelKind({ task: ID })).toBe("task")
+    expect(openPanelKind({ tag_id: ID })).toBe("tag")
+    expect(openPanelKind({ bot: ID })).toBe("bot")
+    expect(openPanelKind({ project: ID })).toBe("project")
+  })
+
+  test("is the kind being captured when no record is named", () => {
+    expect(openPanelKind({ capture: "project" })).toBe("project")
+  })
+
+  test("is none when the search names nothing", () => {
+    expect(openPanelKind({})).toBeUndefined()
+  })
 })
