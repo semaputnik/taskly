@@ -17,7 +17,7 @@ adds only the surface strategy for these screens. It is the last slice of the re
 
 - Projects: see what each project holds and reach its tasks in one click; file a task into it;
   archive, unarchive, delete.
-- Tags: fold look-alikes, rename, reach the tasks a tag is on.
+- Tags: fold tags that look alike, rename, reach the tasks a tag is on.
 - Settings: who I am, what signs me in, where my PDFs go, and (as the superuser) who else is
   on this installation and how to hand them a recovery code.
 - Sign-in: one action, nothing to type; recovery when every passkey is gone.
