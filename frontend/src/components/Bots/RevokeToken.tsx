@@ -1,5 +1,4 @@
 import { useMutation } from "@tanstack/react-query"
-import { Ban } from "lucide-react"
 import { useState } from "react"
 
 import { BotsService, type BotUserPublic } from "@/client"
@@ -40,8 +39,12 @@ const RevokeToken = ({ bot }: { bot: BotUserPublic }) => {
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <Button variant="outline" size="sm" onClick={() => setIsOpen(true)}>
-        <Ban />
+      <Button
+        variant="ghost"
+        size="sm"
+        className="text-ink-2 hover:text-late -mx-2 text-[13.5px] font-medium pointer-coarse:h-11"
+        onClick={() => setIsOpen(true)}
+      >
         Revoke
       </Button>
       <DialogContent className="sm:max-w-sm">

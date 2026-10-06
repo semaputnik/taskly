@@ -1531,6 +1531,25 @@ def get_bot_user_project_ids(
     return project_ids
 
 
+def get_bot_user_assigned_task_counts(
+    *, session: Session, bot_ids: Sequence[uuid.UUID]
+) -> dict[uuid.UUID, int]:
+    """
+    How many tasks name each bot user as their assignee, keyed by bot user id.
+    Deleted tasks are not counted; archived ones are, as they still name it.
+    """
+    counts: dict[uuid.UUID, int] = dict.fromkeys(bot_ids, 0)
+    rows = session.exec(
+        select(Task.assignee_bot_user_id, func.count())
+        .where(col(Task.assignee_bot_user_id).in_(bot_ids), not_deleted(Task))
+        .group_by(col(Task.assignee_bot_user_id))
+    ).all()
+    for bot_id, count in rows:
+        if bot_id is not None:
+            counts[bot_id] = count
+    return counts
+
+
 def issue_bot_token(
     *, session: Session, bot: BotUser, expires_at: datetime | None = None
 ) -> str:

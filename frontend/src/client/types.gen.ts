@@ -273,6 +273,14 @@ export type BotUserPublic = {
      */
     deleted?: boolean;
     /**
+     * Deleted At
+     */
+    deleted_at?: string | null;
+    /**
+     * Assigned Task Count
+     */
+    assigned_task_count?: number;
+    /**
      * Has Token
      */
     has_token: boolean;
@@ -2679,6 +2687,10 @@ export type botsReadBotUsersData = {
          * Limit
          */
         limit?: number;
+        /**
+         * Deleted
+         */
+        deleted?: boolean;
     };
     url: '/api/v1/bot-users/';
 };

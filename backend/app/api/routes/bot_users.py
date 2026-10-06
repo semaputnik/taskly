@@ -32,11 +32,15 @@ TOKEN_ALREADY_ISSUED_STATUS = 409
 TOKEN_ALREADY_ISSUED_CODE = "token_already_issued"
 
 
-def _public(bot: BotUser, project_ids: list[uuid.UUID]) -> BotUserPublic:
+def _public(
+    bot: BotUser, project_ids: list[uuid.UUID], assigned_task_count: int = 0
+) -> BotUserPublic:
     return BotUserPublic(
         id=bot.id,
         name=bot.name,
         deleted=bot.deleted_at is not None,
+        deleted_at=bot.deleted_at,
+        assigned_task_count=assigned_task_count,
         scope=BotScope(
             project_ids=project_ids,
             permissions=BotPermissions.model_validate(bot, from_attributes=True),
@@ -48,6 +52,17 @@ def _public(bot: BotUser, project_ids: list[uuid.UUID]) -> BotUserPublic:
         token_revoked_at=bot.token_revoked_at,
         created_at=bot.created_at,
     )
+
+
+def _public_many(session: SessionDep, bots: list[BotUser]) -> list[BotUserPublic]:
+    ids = [bot.id for bot in bots]
+    project_ids = crud.get_bot_user_project_ids(session=session, bot_ids=ids)
+    counts = crud.get_bot_user_assigned_task_counts(session=session, bot_ids=ids)
+    return [_public(bot, project_ids[bot.id], counts[bot.id]) for bot in bots]
+
+
+def _public_one(session: SessionDep, bot: BotUser) -> BotUserPublic:
+    return _public_many(session, [bot])[0]
 
 
 def _get_owned_bot_user(
@@ -71,30 +86,27 @@ def _get_owned_bot_user(
 
 @router.get("/", response_model=BotUsersPublic)
 def read_bot_users(
-    session: SessionDep, current_user: CurrentUser, skip: int = 0, limit: int = 100
+    session: SessionDep,
+    current_user: CurrentUser,
+    skip: int = 0,
+    limit: int = 100,
+    deleted: bool = False,
 ) -> Any:
     """
     Retrieve the current user's bot users, with their scopes, oldest first.
-    Deleted bot users are not among them.
+    Deleted bot users are not among them, unless `deleted` asks for them
+    instead: then it is only those, the most recently deleted first.
     """
-    count = session.exec(
-        select(func.count())
-        .select_from(BotUser)
-        .where(BotUser.owner_id == current_user.id, col(BotUser.deleted_at).is_(None))
-    ).one()
+    gone = col(BotUser.deleted_at).is_not(None)
+    where = [BotUser.owner_id == current_user.id, gone if deleted else ~gone]
+    count = session.exec(select(func.count()).select_from(BotUser).where(*where)).one()
+    order = (
+        col(BotUser.deleted_at).desc() if deleted else col(BotUser.created_at).asc()
+    )
     bots = session.exec(
-        select(BotUser)
-        .where(BotUser.owner_id == current_user.id, col(BotUser.deleted_at).is_(None))
-        .order_by(col(BotUser.created_at))
-        .offset(skip)
-        .limit(limit)
+        select(BotUser).where(*where).order_by(order).offset(skip).limit(limit)
     ).all()
-    project_ids = crud.get_bot_user_project_ids(
-        session=session, bot_ids=[bot.id for bot in bots]
-    )
-    return BotUsersPublic(
-        data=[_public(bot, project_ids[bot.id]) for bot in bots], count=count
-    )
+    return BotUsersPublic(data=_public_many(session, list(bots)), count=count)
 
 
 @router.get("/{bot_user_id}", response_model=BotUserPublic)
@@ -112,9 +124,7 @@ def read_bot_user(
     refuses, and the list still leaves it out.
     """
     bot = _get_owned_bot_user(session, current_user, bot_user_id, deleted=True)
-    return _public(
-        bot, crud.get_bot_user_project_ids(session=session, bot_ids=[bot.id])[bot.id]
-    )
+    return _public_one(session, bot)
 
 
 @router.post("/", response_model=BotUserPublic)
@@ -134,9 +144,7 @@ def create_bot_user(
     bot = crud.create_bot_user(
         session=session, bot_user_create=bot_user_in, owner_id=current_user.id
     )
-    return _public(
-        bot, crud.get_bot_user_project_ids(session=session, bot_ids=[bot.id])[bot.id]
-    )
+    return _public_one(session, bot)
 
 
 @router.patch("/{bot_user_id}", response_model=BotUserPublic)
@@ -160,9 +168,7 @@ def update_bot_user(
                 session, Caller(owner_id=current_user.id), project_id, action=None
             )
     bot = crud.update_bot_user(session=session, bot=bot, bot_user_update=bot_user_in)
-    return _public(
-        bot, crud.get_bot_user_project_ids(session=session, bot_ids=[bot.id])[bot.id]
-    )
+    return _public_one(session, bot)
 
 
 @router.delete("/{bot_user_id}")
@@ -231,6 +237,4 @@ def revoke_bot_user_token(
     bot = _get_owned_bot_user(session, current_user, bot_user_id)
     if bot.token_hash is not None:
         bot = crud.revoke_bot_token(session=session, bot=bot)
-    return _public(
-        bot, crud.get_bot_user_project_ids(session=session, bot_ids=[bot.id])[bot.id]
-    )
+    return _public_one(session, bot)

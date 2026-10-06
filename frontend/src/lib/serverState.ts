@@ -276,6 +276,21 @@ export const botsQuery = () =>
       (await BotsService.readBotUsers({ query: FIRST_PAGE })).data,
   })
 
+/**
+ * The bot users that were deleted, most recently deleted first: kept so that
+ * what they did and what they were given still names them (FR-08.19).
+ */
+export const deletedBotsQuery = () =>
+  queryOptions({
+    queryKey: [ROOT.bots, "deleted"],
+    queryFn: async () =>
+      (
+        await BotsService.readBotUsers({
+          query: { deleted: true, ...FIRST_PAGE },
+        })
+      ).data,
+  })
+
 export const botQuery = (botId: string | null | undefined) =>
   queryOptions({
     queryKey: [ROOT.bot, botId],

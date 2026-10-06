@@ -1354,6 +1354,11 @@ class BotUserPublic(SQLModel):
     # A deleted bot user is kept, so its record still opens and still says
     # what it now is (FR-08.19). It is gone from the list either way.
     deleted: bool = False
+    # When it was deleted, for the section that keeps deleted bot users in view.
+    deleted_at: datetime | None = None
+    # The tasks that still name it as their assignee, deleted ones left out:
+    # what a deleted bot user is still on the record for (FR-08.21).
+    assigned_task_count: int = 0
     # Whether a token is out, revoked or not; the token itself is never
     # reported again. One that has expired is still out until it is revoked.
     has_token: bool

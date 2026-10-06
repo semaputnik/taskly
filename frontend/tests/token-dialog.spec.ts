@@ -98,15 +98,23 @@ test("Every other dialog still closes on Escape and a click outside", async ({
   page,
 }) => {
   await newUser(page)
-  await page.goto("/bots")
-  const dialog = page.getByRole("dialog", { name: "Add Bot" })
+  const api = await userApi(page)
+  const bot = await api.create("/bot-users/", {
+    name: "Nightly sync",
+    scope: { project_ids: [], permissions: {} },
+  })
+  await page.goto(`/bots?bot=${bot.id}`)
+  const dialog = page.getByRole("dialog", { name: "Delete Nightly sync?" })
+  const open = page
+    .getByRole("complementary", { name: "Nightly sync", exact: true })
+    .getByRole("button", { name: "Delete bot user" })
 
-  await page.getByRole("button", { name: "Add Bot" }).click()
+  await open.click()
   await expect(dialog).toBeVisible()
   await page.keyboard.press("Escape")
   await expect(dialog).toBeHidden()
 
-  await page.getByRole("button", { name: "Add Bot" }).click()
+  await open.click()
   await expect(dialog).toBeVisible()
   await page.mouse.click(5, 5)
   await expect(dialog).toBeHidden()

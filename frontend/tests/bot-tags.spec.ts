@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test"
+import { botLine } from "./utils/bots"
 import { randomEmail } from "./utils/random"
 import { storeTokenAndClose } from "./utils/tokenDialog"
 import { logInUser } from "./utils/user"
@@ -37,14 +38,15 @@ test("Granting a bot user “Create tags” lets it add to the vocabulary", asyn
   // Created with the tasks it needs and without the tags permission, which is
   // off until it is checked.
   await page.goto("/bots")
-  await page.getByRole("button", { name: "Add Bot" }).click()
-  await page.getByPlaceholder("Bot name").fill("Triage agent")
-  await page.getByRole("checkbox", { name: "Support queue" }).check()
-  await page.getByRole("checkbox", { name: "Update tasks" }).check()
+  await page.getByRole("button", { name: "New bot user" }).click()
+  const draft = page.getByRole("complementary", { name: "New bot user" })
+  await draft.getByRole("textbox", { name: "Bot name" }).fill("Triage agent")
+  await draft.getByRole("checkbox", { name: "Support queue" }).check()
+  await draft.getByRole("checkbox", { name: "Update tasks" }).check()
   await expect(
-    page.getByRole("checkbox", { name: "Create tags" }),
+    draft.getByRole("checkbox", { name: "Create tags" }),
   ).not.toBeChecked()
-  await page.getByRole("button", { name: "Create and issue token" }).click()
+  await draft.getByRole("button", { name: "Create and issue token" }).click()
   const dialog = page.getByRole("dialog", { name: "Token for Triage agent" })
   const token = await dialog
     .getByRole("textbox", { name: "Bot token" })
@@ -52,9 +54,9 @@ test("Granting a bot user “Create tags” lets it add to the vocabulary", asyn
   await storeTokenAndClose(dialog)
   const asBot = { Authorization: `Bearer ${token}` }
 
-  const row = page.getByRole("row", { name: "Open Triage agent" })
-  await expect(row).toContainText("Update tasks")
-  await expect(row).not.toContainText("Create tags")
+  const line = botLine(page, "Triage agent")
+  await expect(line).toContainText("updates")
+  await expect(line).not.toContainText("tags")
 
   // It applies a tag the user already has, and is refused a name that is not
   // a tag yet.
@@ -71,14 +73,13 @@ test("Granting a bot user “Create tags” lets it add to the vocabulary", asyn
   expect((await refused.json()).detail.permission).toBe("create_tags")
 
   // Granted in the bot user's panel, the same request goes through.
-  await row.click()
   const createTags = page
     .getByRole("complementary", { name: "Triage agent", exact: true })
     .getByRole("checkbox", { name: "Create tags" })
   await createTags.click()
   await expect(createTags).toBeChecked()
   await page.keyboard.press("Escape")
-  await expect(row).toContainText("Create tags")
+  await expect(line).toContainText("tags")
 
   const created = await request.post(`${api}/tags/`, {
     headers: asBot,
