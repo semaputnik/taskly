@@ -601,9 +601,9 @@ test("A narrowed list says so beside its count, and the action there widens it",
   await page.goto("/tasks")
   await expect(page.getByText("2 tasks")).toBeVisible()
   // Nothing narrows the list, so there is nothing to widen.
-  await expect(
-    page.getByRole("button", { name: "Clear filters" }),
-  ).toHaveCount(0)
+  await expect(page.getByRole("button", { name: "Clear filters" })).toHaveCount(
+    0,
+  )
 
   await chooseFilter(page, "Any project", "Website")
   await expect(page.getByText("1 task", { exact: true })).toBeVisible()

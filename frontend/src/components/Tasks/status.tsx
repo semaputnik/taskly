@@ -3,12 +3,7 @@ import type { ReactNode } from "react"
 import type { TaskPriority, TaskStatus } from "@/client"
 import { cn } from "@/lib/utils"
 import { PRIORITY_TEXT } from "./priority"
-import {
-  type MarkTone,
-  markName,
-  markTone,
-  STATUS_LABELS,
-} from "./statuses"
+import { type MarkTone, markName, markTone, STATUS_LABELS } from "./statuses"
 
 export { OPEN_STATUSES, STATUS_LABELS, STATUSES } from "./statuses"
 
