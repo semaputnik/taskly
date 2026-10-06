@@ -16,6 +16,7 @@ import {
   act,
   actQuiet,
   EditActions,
+  focusOnMount,
   lineInput,
   Note,
   SettingsSection,
@@ -138,6 +139,7 @@ function PasskeyLine({
             Name of this passkey
           </label>
           <input
+            ref={focusOnMount}
             id={id}
             value={draft}
             maxLength={255}

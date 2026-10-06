@@ -11,7 +11,7 @@ import {
   TestResult,
   useTestConnection,
 } from "./paperlessTest"
-import { actQuiet, EditActions, lineInput } from "./Section"
+import { actQuiet, EditActions, focusOnMount, lineInput } from "./Section"
 
 const ADDRESS_MISSING =
   "Enter the address of your Paperless, starting with http:// or https://."
@@ -144,6 +144,7 @@ export function ConnectionForm({
       <PropertyRow label="Address" htmlFor={ids.address}>
         <div className="flex min-w-0 flex-1 flex-col gap-1">
           <input
+            ref={focusOnMount}
             id={ids.address}
             inputMode="url"
             autoComplete="off"
@@ -262,6 +263,7 @@ export function TokenForm({
       >
         <div className="flex min-w-0 flex-1 basis-56 flex-col gap-1">
           <input
+            ref={focusOnMount}
             id={id}
             type="password"
             autoComplete="new-password"

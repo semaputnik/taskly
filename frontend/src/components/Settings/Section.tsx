@@ -24,6 +24,14 @@ export const lineInput = cn(
 )
 
 /**
+ * A ref for a field that opens in place of the control that was pressed: the
+ * reader is where they meant to be, ready to type (a framework `autoFocus`
+ * prop would say the same, and the accessibility lint refuses it).
+ */
+export const focusOnMount = (element: HTMLInputElement | null) =>
+  element?.focus()
+
+/**
  * The commit and the way out of an edit in place, as the page's own text
  * actions: Save in ink, Cancel quiet. More actions of the form (Test) go
  * between them as `children`.

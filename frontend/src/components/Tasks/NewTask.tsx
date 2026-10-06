@@ -245,7 +245,7 @@ export function NewTask({
           gutter,
         )}
       >
-        <span className="text-ink-3 text-xs">
+        <span className="text-ink-3 text-xs pointer-coarse:hidden">
           <kbd className="font-sans">{CHORD}</kbd> creates and starts another
         </span>
         <Button

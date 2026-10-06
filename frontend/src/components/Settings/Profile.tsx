@@ -8,7 +8,13 @@ import useAuth from "@/hooks/useAuth"
 import { useReportChange } from "@/lib/serverState"
 import { toastError, toastSuccess } from "@/lib/toasts"
 import { Appearance } from "./Appearance"
-import { act, EditActions, lineInput, SettingsSection } from "./Section"
+import {
+  act,
+  EditActions,
+  focusOnMount,
+  lineInput,
+  SettingsSection,
+} from "./Section"
 
 const nameSchema = z.string().max(30, "The name is at most 30 characters")
 const emailSchema = z.email({ message: "Invalid email address" })
@@ -112,6 +118,7 @@ function Field({
         >
           <div className="flex min-w-0 flex-1 basis-56 flex-col gap-1">
             <input
+              ref={focusOnMount}
               id={id}
               type={type}
               value={draft}

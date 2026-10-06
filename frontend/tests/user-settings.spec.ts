@@ -66,6 +66,8 @@ test.describe("Edit user profile", () => {
     const updatedName = "Test User 2"
 
     await page.getByRole("button", { name: "Change name" }).click()
+    // The field is where the reader is: focused as it opens.
+    await expect(page.getByLabel("Name", { exact: true })).toBeFocused()
     await page.getByLabel("Name", { exact: true }).fill(updatedName)
     await page.getByRole("button", { name: "Save" }).click()
 
