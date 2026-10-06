@@ -1,6 +1,6 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query"
 import { ArrowUp, Plus } from "lucide-react"
-import { useId, useLayoutEffect, useRef, useState } from "react"
+import { type ReactNode, useId, useLayoutEffect, useRef, useState } from "react"
 
 import type { TaskPublic } from "@/client"
 import { useRecordPanels } from "@/components/Records/panels"
@@ -13,7 +13,6 @@ import {
 } from "@/components/Tasks/useTaskWrites"
 import { useDebouncedValue } from "@/hooks/useDebouncedValue"
 import { useIsPhone } from "@/hooks/useIsPhone"
-import { useVisualViewport } from "@/hooks/useVisualViewport"
 import { projectsQuery, taskTitleSearchQuery } from "@/lib/serverState"
 import { toastCreated } from "@/lib/toasts"
 import { cn } from "@/lib/utils"
@@ -31,6 +30,20 @@ const SEARCH_DELAY_MS = 200
 
 /** About what eight matches, their heading and their hints take up. */
 const MATCHES_HEIGHT = 360
+
+/**
+ * What the capture sheet hands the line it carries: the words it keeps while
+ * it is closed, what to do once the line has made or opened a task, and what
+ * its "More options…" line does.
+ */
+export interface SheetBinding {
+  title: string
+  setTitle: (title: string) => void
+  /** The line made a task, or opened one it found: the sheet is done. */
+  onDone: () => void
+  /** "More options…": on to the full draft. */
+  onMore: () => void
+}
 
 /**
  * The frameless line at the top of a page that a task is written into: a
@@ -57,24 +70,33 @@ const MATCHES_HEIGHT = 360
  * The field is a combobox over a listbox, so a screen reader hears the count
  * of matches and which one is chosen.
  *
- * On a phone the line leaves the top of the page and is pinned to the bottom
- * of the screen, where a thumb rests (FR-06.15). It follows the visual
- * viewport, so it rides above Safari's own bar and above the keyboard while
- * one is up (`useVisualViewport`); the list scrolls under it with a short
- * fade; its matches open upward; and while a record's column covers the
- * screen it is not there at all.
+ * A phone has no line on its pages: the add control in the bottom bar raises
+ * a capture sheet carrying this same line (FR-06.15, `CaptureSheet`). Given
+ * a `sheet`, the line sits at the foot of it, its matches are part of the
+ * sheet and stand above the line rather than floating, and a "More options…"
+ * line leads on to the full draft.
  *
- * `opens` fixes the side the matches open on. Left alone, a phone's open
- * upward and a wider screen's toward whichever side of the line has the room.
+ * `opens` fixes the side the matches open on. Left alone, they open toward
+ * whichever side of the line has the room.
  */
-export function CaptureLine({ opens }: { opens?: "down" | "up" }) {
+export function CaptureLine({
+  opens,
+  sheet,
+}: {
+  opens?: "down" | "up"
+  sheet?: SheetBinding
+}) {
   const panels = useRecordPanels()
-  const phone = useIsPhone()
-  const bar = useRef<HTMLDivElement>(null)
-  useVisualViewport(bar, phone)
-  const side = opens ?? (phone ? "up" : undefined)
   const undo = useUndoCapture()
-  const [title, setTitle] = useState("")
+  // In the sheet the words belong to the sheet, which outlives the line: one
+  // closed with Escape keeps them for the next time it is raised.
+  const [own, setOwn] = useState("")
+  const title = sheet ? sheet.title : own
+  const setTitle = (next: string | ((now: string) => string)) => {
+    const value = typeof next === "function" ? next(title) : next
+    if (sheet) sheet.setTitle(value)
+    else setOwn(value)
+  }
   const target = useCaptureTarget()
   // A page narrowed to a project knows the project's name only once the
   // projects have come: words committed before then would go to the Inbox
@@ -123,8 +145,8 @@ export function CaptureLine({ opens }: { opens?: "down" | "up" }) {
   // are typed into: a list that flipped between keystrokes would be a jump.
   const [upward, setUpward] = useState(false)
   useLayoutEffect(() => {
-    if (!open) return
-    if (side) return setUpward(side === "up")
+    if (!open || sheet) return
+    if (opens) return setUpward(opens === "up")
     const line = wrapper.current?.getBoundingClientRect()
     if (!line) return
     setUpward(
@@ -134,7 +156,7 @@ export function CaptureLine({ opens }: { opens?: "down" | "up" }) {
         MATCHES_HEIGHT,
       ),
     )
-  }, [open, side])
+  }, [open, opens, sheet])
 
   const projectNames = Object.fromEntries(
     (projects?.data ?? []).map((project) => [project.id, project.name]),
@@ -153,12 +175,16 @@ export function CaptureLine({ opens }: { opens?: "down" | "up" }) {
     // A refusal says why in its own notice; the words come back unless the
     // reader has already started the next ones.
     if (!created) setTitle((now) => now || typed)
+    // The sheet has done its work, and would hold the notice's Open and Undo
+    // out of reach beneath its own scrim.
+    else sheet?.onDone()
   }
 
   const openMatch = (task: Pick<TaskPublic, "id">) => {
     // The task was found: the search is over, and the line is free again.
     setTitle("")
     setActiveId(null)
+    sheet?.onDone()
     panels.openTask(task.id)
   }
 
@@ -174,24 +200,77 @@ export function CaptureLine({ opens }: { opens?: "down" | "up" }) {
   const optionId = (index: number) => `${listId}-${index}`
   const heading = term ? `Open tasks matching “${term}”` : ""
 
-  return (
+  const results = open && term && (
     <div
-      ref={bar}
       className={cn(
-        // Pinned on a phone: the ground and a hairline over the list, the
-        // keyboard's height as its offset, the home indicator's as its foot
-        // (which a keyboard covers, so it counts for nothing then).
-        "max-md:bg-page max-md:border-rule-strong max-md:focus-within:border-ink max-md:fixed max-md:inset-x-0 max-md:bottom-[var(--kb-inset,0px)] max-md:z-30 max-md:border-t max-md:px-4 max-md:pb-[max(0px,calc(env(safe-area-inset-bottom)-var(--kb-inset,0px)))]",
-        "max-md:group-has-[[data-record-column]]/shell:hidden",
+        sheet
+          ? "max-h-[calc(var(--vv-height,100svh)-9.5rem)] overflow-y-auto overscroll-contain"
+          : "bg-popover border-rule-strong absolute inset-x-0 z-20 rounded-lg border py-1.5 shadow-md",
+        !sheet && (upward ? "bottom-full mb-2" : "top-full mt-1.5"),
       )}
     >
-      {/* The list's last lines fade out under the pinned line. */}
       <div
-        aria-hidden
-        className="to-page pointer-events-none absolute inset-x-0 bottom-full h-7 bg-linear-to-b from-transparent md:hidden"
-      />
+        className={cn(
+          "text-ink-3 truncate pt-1.5 pb-1 text-[12.5px]",
+          !sheet && "px-3.5",
+        )}
+      >
+        {matches.length === 0
+          ? `No open task has “${term}” in its title`
+          : heading}
+      </div>
+      {matches.length > 0 && (
+        <div id={listId} role="listbox" aria-label={heading}>
+          {matches.map((task, index) => (
+            <Match
+              key={task.id}
+              id={optionId(index)}
+              task={task}
+              term={term}
+              projectName={projectNames[task.project_id]}
+              selected={index === active}
+              inSheet={Boolean(sheet)}
+              onChoose={() => openMatch(task)}
+            />
+          ))}
+        </div>
+      )}
+      {!sheet && (
+        <div className="text-ink-3 border-rule mt-1 flex flex-wrap justify-between gap-x-3 gap-y-1 border-t px-3.5 pt-2 pb-1 text-xs">
+          <span className="min-w-0">
+            <KeyCap className="pointer-coarse:hidden">↵</KeyCap>
+            <span className="hidden pointer-coarse:inline">Return</span> creates
+            “
+            <span className="inline-block max-w-40 truncate align-bottom">
+              {title.trim()}
+            </span>
+            ” in {target.projectName}
+          </span>
+          <span className="shrink-0 pointer-coarse:hidden">
+            <KeyCap>↑</KeyCap>
+            <KeyCap>↓</KeyCap> then <KeyCap>↵</KeyCap> opens a match
+          </span>
+          <span className="hidden shrink-0 pointer-coarse:inline">
+            Tap a match to open it
+          </span>
+        </div>
+      )}
+    </div>
+  )
+
+  return (
+    <div>
+      {/* In the sheet the matches are in the flow, above the line. */}
+      {sheet && results}
       <div ref={wrapper} className="relative">
-        <label className="text-ink-3 border-rule-strong focus-within:border-ink flex h-10 items-center gap-2.5 border-b transition-colors max-md:h-[52px] max-md:border-b-0">
+        <label
+          className={cn(
+            "text-ink-3 flex items-center gap-2.5 transition-colors",
+            sheet
+              ? "h-[52px]"
+              : "border-rule-strong focus-within:border-ink h-10 border-b",
+          )}
+        >
           <Plus aria-hidden className="size-4 shrink-0" strokeWidth={1.5} />
           <input
             type="text"
@@ -240,26 +319,31 @@ export function CaptureLine({ opens }: { opens?: "down" | "up" }) {
               if (chosen) openMatch(chosen)
               else void commit()
             }}
-            // 16px on a phone: iOS zooms the page in to any field set smaller.
-            className="text-ink placeholder:text-ink-3 h-full min-w-0 flex-1 bg-transparent text-[15px] outline-none max-md:text-base"
+            // 16px in the sheet: iOS zooms the page in to any field set smaller.
+            className={cn(
+              "text-ink placeholder:text-ink-3 h-full min-w-0 flex-1 bg-transparent text-[15px] outline-none",
+              sheet && "text-base",
+            )}
           />
           {/* The key works from every screen; the cap is for a keyboard, so a
             touch screen, which has none, goes without it. */}
-          <kbd
-            aria-hidden
-            className="border-rule-strong rounded border px-[5px] font-mono text-[11px] leading-4 pointer-coarse:hidden"
-          >
-            C
-          </kbd>
+          {!sheet && (
+            <kbd
+              aria-hidden
+              className="border-rule-strong rounded border px-[5px] font-mono text-[11px] leading-4 pointer-coarse:hidden"
+            >
+              C
+            </kbd>
+          )}
           {/* A phone's keyboard has a Return key, but a thumb is surer of a
             button. It keeps focus where it is, so the keyboard stays up. */}
-          {title.trim() && (
+          {sheet && title.trim() && (
             <button
               type="button"
               aria-label="Create task"
               onMouseDown={(event) => event.preventDefault()}
               onClick={() => void commit()}
-              className="-mr-1.5 grid size-11 shrink-0 place-items-center md:hidden"
+              className="-mr-1.5 grid size-11 shrink-0 place-items-center"
             >
               <span className="bg-ink text-page grid size-8 place-items-center rounded-full">
                 <ArrowUp aria-hidden className="size-4" strokeWidth={1.8} />
@@ -277,54 +361,47 @@ export function CaptureLine({ opens }: { opens?: "down" | "up" }) {
               : `${matches.length} open ${matches.length === 1 ? "task matches" : "tasks match"}`)}
         </div>
 
-        {open && term && (
-          <div
-            className={cn(
-              "bg-popover border-rule-strong absolute inset-x-0 z-20 rounded-lg border py-1.5 shadow-md max-md:max-h-[calc(var(--vv-height,100svh)-8rem)] max-md:overflow-y-auto",
-              upward ? "bottom-full mb-2" : "top-full mt-1.5",
-            )}
-          >
-            <div className="text-ink-3 truncate px-3.5 pt-1.5 pb-1 text-[12.5px]">
-              {matches.length === 0
-                ? `No open task has “${term}” in its title`
-                : heading}
-            </div>
-            {matches.length > 0 && (
-              <div id={listId} role="listbox" aria-label={heading}>
-                {matches.map((task, index) => (
-                  <Match
-                    key={task.id}
-                    id={optionId(index)}
-                    task={task}
-                    term={term}
-                    projectName={projectNames[task.project_id]}
-                    selected={index === active}
-                    onChoose={() => openMatch(task)}
-                  />
-                ))}
-              </div>
-            )}
-            <div className="text-ink-3 border-rule mt-1 flex flex-wrap justify-between gap-x-3 gap-y-1 border-t px-3.5 pt-2 pb-1 text-xs">
-              <span className="min-w-0">
-                <KeyCap className="pointer-coarse:hidden">↵</KeyCap>
-                <span className="hidden pointer-coarse:inline">Return</span>{" "}
-                creates “
-                <span className="inline-block max-w-40 truncate align-bottom">
-                  {title.trim()}
-                </span>
-                ” in {target.projectName}
-              </span>
-              <span className="shrink-0 pointer-coarse:hidden">
-                <KeyCap>↑</KeyCap>
-                <KeyCap>↓</KeyCap> then <KeyCap>↵</KeyCap> opens a match
-              </span>
-              <span className="hidden shrink-0 pointer-coarse:inline">
-                Tap a match to open it
-              </span>
-            </div>
-          </div>
-        )}
+        {!sheet && results}
       </div>
+      {sheet && (
+        <SheetFoot
+          typed={title.trim()}
+          project={target.projectName}
+          onMore={sheet.onMore}
+        />
+      )}
+    </div>
+  )
+}
+
+/**
+ * The foot of the capture sheet: what Return will do, and the way into the
+ * full draft for a task that needs more than a title.
+ */
+function SheetFoot({
+  typed,
+  project,
+  onMore,
+}: {
+  typed: string
+  project: string
+  onMore: () => void
+}): ReactNode {
+  return (
+    <div className="text-ink-3 flex min-h-11 items-center justify-between gap-3 text-xs">
+      <span className="min-w-0 truncate">
+        {typed
+          ? `Return creates “${typed}” in ${project}`
+          : `Goes to ${project}`}
+      </span>
+      <button
+        type="button"
+        onMouseDown={(event) => event.preventDefault()}
+        onClick={onMore}
+        className="text-ink focus-visible:outline-ink -mr-2 inline-flex h-11 shrink-0 items-center rounded-md px-2 text-[13.5px] font-medium underline-offset-4 hover:underline focus-visible:outline-2"
+      >
+        More options…
+      </button>
     </div>
   )
 }
@@ -361,6 +438,7 @@ function Match({
   term,
   projectName,
   selected,
+  inSheet,
   onChoose,
 }: {
   id: string
@@ -368,6 +446,7 @@ function Match({
   term: string
   projectName?: string
   selected: boolean
+  inSheet: boolean
   onChoose: () => void
 }) {
   return (
@@ -382,14 +461,17 @@ function Match({
       onMouseDown={(event) => event.preventDefault()}
       onClick={onChoose}
       className={cn(
-        "hover:bg-hover flex cursor-pointer items-center gap-3 px-3.5 py-2.5 text-[15px] md:py-2 md:text-sm",
+        "hover:bg-hover flex cursor-pointer items-center gap-3 py-2.5 text-[15px]",
+        inSheet ? "border-rule min-h-11 border-b" : "px-3.5 md:py-2 md:text-sm",
         selected && "bg-hover",
       )}
     >
       <StatusMark status={task.status} priority={task.priority} />
-      {/* The project follows the title on a phone, where the line is narrow,
-          and sits at the right edge beside a desktop's wider one. */}
-      <span className="min-w-0 truncate font-medium md:flex-1">
+      {/* The project follows the title in the sheet, where the line is
+          narrow, and sits at the right edge beside a desktop's wider one. */}
+      <span
+        className={cn("min-w-0 truncate font-medium", !inSheet && "md:flex-1")}
+      >
         {titleParts(task.title, term).map((part, index) =>
           part.match ? (
             <b key={index} className="font-bold">
@@ -406,6 +488,20 @@ function Match({
           {projectName}
         </span>
       )}
+    </div>
+  )
+}
+
+/**
+ * The capture line a page carries at its top. A phone has none: its add
+ * control raises the capture sheet instead (FR-06.15).
+ */
+export function PageCaptureLine({ className }: { className?: string }) {
+  const phone = useIsPhone()
+  if (phone) return null
+  return (
+    <div className={className}>
+      <CaptureLine />
     </div>
   )
 }

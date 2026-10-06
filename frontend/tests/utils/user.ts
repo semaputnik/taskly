@@ -14,7 +14,13 @@ export async function logInUser(page: Page, email: string) {
     token,
   )
   await page.goto("/")
-  await expect(page.getByRole("combobox", { name: "Add a task" })).toBeVisible()
+  // The way to add a task is the line on a wide screen and the bar's add
+  // control on a phone (FR-06.15); either says the app has loaded.
+  await expect(
+    page
+      .getByRole("combobox", { name: "Add a task" })
+      .or(page.getByRole("button", { name: "Add a task" })),
+  ).toBeVisible()
 }
 
 export async function logOutUser(page: Page) {

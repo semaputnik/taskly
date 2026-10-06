@@ -385,8 +385,9 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
   Activity; Projects, Tags, Archive, Settings, appearance and signing out
   are reached from the account control in the top bar. The add control, on
   any screen, raises a capture sheet above the keyboard carrying the same
-  line and its matches, and a way into the full draft; the day page and the
-  task list carry no capture line of their own on a phone.
+  line and its matches, and a "More options…" line into the full draft,
+  which takes the typed words as its title; the day page and the task list
+  carry no capture line of their own on a phone.
 
 ### F-07. REST API
 

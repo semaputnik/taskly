@@ -24,19 +24,43 @@ const THEMES: { value: Theme; label: string; testId?: string }[] = [
 ]
 
 /**
+ * The appearance choice as it sits in an account menu: a label and the three
+ * themes as a radio group. The desktop's account row and the phone's account
+ * control share it.
+ */
+export function AppearanceItems({ itemClassName }: { itemClassName?: string }) {
+  const { theme, setTheme } = useTheme()
+  return (
+    <>
+      <DropdownMenuLabel className="text-muted-foreground text-xs font-normal">
+        Appearance
+      </DropdownMenuLabel>
+      <DropdownMenuRadioGroup
+        value={theme}
+        onValueChange={(value) => setTheme(value as Theme)}
+      >
+        {THEMES.map(({ value, label, testId }) => (
+          <DropdownMenuRadioItem
+            key={value}
+            value={value}
+            data-testid={testId}
+            className={itemClassName}
+          >
+            {label}
+          </DropdownMenuRadioItem>
+        ))}
+      </DropdownMenuRadioGroup>
+    </>
+  )
+}
+
+/**
  * The account row at the foot of the navigation: an initial avatar and the
  * name, which open the account menu (appearance, log out), beside a settings
  * glyph. Settings is a place, so it is a link and not a menu entry.
  */
-export function User({
-  user,
-  onNavigate,
-}: {
-  user: UserPublic | null | undefined
-  onNavigate?: () => void
-}) {
+export function User({ user }: { user: UserPublic | null | undefined }) {
   const { logout } = useAuth()
-  const { theme, setTheme } = useTheme()
 
   if (!user) return null
 
@@ -77,23 +101,7 @@ export function User({
             )}
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
-          <DropdownMenuLabel className="text-muted-foreground text-xs font-normal">
-            Appearance
-          </DropdownMenuLabel>
-          <DropdownMenuRadioGroup
-            value={theme}
-            onValueChange={(value) => setTheme(value as Theme)}
-          >
-            {THEMES.map(({ value, label, testId }) => (
-              <DropdownMenuRadioItem
-                key={value}
-                value={value}
-                data-testid={testId}
-              >
-                {label}
-              </DropdownMenuRadioItem>
-            ))}
-          </DropdownMenuRadioGroup>
+          <AppearanceItems />
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={logout}>
             <LogOut />
@@ -104,7 +112,6 @@ export function User({
       <RouterLink
         to="/settings"
         aria-label="Settings"
-        onClick={onNavigate}
         className={cn(
           navItemFocus,
           "text-ink-3 hover:bg-hover hover:text-ink data-[status=active]:text-ink grid size-[30px] flex-none place-items-center rounded-md",
