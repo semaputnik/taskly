@@ -276,6 +276,21 @@ export const botsQuery = () =>
       (await BotsService.readBotUsers({ query: FIRST_PAGE })).data,
   })
 
+/**
+ * The bot users that were deleted, most recently deleted first: kept so that
+ * what they did and what they were given still names them (FR-08.19).
+ */
+export const deletedBotsQuery = () =>
+  queryOptions({
+    queryKey: [ROOT.bots, "deleted"],
+    queryFn: async () =>
+      (
+        await BotsService.readBotUsers({
+          query: { deleted: true, ...FIRST_PAGE },
+        })
+      ).data,
+  })
+
 export const botQuery = (botId: string | null | undefined) =>
   queryOptions({
     queryKey: [ROOT.bot, botId],
@@ -372,6 +387,11 @@ export type Change =
 // most changes reach both of those and the activity log.
 const COUNTS: Root[] = [ROOT.projects, ROOT.project, ROOT.tags, ROOT.tag]
 
+// A deleted bot user says how many tasks still name it, so a task that is
+// created, reassigned or deleted moves that count. The live bot users carry no
+// such number and are left alone.
+const DELETED_BOTS: QueryKey = [ROOT.bots, "deleted"]
+
 /** The query keys a change makes stale, as prefixes of the keys they cover. */
 export function staleKeys(change: Change): QueryKey[] {
   const roots = (...roots: Root[]): QueryKey[] => roots.map((root) => [root])
@@ -381,11 +401,15 @@ export function staleKeys(change: Change): QueryKey[] {
       return [
         ...roots(ROOT.tasks, ROOT.activity, ...COUNTS),
         [ROOT.task, change.taskId],
+        DELETED_BOTS,
       ]
     case "task created":
-      return roots(ROOT.tasks, ROOT.activity, ...COUNTS)
+      return [...roots(ROOT.tasks, ROOT.activity, ...COUNTS), DELETED_BOTS]
     case "deletion restored":
-      return roots(ROOT.tasks, ROOT.task, ROOT.activity, ...COUNTS)
+      return [
+        ...roots(ROOT.tasks, ROOT.task, ROOT.activity, ...COUNTS),
+        DELETED_BOTS,
+      ]
     case "tag created":
       return roots(ROOT.tags, ROOT.activity)
     case "tag changed":

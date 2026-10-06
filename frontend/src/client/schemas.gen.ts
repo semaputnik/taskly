@@ -436,6 +436,23 @@ export const BotUserPublicSchema = {
             title: 'Deleted',
             default: false
         },
+        deleted_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Deleted At'
+        },
+        assigned_task_count: {
+            type: 'integer',
+            title: 'Assigned Task Count',
+            default: 0
+        },
         has_token: {
             type: 'boolean',
             title: 'Has Token'

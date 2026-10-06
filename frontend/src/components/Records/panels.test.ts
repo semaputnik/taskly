@@ -28,7 +28,7 @@ describe("the panel search schema", () => {
         project: "not-an-id",
         tag_id: ID,
         bot: ID,
-        capture: "bot",
+        capture: "folder",
         tag: "errands",
         page: 2,
       }),
@@ -40,6 +40,7 @@ describe("the panel search schema", () => {
       capture: undefined,
     })
     expect(panelSearchSchema.parse({ capture: "tag" }).capture).toBe("tag")
+    expect(panelSearchSchema.parse({ capture: "bot" }).capture).toBe("bot")
   })
 })
 

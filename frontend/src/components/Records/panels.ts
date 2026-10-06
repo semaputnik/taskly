@@ -78,6 +78,7 @@ export const CAPTURE_KINDS = [
   "task",
   "project",
   "tag",
+  "bot",
 ] as const satisfies readonly RecordKind[]
 export type CaptureKind = (typeof CAPTURE_KINDS)[number]
 
@@ -195,7 +196,10 @@ export function useRecordPanels() {
      * of the record it leaves in the history: walking ten tasks is one
      * visit to the column, and Back leaves it rather than walking back.
      */
-    walkTo: useCallback((id: string) => go(opening("task", id), true), [go]),
+    walkTo: useCallback(
+      (id: string, kind: RecordKind = "task") => go(opening(kind, id), true),
+      [go],
+    ),
     openProject: useCallback((id: string) => open("project", id), [open]),
     openTag: useCallback((id: string) => open("tag", id), [open]),
     openBot: useCallback((id: string) => open("bot", id), [open]),

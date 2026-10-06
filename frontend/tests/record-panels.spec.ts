@@ -1,4 +1,5 @@
 import { expect, type Page, test } from "@playwright/test"
+import { botLine, createBotInColumn, openBot } from "./utils/bots"
 import { randomEmail } from "./utils/random"
 import { taskLine } from "./utils/tasks"
 import { storeTokenAndClose } from "./utils/tokenDialog"
@@ -186,7 +187,7 @@ test("A bot user's scope and permissions each save on their own", async ({
   ).json()
 
   await page.goto("/bots")
-  await row(page, "Triage agent").click()
+  await openBot(page, "Triage agent")
   const panel = page.getByRole("complementary", { name: "Triage agent" })
   await expect(panel.getByRole("textbox", { name: "Bot name" })).toHaveValue(
     "Triage agent",
@@ -232,7 +233,7 @@ test("A token is issued and revoked from the bot user's panel", async ({
   })
 
   await page.goto("/bots")
-  await row(page, "Nightly sync").click()
+  await openBot(page, "Nightly sync")
   const panel = page.getByRole("complementary", {
     name: "Nightly sync",
     exact: true,
@@ -263,7 +264,8 @@ test("A token is issued and revoked from the bot user's panel", async ({
     .getByRole("button", { name: "Revoke", exact: true })
     .click()
   await expect(page.getByText("was revoked")).toBeVisible()
-  await expect(panel).toContainText("Revoked — its requests are refused")
+  await expect(panel).toContainText("Revoked")
+  await expect(panel).toContainText("its requests are refused")
   // The bot user itself is untouched.
   await expect(panel.getByRole("textbox", { name: "Bot name" })).toHaveValue(
     "Nightly sync",
@@ -310,16 +312,11 @@ test("Creating a bot user still asks for its scope up front", async ({
   })
 
   await page.goto("/bots")
-  await page.getByRole("button", { name: "Add Bot" }).click()
-  const dialog = page.getByRole("dialog", { name: "Add Bot" })
-  await dialog.getByPlaceholder("Bot name").fill("Release agent")
-  await dialog.getByRole("checkbox", { name: "Releases" }).check()
-  await dialog.getByRole("button", { name: "Create and issue token" }).click()
-
-  await storeTokenAndClose(
-    page.getByRole("dialog", { name: "Token for Release agent" }),
-  )
-  await expect(row(page, "Release agent")).toContainText("Releases")
+  await createBotInColumn(page, {
+    name: "Release agent",
+    projects: ["Releases"],
+  })
+  await expect(botLine(page, "Release agent")).toContainText("Releases")
 })
 
 test("No record carries a three-dot menu, and rows open from the keyboard", async ({

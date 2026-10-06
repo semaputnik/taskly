@@ -202,10 +202,14 @@ test("The sheet follows the keyboard, and Return writes a task from Bots", async
   await page.goto("/bots")
   await addControl(page).tap()
   await expect(sheet(page)).toBeVisible()
-  const rest = await boxOf(sheet(page))
+  // At rest on the bottom edge: it is visible from the first frame of its
+  // slide, so it is waited for there rather than measured on the way.
   await expect
-    .poll(async () => (await boxOf(sheet(page))).y)
-    .toBeCloseTo(rest.y, 0)
+    .poll(async () => {
+      const place = await boxOf(sheet(page))
+      return place.y + place.height
+    })
+    .toBeCloseTo(812, 0)
 
   await raiseKeyboard(page, 300)
   await expect

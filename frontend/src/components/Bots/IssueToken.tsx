@@ -1,5 +1,4 @@
 import { useMutation } from "@tanstack/react-query"
-import { KeyRound } from "lucide-react"
 import { useState } from "react"
 
 import { BotsService, type BotUserPublic } from "@/client"
@@ -57,8 +56,12 @@ const IssueToken = ({ bot }: { bot: BotUserPublic }) => {
 
   return (
     <>
-      <Button variant="outline" size="sm" onClick={() => setIsOpen(true)}>
-        <KeyRound />
+      <Button
+        variant="ghost"
+        size="sm"
+        className="text-ink-2 hover:text-ink -mx-2 text-[13.5px] font-medium pointer-coarse:h-11"
+        onClick={() => setIsOpen(true)}
+      >
         {label}
       </Button>
 

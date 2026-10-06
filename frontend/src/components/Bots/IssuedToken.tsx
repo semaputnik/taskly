@@ -11,7 +11,7 @@ export interface Issued {
 const ShowIssuedToken = createContext<(issued: Issued) => void>(() => {})
 
 /**
- * Holds a just-issued token on the page itself, above the table.
+ * Holds a just-issued token above the panels.
  *
  * The button that issues a token sits in the bot user's row, and the row
  * changes as soon as the list learns the token is out — which it can at any

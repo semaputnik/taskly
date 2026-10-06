@@ -270,6 +270,44 @@ def test_deleting_a_bot_user_marks_it_deleted_and_takes_it_off_the_list(
     assert stored.name == "Retired"
 
 
+def test_the_deleted_bot_users_are_listed_on_request_with_when_and_what_they_still_name(
+    client: TestClient, owner: Headers
+) -> None:
+    kept = create_bot_user(client, owner, project_ids=[], permissions=READ_ONLY)
+    retired = create_bot_user(
+        client, owner, project_ids=[], permissions=READ_ONLY, name="Retired"
+    )
+    for title in ("One", "Two"):
+        r = client.post(
+            f"{API}/tasks/",
+            headers=owner,
+            json={"title": title, "assignee_id": retired["id"]},
+        )
+        assert r.status_code == 200, r.text
+    gone = client.post(
+        f"{API}/tasks/",
+        headers=owner,
+        json={"title": "Gone", "assignee_id": retired["id"]},
+    ).json()
+    client.delete(f"{API}/tasks/{gone['id']}", headers=owner)
+    client.delete(f"{API}/bot-users/{retired['id']}", headers=owner)
+
+    r = client.get(f"{API}/bot-users/", headers=owner, params={"deleted": True})
+    assert r.status_code == 200, r.text
+    assert r.json()["count"] == 1
+    [listed] = r.json()["data"]
+    assert listed["id"] == retired["id"]
+    assert listed["deleted"] is True
+    assert listed["deleted_at"] is not None
+    # Deleted tasks are not named by anything the user can see.
+    assert listed["assigned_task_count"] == 2
+
+    live = _listed(client, owner)
+    assert [b["id"] for b in live] == [kept["id"]]
+    assert live[0]["deleted_at"] is None
+    assert live[0]["assigned_task_count"] == 0
+
+
 def test_a_deleted_bot_user_is_gone_from_every_management_endpoint(
     client: TestClient, owner: Headers
 ) -> None:
