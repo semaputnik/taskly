@@ -13,6 +13,7 @@ import {
   AttachmentsService,
   BotsService,
   CommentsService,
+  PaperlessService,
   ProjectsService,
   type TagPublic,
   TagsService,
@@ -61,6 +62,7 @@ const ROOT = {
   activity: "activity",
   comments: "comments",
   attachments: "attachments",
+  paperless: "paperless",
 } as const
 
 type Root = (typeof ROOT)[keyof typeof ROOT]
@@ -355,6 +357,16 @@ export const attachmentsQuery = (taskId: string) =>
         .data,
   })
 
+/**
+ * The signed-in user's Paperless connection (F-04): whether there is one, its
+ * address and how many PDFs are kept there. The token is never in it.
+ */
+export const paperlessQuery = () =>
+  queryOptions({
+    queryKey: [ROOT.paperless],
+    queryFn: async () => (await PaperlessService.readConnection()).data,
+  })
+
 // Changes
 
 /** Something the reader did that the server now knows, in the domain's words. */
@@ -383,6 +395,8 @@ export type Change =
   | { type: "attachments changed"; taskId: string }
   /** The signed-in account itself changed: everything read may be stale. */
   | { type: "account changed" }
+  /** Paperless was connected, changed, had its token replaced, or was disconnected. */
+  | { type: "paperless changed" }
   /** A passkey was added to or removed from the signed-in account. */
   | { type: "passkeys changed" }
   | { type: "users changed" }
@@ -449,6 +463,10 @@ export function staleKeys(change: Change): QueryKey[] {
       return [[ROOT.comments, change.taskId], [ROOT.activity]]
     case "attachments changed":
       return [[ROOT.attachments, change.taskId], [ROOT.activity]]
+    case "paperless changed":
+      // Where every attachment is kept, and whether its document can be
+      // reached, follows the connection.
+      return roots(ROOT.paperless, ROOT.attachments)
     case "account changed":
       return [[]]
     case "passkeys changed":

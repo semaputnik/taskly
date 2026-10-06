@@ -26,6 +26,7 @@ test.describe("The document", () => {
       /^Profile/,
       /^Passkeys/,
       /^Sessions/,
+      /^Paperless/,
       /^Account/,
     ])
   })
@@ -40,6 +41,7 @@ test.describe("The document", () => {
       /^Profile/,
       /^Passkeys/,
       /^Sessions/,
+      /^Paperless/,
       /^Users/,
       /^Account/,
     ])
