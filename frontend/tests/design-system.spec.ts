@@ -24,12 +24,15 @@ for (const theme of ["light", "dark"] as const) {
     })
 
     test("The primary action is readable on its fill", async ({ page }) => {
-      // The Tags page still has its filled button.
+      // The one filled button left on a page of the Changelog world is the
+      // commit of a new record's draft in the column: Create tag, enabled
+      // once the draft has a name.
       await page.goto("/tags")
-      const add = page
-        .getByRole("main")
-        .getByRole("button", { name: "Add Tag" })
-      expect(await textOnFill(add)).toBeGreaterThanOrEqual(AA)
+      await page.getByRole("button", { name: "New tag" }).click()
+      await page.getByRole("textbox", { name: "Tag name" }).fill("errands")
+      const create = page.getByRole("button", { name: "Create tag" })
+      await expect(create).toBeEnabled()
+      expect(await textOnFill(create)).toBeGreaterThanOrEqual(AA)
     })
 
     test("The Projects page's quiet text is readable", async ({ page }) => {

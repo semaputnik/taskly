@@ -62,7 +62,10 @@ test("Every destructive confirmation names its consequence before its button", a
   )
 
   await page.goto("/tags")
-  await page.getByRole("row", { name: "Open outdoors" }).click()
+  await page
+    .getByRole("list", { name: "All tags" })
+    .getByRole("link", { name: "outdoors", exact: true })
+    .click()
   await page.getByRole("button", { name: "Delete tag" }).click()
   await expectConsequenceFirst(
     page.getByRole("dialog", { name: /Delete the tag outdoors/ }),

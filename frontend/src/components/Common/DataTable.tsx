@@ -6,7 +6,6 @@ import {
   useTable,
 } from "@tanstack/react-table"
 
-import { type RecordKind, useRecordPanels } from "@/components/Records/panels"
 import {
   Table,
   TableBody,
@@ -32,27 +31,7 @@ interface DataTableProps<TData extends RowData> {
    * and those two need different words — so the table does not guess.
    */
   empty?: React.ReactNode
-  /** Makes rows open something. Clicks on a row's own controls are ignored. */
-  onRowClick?: (row: TData) => void
-  /**
-   * The kind of record a row opens. The row whose record is open in the
-   * column is tinted, as a line on the day page is.
-   */
-  opens?: RecordKind
-  /**
-   * What opening a row does, in words. A row that acts is a control, and a
-   * control without a name is unusable to anyone not looking at the screen.
-   */
-  rowLabel?: (row: TData) => string
 }
-
-/**
- * A row can hold checkboxes, menus and links, and clicking one of those means
- * that control — not "open the row". Asking the event where it landed keeps
- * the rule in one place, rather than making every cell remember to stop
- * propagation.
- */
-const INTERACTIVE = "button, a, input, select, textarea"
 
 /**
  * A cell's content, called rather than mounted when it is a plain function.
@@ -71,22 +50,12 @@ function renderCell<TProps extends object>(
     : flexRender(cell as never, context)
 }
 
-function fromRowItself(event: React.MouseEvent<HTMLElement>): boolean {
-  const target = event.target as HTMLElement | null
-  return !target?.closest(INTERACTIVE)
-}
-
 export function DataTable<TData extends RowData>({
   columns,
   data,
   empty,
-  onRowClick,
-  opens,
-  rowLabel,
 }: DataTableProps<TData>) {
   const table = useTable({ features, data, columns })
-  const { idOf } = useRecordPanels()
-  const openId = opens ? idOf(opens) : null
   const columnCount = columns.length
 
   return (
@@ -111,43 +80,7 @@ export function DataTable<TData extends RowData>({
         {table.getRowModel().rows.length ? (
           table.getRowModel().rows.map((row) => {
             return (
-              <TableRow
-                key={row.id}
-                data-open={
-                  openId !== null &&
-                  (row.original as { id?: string }).id === openId
-                    ? ""
-                    : undefined
-                }
-                className={
-                  onRowClick
-                    ? "focus-visible:ring-ring cursor-pointer outline-none focus-visible:ring-2"
-                    : undefined
-                }
-                // A row that opens a record takes focus, answers Enter and
-                // Space, and says what it opens. It stays a row: giving it a
-                // button's role would take the table's structure away from
-                // every reader who relies on it.
-                tabIndex={onRowClick ? 0 : undefined}
-                aria-label={rowLabel?.(row.original)}
-                onClick={
-                  onRowClick
-                    ? (event) => {
-                        if (fromRowItself(event)) onRowClick(row.original)
-                      }
-                    : undefined
-                }
-                onKeyDown={
-                  onRowClick
-                    ? (event) => {
-                        if (event.key !== "Enter" && event.key !== " ") return
-                        if (event.target !== event.currentTarget) return
-                        event.preventDefault()
-                        onRowClick(row.original)
-                      }
-                    : undefined
-                }
-              >
+              <TableRow key={row.id}>
                 {row.getAllCells().map((cell) => (
                   <TableCell key={cell.id}>
                     {renderCell(cell.column.columnDef.cell, cell.getContext())}

@@ -406,9 +406,10 @@ class TagPublic(TagBase):
     # list, but deleting or merging the tag reaches them too.
     archived_task_count: int = 0
     # The bot user that brought the tag into being, if one did — through the
-    # API or by typing a new name onto a task — so an agent's vocabulary can
+    # API or by typing a new name onto a task — so a bot user's vocabulary can
     # be told from the user's own (FR-01.28).
     created_by_bot_user: BotUserRef | None = None
+    created_at: datetime | None = None
 
 
 class TagDuplicateDismissal(SQLModel, table=True):

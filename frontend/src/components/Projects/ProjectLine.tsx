@@ -2,14 +2,11 @@ import { Link as RouterLink } from "@tanstack/react-router"
 import { ArrowRight } from "lucide-react"
 
 import type { ProjectPublic } from "@/client"
+import { countLink } from "@/components/Dashboard/shared"
 import { recordLink, useIsOpen } from "@/components/Records/panels"
 import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
 import { keptInWords, metaFacts } from "./words"
-
-/** The one count's link: quiet at rest, tinted under the pointer. */
-const countLink =
-  "focus-visible:ring-ring/50 hover:bg-rule -my-1 -mr-2 inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[13.5px] font-medium whitespace-nowrap outline-none focus-visible:ring-[3px] pointer-coarse:-my-3 pointer-coarse:py-3"
 
 /** The neutral square that marks a project, quieter for an archived one. */
 function Marker({ archived }: { archived?: boolean }) {

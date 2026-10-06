@@ -38,15 +38,16 @@ test("A failure says what failed, not that something went wrong", async ({
   await api.create("/tags/", { name: "errands" })
 
   await page.goto("/tags")
-  await page.getByRole("button", { name: "Add Tag" }).click()
+  await page.getByRole("button", { name: "New tag" }).click()
   const name = page.getByRole("textbox", { name: "Tag name" })
   await name.fill("errands")
   await name.press("Enter")
 
-  const toast = page.locator("[data-sonner-toast]").first()
-  await expect(toast).toContainText("You already have a tag named “errands”.")
-  await expect(toast).not.toContainText("Something went wrong")
-  await expect(toast).not.toContainText("Success!")
+  // The refusal is said under the name, in the API's words.
+  const refusal = page.getByRole("complementary").getByRole("alert")
+  await expect(refusal).toContainText("You already have a tag named “errands”.")
+  await expect(refusal).not.toContainText("Something went wrong")
+  await expect(refusal).not.toContainText("Success!")
 })
 
 test("A name that is not set reads as prose", async ({ page }) => {

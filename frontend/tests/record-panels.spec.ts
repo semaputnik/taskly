@@ -2,6 +2,7 @@ import { expect, type Page, test } from "@playwright/test"
 import { botLine, createBotInColumn, openBot } from "./utils/bots"
 import { randomEmail } from "./utils/random"
 import { storeSecretAndClose } from "./utils/secretDialog"
+import { tagLink } from "./utils/tags"
 import { taskLine } from "./utils/tasks"
 import { logInUser } from "./utils/user"
 
@@ -21,12 +22,8 @@ async function api(page: Page) {
   }
 }
 
-/**
- * A record's row, by the name it says it opens: two tables can be on one
- * screen, and a task's row carries its project's name too.
- */
-const row = (page: Page, name: string) =>
-  page.getByRole("row", { name: `Open ${name}` })
+/** A tag's name on its line: the link that opens its column. */
+const row = (page: Page, name: string) => tagLink(page, name)
 
 /** A project's name on its line: the link that opens its column. */
 const projectLink = (page: Page, name: string) =>
@@ -309,7 +306,7 @@ test("Creating a project or a tag opens the new record's panel", async ({
   await expect(projectLink(page, "Move house")).toBeVisible()
 
   await page.goto("/tags")
-  await page.getByRole("button", { name: "Add Tag" }).click()
+  await page.getByRole("button", { name: "New tag" }).click()
   const tagName = page.getByRole("textbox", { name: "Tag name" })
   await tagName.fill("packing")
   await tagName.press("Enter")
@@ -384,9 +381,12 @@ test("A refused rename keeps the name that was typed", async ({ page }) => {
   await name.fill("errands")
   await name.press("Enter")
 
-  // The API refuses a name already in use, and says so. Putting the two
-  // together is offered as a merge of its own, which the reader declines.
-  await expect(page.getByText("You already have a tag named")).toBeVisible()
+  // The API refuses a name already in use, and says so under the name.
+  // Putting the two together is offered as a merge of its own, which the
+  // reader declines.
+  await expect(page.locator("[role=alert]")).toContainText(
+    "You already have a tag named",
+  )
   const offer = page.getByRole("dialog", { name: "Merge into errands?" })
   await expect(offer).toBeVisible()
   await offer.getByRole("button", { name: "Cancel" }).click()

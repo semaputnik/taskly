@@ -2,6 +2,7 @@ import { useSuspenseQueries } from "@tanstack/react-query"
 import { createFileRoute } from "@tanstack/react-router"
 import { Suspense } from "react"
 
+import { ListHeading as Heading } from "@/components/Common/ListHeading"
 import { textLink } from "@/components/Dashboard/shared"
 import {
   ArchivedProjectLine,
@@ -31,31 +32,6 @@ export const Route = createFileRoute("/_layout/projects")({
     ],
   }),
 })
-
-/** A section's heading: 13px, 600, over a hairline, its count in mono. */
-function Heading({
-  children,
-  count,
-  note,
-}: {
-  children: string
-  count: number
-  note?: string
-}) {
-  return (
-    <h2 className="border-rule-strong flex items-baseline gap-2 border-b pb-2 text-[13px] font-semibold">
-      {children}
-      <span className="text-ink-3 font-mono text-xs font-normal tabular-nums">
-        {count}
-      </span>
-      {note && (
-        <span className="text-ink-3 ml-auto text-[13px] font-normal">
-          {note}
-        </span>
-      )}
-    </h2>
-  )
-}
 
 /**
  * The live projects as lines, the sentence of counts above them, and the

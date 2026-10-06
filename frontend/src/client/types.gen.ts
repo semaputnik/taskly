@@ -855,6 +855,10 @@ export type TagPublic = {
      */
     archived_task_count?: number;
     created_by_bot_user?: BotUserRef | null;
+    /**
+     * Created At
+     */
+    created_at?: string | null;
 };
 
 /**
