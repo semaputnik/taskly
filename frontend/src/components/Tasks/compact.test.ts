@@ -48,14 +48,13 @@ describe("a due date in a compact row", () => {
       text: "14 days late",
       tone: "late",
     })
-    // Past the line the date is said in the product's numeric format, and
-    // is still red.
+    // Past the line the date is said in words, and is still red.
     expect(describeDue(ago(15), TODAY)).toEqual({
-      text: `due ${formatDay(ago(15))}`,
+      text: `due ${formatDay(ago(15), new Date(2026, 8, 18))}`,
       tone: "late",
     })
     expect(describeDue("1999-12-31", TODAY)).toEqual({
-      text: `due ${formatDay("1999-12-31")}`,
+      text: `due ${formatDay("1999-12-31", new Date(2026, 8, 18))}`,
       tone: "late",
     })
   })

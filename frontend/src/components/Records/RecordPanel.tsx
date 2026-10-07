@@ -7,6 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
 import type { RecordLoad } from "./panels"
+import { SaveCue, SaveCueProvider } from "./saveCue"
 import type { Neighbours } from "./walk"
 
 /**
@@ -49,13 +50,14 @@ export const gutter = "px-4 md:px-9"
 
 /**
  * A property's value as a text button: 30px tall, flat at rest, tinted on
- * hover, with its chevron shown only then, and always, a little quieter,
- * under a thumb, which has no hover. Written for a select's trigger (the
- * chevron is its last child); the margin pulls the text back onto the label
- * column's edge, so the tint reaches past the text and the text does not move.
+ * hover, with its chevron always in view in Ink 3 — a value that can change
+ * says so at rest, where there is no hover to reveal it — and darkening to ink
+ * on hover and focus. Written for a select's trigger (the chevron is its last
+ * child); the margin pulls the text back onto the label column's edge, so the
+ * tint reaches past the text and the text does not move.
  */
 export const quiet =
-  "record-control data-[size=default]:h-[30px] data-[size=default]:pointer-coarse:h-11 w-fit max-w-full -ml-2 gap-1.5 border-transparent bg-transparent px-2 py-0 text-[15px] shadow-none hover:bg-hover focus-visible:border-ring dark:bg-transparent dark:hover:bg-hover [&>svg:last-child]:size-3 [&>svg:last-child]:opacity-0 hover:[&>svg:last-child]:opacity-100 focus-visible:[&>svg:last-child]:opacity-100 data-[state=open]:[&>svg:last-child]:opacity-100 pointer-coarse:[&>svg:last-child]:opacity-60"
+  "record-control data-[size=default]:h-[30px] data-[size=default]:pointer-coarse:h-11 w-fit max-w-full -ml-2 gap-1.5 border-transparent bg-transparent px-2 py-0 text-[15px] shadow-none hover:bg-hover focus-visible:border-ring dark:bg-transparent dark:hover:bg-hover [&>svg:last-child]:size-3 [&>svg:last-child]:opacity-100 hover:[&>svg:last-child]:text-ink! focus-visible:[&>svg:last-child]:text-ink! data-[state=open]:[&>svg:last-child]:text-ink!"
 
 export function RecordPanel({
   open,
@@ -94,56 +96,58 @@ export function RecordPanel({
   // and unmount, and focus follows them.
   if (!open) return null
   return (
-    <Column
-      name={name}
-      kind={kind}
-      onClose={onClose}
-      walk={walk}
-      onWalk={onWalk}
-      bar={bar}
-    >
-      {failure ? (
-        <div role="alert" className="flex flex-col items-start gap-3 p-6">
-          <p className="font-medium">
-            {failure === "missing"
-              ? `This ${kind} could not be opened`
-              : `This ${kind} could not be loaded`}
-          </p>
-          <p className="text-muted-foreground text-sm text-pretty">
-            {failure === "missing"
-              ? "It may have been deleted, or the link points at something that is not yours. Deleted records can be restored from the activity log."
-              : `The server did not answer this time. Nothing about the ${kind} has changed.`}
-          </p>
-          <div className="flex gap-2">
-            {failure === "unavailable" && onRetry && (
-              <Button size="sm" onClick={onRetry}>
-                Try again
+    <SaveCueProvider>
+      <Column
+        name={name}
+        kind={kind}
+        onClose={onClose}
+        walk={walk}
+        onWalk={onWalk}
+        bar={bar}
+      >
+        {failure ? (
+          <div role="alert" className="flex flex-col items-start gap-3 p-6">
+            <p className="font-medium">
+              {failure === "missing"
+                ? `This ${kind} could not be opened`
+                : `This ${kind} could not be loaded`}
+            </p>
+            <p className="text-muted-foreground text-sm text-pretty">
+              {failure === "missing"
+                ? "It may have been deleted, or the link points at something that is not yours. Deleted records can be restored from the activity log."
+                : `The server did not answer this time. Nothing about the ${kind} has changed.`}
+            </p>
+            <div className="flex gap-2">
+              {failure === "unavailable" && onRetry && (
+                <Button size="sm" onClick={onRetry}>
+                  Try again
+                </Button>
+              )}
+              <Button variant="outline" size="sm" onClick={onClose}>
+                Close
               </Button>
-            )}
-            <Button variant="outline" size="sm" onClick={onClose}>
-              Close
-            </Button>
-          </div>
-        </div>
-      ) : pending ? (
-        <div className="flex flex-col gap-4 p-6">
-          <Skeleton className="h-4 w-24" />
-          <Skeleton className="h-7 w-3/4" />
-          <Skeleton className="h-40 w-full" />
-        </div>
-      ) : (
-        <>
-          {children}
-          {destructive && (
-            <div className={cn("mt-auto", gutter)}>
-              <div className="flex flex-wrap gap-2 border-t py-4">
-                {destructive}
-              </div>
             </div>
-          )}
-        </>
-      )}
-    </Column>
+          </div>
+        ) : pending ? (
+          <div className="flex flex-col gap-4 p-6">
+            <Skeleton className="h-4 w-24" />
+            <Skeleton className="h-7 w-3/4" />
+            <Skeleton className="h-40 w-full" />
+          </div>
+        ) : (
+          <>
+            {children}
+            {destructive && (
+              <div className={cn("mt-auto", gutter)}>
+                <div className="flex flex-wrap gap-2 border-t py-4">
+                  {destructive}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </Column>
+    </SaveCueProvider>
   )
 }
 
@@ -192,8 +196,9 @@ function Column({
       <div className="bg-page sticky top-0 z-10 flex h-14 shrink-0 items-center gap-3 pr-3 pl-4 md:pr-[29px] md:pl-9 min-[1200px]:h-[52px]">
         {/* One bar: where the record sits, then the controls that act on the
             column. The context truncates; the controls never move. */}
-        <div className="text-ink-3 flex min-w-0 flex-1 items-center gap-1.5 text-[13px]">
+        <div className="text-ink-3 relative flex min-w-0 flex-1 items-center gap-1.5 text-[13px]">
           {bar}
+          <SaveCue />
         </div>
         <span className="flex shrink-0 items-center gap-1">
           {walk && (
@@ -478,12 +483,14 @@ export function PropertyRow({
           <span id={labelId} className={text}>
             {label}
           </span>
-          <fieldset
-            aria-labelledby={labelId}
-            className={`${value} m-0 border-0 p-0`}
-          >
+          {/* Not a `fieldset`: a fieldset's own box takes the row's minimum
+              height but its content does not, so a short value sat at the top
+              of a tall row (the Created row on a phone) instead of level
+              with its label. */}
+          {/* biome-ignore lint/a11y/useSemanticElements: a fieldset cannot centre its content, see above */}
+          <div role="group" aria-labelledby={labelId} className={value}>
             {children}
-          </fieldset>
+          </div>
         </>
       )}
     </div>
@@ -508,7 +515,7 @@ export function PropertyList({ children }: { children: React.ReactNode }) {
  * disabled control: a control that cannot be used still asks to be tried.
  */
 export function ReadOnlyValue({ children }: { children: React.ReactNode }) {
-  return <span className="text-ink-3 text-sm">{children}</span>
+  return <span className="text-ink-3 text-[15px]">{children}</span>
 }
 
 /** A section heading: 13px, 600, over a hairline. */
@@ -583,8 +590,14 @@ export function EditableText({
   placeholder,
   id,
   ariaLabel,
+  required,
 }: {
   value: string
+  /**
+   * Said under the field when it is left empty: the old words come back and
+   * this tells why. Without it an emptied field is saved as empty.
+   */
+  required?: string
   /**
    * Save the new value. Resolving to `false` says the save was refused, and
    * the field then keeps what was typed instead of snapping back to what the
@@ -604,6 +617,8 @@ export function EditableText({
   ariaLabel?: string
 }) {
   const [draft, setDraft] = useState(value)
+  const [problem, setProblem] = useState("")
+  const problemId = useId()
   // Whether the field holds words the reader typed and has not yet saved or
   // abandoned. Only those are ever sent: focus alone is not an edit, so a
   // field that was merely visited keeps following the server — a save made a
@@ -617,16 +632,23 @@ export function EditableText({
 
   const type = (next: string) => {
     typed.current = true
+    setProblem("")
     setDraft(next)
   }
 
   const abandon = () => {
     typed.current = false
+    setProblem("")
     setDraft(value)
   }
 
   const commit = async () => {
     if (!typed.current) return
+    if (required && !draft.trim()) {
+      abandon()
+      setProblem(required)
+      return
+    }
     if (draft === value) {
       typed.current = false
       return
@@ -643,22 +665,41 @@ export function EditableText({
     placeholder,
     onBlur: () => void commit(),
     className: cn(ghost, className),
+    ...(required && {
+      "aria-invalid": problem ? true : undefined,
+      "aria-describedby": problemId,
+    }),
   }
+
+  // The reason is under the field, in a region that is always there so that
+  // putting words in it is announced.
+  const reason = required && (
+    <p
+      id={problemId}
+      aria-live="polite"
+      className="text-late not-empty:pt-0.5 text-[13px]"
+    >
+      {problem}
+    </p>
+  )
 
   if (wrap) {
     return (
-      <Textarea
-        {...shared}
-        rows={1}
-        onChange={(e) => type(e.target.value.replace(/\s*\n\s*/g, " "))}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" && !e.nativeEvent.isComposing) {
-            e.preventDefault()
-            e.currentTarget.blur()
-          }
-          if (e.key === "Escape") abandon()
-        }}
-      />
+      <div className="min-w-0">
+        <Textarea
+          {...shared}
+          rows={1}
+          onChange={(e) => type(e.target.value.replace(/\s*\n\s*/g, " "))}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+              e.preventDefault()
+              e.currentTarget.blur()
+            }
+            if (e.key === "Escape") abandon()
+          }}
+        />
+        {reason}
+      </div>
     )
   }
 

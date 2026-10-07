@@ -4,7 +4,7 @@ import type { ReactNode } from "react"
 import type { ActivityEntryPublic, TaskStatus } from "@/client"
 import { type RecordKind, recordLink } from "@/components/Records/panels"
 import { STATUS_LABELS } from "@/components/Tasks/statuses"
-import { formatDay } from "@/lib/dates"
+import { formatDayPlain } from "@/lib/dates"
 import { cn } from "@/lib/utils"
 
 interface ProjectRef {
@@ -43,7 +43,7 @@ function describeBatch(changes: Record<string, unknown>): string {
   if ("due_date" in changes) {
     said.push(
       changes.due_date
-        ? `due ${formatDay(changes.due_date as string)}`
+        ? `due ${formatDayPlain(changes.due_date as string)}`
         : "due date cleared",
     )
   }

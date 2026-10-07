@@ -30,7 +30,11 @@ test("A refused title keeps what was typed, and leaving again retries", async ({
   await title.fill("Book the vet for Friday")
   await title.press("Enter")
 
-  await expect(page.getByText("The title could not be saved.")).toBeVisible()
+  // The refusal is said once, in the column's bar, and stays until the next
+  // edit; the typed words stay in the field.
+  const cue = page.getByRole("status").filter({ hasText: /save/i })
+  await expect(cue).toHaveText("Couldn't save: The title could not be saved.")
+  await expect(page.getByText("The title could not be saved.")).toHaveCount(1)
   await expect(title).toHaveValue("Book the vet for Friday")
   expect(patches).toEqual(["Book the vet for Friday"])
 
@@ -39,6 +43,7 @@ test("A refused title keeps what was typed, and leaving again retries", async ({
   await title.focus()
   await title.press("Enter")
   await expect.poll(() => patches.length).toBe(2)
+  await expect(cue).toHaveText("Saved")
   await expect(
     page.getByRole("complementary", { name: "Book the vet for Friday" }),
   ).toBeVisible()

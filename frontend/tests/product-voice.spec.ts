@@ -81,14 +81,13 @@ test("Deleting an account names its button and what goes with it", async ({
   await expect(description).toContainText("cannot be undone")
 })
 
-test("A date in the panel's date field is written the product's way", async ({
-  page,
-}) => {
+test("A date in the panel's date field is said in words", async ({ page }) => {
   await newUser(page)
   const api = await userApi(page)
   const task = await api.create("/tasks/", {
     title: "Renew the lease",
-    due_date: "2026-09-01",
+    // A year that is not this one, so the year is said too.
+    due_date: "2019-09-01",
   })
   await api.create(`/tasks/${task.id}/comments/`, { body: "Signed" })
 
@@ -99,8 +98,10 @@ test("A date in the panel's date field is written the product's way", async ({
     .getByRole("complementary", { name: "Renew the lease" })
     .getByRole("button", { name: /^Due date:/ })
   const shown = ((await field.textContent()) ?? "").trim()
-  expect(shown).toMatch(/2026/)
-  expect(shown).not.toContain("2026-09-01")
+  expect(shown).toMatch(/2019/)
+  expect(shown).toMatch(/Sep/)
+  expect(shown).not.toContain("2019-09-01")
+  expect(shown).not.toMatch(/\d{1,2}[./]\d{1,2}[./]\d{2,4}/)
 
   // Moments in the panel are written to the minute and no further: the
   // Created row with its day, the history's time column with the time alone.

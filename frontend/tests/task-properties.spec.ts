@@ -7,6 +7,18 @@ test.use({ storageState: { cookies: [], origins: [] } })
 
 const AA = 4.5
 
+/** A palette token as the `rgb(...)` string a computed colour reads as. */
+async function rgbOf(page: Page, name: string) {
+  return page.evaluate((property) => {
+    const probe = document.createElement("span")
+    probe.style.color = `var(${property})`
+    document.body.append(probe)
+    const colour = getComputedStyle(probe).color
+    probe.remove()
+    return colour
+  }, name)
+}
+
 async function openTask(
   page: Page,
   fields: Record<string, unknown> = {},
@@ -80,7 +92,7 @@ test("One bar says where the task sits and who opened it, then the title and the
   ).toHaveValue("Four pages off the old template.")
 })
 
-test("A value shows its chevron when it is reached for, and every one takes a visible ring from the keyboard", async ({
+test("A value always shows its chevron, in Ink 3, darkening when it is reached for, and every one takes a visible ring from the keyboard", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1440, height: 900 })
@@ -88,10 +100,27 @@ test("A value shows its chevron when it is reached for, and every one takes a vi
   const priority = panel.getByRole("combobox", { name: "Priority" })
   const chevron = priority.locator("svg").last()
 
-  await expect(chevron).toHaveCSS("opacity", "0")
-  await priority.hover()
+  // At rest: there, in the quiet ink, with no hover to reveal it.
   await expect(chevron).toHaveCSS("opacity", "1")
+  const quiet = await chevron.evaluate((node) => getComputedStyle(node).color)
+  expect(quiet).toBe(await rgbOf(page, "--ink-3"))
+  await priority.hover()
+  await expect(chevron).toHaveCSS("color", await rgbOf(page, "--ink"))
   await expect(priority).not.toHaveCSS("background-color", "rgba(0, 0, 0, 0)")
+  await page.mouse.move(0, 0)
+  await expect(chevron).toHaveCSS("color", quiet)
+  await priority.focus()
+  await expect(chevron).toHaveCSS("color", await rgbOf(page, "--ink"))
+  // Every property that can change carries one, the due date's calendar
+  // glyph standing in its place.
+  for (const name of ["Status", "Project", "Assignee", "Repeat"]) {
+    await expect(
+      panel.getByRole("combobox", { name }).locator("svg").last(),
+    ).toHaveCSS("opacity", "1")
+  }
+  await expect(
+    panel.getByRole("button", { name: "Due date: not set" }).locator("svg"),
+  ).toHaveCSS("opacity", "1")
 
   // Tab from the status, down the list: each value is a control that is
   // reached and shows a ring where it has focus.
@@ -172,7 +201,7 @@ test("The status mark beside the title closes the task", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 })
   const { api, task, panel } = await openTask(page)
 
-  const mark = panel.getByRole("checkbox", { name: /^Mark as done/ })
+  const mark = panel.getByRole("checkbox", { name: /^Mark done/ })
   await expect(mark).toBeVisible()
   await mark.click()
   await expect(panel.getByRole("combobox", { name: "Status" })).toContainText(
@@ -275,4 +304,108 @@ test.describe("On a phone", () => {
       .boundingBox()
     expect(title && title.x + title.width <= 375 - 16 + 1).toBe(true)
   })
+})
+
+test("Dates in the column are said in words", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  const { panel } = await openTask(page, { due_date: "2019-09-24" })
+
+  // Filed just now: the bar and the Created row both say so in words.
+  const bar = panel
+    .getByRole("button", { name: "Close" })
+    .locator("xpath=../..")
+  await expect(bar).toContainText("opened by you, today")
+  await expect(panel.getByRole("group", { name: "Created" })).toContainText(
+    /^Today, \d{1,2}[:.]\d{2}/,
+  )
+  // A day in another year carries its year, and a month is a word.
+  const due = panel.getByRole("button", { name: /^Due date:/ })
+  await expect(due).toContainText("2019")
+  await expect(due).toContainText(/Sep/)
+  await expect(due).not.toContainText(/\d{1,2}[./]\d{1,2}[./]\d{2,4}/)
+})
+
+test("The Created row is on the type scale of the rows above it", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  const { panel } = await openTask(page)
+  const size = (name: string) =>
+    panel
+      .getByRole("group", { name })
+      .evaluate(
+        (node) => getComputedStyle(node.firstElementChild ?? node).fontSize,
+      )
+  expect(await size("Created")).toBe("15px")
+  const label = panel.getByText("Created", { exact: true })
+  // The text itself, not its box: a short value in a tall row must be level.
+  const value = panel.getByRole("group", { name: "Created" }).locator("time")
+  const [labelBox, valueBox] = await Promise.all([
+    label.boundingBox(),
+    value.boundingBox(),
+  ])
+  // Level with its label, not sunk below it.
+  expect(
+    Math.abs(
+      (labelBox?.y ?? 0) +
+        (labelBox?.height ?? 0) / 2 -
+        ((valueBox?.y ?? 0) + (valueBox?.height ?? 0) / 2),
+    ),
+  ).toBeLessThanOrEqual(2)
+})
+
+test("A saved field says Saved in the bar, which fades by itself", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  const { panel } = await openTask(page)
+  const bar = panel
+    .getByRole("button", { name: "Close" })
+    .locator("xpath=../..")
+  // The region that says it is there before there is anything to say.
+  await expect(bar.getByRole("status")).toHaveCount(1)
+  await expect(bar.getByRole("status")).toHaveAttribute("aria-live", "polite")
+  await expect(bar.getByRole("status")).toHaveText("")
+
+  await panel.getByRole("combobox", { name: "Priority" }).click()
+  await page.getByRole("option", { name: /P2/ }).click()
+  await expect(bar.getByRole("status")).toHaveText("Saved")
+  await expect(bar.getByRole("status")).toHaveText("", { timeout: 5_000 })
+})
+
+test("A blank title is refused: the old one comes back and the field says why", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  const { api, task, panel } = await openTask(page)
+  let patches = 0
+  await page.route(`**/api/v1/tasks/${task.id}`, (route) => {
+    if (route.request().method() === "PATCH") patches += 1
+    return route.fallback()
+  })
+
+  const title = panel.getByRole("textbox", { name: "Task title" })
+  await title.fill("   ")
+  await title.press("Enter")
+  await expect(title).toHaveValue("Migrate the marketing pages")
+  const reason = panel.getByText("A task needs a title")
+  await expect(reason).toBeVisible()
+  await expect(reason).toHaveAttribute("aria-live", "polite")
+  await expect(title).toHaveAttribute("aria-describedby", /.+/)
+  expect(patches).toBe(0)
+  expect((await (await api.get(`/tasks/${task.id}`)).json()).title).toBe(
+    "Migrate the marketing pages",
+  )
+
+  // Typing again takes the reason away.
+  await title.fill("Migrate the pages")
+  await expect(reason).toBeHidden()
+})
+
+test("An empty Files section says so in a sentence", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  const { panel } = await openTask(page)
+  await expect(
+    panel.getByRole("region", { name: "Files" }).getByText(/^No files yet/),
+  ).toBeVisible()
 })

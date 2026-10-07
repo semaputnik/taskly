@@ -3,7 +3,7 @@ import { useState } from "react"
 
 import type { RecoveryCodeIssued, UserPublic } from "@/client"
 import { SecretDialog } from "@/components/Bots/TokenDialog"
-import { formatDateTime } from "@/lib/dates"
+import { formatDateTime, inSentence } from "@/lib/dates"
 import { issueRecoveryCode, reportUnlessDismissed } from "@/lib/passkeys"
 import { act } from "./Section"
 
@@ -51,7 +51,7 @@ export function IssueRecoveryCode({ user }: { user: UserPublic }) {
             noun: "code",
             fieldLabel: "Recovery code",
             consequence: "you would have to issue another",
-            note: `It works once, until ${formatDateTime(issued.expires_at)}, and replaces any code issued before.`,
+            note: `It works once, until ${inSentence(formatDateTime(issued.expires_at))}, and replaces any code issued before.`,
             value: issued.code,
           }
         }

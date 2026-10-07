@@ -24,7 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Refusal, refusalCode, refusalMessage } from "@/lib/apiErrors"
-import { formatDayOf } from "@/lib/dates"
+import { formatDayOf, inSentence } from "@/lib/dates"
 import { tagVocabularyQuery, useReportChange } from "@/lib/serverState"
 import { cn } from "@/lib/utils"
 import DeleteTag from "./DeleteTag"
@@ -83,7 +83,7 @@ export function TagPanel() {
               <>
                 <span aria-hidden>·</span>
                 <span className="truncate">
-                  created {formatDayOf(tag.created_at)}
+                  created {inSentence(formatDayOf(tag.created_at))}
                   {tag.created_by_bot_user &&
                     ` by ${tag.created_by_bot_user.name}`}
                 </span>

@@ -137,6 +137,11 @@ export const TaskAttachments = ({ task }: TaskAttachmentsProps) => {
         </button>
       }
     >
+      {attachments && files.length === 0 && (
+        <p className="text-ink-3 pt-2 text-[13px]">
+          No files yet. Attach one to keep it with this task.
+        </p>
+      )}
       <ul>
         {files.map((attachment) => {
           const handover = attachment.paperless_handover

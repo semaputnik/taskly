@@ -3,7 +3,7 @@ import { useId, useState } from "react"
 
 import { type PasskeyPublic, UsersService } from "@/client"
 import { Skeleton } from "@/components/ui/skeleton"
-import { formatDateTime } from "@/lib/dates"
+import { formatDateTime, inSentence } from "@/lib/dates"
 import {
   addPasskey,
   removePasskey,
@@ -160,9 +160,9 @@ function PasskeyLine({
           <div className="min-w-0">
             <div className="truncate font-medium">{passkey.name}</div>
             <div className="text-ink-3 text-[12.5px]">
-              added {formatDateTime(passkey.created_at)} ·{" "}
+              added {inSentence(formatDateTime(passkey.created_at))} ·{" "}
               {passkey.last_used_at
-                ? `last used ${formatDateTime(passkey.last_used_at)}`
+                ? `last used ${inSentence(formatDateTime(passkey.last_used_at))}`
                 : "never used"}
             </div>
           </div>

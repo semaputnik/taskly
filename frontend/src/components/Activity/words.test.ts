@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 
 import type { ActivityEntryPublic } from "@/client"
+import { dateInWords } from "@/lib/dates"
 import {
   emptyMessage,
   lede,
@@ -82,14 +83,7 @@ describe("logDays", () => {
     expect(days.map((d) => [d.heading, d.entries.length])).toEqual([
       ["Today", 2],
       ["Yesterday", 1],
-      [
-        new Date(2026, 9, 1).toLocaleDateString(undefined, {
-          year: "numeric",
-          month: "2-digit",
-          day: "2-digit",
-        }),
-        1,
-      ],
+      [dateInWords(new Date(2026, 9, 1), now), 1],
     ])
   })
 

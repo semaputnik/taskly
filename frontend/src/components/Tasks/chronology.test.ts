@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 
 import type { ActivityEntryPublic, CommentPublic } from "@/client"
+import { dateInWords } from "@/lib/dates"
 import { chronology } from "./chronology"
 import { describeTaskEvent } from "./taskEvents"
 
@@ -126,11 +127,7 @@ describe("the chronology", () => {
     )
 
     expect(days.map((d) => d.heading)).toEqual([
-      new Date("2026-09-01T08:00:00").toLocaleDateString(undefined, {
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-      }),
+      dateInWords(new Date("2026-09-01T08:00:00"), now),
       "Yesterday",
       "Today",
     ])

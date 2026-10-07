@@ -7,6 +7,8 @@
  * Everything is in the reader's local calendar.
  */
 
+import { dateInWords } from "@/lib/dates"
+
 const DAY_MS = 86_400_000
 
 /** How many calendar days before `now` the date falls: 0 today, 1 yesterday. */
@@ -32,11 +34,7 @@ function dayName(date: Date, now: Date, locale?: string): string | null {
   if (days <= 0) return null
   if (days === 1) return "yesterday"
   if (days < 7) return date.toLocaleDateString(locale, { weekday: "long" })
-  return date.toLocaleDateString(locale, {
-    day: "numeric",
-    month: "short",
-    ...(date.getFullYear() !== now.getFullYear() && { year: "numeric" }),
-  })
+  return dateInWords(date, now, locale)
 }
 
 /**

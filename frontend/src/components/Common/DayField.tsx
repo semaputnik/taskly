@@ -6,13 +6,12 @@ import { formatDay } from "@/lib/dates"
 import { cn } from "@/lib/utils"
 
 /**
- * A stored day, written the product's way, with the browser's own picker to
- * change it.
+ * A stored day, said in words, with the browser's own picker to change it.
  *
  * A native date field writes its value in the browser's interface language,
  * which need not be the locale the rest of the page is written in — so the
  * same due date could read "01.09.2026" in the panel and "09/01/2026" in the
- * table beside it. Here the day is always shown by `formatDay`, and the native
+ * table beside it. Words ("1 Sept") leave nothing to misread. Here the day is always shown by `formatDay`, and the native
  * field only does the picking (One Way to Write a Date).
  *
  * With a mouse, the button opens the picker by script. A touch screen gets the

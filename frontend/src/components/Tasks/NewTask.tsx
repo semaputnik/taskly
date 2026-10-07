@@ -24,7 +24,16 @@ import { Textarea } from "@/components/ui/textarea"
 import { projectsQuery } from "@/lib/serverState"
 import { cn } from "@/lib/utils"
 import { type CaptureTarget, titleHandedOff } from "./capture"
-import { carryOver, emptyDraft, isTouched, type TaskFields } from "./draft"
+import {
+  carryOver,
+  clearKeptDraft,
+  draftKey,
+  emptyDraft,
+  isTouched,
+  keepDraft,
+  readKeptDraft,
+  type TaskFields,
+} from "./draft"
 import { descriptionClass, TaskPropertyRows } from "./TaskProperties"
 import { useTaskCapture } from "./useTaskWrites"
 
@@ -61,13 +70,30 @@ export function NewTask({
 }) {
   const capture = useTaskCapture(target, onCreated)
   const [defaults, setDefaults] = useState(() => emptyDraft(target))
-  // Words written in the capture sheet before "More options…" are the title.
-  const [draft, setDraft] = useState(() => ({
-    ...defaults,
-    title: titleHandedOff.peek(),
-  }))
+  // What this browser kept of an earlier draft comes back; words written in
+  // the capture sheet before "More options…" are the title, over it.
+  const [draft, setDraft] = useState(() => {
+    const kept = readKeptDraft(target) ?? defaults
+    const handed = titleHandedOff.peek()
+    return handed ? { ...kept, title: handed } : kept
+  })
   useEffect(() => titleHandedOff.clear(), [])
   const touched = isTouched(draft, defaults)
+
+  // Kept in this browser for as long as it holds something, so a reload or a
+  // closed tab does not take it. Nothing is sent to the server.
+  const place = { parentId: target.parentId, projectId: target.projectId }
+  const key = draftKey(place)
+  const keptAt = useRef(place)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `place` is read through `key`, which names it
+  useEffect(() => {
+    // The list's project can arrive after the panel does, moving where this
+    // draft lands: what was kept under the first place goes with it.
+    if (draftKey(keptAt.current) !== key) clearKeptDraft(keptAt.current)
+    keptAt.current = place
+    if (touched) keepDraft(place, draft)
+    else clearKeptDraft(place)
+  }, [touched, draft, key])
   const titleRef = useCaptureFocus<HTMLTextAreaElement>()
   // Set while a commit is taking the reader onto the new record, which is a
   // way of leaving the draft that loses nothing.
@@ -147,7 +173,12 @@ export function NewTask({
       leaving.current = true
     }
     const accepted = await capture.create(sent, stay)
-    if (accepted) return
+    if (accepted) {
+      // Made: there is a task now, so nothing is left to restore. (A run's
+      // carried-over draft is untouched and clears itself.)
+      if (!stay) clearKeptDraft(place)
+      return
+    }
     // A refusal keeps the whole draft. After a run's capture the title and
     // description come back, unless something new has been typed there.
     leaving.current = false
@@ -245,7 +276,7 @@ export function NewTask({
           gutter,
         )}
       >
-        <span className="text-ink-3 text-xs pointer-coarse:hidden">
+        <span className="text-ink-3 hidden text-xs sm:inline pointer-coarse:hidden">
           <kbd className="font-sans">{CHORD}</kbd> creates and starts another
         </span>
         <Button
@@ -272,8 +303,9 @@ export function NewTask({
         }}
         onDiscard={() => {
           // The draft is given up: whatever carries the reader away now goes
-          // without asking again.
+          // without asking again, and nothing of it is kept.
           leaving.current = true
+          clearKeptDraft(place)
           answer.current?.(false)
         }}
       />

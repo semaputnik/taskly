@@ -577,3 +577,60 @@ test("The superuser's account menu has Users, which lands on that section of Set
   await page.getByRole("button", { name: "Account", exact: true }).tap()
   await expect(page.getByRole("menuitem", { name: "Admin" })).toHaveCount(0)
 })
+
+test("The task column's bar keeps the date whole beside the walk count, and its mark is a thumb's size", async ({
+  page,
+}) => {
+  await newUser(page)
+  const api = await userApi(page)
+  await api.create("/tasks/", { title: "Pay the invoice" })
+  await api.create("/tasks/", { title: "Book the vet" })
+  await page.goto("/tasks")
+  await page.getByRole("link", { name: "Pay the invoice" }).tap()
+  const column = page.getByRole("complementary", { name: "Pay the invoice" })
+  await expect(column).toBeVisible()
+
+  // The date is whole and clear of the "1 of 1" beside it.
+  const opened = column.getByText(/^opened by you, /)
+  await expect(opened).toBeVisible()
+  const date = await boxOf(opened)
+  const count = await boxOf(column.getByText(/^\d of 2$/))
+  expect(date.x + date.width).toBeLessThanOrEqual(count.x)
+  // The project is left for a screen reader; the Project row says it.
+  await expect(column.getByRole("combobox", { name: "Project" })).toContainText(
+    "Inbox",
+  )
+
+  // The Created row's text is level with its label in a 44px row.
+  const label = await boxOf(column.getByText("Created", { exact: true }))
+  const created = await boxOf(
+    column.getByRole("group", { name: "Created" }).locator("time"),
+  )
+  expect(
+    Math.abs(label.y + label.height / 2 - (created.y + created.height / 2)),
+  ).toBeLessThanOrEqual(2)
+
+  // 44px target, named for what it does.
+  const mark = column.getByRole("checkbox", { name: /^Mark done/ })
+  const box = await boxOf(mark)
+  expect(box.width).toBeGreaterThanOrEqual(44)
+  expect(box.height).toBeGreaterThanOrEqual(44)
+
+  // A saved field says so in the bar, in place of the context while it is up.
+  await column.getByRole("combobox", { name: "Priority" }).tap()
+  await page.getByRole("option", { name: /P2/ }).tap()
+  const cue = column.locator("[data-save-cue]")
+  await expect(cue).toHaveText("Saved")
+  await expect(cue).toHaveText("", { timeout: 5_000 })
+})
+
+test("The draft says nothing of a keyboard chord on a phone", async ({
+  page,
+}) => {
+  await newUser(page)
+  await page.goto("/tasks?capture=task")
+  const draft = page.getByRole("complementary", { name: "New task" })
+  await expect(draft).toBeVisible()
+  await expect(draft.getByRole("button", { name: "Create task" })).toBeVisible()
+  await expect(draft.getByText(/Enter/)).toBeHidden()
+})

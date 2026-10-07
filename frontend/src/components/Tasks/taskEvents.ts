@@ -1,11 +1,11 @@
 import type { ActivityEntryPublic, TaskStatus } from "@/client"
-import { formatDay } from "@/lib/dates"
+import { formatDayPlain } from "@/lib/dates"
 import { STATUS_LABELS } from "./statuses"
 
 /**
  * What one log entry says about a task, as the rest of a sentence whose
  * subject is whoever made the change: "moved it to In progress", "set the due
- * date to 07.10.2026". The task panel shows its history as a chronology of
+ * date to 7 Oct". The task panel shows its history as a chronology of
  * these, so every line leaves the task out: it is the one the panel is open
  * on.
  *
@@ -82,7 +82,7 @@ function changedFields(changes: Record<string, Change>): string | null {
   if (changes.due_date) {
     said.push(
       changes.due_date.to
-        ? `set the due date to ${formatDay(changes.due_date.to as string)}`
+        ? `set the due date to ${formatDayPlain(changes.due_date.to as string)}`
         : "cleared the due date",
     )
   }

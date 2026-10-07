@@ -12,7 +12,7 @@ import {
   titleFieldClass,
 } from "@/components/Records/RecordPanel"
 import { useWalk } from "@/components/Records/walk"
-import { formatDateTime, formatDayOf } from "@/lib/dates"
+import { formatDateTime, formatDayOf, inSentence } from "@/lib/dates"
 import { scopeProjectsQuery, useReportChange } from "@/lib/serverState"
 import { toastError } from "@/lib/toasts"
 import { cn } from "@/lib/utils"
@@ -71,7 +71,7 @@ export function BotPanel() {
               <>
                 <span aria-hidden>·</span>
                 <span className="truncate">
-                  created {formatDayOf(bot.created_at)}
+                  created {inSentence(formatDayOf(bot.created_at))}
                 </span>
               </>
             )}
@@ -240,7 +240,7 @@ function TokenState({ bot }: { bot: BotUserPublic }) {
         <span className="text-done font-medium">Working</span>
         <span className={quiet}>
           {bot.token_expires_at
-            ? `expires ${formatDayOf(bot.token_expires_at)}`
+            ? `expires ${inSentence(formatDayOf(bot.token_expires_at))}`
             : "never expires"}
         </span>
       </>

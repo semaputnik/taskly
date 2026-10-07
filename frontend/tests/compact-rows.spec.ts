@@ -78,7 +78,7 @@ test("A compact row shows subtasks, due day, tags and project, and its status ma
   // The mark is the completion control, named for its status and priority
   // since its shape and colour say nothing to a screen reader.
   const urgent = row.getByRole("checkbox", {
-    name: "Mark as done (In progress, priority P1)",
+    name: "Mark done (In progress, priority P1)",
   })
   await expect(urgent).not.toBeChecked()
   await expect(urgent.locator("svg")).toHaveClass(/text-priority-p1/)
@@ -86,7 +86,7 @@ test("A compact row shows subtasks, due day, tags and project, and its status ma
   await expect(
     started
       .getByRole("checkbox", {
-        name: "Mark as done (In progress, priority P3)",
+        name: "Mark done (In progress, priority P3)",
       })
       .locator("svg"),
   ).toHaveClass(/text-priority-p3/)
@@ -101,11 +101,11 @@ test("A status mark names its status in a tip on hover and on keyboard focus, an
   await page.goto("/tasks")
 
   const mark = page.getByRole("checkbox", {
-    name: /^Mark as done \(In progress/,
+    name: /^Mark done \(In progress/,
   })
   // The tip is drawn from an attribute, so it is not text a screen reader
   // reads on top of the control's own name.
-  await expect(mark).toHaveAccessibleName("Mark as done (In progress)")
+  await expect(mark).toHaveAccessibleName("Mark done (In progress)")
   await expect(mark).toHaveAttribute("data-tip", "In progress")
   const tip = () =>
     mark.evaluate((element) => {
@@ -162,7 +162,9 @@ test("An overdue line says how late up to a fortnight, then the date, and is red
   const recent = line("Pay the invoice")
   await expect(recent).toContainText("14 days late")
   const old = line("Renew the licence")
-  await expect(old).toContainText(/due \d{2}\D\d{2}\D\d{4}/)
+  // The date is said in words ("due 2 Sept"), never as numbers.
+  await expect(old).toContainText(/due \p{L}/u)
+  await expect(old).not.toContainText(/\d{1,2}[./]\d{1,2}[./]\d{2,4}/)
   await expect(old).not.toContainText("days late")
   // Still red: the date takes the due day's alert colour.
   await expect(old.getByText(/^due /).locator("xpath=..")).toHaveClass(

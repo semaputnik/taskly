@@ -1,5 +1,5 @@
 import type { BotPermissions, BotUserPublic } from "@/client"
-import { formatDayOf } from "@/lib/dates"
+import { formatDayOf, inSentence } from "@/lib/dates"
 import { since } from "./health"
 import { tokenStatus } from "./tokens"
 
@@ -98,7 +98,7 @@ export function stillNamedInWords(taskCount: number): string {
 
 /** "deleted 12 Sept", or just "deleted" for a record that does not say when. */
 export function deletedInWords(at: string | null | undefined): string {
-  return at ? `deleted ${formatDayOf(at)}` : "deleted"
+  return at ? `deleted ${inSentence(formatDayOf(at))}` : "deleted"
 }
 
 const count = (n: number, one: string, many: string) =>
