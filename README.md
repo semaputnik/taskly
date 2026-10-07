@@ -40,7 +40,7 @@ address `FIRST_SUPERUSER` names in `.env`: whoever registers it while there is
 no superuser becomes one. A database from before passkeys keeps its accounts
 without a way in; get the superuser's recovery code with
 `uv run python -m app.superuser_recovery_code` from `backend/` and spend it
-under “Have a recovery code?”.
+under “Use a recovery code”.
 
 ## URLs
 
