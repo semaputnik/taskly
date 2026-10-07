@@ -71,7 +71,7 @@ export function NewTask({
   const capture = useTaskCapture(target, onCreated)
   const [defaults, setDefaults] = useState(() => emptyDraft(target))
   // What this browser kept of an earlier draft comes back; words written in
-  // the capture sheet before "More options…" are the title, over it.
+  // the capture sheet before "Add details…" are the title, over it.
   const [draft, setDraft] = useState(() => {
     const kept = readKeptDraft(target) ?? defaults
     const handed = titleHandedOff.peek()

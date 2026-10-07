@@ -141,6 +141,29 @@ test("The current screen is stated and marked by weight, not by colour", async (
   ).not.toHaveAttribute("aria-current", "page")
   expect(await weight("Bots")).toBeGreaterThan(await weight("Today"))
 
+  // Labels are 12px; a resting one is ink-2 and the current one ink, and
+  // only the current one has the short hairline above its label.
+  const look = (name: string) =>
+    bar(page)
+      .getByRole("link", { name })
+      .evaluate((element) => {
+        const own = getComputedStyle(element)
+        const mark = getComputedStyle(element, "::before")
+        return {
+          size: own.fontSize,
+          color: own.color,
+          mark: mark.backgroundColor,
+          markHeight: mark.height,
+        }
+      })
+  const current = await look("Bots")
+  const resting = await look("Today")
+  expect(current.size).toBe("12px")
+  expect(resting.size).toBe("12px")
+  expect(resting.color).not.toBe(current.color)
+  expect(current.mark).toBe(current.color)
+  expect(resting.mark).toBe("rgba(0, 0, 0, 0)")
+
   // Today is the root, which every path starts with: it is current only on
   // the day page.
   await page.goto("/tasks")
@@ -221,9 +244,12 @@ test("The sheet follows the keyboard, and Return writes a task from Bots", async
     .toBeCloseTo(812 - 300, 0)
 
   // Nothing to send while nothing is written.
-  await expect(page.getByRole("button", { name: "Create task" })).toHaveCount(0)
+  const create = sheet(page).getByRole("button", { name: "Create", exact: true })
+  await expect(create).toHaveCount(0)
   await line(page).fill("Buy milk")
-  await page.getByRole("button", { name: "Create task" }).tap()
+  // The action is a word, visible, and a tap on it leaves the keyboard up.
+  await expect(create).toHaveText("Create")
+  await create.tap()
   await expect(page.getByText("“Buy milk” created")).toBeVisible()
   // Done: the sheet gives way to the screen, which stays where it was, and
   // focus goes back to the control that raised it.
@@ -299,14 +325,14 @@ test("Escape or a tap outside closes the sheet and keeps the words", async ({
   await expect(line(page)).toHaveValue("Ring the plumber")
 })
 
-test("More options opens the full draft with what was typed", async ({
+test("Add details opens the full draft with what was typed", async ({
   page,
 }) => {
   await newUser(page)
   await page.goto("/activity")
   await addControl(page).tap()
   await line(page).fill("Write the report")
-  await sheet(page).getByRole("button", { name: "More options…" }).tap()
+  await sheet(page).getByRole("button", { name: "Add details…" }).tap()
 
   await expect(sheet(page)).toBeHidden()
   await expect(page).toHaveURL(/capture=task/)
@@ -324,6 +350,70 @@ test("More options opens the full draft with what was typed", async ({
   await expect(page.locator("[data-record-column]")).toHaveCount(0)
   await addControl(page).tap()
   await expect(line(page)).toHaveValue("")
+})
+
+test("Words left in a closed sheet put a dot on the add control, which goes with them", async ({
+  page,
+}) => {
+  await newUser(page)
+  await page.goto("/bots")
+  const dot = page.getByTestId("draft-kept")
+  await expect(dot).toHaveCount(0)
+
+  await addControl(page).tap()
+  await line(page).fill("Ring the plumber")
+  // Open, the sheet holds the words itself: no dot yet.
+  await expect(dot).toHaveCount(0)
+  await page.keyboard.press("Escape")
+  await page.keyboard.press("Escape")
+  await expect(sheet(page)).toBeHidden()
+  await expect(dot).toBeVisible()
+  const kept = page.getByRole("button", { name: "Add a task, draft kept" })
+  await expect(kept).toBeVisible()
+
+  // Clearing the words takes the dot away.
+  await kept.tap()
+  await line(page).fill("")
+  await page.keyboard.press("Escape")
+  await expect(sheet(page)).toBeHidden()
+  await expect(dot).toHaveCount(0)
+  await expect(addControl(page)).toHaveCount(1)
+
+  // So does making the task.
+  await addControl(page).tap()
+  await line(page).fill("Call the bank")
+  await page.keyboard.press("Escape")
+  await page.keyboard.press("Escape")
+  await expect(dot).toBeVisible()
+  await addControl(page).tap()
+  await line(page).press("Enter")
+  await expect(sheet(page)).toBeHidden()
+  await expect(dot).toHaveCount(0)
+})
+
+test("The dark sheet is a step lighter than the page, with a hairline at its top", async ({
+  page,
+}) => {
+  await page.addInitScript(() =>
+    localStorage.setItem("vite-ui-theme", "dark"),
+  )
+  await newUser(page)
+  await page.goto("/bots")
+  await expect(page.locator("html")).toHaveClass(/dark/)
+  await addControl(page).tap()
+  await expect(sheet(page)).toBeVisible()
+  const look = await sheet(page).evaluate((element) => {
+    const own = getComputedStyle(element)
+    return {
+      ground: own.backgroundColor,
+      page: getComputedStyle(document.body).backgroundColor,
+      edge: own.borderTopColor,
+      edgeWidth: own.borderTopWidth,
+    }
+  })
+  expect(look.ground).not.toBe(look.page)
+  expect(look.edgeWidth).toBe("1px")
+  expect(look.edge).not.toBe("rgba(0, 0, 0, 0)")
 })
 
 test("The bar gives way to a record's full-screen column", async ({ page }) => {
@@ -347,12 +437,14 @@ test("The account control holds the other screens and signing out", async ({
 }) => {
   await newUser(page)
   await page.goto("/")
-  const account = page.getByRole("button", { name: "Account", exact: true })
+  const account = page.getByRole("button", { name: "Menu", exact: true })
   // The top bar keeps the wordmark and gains the avatar, a target for a thumb.
   await expect(page.getByRole("link", { name: "Taskly" })).toBeVisible()
   expect((await boxOf(account)).height).toBeGreaterThanOrEqual(44)
   expect((await boxOf(account)).width).toBeGreaterThanOrEqual(44)
-  await expect(page.getByRole("button", { name: "Menu" })).toHaveCount(0)
+  // It says what it is in a word beside the avatar, so Projects is findable.
+  await expect(account).toContainText("Menu")
+  expect((await boxOf(account)).width).toBeGreaterThan(44)
 
   await account.tap()
   const menu = page.getByRole("menu")
@@ -568,13 +660,13 @@ test("The superuser's account menu has Users, which lands on that section of Set
   page,
 }) => {
   await logInUser(page, firstSuperuser)
-  await page.getByRole("button", { name: "Account", exact: true }).tap()
+  await page.getByRole("button", { name: "Menu", exact: true }).tap()
   await page.getByRole("menuitem", { name: "Users" }).tap()
 
   await expect(page).toHaveURL(/\/settings#users$/)
   await expect(page.getByRole("region", { name: "Users" })).toBeVisible()
   // Admin is gone as an entry.
-  await page.getByRole("button", { name: "Account", exact: true }).tap()
+  await page.getByRole("button", { name: "Menu", exact: true }).tap()
   await expect(page.getByRole("menuitem", { name: "Admin" })).toHaveCount(0)
 })
 

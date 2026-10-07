@@ -113,3 +113,46 @@ test("no accent marks location", () => {
   // accent sat at hue 18x in OKLCH; no colour of that family returns.
   expect(css).not.toMatch(/oklch\([^)]*\b18\d(\.\d+)?\s*\)/)
 })
+
+// The phone's navigation: the tab bar and the Menu control sit on the page,
+// and in dark the capture sheet sits one step lighter, on --raised.
+const PHONE_NAV: [string, string][] = [
+  // A resting tab label, and the Menu word, on the bar's and top bar's ground.
+  ["--ink-2", "--page"],
+  ["--ink", "--page"],
+  // The sheet's words, its hints and its foot, on the ground it rises on.
+  ["--ink", "--raised"],
+  ["--ink-2", "--raised"],
+  ["--ink-3", "--raised"],
+  // The Create label on its ink fill.
+  ["--page", "--ink"],
+]
+
+for (const [theme, tokens] of Object.entries(themes)) {
+  describe(`${theme} phone navigation`, () => {
+    for (const [text, ground] of PHONE_NAV) {
+      test(`${text} on ${ground} clears AA`, () => {
+        const ratio = contrast(resolve(tokens, text), resolve(tokens, ground))
+        expect(ratio).toBeGreaterThanOrEqual(AA)
+      })
+    }
+  })
+}
+
+test("the dark capture sheet is lighter than the page it rises over", () => {
+  const dark = themes.dark
+  expect(luminance(resolve(dark, "--raised"))).toBeGreaterThan(
+    luminance(resolve(dark, "--page")),
+  )
+})
+
+test("a resting tab label is ink-2 at 12px, and the current one is ink", () => {
+  const nav = readFileSync(
+    join(import.meta.dir, "components/Sidebar/PhoneNav.tsx"),
+    "utf8",
+  )
+  const tab = nav.match(/const tabClass = cn\([\s\S]*?\n\)/)?.[0] ?? ""
+  expect(tab).toContain('"text-ink-2 ')
+  expect(tab).toContain("data-[status=active]:text-ink")
+  expect(tab).toContain("text-xs")
+})
