@@ -15,7 +15,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useCopyToClipboard } from "@/hooks/useCopyToClipboard"
-import { formatDateTime } from "@/lib/dates"
+import { formatDateTime, inSentence } from "@/lib/dates"
 
 interface TokenDialogProps {
   botName: string
@@ -66,7 +66,7 @@ const TokenDialog = ({
             fieldLabel: "Bot token",
             consequence: "the bot user needs a new one",
             note: expiresAt
-              ? `It expires ${formatDateTime(expiresAt)}.`
+              ? `It expires ${inSentence(formatDateTime(expiresAt))}.`
               : "It works until you revoke it.",
             value: token,
           }

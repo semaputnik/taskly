@@ -28,6 +28,8 @@ export function dateInWords(
   now: Date = new Date(),
   locale?: string,
 ): string {
+  // `format` throws on an invalid date, where the old text said so.
+  if (Number.isNaN(date.getTime())) return ""
   return new Intl.DateTimeFormat(locale, {
     day: "numeric",
     month: "short",
@@ -71,13 +73,26 @@ export function formatDayPlain(
   return Number.isNaN(local.getTime()) ? day : dateInWords(local, now, locale)
 }
 
+/**
+ * A day or moment that sits in the middle of a sentence ("created today",
+ * "expires tomorrow, 10:00"): its leading "Today", "Tomorrow" or "Yesterday"
+ * in lower case, as a sentence has it. A date is left as it is.
+ */
+export function inSentence(text: string): string {
+  return text.replace(/^(Today|Tomorrow|Yesterday)\b/, (word) =>
+    word.toLowerCase(),
+  )
+}
+
 /** The local day a timestamp falls on. */
 export function formatDayOf(
   timestamp: string,
   now: Date = new Date(),
   locale?: string,
 ): string {
-  return inWords(new Date(timestamp), now, locale)
+  const at = new Date(timestamp)
+  // Not a moment: shown as it came, as `formatDay` does.
+  return Number.isNaN(at.getTime()) ? timestamp : inWords(at, now, locale)
 }
 
 /** A timestamp to the minute: its day in words, then the time. */
@@ -86,6 +101,7 @@ export function formatDateTime(
   now: Date = new Date(),
   locale?: string,
 ): string {
+  if (Number.isNaN(new Date(timestamp).getTime())) return timestamp
   const time = new Date(timestamp).toLocaleTimeString(locale, {
     hour: "2-digit",
     minute: "2-digit",

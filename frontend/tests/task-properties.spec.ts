@@ -314,7 +314,7 @@ test("Dates in the column are said in words", async ({ page }) => {
   const bar = panel
     .getByRole("button", { name: "Close" })
     .locator("xpath=../..")
-  await expect(bar).toContainText("opened by you, Today")
+  await expect(bar).toContainText("opened by you, today")
   await expect(panel.getByRole("group", { name: "Created" })).toContainText(
     /^Today, \d{1,2}[:.]\d{2}/,
   )

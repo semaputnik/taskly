@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 
 import {
   clearKeptDraft,
+  draftKey,
   emptyDraft,
   keepDraft,
   readKeptDraft,
@@ -66,6 +67,17 @@ describe("a kept task draft", () => {
     keepDraft({ parentId: "t1" }, { ...written, title: "Sub" }, storage)
     expect(readKeptDraft(top, storage)?.title).toBe("Book the vet")
     expect(readKeptDraft({ parentId: "t1" }, storage)?.title).toBe("Sub")
+  })
+
+  test("is kept apart for each project a list is narrowed to", () => {
+    const storage = memory()
+    keepDraft({ projectId: "p1" }, written, storage)
+    expect(readKeptDraft({ projectId: "p2" }, storage)).toBeNull()
+    expect(readKeptDraft(top, storage)).toBeNull()
+    expect(readKeptDraft({ projectId: "p1" }, storage)?.title).toBe(
+      "Book the vet",
+    )
+    expect(draftKey({ projectId: "p1" })).not.toBe(draftKey(top))
   })
 
   test("is ignored when what is stored is not a draft", () => {

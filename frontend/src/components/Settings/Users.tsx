@@ -8,7 +8,7 @@ import { ErrorBoundary } from "react-error-boundary"
 import type { UserListed } from "@/client"
 import { Skeleton } from "@/components/ui/skeleton"
 import useAuth from "@/hooks/useAuth"
-import { formatDayOf } from "@/lib/dates"
+import { formatDayOf, inSentence } from "@/lib/dates"
 import { usersQuery } from "@/lib/serverState"
 import { cn } from "@/lib/utils"
 import { IssueRecoveryCode } from "./IssueRecoveryCode"
@@ -120,7 +120,7 @@ function UserLine({
           )}
           <span>
             {account.last_sign_in_at
-              ? `last signed in ${formatDayOf(account.last_sign_in_at)}`
+              ? `last signed in ${inSentence(formatDayOf(account.last_sign_in_at))}`
               : "never signed in"}
           </span>
         </div>

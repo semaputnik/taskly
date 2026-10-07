@@ -7,6 +7,7 @@ import {
   formatDay,
   formatDayOf,
   formatDayPlain,
+  inSentence,
 } from "./dates"
 
 // September is "Sept" in current browsers and "Sep" in older ICU data, so the
@@ -57,6 +58,25 @@ describe("a day in words", () => {
   test("the plain form never says Today", () => {
     expect(formatDayPlain("2026-10-07", NOW, "en-GB")).toBe("7 Oct")
     expect(dateInWords(new Date(2026, 9, 7), NOW, "en-GB")).toBe("7 Oct")
+  })
+})
+
+describe("a day in the middle of a sentence", () => {
+  test("lower-cases a relative word and leaves a date alone", () => {
+    expect(inSentence("Today")).toBe("today")
+    expect(inSentence("Tomorrow, 10:00")).toBe("tomorrow, 10:00")
+    expect(inSentence("Yesterday")).toBe("yesterday")
+    expect(inSentence("24 Sept 2025")).toBe("24 Sept 2025")
+    expect(inSentence("Todayish")).toBe("Todayish")
+  })
+})
+
+describe("what is not a date", () => {
+  test("is shown as it came instead of throwing", () => {
+    expect(formatDayOf("not a time", NOW, "en-GB")).toBe("not a time")
+    expect(formatDateTime("not a time", NOW, "en-GB")).toBe("not a time")
+    expect(dayHeading("not a time", NOW)).toBe("not a time")
+    expect(dateInWords(new Date("nope"), NOW, "en-GB")).toBe("")
   })
 })
 

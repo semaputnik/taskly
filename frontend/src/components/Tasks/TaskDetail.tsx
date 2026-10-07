@@ -10,7 +10,7 @@ import {
   taskTitleClass,
 } from "@/components/Records/RecordPanel"
 import { useWalk } from "@/components/Records/walk"
-import { formatDayOf } from "@/lib/dates"
+import { formatDayOf, inSentence } from "@/lib/dates"
 import { projectsQuery, taskQuery } from "@/lib/serverState"
 import { toastSuccess } from "@/lib/toasts"
 import { cn } from "@/lib/utils"
@@ -168,7 +168,7 @@ export function TaskDetail() {
  */
 function opened(task: TaskPublic): string {
   const by = reporterName(task)
-  const day = task.created_at ? formatDayOf(task.created_at) : null
+  const day = task.created_at ? inSentence(formatDayOf(task.created_at)) : null
   return ["opened", by && `by ${by},`, day].filter(Boolean).join(" ")
 }
 

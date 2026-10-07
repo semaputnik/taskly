@@ -1,5 +1,5 @@
 import type { ActivityEntryPublic, TaskStatus } from "@/client"
-import { formatDay } from "@/lib/dates"
+import { formatDayPlain } from "@/lib/dates"
 import { STATUS_LABELS } from "./statuses"
 
 /**
@@ -82,7 +82,7 @@ function changedFields(changes: Record<string, Change>): string | null {
   if (changes.due_date) {
     said.push(
       changes.due_date.to
-        ? `set the due date to ${formatDay(changes.due_date.to as string)}`
+        ? `set the due date to ${formatDayPlain(changes.due_date.to as string)}`
         : "cleared the due date",
     )
   }

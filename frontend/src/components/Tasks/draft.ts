@@ -141,9 +141,15 @@ function browserStorage(): DraftStorage | null {
   }
 }
 
-/** One draft per place it lands: a task of its own, or a subtask of one. */
-function draftKey(target: DraftTarget): string {
-  return `taskly:task-draft:${target.parentId ?? "top"}`
+/**
+ * One draft per place it lands: a subtask of one task, or a task of its own in
+ * the project the list is narrowed to (the Inbox when it is not), so a draft
+ * begun on one project's list is not filed into another by a restore.
+ */
+export function draftKey(target: DraftTarget): string {
+  return target.parentId
+    ? `taskly:task-draft:subtask:${target.parentId}`
+    : `taskly:task-draft:project:${target.projectId ?? "inbox"}`
 }
 
 export function keepDraft(

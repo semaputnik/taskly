@@ -19,7 +19,7 @@ import {
   titleFieldClass,
 } from "@/components/Records/RecordPanel"
 import { useWalk } from "@/components/Records/walk"
-import { formatDayOf } from "@/lib/dates"
+import { formatDayOf, inSentence } from "@/lib/dates"
 import { botsQuery, useReportChange } from "@/lib/serverState"
 import { toastError, toastSuccess } from "@/lib/toasts"
 import { cn } from "@/lib/utils"
@@ -77,7 +77,7 @@ export function ProjectPanel() {
                   ·
                 </span>
                 <span className="shrink-0 whitespace-nowrap">
-                  created {formatDayOf(project.created_at)}
+                  created {inSentence(formatDayOf(project.created_at))}
                 </span>
               </>
             )}
