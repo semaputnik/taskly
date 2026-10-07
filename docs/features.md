@@ -402,10 +402,14 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
   full draft from any screen. On a phone the navigation is a bar at the
   bottom of the screen with Today, Tasks, a central add control, Bots and
   Activity; Projects, Tags, Archive, Settings, appearance and signing out
-  are reached from the account control in the top bar. The add control, on
+  are reached from the Menu control in the top bar, which says its name
+  beside the avatar. The add control, on
   any screen, raises a capture sheet above the keyboard carrying the same
-  line and its matches, and a "More options…" line into the full draft,
-  which takes the typed words as its title; the day page and the task list
+  line and its matches, a visible Create action once words are typed (Return
+  creates too), and an "Add details…" line into the full draft,
+  which takes the typed words as its title. A sheet closed with words in it
+  leaves a dot on the add control, which then reads "Add a task, draft kept";
+  the dot goes when the task is created or the words are cleared; the day page and the task list
   carry no capture line of their own on a phone.
 
 ### F-07. REST API

@@ -38,8 +38,8 @@ export const Route = createFileRoute("/_layout")({
 
 /**
  * Below the tablet width the navigation moves to the bottom of the screen
- * (`TabBar`), and the top bar keeps the wordmark and gains the account
- * control, which holds what the bar has no room for.
+ * (`TabBar`), and the top bar keeps the wordmark and gains the labelled
+ * Menu control, which holds what the bar has no room for.
  */
 function TopBar() {
   return (
@@ -54,6 +54,7 @@ function Layout() {
   // The add control raises the capture sheet from any screen; the bar and the
   // sheet share it, and the sheet hands focus back to the control.
   const [adding, setAdding] = useState(false)
+  const [held, setHeld] = useState(false)
   const addControl = useRef<HTMLButtonElement>(null)
   return (
     <>
@@ -101,11 +102,13 @@ function Layout() {
           onAdd={() => setAdding(true)}
           addRef={addControl}
           adding={adding}
+          held={held}
         />
         <CaptureSheet
           open={adding}
           onOpenChange={setAdding}
           returnFocusTo={addControl}
+          onHeldChange={setHeld}
         />
       </div>
     </>

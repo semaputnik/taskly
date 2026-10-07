@@ -1,5 +1,5 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query"
-import { ArrowUp, Plus } from "lucide-react"
+import { Plus } from "lucide-react"
 import { type ReactNode, useId, useLayoutEffect, useRef, useState } from "react"
 
 import type { TaskPublic } from "@/client"
@@ -34,14 +34,14 @@ const MATCHES_HEIGHT = 360
 /**
  * What the capture sheet hands the line it carries: the words it keeps while
  * it is closed, what to do once the line has made or opened a task, and what
- * its "More options…" line does.
+ * its "Add details…" line does.
  */
 export interface SheetBinding {
   title: string
   setTitle: (title: string) => void
   /** The line made a task, or opened one it found: the sheet is done. */
   onDone: () => void
-  /** "More options…": on to the full draft. */
+  /** "Add details…": on to the full draft. */
   onMore: () => void
 }
 
@@ -73,7 +73,7 @@ export interface SheetBinding {
  * A phone has no line on its pages: the add control in the bottom bar raises
  * a capture sheet carrying this same line (FR-06.15, `CaptureSheet`). Given
  * a `sheet`, the line sits at the foot of it, its matches are part of the
- * sheet and stand above the line rather than floating, and a "More options…"
+ * sheet and stand above the line rather than floating, and an "Add details…"
  * line leads on to the full draft.
  *
  * `opens` fixes the side the matches open on. Left alone, they open toward
@@ -349,13 +349,12 @@ export function CaptureLine({
           {sheet && title.trim() && (
             <button
               type="button"
-              aria-label="Create task"
               onMouseDown={(event) => event.preventDefault()}
               onClick={() => void commit()}
-              className="-mr-1.5 grid size-11 shrink-0 place-items-center"
+              className="focus-visible:outline-ink -mr-1.5 grid h-11 shrink-0 place-items-center rounded-full px-1.5 focus-visible:outline-2"
             >
-              <span className="bg-ink text-page grid size-8 place-items-center rounded-full">
-                <ArrowUp aria-hidden className="size-4" strokeWidth={1.8} />
+              <span className="bg-ink text-page grid h-8 place-items-center rounded-full px-4 text-[13.5px] font-medium">
+                Create
               </span>
             </button>
           )}
@@ -409,7 +408,7 @@ function SheetFoot({
         onClick={onMore}
         className="text-ink focus-visible:outline-ink -mr-2 inline-flex h-11 shrink-0 items-center rounded-md px-2 text-[13.5px] font-medium underline-offset-4 hover:underline focus-visible:outline-2"
       >
-        More options…
+        Add details…
       </button>
     </div>
   )

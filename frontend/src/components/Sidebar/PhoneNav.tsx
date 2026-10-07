@@ -27,7 +27,7 @@ import { navItemFocus } from "./styles"
 
 const tabClass = cn(
   navItemFocus,
-  "text-ink-3 data-[status=active]:text-ink flex h-full flex-col items-center justify-center gap-[3px] text-[11px] font-medium data-[status=active]:font-semibold focus-visible:-outline-offset-4",
+  "text-ink-2 data-[status=active]:text-ink relative flex h-full flex-col items-center justify-center gap-[5px] text-xs font-medium data-[status=active]:font-semibold focus-visible:-outline-offset-4 before:absolute before:top-[32.5px] before:left-1/2 before:h-px before:w-4 before:-translate-x-1/2 data-[status=active]:before:bg-ink",
 )
 
 /**
@@ -35,8 +35,9 @@ const tabClass = cn(
  * thumb rests. Today and Tasks, the add control as a filled circle in the
  * middle, Bots and Activity. The screen the reader is on is marked by weight
  * and ink and never by colour, and is stated to a screen reader as the
- * current page. Projects, Tags and the rest are behind the account
- * control in the top bar (`AccountMenu`).
+ * current page; a short ink hairline above its label says it a second time.
+ * Projects, Tags and the rest are behind the labelled Menu control in the top
+ * bar (`AccountMenu`).
  *
  * The add control raises the capture sheet from any screen (FR-06.15). A
  * record's full-screen column covers the screen and takes the bar with it.
@@ -45,11 +46,15 @@ export function TabBar({
   onAdd,
   addRef,
   adding,
+  held,
 }: {
   onAdd: () => void
   addRef: RefObject<HTMLButtonElement | null>
   adding: boolean
+  /** The capture sheet is closed with words left in it. */
+  held: boolean
 }) {
+  const kept = held && !adding
   return (
     <nav
       aria-label="Main"
@@ -76,7 +81,7 @@ export function TabBar({
           <button
             ref={addRef}
             type="button"
-            aria-label="Add a task"
+            aria-label={kept ? "Add a task, draft kept" : "Add a task"}
             aria-haspopup="dialog"
             aria-expanded={adding}
             onClick={onAdd}
@@ -87,9 +92,18 @@ export function TabBar({
           >
             <span
               aria-hidden
-              className="bg-ink text-page grid size-10 place-items-center rounded-full"
+              className="bg-ink text-page relative grid size-10 place-items-center rounded-full"
             >
               <Plus className="size-[22px]" strokeWidth={2} />
+              {/* Words are waiting in the sheet. Ink on the disc's own ink
+                  would vanish, so the dot is the page ground inside a ring of
+                  ink, at the disc's corner. */}
+              {kept && (
+                <span
+                  data-testid="draft-kept"
+                  className="bg-page border-ink absolute -top-0.5 -right-0.5 size-3 rounded-full border-2"
+                />
+              )}
             </span>
           </button>
         </li>
@@ -113,9 +127,10 @@ export function TabBar({
 const menuItemClass = "min-h-11"
 
 /**
- * The account control in the phone's top bar: the initial in a circle, which
- * opens what the bar has no room for — the screens that are not tabs,
- * appearance, and signing out. Settings is a place, so it is a link.
+ * The menu control in the phone's top bar: the word "Menu" and the initial in
+ * a circle, which opens what the bar has no room for — the screens that are
+ * not tabs, and signing out. The word is there because an initial alone does
+ * not say that Projects is behind it. Settings is a place, so it is a link.
  */
 export function AccountMenu() {
   const { user, logout } = useAuth()
@@ -136,13 +151,13 @@ export function AccountMenu() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
-        aria-label="Account"
         data-testid="account-menu"
         className={cn(
           navItemFocus,
-          "hover:bg-hover data-[state=open]:bg-hover -mr-2 ml-auto grid size-11 place-items-center rounded-md",
+          "hover:bg-hover data-[state=open]:bg-hover text-ink-2 -mr-2 ml-auto flex h-11 min-w-11 items-center gap-2 rounded-md px-2 text-[13.5px] font-medium",
         )}
       >
+        Menu
         <span
           aria-hidden
           className="bg-ink text-page grid size-[26px] place-items-center rounded-full text-xs font-semibold"
@@ -182,8 +197,8 @@ export function AccountMenu() {
  * a dimmed page, on any screen (FR-06.15).
  *
  * It carries the same line as the pages of a desktop, with its title search
- * (FR-06.14): Return creates, a tap on a match opens that task, and a "More
- * options…" line goes on to the full draft (ADR-0005), which is the only way a
+ * (FR-06.14): Return creates, a tap on a match opens that task, and a "Add
+ * details…" line goes on to the full draft (ADR-0005), which is the only way a
  * phone has to give a task a day, a priority or another project before it
  * exists. The sheet sits above the keyboard, following the visual viewport
  * (`useVisualViewport`, which writes to the sheet's own element and nothing
@@ -197,11 +212,14 @@ export function CaptureSheet({
   open,
   onOpenChange,
   returnFocusTo,
+  onHeldChange,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   /** The control that raised it, which gets focus back. */
   returnFocusTo: RefObject<HTMLElement | null>
+  /** Said whenever words are, or stop being, held in the sheet. */
+  onHeldChange: (held: boolean) => void
 }) {
   const panels = useRecordPanels()
   const phone = useIsPhone()
@@ -217,6 +235,11 @@ export function CaptureSheet({
   useEffect(() => {
     if (!phone && open) onOpenChange(false)
   }, [phone, open, onOpenChange])
+
+  // The bar's add control wears a dot while words wait here. Only the sheet's
+  // own words count; a kept full draft (`Tasks/draft.ts`) does not.
+  const held = title.trim() !== ""
+  useEffect(() => onHeldChange(held), [held, onHeldChange])
 
   // Words left over from an earlier hand-over are not this sheet's.
   useEffect(() => {
@@ -241,7 +264,7 @@ export function CaptureSheet({
           event.preventDefault()
           returnFocusTo.current?.focus()
         }}
-        className="bg-page bottom-[var(--kb-inset,0px)] max-h-[var(--vv-height,100svh)] gap-0 rounded-t-xl px-4 pt-2.5 pb-[max(0px,calc(env(safe-area-inset-bottom)-var(--kb-inset,0px)))] shadow-none data-[state=closed]:duration-150 data-[state=open]:duration-200"
+        className="bg-popover dark:border-rule-strong bottom-[var(--kb-inset,0px)] max-h-[var(--vv-height,100svh)] gap-0 rounded-t-xl px-4 pt-2.5 pb-[max(0px,calc(env(safe-area-inset-bottom)-var(--kb-inset,0px)))] shadow-none data-[state=closed]:duration-150 data-[state=open]:duration-200"
       >
         <div
           aria-hidden

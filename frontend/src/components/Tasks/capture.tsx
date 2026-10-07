@@ -36,7 +36,7 @@ export interface CaptureTarget {
 }
 
 /**
- * Words typed in the capture sheet that its "More options…" line carries on
+ * Words typed in the capture sheet that its "Add details…" line carries on
  * to the full draft, so the title is not written twice. Held outside React:
  * the sheet and the draft are different panels, and the words are used once.
  */
