@@ -585,3 +585,77 @@ test("A failed fetch says the tasks could not be loaded, not that there are none
   await expect(taskLine(page, "Task 00")).toBeVisible()
   await expect(alert).toHaveCount(0)
 })
+
+test("A narrowed list says so beside its count, and the action there widens it", async ({
+  page,
+}) => {
+  await newUser(page)
+  const api = await userApi(page)
+  const project = await api.create("/projects/", { name: "Website" })
+  await api.create("/tasks/", {
+    title: "In the project",
+    project_id: project.id,
+  })
+  await api.create("/tasks/", { title: "Loose" })
+
+  await page.goto("/tasks")
+  await expect(page.getByText("2 tasks")).toBeVisible()
+  // Nothing narrows the list, so there is nothing to widen.
+  await expect(page.getByRole("button", { name: "Clear filters" })).toHaveCount(
+    0,
+  )
+
+  await chooseFilter(page, "Any project", "Website")
+  await expect(page.getByText("1 task", { exact: true })).toBeVisible()
+  const clear = page.getByRole("button", { name: "Clear filters" })
+  await expect(clear).toBeVisible()
+  // It sits on the count's own line.
+  const count = await page.getByText("1 task", { exact: true }).boundingBox()
+  const action = await clear.boundingBox()
+  expect(Math.abs((count?.y ?? 0) - (action?.y ?? 99))).toBeLessThan(12)
+
+  await clear.click()
+  await expect(lineTitles(page)).toHaveCount(2)
+  await expect(page).not.toHaveURL(/project_id/)
+  await expect(clear).toHaveCount(0)
+})
+
+test("Previous and Next are there only when there is more than one page", async ({
+  page,
+}) => {
+  await newUser(page)
+  await seedTasks(page, 25)
+  await page.goto("/tasks")
+  // A full page is still one page.
+  await expect(page.getByText("25 tasks", { exact: true })).toBeVisible()
+  await expect(page.getByRole("button", { name: "Previous" })).toHaveCount(0)
+  await expect(page.getByRole("button", { name: "Next" })).toHaveCount(0)
+
+  const api = await userApi(page)
+  await api.create("/tasks/", { title: "One more" })
+  await page.reload()
+  await expect(page.getByText("26 tasks · page 1 of 2")).toBeVisible()
+  await expect(page.getByRole("button", { name: "Next" })).toBeEnabled()
+})
+
+test("The status and priority menus show each option's mark beside its word", async ({
+  page,
+}) => {
+  await newUser(page)
+  await page.goto("/tasks")
+
+  await page.getByRole("button", { name: "Any status" }).click()
+  for (const name of ["Backlog", "To do", "In progress", "Review", "Waiting"]) {
+    await expect(
+      page.getByRole("menuitemradio", { name, exact: true }).locator("svg"),
+    ).toHaveCount(1)
+  }
+  await page.keyboard.press("Escape")
+
+  await page.getByRole("button", { name: "Any priority" }).click()
+  for (const name of ["P1", "P2", "P3", "P4"]) {
+    await expect(
+      page.getByRole("menuitemradio", { name, exact: true }).locator("svg"),
+    ).toHaveCount(1)
+  }
+})

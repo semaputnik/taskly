@@ -467,6 +467,67 @@ test("The filter row keeps three filters and the order, and folds the rest behin
   await expect(page).toHaveURL(/sort=due_date/)
 })
 
+test("The control row is two balanced rows at 375 and 390, and the order never sits alone", async ({
+  page,
+}) => {
+  await newUser(page)
+  const api = await userApi(page)
+  const project = await api.create("/projects/", { name: "Website relaunch" })
+  await api.create("/tasks/", { title: "Anything", project_id: project.id })
+
+  for (const width of [375, 390]) {
+    await page.setViewportSize({ width, height: 812 })
+    for (const search of ["", `?project_id=${project.id}`]) {
+      await page.goto(`/tasks${search}`)
+      const row = page.getByRole("group", { name: "Filters" })
+      await expect(row).toBeVisible()
+      const status = await boxOf(
+        row.getByRole("button", { name: /^(Any status|Status:)/ }),
+      )
+      const more = await boxOf(row.getByRole("button", { name: "More" }))
+      const order = await boxOf(row.getByRole("button", { name: /^Order:/ }))
+      // The three filters are the first row; More and the order share the
+      // second, so the order has company, whatever fits above it.
+      expect(more.y).toBeGreaterThan(status.y + 20)
+      expect(order.y).toBe(more.y)
+      expect(order.x + order.width).toBeLessThanOrEqual(width)
+    }
+  }
+})
+
+test("A line whose facts fill it drops its project to a line of its own instead of cutting it", async ({
+  page,
+}) => {
+  await newUser(page)
+  const api = await userApi(page)
+  const project = await api.create("/projects/", { name: "Website relaunch" })
+  await api.create("/tags/", { name: "copy" })
+  await api.create("/tasks/", {
+    title: "Rewrite the pricing copy",
+    project_id: project.id,
+    due_date: "2030-03-14",
+    tags: ["copy", "pricing"],
+  })
+
+  for (const width of [375, 390]) {
+    await page.setViewportSize({ width, height: 812 })
+    await page.goto("/tasks")
+    const item = page
+      .getByRole("list", { name: "Tasks" })
+      .getByRole("listitem")
+      .first()
+    const name = item.getByText("Website relaunch", { exact: true })
+    await expect(name).toBeVisible()
+    // Whole, not "Website r…".
+    const cut = await name.evaluate((e) => e.scrollWidth > e.clientWidth)
+    expect(cut).toBe(false)
+    // And inside the line.
+    const line = await boxOf(item)
+    const place = await boxOf(name)
+    expect(place.x + place.width).toBeLessThanOrEqual(line.x + line.width)
+  }
+})
+
 test("The task list never scrolls sideways, however long a title or a project name", async ({
   page,
 }) => {

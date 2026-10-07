@@ -3,7 +3,7 @@ import type { ReactNode } from "react"
 import type { TaskPriority, TaskStatus } from "@/client"
 import { cn } from "@/lib/utils"
 import { PRIORITY_TEXT } from "./priority"
-import { type MarkTone, markName, markTone } from "./statuses"
+import { type MarkTone, markName, markTone, STATUS_LABELS } from "./statuses"
 
 export { OPEN_STATUSES, STATUS_LABELS, STATUSES } from "./statuses"
 
@@ -109,5 +109,19 @@ export function StatusMark({
     >
       {STATUS_SHAPES[status]}
     </svg>
+  )
+}
+
+/**
+ * A status as a choice in a menu: its mark beside its name, so the menu is
+ * the legend for the marks on the lines. Without a priority the mark stands
+ * for the status alone, in ink.
+ */
+export function StatusOption({ status }: { status: TaskStatus }) {
+  return (
+    <span className="flex items-center gap-2">
+      <StatusMark status={status} className="size-3.5" />
+      {STATUS_LABELS[status]}
+    </span>
   )
 }
