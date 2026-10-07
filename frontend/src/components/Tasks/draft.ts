@@ -120,3 +120,114 @@ function sameRule(a: Recurrence | null, b: Recurrence | null): boolean {
     (a.interval_days ?? null) === (b.interval_days ?? null)
   )
 }
+
+/**
+ * The draft as this browser keeps it.
+ *
+ * A draft lives in the panel, so a reload, a dropped tab or a browser that
+ * restarts would take what was written with it. It is kept in this browser's
+ * own storage, never sent anywhere, and given back when the draft opens
+ * again; creating the task or discarding the draft clears it. Storage may be
+ * refused or missing (a private window, blocked site data), so every access
+ * is guarded and a draft that cannot be kept is simply not kept.
+ */
+export type DraftStorage = Pick<Storage, "getItem" | "setItem" | "removeItem">
+
+function browserStorage(): DraftStorage | null {
+  try {
+    return window.localStorage
+  } catch {
+    return null
+  }
+}
+
+/** One draft per place it lands: a task of its own, or a subtask of one. */
+function draftKey(target: DraftTarget): string {
+  return `taskly:task-draft:${target.parentId ?? "top"}`
+}
+
+export function keepDraft(
+  target: DraftTarget,
+  draft: TaskDraft,
+  storage: DraftStorage | null = browserStorage(),
+): void {
+  try {
+    storage?.setItem(draftKey(target), JSON.stringify(draft))
+  } catch {
+    // Not kept; the draft on screen is unaffected.
+  }
+}
+
+export function clearKeptDraft(
+  target: DraftTarget,
+  storage: DraftStorage | null = browserStorage(),
+): void {
+  try {
+    storage?.removeItem(draftKey(target))
+  } catch {
+    // Nothing to clear that could be reached.
+  }
+}
+
+const isText = (value: unknown): value is string => typeof value === "string"
+const isTextOrNull = (value: unknown): value is string | null =>
+  value === null || isText(value)
+
+/** The kept draft, or null when there is none or what is there is not one. */
+export function readKeptDraft(
+  target: DraftTarget,
+  storage: DraftStorage | null = browserStorage(),
+): TaskDraft | null {
+  let raw: unknown
+  try {
+    const stored = storage?.getItem(draftKey(target))
+    if (!stored) return null
+    raw = JSON.parse(stored)
+  } catch {
+    return null
+  }
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+    return null
+  }
+  const kept = raw as Record<string, unknown>
+  const base = emptyDraft(target)
+
+  const title = kept.title ?? base.title
+  const description = kept.description ?? base.description
+  const assignee = kept.assignee ?? base.assignee
+  const due = kept.due_date === undefined ? base.due_date : kept.due_date
+  const priority = kept.priority === undefined ? base.priority : kept.priority
+  const tags = kept.tags ?? base.tags
+  const recurrence =
+    kept.recurrence === undefined ? base.recurrence : kept.recurrence
+  const project = kept.project_id
+
+  if (
+    !isText(title) ||
+    !isText(description) ||
+    !isText(assignee) ||
+    !isTextOrNull(due) ||
+    !isTextOrNull(priority) ||
+    !Array.isArray(tags) ||
+    !tags.every(isText) ||
+    !(project === undefined || isText(project)) ||
+    !(
+      recurrence === null ||
+      (typeof recurrence === "object" &&
+        !Array.isArray(recurrence) &&
+        isText((recurrence as Record<string, unknown>).frequency))
+    )
+  ) {
+    return null
+  }
+  return {
+    title,
+    description,
+    assignee,
+    due_date: due,
+    priority: priority as TaskPriority | null,
+    tags,
+    recurrence: recurrence as Recurrence | null,
+    project_id: project ?? base.project_id,
+  }
+}

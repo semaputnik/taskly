@@ -52,12 +52,12 @@ export const descriptionClass =
 
 /**
  * The due date's button, flat like the selects beside it. The picker's
- * calendar glyph stands where a select has its chevron: shown on reaching for
- * the value.
+ * calendar glyph stands where a select has its chevron: always in view in
+ * Ink 3, darkening on reaching for the value.
  */
 const dueClass = cn(
   quiet,
-  "h-[30px] justify-start pointer-coarse:h-11 md:text-[15px] [&_svg]:size-3 [&_svg]:opacity-0 hover:[&_svg]:opacity-100 focus-visible:[&_svg]:opacity-100 pointer-coarse:[&_svg]:opacity-60",
+  "h-[30px] justify-start pointer-coarse:h-11 md:text-[15px] [&_svg]:size-3 [&_svg]:opacity-100 hover:[&_svg]:text-ink! focus-visible:[&_svg]:text-ink!",
 )
 
 /**
@@ -289,7 +289,7 @@ export function TaskProperties({ task }: { task: TaskPublic }) {
   const { user: currentUser } = useAuth()
   const update = useTaskUpdate(task)
   // Status has its own path: moving to done may need the subtasks prompt.
-  const status = useTaskStatus(task)
+  const status = useTaskStatus(task, { announce: true })
   const ids = useId()
 
   const fields: TaskFields = {

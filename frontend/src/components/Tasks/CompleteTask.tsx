@@ -42,6 +42,8 @@ interface CompleteTaskProps {
    * than adding to it.
    */
   receipt?: boolean
+  /** Say the result in the column's bar, for the control of the open task. */
+  announce?: boolean
   className?: string
   /** Resizes the drawn mark, for the title that is the status's biggest. */
   markClassName?: string
@@ -83,15 +85,17 @@ export function CompleteTask({
   asMark = false,
   late = false,
   receipt = false,
+  announce = false,
   className,
   markClassName,
   tip = false,
 }: CompleteTaskProps) {
   const status = useTaskStatus(task, {
     onCompleted: receipt ? completionReceipt(task) : undefined,
+    announce,
   })
   const done = task.status === "done"
-  const action = done ? "Reopen task" : "Mark as done"
+  const action = done ? "Reopen task" : "Mark done"
   const toggle = (checked: boolean) =>
     void status.change(checked ? "done" : "todo")
 
@@ -107,8 +111,8 @@ export function CompleteTask({
           aria-label={`${action} (${markName(task.status, task.priority)})`}
           data-tip={tip ? STATUS_LABELS[task.status] : undefined}
           className={cn(
-            // The mark is 18px; the padding takes the target to 26px without
-            // moving it off the title's line.
+            // The padding takes the target to 26px without moving the mark off
+            // the title's line; a caller on a thumb widens it (see `className`).
             "focus-visible:ring-ring/50 -m-1 shrink-0 rounded-full p-1 outline-none focus-visible:ring-[3px] disabled:opacity-50",
             tip && MARK_TIP,
             className,

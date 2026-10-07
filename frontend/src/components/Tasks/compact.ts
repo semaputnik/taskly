@@ -1,5 +1,5 @@
 import type { TaskPublic } from "@/client"
-import { formatDay } from "@/lib/dates"
+import { dateInWords, formatDay } from "@/lib/dates"
 import { describeRecurrence } from "./recurrence"
 
 /**
@@ -26,23 +26,14 @@ function localDay(day: string): Date {
   return new Date(year, month - 1, date)
 }
 
-/** A day written out plainly, carrying the year only when it is not this one. */
-function plainDay(due: Date, now: Date): string {
-  return due.toLocaleDateString(undefined, {
-    day: "numeric",
-    month: "short",
-    ...(due.getFullYear() !== now.getFullYear() && { year: "numeric" }),
-  })
-}
-
 /**
  * A due day in words, measured from `today` (both `YYYY-MM-DD`): "Today",
  * "Tomorrow", a weekday within the week, "3 days late" once missed, and a
  * short date past that, with the year only when it is not this one.
  *
  * A missed day is counted in days only up to a fortnight; past that the number
- * is one nobody reads ("9775 days late"), so the date is said instead, in the
- * product's numeric format ("due 03/02/2026"), and still in the alert tone.
+ * is one nobody reads ("9775 days late"), so the date is said instead, in
+ * words ("due 3 Feb 2026"), and still in the alert tone.
  * This is the one place the rule is kept: the Today page, the task list, the
  * task column and subtask lines all say a due day through here.
  *
@@ -59,12 +50,12 @@ export function describeDue(
   const due = localDay(dueDate)
   const now = localDay(today)
 
-  if (done) return { text: plainDay(due, now), tone: "later" }
+  if (done) return { text: dateInWords(due, now), tone: "later" }
 
   const days = Math.round((due.getTime() - now.getTime()) / DAY_MS)
 
   if (days < -MAX_DAYS_LATE) {
-    return { text: `due ${formatDay(dueDate)}`, tone: "late" }
+    return { text: `due ${formatDay(dueDate, now)}`, tone: "late" }
   }
   if (days < -1) return { text: `${-days} days late`, tone: "late" }
   if (days === -1) return { text: "Yesterday", tone: "late" }
@@ -76,7 +67,7 @@ export function describeDue(
       tone: "soon",
     }
   }
-  return { text: plainDay(due, now), tone: "later" }
+  return { text: dateInWords(due, now), tone: "later" }
 }
 
 /** "1/3" for a task with subtasks; nothing for one without. */

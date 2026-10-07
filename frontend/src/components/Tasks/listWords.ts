@@ -1,4 +1,4 @@
-import { formatDay } from "@/lib/dates"
+import { formatDayPlain } from "@/lib/dates"
 import { NATURAL_ORDER, type TaskSearch } from "./search"
 
 /**
@@ -93,14 +93,14 @@ export function timeLabel(
   const { overdue, due_from: from, due_to: to } = search
   const range =
     from && to
-      ? `${formatDay(from)} – ${formatDay(to)}`
+      ? `${formatDayPlain(from)} – ${formatDayPlain(to)}`
       : from
-        ? `From ${formatDay(from)}`
+        ? `From ${formatDayPlain(from)}`
         : to
-          ? `To ${formatDay(to)}`
+          ? `To ${formatDayPlain(to)}`
           : undefined
   if (overdue && range) {
-    // "Overdue, to 09.10.2026": the range's own words, lower-cased to read on.
+    // "Overdue, to 9 Oct": the range's own words, lower-cased to read on.
     return `Overdue, ${range.charAt(0).toLowerCase()}${range.slice(1)}`
   }
   return overdue ? "Overdue" : range

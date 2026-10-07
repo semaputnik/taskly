@@ -1,6 +1,7 @@
 import type { TaskHandover } from "@/client"
 import type { OpenStatus } from "@/components/Tasks/statuses"
 import { STATUS_LABELS } from "@/components/Tasks/statuses"
+import { dateInWords } from "@/lib/dates"
 
 /**
  * My work's words and narrowing (FR-06.7): which groups it draws and in what
@@ -50,11 +51,7 @@ function finishedWhen(at: Date, now: Date, locale?: string): string {
   if (days < 7) {
     return `on ${at.toLocaleDateString(locale, { weekday: "long" })}`
   }
-  return `on ${at.toLocaleDateString(locale, {
-    day: "numeric",
-    month: "short",
-    ...(at.getFullYear() !== now.getFullYear() && { year: "numeric" }),
-  })}`
+  return `on ${dateInWords(at, now, locale)}`
 }
 
 /**

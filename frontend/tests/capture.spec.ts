@@ -315,7 +315,7 @@ test("A subtask is captured inline in its parent's Subtasks section", async ({
   await expect(subtaskField).toBeFocused()
 
   // Closing the line moves the count and strikes the title.
-  await subtasks.getByRole("checkbox", { name: /Mark as done/ }).click()
+  await subtasks.getByRole("checkbox", { name: /Mark done/ }).click()
   await expect(
     subtasks.getByRole("heading", { name: /Subtasks\s*1\/1/ }),
   ).toBeVisible()

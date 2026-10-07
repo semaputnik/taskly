@@ -7,6 +7,7 @@ import type {
   TaskStatus,
   TaskUpdate,
 } from "@/client"
+import { useSaveCue } from "@/components/Records/saveCue"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -18,6 +19,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import useAuth from "@/hooks/useAuth"
+import { refusalMessage } from "@/lib/apiErrors"
 import { useReportChange } from "@/lib/serverState"
 import { toastError, toastProblem, toastSuccess } from "@/lib/toasts"
 import type { CaptureTarget } from "./capture"
@@ -36,24 +38,33 @@ import {
 /**
  * The task writes, as controls use them.
  *
- * One feedback policy for all of them: an edit in a panel is silent — the
- * value on screen is the receipt — while a batch and a destructive act
- * confirm with a toast. A failure always raises one. The prompts a write can
+ * One feedback policy for all of them: an edit in the task's column says
+ * "Saved" in the column's bar, or why it could not, while a batch and a
+ * destructive act confirm with a toast. A failure elsewhere raises one. The prompts a write can
  * need (open subtasks, a due date's scope) are rendered by the hook that
  * needs them, so no control has to remember to.
  */
 
-/** Run writes, counting the ones in flight and toasting any failure. */
-function useWrites() {
+/**
+ * Run writes, counting the ones in flight and saying the result: in the
+ * column's bar for a field edit (`announce`, where there is a column), as a
+ * toast for a failure anywhere else.
+ */
+function useWrites(announce = false) {
   const report = useReportChange()
+  const cue = useSaveCue()
   const [inFlight, setInFlight] = useState(0)
 
   async function run<T>(write: (report: Report) => Promise<Outcome<T>>) {
     setInFlight((count) => count + 1)
     try {
       const outcome = await write(report)
-      if (!outcome.saved && outcome.reason === "failed") {
-        toastError(outcome.error)
+      const says = announce ? cue : null
+      if (outcome.saved) {
+        says?.saved()
+      } else if (outcome.reason === "failed") {
+        if (says) says.failed(refusalMessage(outcome.error))
+        else toastError(outcome.error)
       }
       return outcome
     } finally {
@@ -74,7 +85,7 @@ function useWrites() {
  * scope, and `save` resolves once it is chosen or the question is dismissed.
  */
 export function useTaskUpdate(task: TaskPublic) {
-  const { run, isPending } = useWrites()
+  const { run, isPending } = useWrites(true)
   const [asking, setAsking] = useState<TaskUpdate | null>(null)
   const settle = useRef<(saved: boolean) => void>(() => {})
 
@@ -125,7 +136,10 @@ export function useTaskStatus(
   task: TaskPublic,
   {
     onCompleted,
+    announce = false,
   }: {
+    /** Say the result in the column's bar: for the control of the open task. */
+    announce?: boolean
     /**
      * The task reached done, by whichever path — the control directly, or
      * the prompt that asks about its open subtasks first. It is handed
@@ -135,7 +149,7 @@ export function useTaskStatus(
     onCompleted?: (reopen: () => Promise<boolean>) => void
   } = {},
 ) {
-  const { run, isPending } = useWrites()
+  const { run, isPending } = useWrites(announce)
   const [isPrompting, setIsPrompting] = useState(false)
   const [announcement, setAnnouncement] = useState("")
 

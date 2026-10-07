@@ -85,7 +85,7 @@ test("Completing sends done, takes the row away, and undoes to To do", async ({
 
   for (const title of ["Started", "Parked"]) {
     const box = row(page, title).getByRole("checkbox", {
-      name: "Mark as done",
+      name: "Mark done",
     })
     await expect(box).not.toBeChecked()
     const sent = nextUpdate(page)
@@ -184,7 +184,7 @@ test("Done asks about open subtasks from the checkbox and from the panel", async
   await page.goto("/tasks")
 
   await row(page, "Move house")
-    .getByRole("checkbox", { name: "Mark as done" })
+    .getByRole("checkbox", { name: "Mark done" })
     .click()
   let prompt = page.getByRole("dialog", {
     name: "This task has open subtasks",

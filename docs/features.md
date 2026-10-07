@@ -336,8 +336,8 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
   many tasks at once is made by a bot user through the REST API's batch
   endpoint, which stays (FR-10.9). A subtask line is indented under its root
   task with a branch mark. A due day that has passed reads "Yesterday" and
-  then "N days late" up to 14 days late; further back it reads the date in
-  the product's numeric format ("due 03/02/2026"), still in the alert
+  then "N days late" up to 14 days late; further back it reads the date
+  in words ("due 3 Feb 2026"), still in the alert
   colour. The same words are used on the dashboard, the task list, the task
   column's subtask lines and everywhere else a task line is shown.
 - **FR-06.6** Priorities are told apart by colour as well as by name: P1 red,

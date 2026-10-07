@@ -25,7 +25,7 @@ test("A user's own changes appear on the Activity page, newest first", async ({
   await page.keyboard.press("Escape")
 
   await taskLine(page, "Renew the passport")
-    .getByRole("checkbox", { name: "Mark as done" })
+    .getByRole("checkbox", { name: "Mark done" })
     .click()
   // The list holds open work, so the task leaves it once it is done
   // (ADR-0006). Where it went is the point of the rest of this test.

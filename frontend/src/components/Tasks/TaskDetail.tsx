@@ -13,6 +13,7 @@ import { useWalk } from "@/components/Records/walk"
 import { formatDayOf } from "@/lib/dates"
 import { projectsQuery, taskQuery } from "@/lib/serverState"
 import { toastSuccess } from "@/lib/toasts"
+import { cn } from "@/lib/utils"
 import { CompleteTask } from "./CompleteTask"
 import { useCaptureTarget } from "./capture"
 import DeleteTask from "./DeleteTask"
@@ -80,12 +81,18 @@ export function TaskDetail() {
           </>
         ) : task ? (
           <>
-            <span className="text-ink-2 shrink-0 font-medium">
+            {/* On a phone the project is left for a screen reader, as in the
+                other columns' bars: the Project row says it, and the date
+                needs the room to stay whole beside the walk count. */}
+            <span className="text-ink-2 shrink-0 font-medium max-sm:sr-only">
               {projectName ?? "Inbox"}
             </span>
             {parent && (
               <>
-                <ChevronRight className="size-3.5 shrink-0" aria-hidden />
+                <ChevronRight
+                  className="size-3.5 shrink-0 max-sm:hidden"
+                  aria-hidden
+                />
                 <button
                   type="button"
                   onClick={() => onOpenTask(parent.id)}
@@ -95,8 +102,10 @@ export function TaskDetail() {
                 </button>
               </>
             )}
-            <span aria-hidden>·</span>
-            <span className="truncate">{opened(task)}</span>
+            <span aria-hidden className={cn(!parent && "max-sm:hidden")}>
+              ·
+            </span>
+            <span className="shrink-0 whitespace-nowrap">{opened(task)}</span>
           </>
         ) : undefined
       }
@@ -122,7 +131,15 @@ export function TaskDetail() {
               title it closes. */}
           <TitleRow
             mark={
-              <CompleteTask asMark task={task} markClassName="size-[22px]" />
+              <CompleteTask
+                asMark
+                announce
+                task={task}
+                markClassName="size-[22px]"
+                // 22px mark, 11px of padding each side: the 44px a thumb needs,
+                // taken back out of the margin so nothing moves.
+                className="pointer-coarse:-m-[11px] pointer-coarse:p-[11px]"
+              />
             }
           >
             <TaskTitle task={task} />
@@ -144,10 +161,10 @@ export function TaskDetail() {
 }
 
 /**
- * The bar's account of how the task came to be: "opened by you, 24.09.2026",
+ * The bar's account of how the task came to be: "opened by you, 24 Sept",
  * or by the bot user that filed it. A task from before the reporter was kept
- * says only when. The day is written the product's way, numerically in the
- * reader's locale, as the Created row beneath writes its day (it adds the time).
+ * says only when. The day is said in words, as the Created row beneath says its day (it
+ * adds the time).
  */
 function opened(task: TaskPublic): string {
   const by = reporterName(task)
@@ -164,9 +181,8 @@ function TaskTitle({ task }: { task: TaskPublic }) {
       wrap
       value={task.title}
       ariaLabel="Task title"
-      onCommit={(title) =>
-        title.trim() ? update.save({ title: title.trim() }) : undefined
-      }
+      required="A task needs a title"
+      onCommit={(title) => update.save({ title: title.trim() })}
       className={taskTitleClass}
     />
   )

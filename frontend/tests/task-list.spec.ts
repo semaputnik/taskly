@@ -401,7 +401,7 @@ test("A task is closed from its line, which leaves the list with a notice", asyn
 
   await page.goto("/tasks")
   await taskLine(page, "Task 00")
-    .getByRole("checkbox", { name: "Mark as done" })
+    .getByRole("checkbox", { name: "Mark done" })
     .click()
   // The list holds open work (ADR-0006), so the line goes and the notice
   // carries the way back.
