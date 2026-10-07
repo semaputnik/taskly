@@ -54,7 +54,9 @@ export async function gotoAndBeSentAway(page: Page, url: string) {
  * leave, which aborts the test's own navigation and leaves the test waiting
  * for a URL it is already at. Seeded before any page exists, only the
  * navigation under test ever meets the token. The seed runs once per tab, so
- * the sign-in screen the reader is sent to is not given it back.
+ * the sign-in screen the reader is sent to is not given it back. Call it before
+ * the tab's first navigation: the first page the tab opens is the one that gets
+ * the token.
  */
 export async function holdRefusedCredential(page: Page, token: string) {
   await page.addInitScript((token) => {
