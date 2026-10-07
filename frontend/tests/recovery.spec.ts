@@ -49,7 +49,11 @@ test("A wrong code is refused", async ({ page }) => {
 
   // Said beside the code that was refused, not in a notice that fades.
   await expect(page.getByRole("alert")).toHaveText(
-    "This email and recovery code do not match a live code.",
+    "This email and recovery code do not match a live code. Ask the superuser for a new code.",
+  )
+  await expect(page.getByTestId("recovery-code-input")).toHaveAttribute(
+    "aria-invalid",
+    "true",
   )
   await expect(page).toHaveURL(/\/recover/)
 })

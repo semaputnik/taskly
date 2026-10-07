@@ -170,3 +170,36 @@ def test_delete_non_inbox_project(client: TestClient, db: Session) -> None:
     r = client.get(f"{settings.API_V1_STR}/projects/", headers=headers)
     names = {p["name"] for p in r.json()["data"]}
     assert "Throwaway" not in names
+
+
+def test_projects_list_in_a_fixed_order_across_pages(
+    client: TestClient, db: Session
+) -> None:
+    """Inbox first, then by name ignoring case, with the id as the tie-break."""
+    headers = new_user_headers(client, db)
+    names = ["zebra", "Apple", "banana", "apple", "Dup", "dup", "Cherry"]
+    for name in names:
+        r = client.post(
+            f"{settings.API_V1_STR}/projects/", headers=headers, json={"name": name}
+        )
+        assert r.status_code == 200
+
+    full = client.get(
+        f"{settings.API_V1_STR}/projects/", headers=headers, params={"limit": 100}
+    ).json()["data"]
+    assert full[0]["is_inbox"] is True
+    rest = full[1:]
+    assert [p["name"].lower() for p in rest] == sorted(n.lower() for n in names)
+    for first, second in zip(rest, rest[1:], strict=False):
+        if first["name"].lower() == second["name"].lower():
+            assert first["id"] < second["id"]
+
+    paged: list[str] = []
+    for skip in range(0, len(full), 3):
+        page = client.get(
+            f"{settings.API_V1_STR}/projects/",
+            headers=headers,
+            params={"skip": skip, "limit": 3},
+        ).json()
+        paged.extend(p["id"] for p in page["data"])
+    assert paged == [p["id"] for p in full]

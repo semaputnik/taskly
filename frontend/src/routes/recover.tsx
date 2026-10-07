@@ -4,6 +4,7 @@ import { useForm } from "react-hook-form"
 import { z } from "zod"
 
 import {
+  AuthFailure,
   AuthLink,
   AuthLinks,
   AuthScreen,
@@ -21,7 +22,7 @@ import {
 } from "@/components/ui/form"
 import { LoadingButton } from "@/components/ui/loading-button"
 import useAuth, { isLoggedIn } from "@/hooks/useAuth"
-import { refusalMessage } from "@/lib/apiErrors"
+import { isRefusal, refusalMessage } from "@/lib/apiErrors"
 import { passkeysSupported, wasDismissed } from "@/lib/passkeys"
 
 const formSchema = z.object({
@@ -63,6 +64,8 @@ function Recover() {
   )
 }
 
+const ASK_FOR_A_NEW_CODE = "Ask the superuser for a new code."
+
 function RecoverForm() {
   const { recoverMutation } = useAuth()
   const form = useForm<FormData>({
@@ -79,11 +82,15 @@ function RecoverForm() {
 
   // A refusal is said here, beside the code that was refused, in the API's
   // words: a wrong code, a spent one and an expired one read the same
-  // (FR-12.18). A prompt the person dismissed is not a problem to report.
-  const refusal =
-    recoverMutation.isError && !wasDismissed(recoverMutation.error)
-      ? refusalMessage(recoverMutation.error)
-      : null
+  // (FR-12.18), and all end by saying who can issue a new one. A prompt the
+  // person dismissed is not a problem to report.
+  const failed = recoverMutation.isError && !wasDismissed(recoverMutation.error)
+  const refused = failed && isRefusal(recoverMutation.error)
+  const refusal = failed
+    ? refused
+      ? `${refusalMessage(recoverMutation.error)} ${ASK_FOR_A_NEW_CODE}`
+      : refusalMessage(recoverMutation.error)
+    : null
 
   return (
     <Form {...form}>
@@ -113,12 +120,13 @@ function RecoverForm() {
         <FormField
           control={form.control}
           name="code"
-          render={({ field }) => (
+          render={({ field, fieldState }) => (
             <FormItem className="gap-1">
               <FieldLine label="Code" htmlFor="code">
                 <FormControl>
                   <input
                     id="code"
+                    aria-invalid={!!fieldState.error || refused}
                     data-testid="recovery-code-input"
                     placeholder="XXXX-XXXX-XXXX-XXXX"
                     autoComplete="one-time-code"
@@ -132,11 +140,7 @@ function RecoverForm() {
             </FormItem>
           )}
         />
-        {refusal && (
-          <p role="alert" className="text-late mt-3 text-[13.5px] font-medium">
-            {refusal}
-          </p>
-        )}
+        {refusal && <AuthFailure>{refusal}</AuthFailure>}
         <LoadingButton
           type="submit"
           className={authAction}
