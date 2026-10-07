@@ -49,6 +49,19 @@ export function AuthScreen({
 export const authAction =
   "mt-3 h-11 w-full gap-2.5 rounded-lg text-[15px] font-medium pointer-coarse:h-12"
 
+/**
+ * What a screen says when it could not do what was asked: one line in
+ * Overdue Red, announced as an alert, in the API's words or the ceremony's.
+ * A message that fades is not enough to correct a sign-in by.
+ */
+export function AuthFailure({ children }: { children: React.ReactNode }) {
+  return (
+    <p role="alert" className="text-late mt-3 text-[13.5px] font-medium">
+      {children}
+    </p>
+  )
+}
+
 /** The links beneath the action: quiet text, the next step in ink. */
 export function AuthLinks({ children }: { children: React.ReactNode }) {
   return (
@@ -105,6 +118,7 @@ export function PasskeysUnsupported() {
  * A field set as a line: its label at the left, the value beside it, one
  * hairline beneath. Under focus the hairline is drawn in ink and doubled in
  * weight: the focus mark of the world, set on the line rather than around it.
+ * An invalid field draws the same line in Overdue Red.
  */
 export function FieldLine({
   label,
@@ -116,7 +130,7 @@ export function FieldLine({
   children: React.ReactNode
 }) {
   return (
-    <div className="border-rule-strong focus-within:border-ink flex h-11 items-center border-b focus-within:shadow-[0_1px_0_0_var(--ink)]">
+    <div className="border-rule-strong focus-within:border-ink has-[[aria-invalid=true]]:border-late flex h-11 items-center border-b focus-within:shadow-[0_1px_0_0_var(--ink)] has-[[aria-invalid=true]]:focus-within:shadow-[0_1px_0_0_var(--late)]">
       <label
         htmlFor={htmlFor}
         className="text-ink-3 mr-3 w-[76px] shrink-0 text-[12.5px]"

@@ -5,7 +5,6 @@ import { UsersService } from "@/client"
 import {
   recoverAccount,
   registerAccount,
-  reportUnlessDismissed,
   signInWithPasskey,
 } from "@/lib/passkeys"
 import { clearServerState, currentUserQuery } from "@/lib/serverState"
@@ -36,7 +35,7 @@ const useAuth = () => {
       startSession(token)
       navigate({ to: "/" })
     },
-    onError: reportUnlessDismissed,
+    // No notice: the sign-in screen says the failure under its button.
   })
 
   const registerMutation = useMutation({
@@ -58,7 +57,7 @@ const useAuth = () => {
       }
       navigate({ to: "/" })
     },
-    onError: reportUnlessDismissed,
+    // No notice: the sign-up screen says the failure beside what caused it.
   })
 
   const recoverMutation = useMutation({
