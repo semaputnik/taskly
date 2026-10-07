@@ -244,7 +244,10 @@ test("The sheet follows the keyboard, and Return writes a task from Bots", async
     .toBeCloseTo(812 - 300, 0)
 
   // Nothing to send while nothing is written.
-  const create = sheet(page).getByRole("button", { name: "Create", exact: true })
+  const create = sheet(page).getByRole("button", {
+    name: "Create",
+    exact: true,
+  })
   await expect(create).toHaveCount(0)
   await line(page).fill("Buy milk")
   // The action is a word, visible, and a tap on it leaves the keyboard up.
@@ -394,9 +397,7 @@ test("Words left in a closed sheet put a dot on the add control, which goes with
 test("The dark sheet is a step lighter than the page, with a hairline at its top", async ({
   page,
 }) => {
-  await page.addInitScript(() =>
-    localStorage.setItem("vite-ui-theme", "dark"),
-  )
+  await page.addInitScript(() => localStorage.setItem("vite-ui-theme", "dark"))
   await newUser(page)
   await page.goto("/bots")
   await expect(page.locator("html")).toHaveClass(/dark/)
