@@ -42,3 +42,26 @@ export async function gotoAndBeSentAway(page: Page, url: string) {
     if (!String(error).includes("ERR_ABORTED")) throw error
   })
 }
+
+/**
+ * Have the browser hold `token` in storage from the first page this tab opens,
+ * for a test about what the app does with a credential the API refuses.
+ *
+ * Storing it from the test, with `page.evaluate` on a page that is already
+ * running, is a race: that page is the app, and the next render of the
+ * sign-in screen reads the token and asks the API who it belongs to. The
+ * refusal then sends the reader away from the page the test is about to
+ * leave, which aborts the test's own navigation and leaves the test waiting
+ * for a URL it is already at. Seeded before any page exists, only the
+ * navigation under test ever meets the token. The seed runs once per tab, so
+ * the sign-in screen the reader is sent to is not given it back. Call it before
+ * the tab's first navigation: the first page the tab opens is the one that gets
+ * the token.
+ */
+export async function holdRefusedCredential(page: Page, token: string) {
+  await page.addInitScript((token) => {
+    if (sessionStorage.getItem("credential-held")) return
+    sessionStorage.setItem("credential-held", "1")
+    localStorage.setItem("access_token", token)
+  }, token)
+}

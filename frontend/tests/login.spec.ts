@@ -8,7 +8,12 @@ import {
   withoutPasskeySupport,
 } from "./utils/passkeys.ts"
 import { randomEmail } from "./utils/random.ts"
-import { gotoAndBeSentAway, logInUser, logOutUser } from "./utils/user.ts"
+import {
+  gotoAndBeSentAway,
+  holdRefusedCredential,
+  logInUser,
+  logOutUser,
+} from "./utils/user.ts"
 
 test.use({ storageState: { cookies: [], origins: [] } })
 
@@ -253,10 +258,7 @@ test("Logged-out user cannot access protected routes", async ({ page }) => {
 })
 
 test("Redirects to /login when token is wrong", async ({ page }) => {
-  await page.goto("/settings")
-  await page.evaluate(() => {
-    localStorage.setItem("access_token", "invalid_token")
-  })
+  await holdRefusedCredential(page, "invalid_token")
   await gotoAndBeSentAway(page, "/settings")
   await page.waitForURL("/login")
   await expect(page).toHaveURL("/login")
@@ -265,10 +267,7 @@ test("Redirects to /login when token is wrong", async ({ page }) => {
 test("A refused credential sends the reader on at once, not after retries", async ({
   page,
 }) => {
-  await page.goto("/login")
-  await page.evaluate(() => {
-    localStorage.setItem("access_token", "stale_token")
-  })
+  await holdRefusedCredential(page, "stale_token")
 
   const started = Date.now()
   await gotoAndBeSentAway(page, "/tasks")
@@ -276,6 +275,8 @@ test("A refused credential sends the reader on at once, not after retries", asyn
   // Retried like any other failure, a refused credential costs four refusals
   // and about eight seconds of a screen that neither loads nor moves on.
   expect(Date.now() - started).toBeLessThan(5000)
+  // The sign-in screen is up; the credential went with the redirect.
+  await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible()
   await expect(
     page.evaluate(() => localStorage.getItem("access_token")),
   ).resolves.toBeNull()

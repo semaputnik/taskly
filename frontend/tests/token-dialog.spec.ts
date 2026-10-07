@@ -1,8 +1,23 @@
-import { expect, type Page, test } from "@playwright/test"
+import { expect, type Locator, type Page, test } from "@playwright/test"
 import { newUser, userApi } from "./utils/account"
 import { storeSecretAndClose } from "./utils/secretDialog"
 
 test.use({ storageState: { cookies: [], origins: [] } })
+
+/**
+ * Wait until a dialog has finished opening. A layer only starts listening for
+ * a press outside itself a task after it mounts, so a press that lands in the
+ * first few milliseconds, as the instant production build lets one, passes
+ * straight through to the page behind it: the dialog neither closes nor, in a
+ * test that expects it to hold, is ever really tested. A reader's hand is
+ * never that quick; the test's is, so it waits for the zoom-in to end.
+ */
+async function settled(dialog: Locator) {
+  await expect(dialog).toBeVisible()
+  await dialog.evaluate((el) =>
+    Promise.all(el.getAnimations().map((animation) => animation.finished)),
+  )
+}
 
 /** A fresh token for a bot user of the test's own, on screen once. */
 async function revealToken(page: Page) {
@@ -23,7 +38,7 @@ async function revealToken(page: Page) {
     .getByRole("button", { name: "Issue" })
     .click()
   const dialog = page.getByRole("dialog", { name: "Token for Nightly sync" })
-  await expect(dialog).toBeVisible()
+  await settled(dialog)
   const token = await dialog
     .getByRole("textbox", { name: "Bot token" })
     .inputValue()
@@ -110,12 +125,12 @@ test("Every other dialog still closes on Escape and a click outside", async ({
     .getByRole("button", { name: "Delete bot user" })
 
   await open.click()
-  await expect(dialog).toBeVisible()
+  await settled(dialog)
   await page.keyboard.press("Escape")
   await expect(dialog).toBeHidden()
 
   await open.click()
-  await expect(dialog).toBeVisible()
+  await settled(dialog)
   await page.mouse.click(5, 5)
   await expect(dialog).toBeHidden()
 })
