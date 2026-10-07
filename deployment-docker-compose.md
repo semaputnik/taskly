@@ -176,7 +176,7 @@ until it has finished, so an image whose code expects a column the database
 does not have never reaches a request. It runs on every `up` and does nothing
 when the database is already at the right revision.
 
-To release a new version, set `TASKLY_TAG` to it and repeat those two commands.
+To release a new version, set `TASKLY_TAG` to it and repeat those two commands. Do not skip the `pull`: `docker compose up` does not fetch a newer image when one with the same tag is already on the server, which is especially true of `latest`, so without it the old version keeps running. Pinning `TASKLY_TAG` to the released version, such as `2.0.0`, makes it obvious which version is running.
 
 To read what the migration step did, or why it stopped:
 
@@ -210,14 +210,17 @@ A user who lost every passkey asks the superuser, who issues a recovery code fro
 docker compose -f compose.release.yml exec backend python -m app.superuser_recovery_code
 ```
 
-(For the stack built from source, use `-f compose.yml -f compose.deploy.yml` instead.) The code is good for 24 hours and is entered with the email under “Have a recovery code?” on the sign-in screen.
+(For the stack built from source, use `-f compose.yml -f compose.deploy.yml` instead.) The code is good for 24 hours and is entered with the email under “Use a recovery code” on the sign-in screen.
 
 ### Upgrading from Password Sign-in
 
-Accounts created with a password keep their data but lose their way in when you upgrade, since passwords are gone. After the upgrade:
+Accounts created with a password keep their data but lose their way in when you upgrade, since passwords are gone. To upgrade from v1.3.1 to v2.0.0:
 
-1. Print the superuser's recovery code with the command above, and spend it to give the superuser a passkey.
-2. As the superuser, open the users list and issue a recovery code to each other user, and hand it to them yourself. Each one spends theirs on a new passkey.
+1. Back up the database first, for example with `docker compose -f compose.release.yml exec db pg_dump -U postgres app > backup.sql`.
+2. Add `WEBHOOK_SECRET_KEY` and `PAPERLESS_TOKEN_KEY` to your environment; the application refuses to start without them.
+3. Set `TASKLY_TAG` to `2.0.0`, then run `pull` and `up -d` as above.
+4. Print the superuser's recovery code with the command above, and spend it to give the superuser a passkey.
+5. As the superuser, open the users list and issue a recovery code to each other user, and hand it to them yourself. Each one spends theirs on a new passkey.
 
 `FIRST_SUPERUSER_PASSWORD` is no longer read; remove it from your environment and secrets.
 
