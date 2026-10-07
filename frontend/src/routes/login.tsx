@@ -3,6 +3,7 @@ import { KeyRound } from "lucide-react"
 import { type FormEvent, useEffect } from "react"
 
 import {
+  AuthFailure,
   AuthLink,
   AuthLinks,
   AuthScreen,
@@ -13,10 +14,12 @@ import {
 } from "@/components/Auth/AuthScreen"
 import { LoadingButton } from "@/components/ui/loading-button"
 import useAuth, { isLoggedIn } from "@/hooks/useAuth"
+import { refusalMessage } from "@/lib/apiErrors"
 import {
   autofillSupported,
   cancelCeremony,
   passkeysSupported,
+  wasDismissed,
 } from "@/lib/passkeys"
 
 export const Route = createFileRoute("/login")({
@@ -82,6 +85,13 @@ function PasskeySignIn() {
     signInMutation.mutate({})
   }
 
+  // Said under the button, in the API's words or the ceremony's. A prompt the
+  // person dismissed is not a problem to report.
+  const failure =
+    signInMutation.isError && !wasDismissed(signInMutation.error)
+      ? refusalMessage(signInMutation.error)
+      : null
+
   return (
     <form onSubmit={signIn}>
       {/* The browser's passkey suggestions attach to an email field (FR-12.3).
@@ -110,6 +120,7 @@ function PasskeySignIn() {
         <KeyRound />
         Sign in with a passkey
       </LoadingButton>
+      {failure && <AuthFailure>{failure}</AuthFailure>}
     </form>
   )
 }

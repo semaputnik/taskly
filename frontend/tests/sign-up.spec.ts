@@ -75,10 +75,54 @@ test("Registering a taken email is refused", async ({ page }) => {
     .getByRole("button", { name: "Create a passkey and sign in" })
     .click()
 
-  await expect(
-    page.getByText("An account with this email already exists."),
-  ).toBeVisible()
+  // Said under the email field, which is marked invalid; not in a notice.
+  await expect(page.getByTestId("email-input")).toHaveAttribute(
+    "aria-invalid",
+    "true",
+  )
+  await expect(page.getByTestId("email-input")).toHaveAccessibleDescription(
+    "An account with this email already exists.",
+  )
+  await expect(page.locator("[data-sonner-toast]")).toHaveCount(0)
   await expect(page).toHaveURL(/\/signup/)
+})
+
+test("Sign-up says what losing every passkey means", async ({ page }) => {
+  await page.goto("/signup")
+
+  await expect(
+    page.getByText(
+      "Taskly has no password. If you lose every passkey, the superuser can issue you a recovery code.",
+    ),
+  ).toBeVisible()
+})
+
+test("A sign-up that fails after the address was accepted is said under the button", async ({
+  page,
+}) => {
+  await addVirtualAuthenticator(page)
+  await page.route("**/api/v1/login/registration", (route) =>
+    route.fulfill({
+      status: 400,
+      contentType: "application/json",
+      body: JSON.stringify({ detail: "The passkey could not be verified." }),
+    }),
+  )
+
+  await page.goto("/signup")
+  await page.getByTestId("email-input").fill(randomEmail())
+  await page
+    .getByRole("button", { name: "Create a passkey and sign in" })
+    .click()
+
+  await expect(page.getByRole("alert")).toHaveText(
+    "The passkey could not be verified.",
+  )
+  await expect(page.getByTestId("email-input")).not.toHaveAttribute(
+    "aria-invalid",
+    "true",
+  )
+  await expect(page.locator("[data-sonner-toast]")).toHaveCount(0)
 })
 
 test("Registering with an invalid email", async ({ page }) => {

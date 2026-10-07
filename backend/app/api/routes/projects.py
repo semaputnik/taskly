@@ -55,7 +55,19 @@ def read_projects(
     count_statement = select(func.count()).select_from(Project).where(*conditions)
     count = session.exec(count_statement).one()
 
-    statement = select(Project).where(*conditions).offset(skip).limit(limit)
+    # A fixed order, so paging is stable: Inbox first, then by name ignoring
+    # case, with the id to settle projects that share a name.
+    statement = (
+        select(Project)
+        .where(*conditions)
+        .order_by(
+            col(Project.is_inbox).desc(),
+            func.lower(Project.name),
+            col(Project.id),
+        )
+        .offset(skip)
+        .limit(limit)
+    )
     projects = session.exec(statement).all()
     task_stats = crud.get_project_task_stats(
         session=session,

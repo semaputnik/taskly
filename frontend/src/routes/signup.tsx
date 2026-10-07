@@ -4,6 +4,7 @@ import { useForm } from "react-hook-form"
 import { z } from "zod"
 
 import {
+  AuthFailure,
   AuthLink,
   AuthLinks,
   AuthScreen,
@@ -21,7 +22,8 @@ import {
 } from "@/components/ui/form"
 import { LoadingButton } from "@/components/ui/loading-button"
 import useAuth, { isLoggedIn } from "@/hooks/useAuth"
-import { passkeysSupported } from "@/lib/passkeys"
+import { refusalMessage } from "@/lib/apiErrors"
+import { EmailRefused, passkeysSupported, wasDismissed } from "@/lib/passkeys"
 
 const formSchema = z.object({
   email: z.email({ message: "Invalid email address" }),
@@ -76,8 +78,28 @@ function SignUpForm() {
 
   const onSubmit = (data: FormData) => {
     if (registerMutation.isPending) return
-    registerMutation.mutate({ email: data.email, name: data.name.trim() })
+    registerMutation.mutate(
+      { email: data.email, name: data.name.trim() },
+      {
+        // A refused address is said under the email field, marked invalid,
+        // and stays until the address is edited.
+        onError: (error) => {
+          if (error instanceof EmailRefused) {
+            form.setError("email", { message: error.message })
+          }
+        },
+      },
+    )
   }
+
+  // Any other failure is said under the action. A prompt the person
+  // dismissed is not a problem to report.
+  const failure =
+    registerMutation.isError &&
+    !(registerMutation.error instanceof EmailRefused) &&
+    !wasDismissed(registerMutation.error)
+      ? refusalMessage(registerMutation.error)
+      : null
 
   return (
     <Form {...form}>
@@ -126,6 +148,10 @@ function SignUpForm() {
             </FormItem>
           )}
         />
+        <p className="text-ink-3 mt-3 text-[13.5px] leading-normal">
+          Taskly has no password. If you lose every passkey, the superuser can
+          issue you a recovery code.
+        </p>
         <LoadingButton
           type="submit"
           className={authAction}
@@ -133,6 +159,7 @@ function SignUpForm() {
         >
           Create a passkey and sign in
         </LoadingButton>
+        {failure && <AuthFailure>{failure}</AuthFailure>}
       </form>
     </Form>
   )

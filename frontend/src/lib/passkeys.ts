@@ -11,6 +11,7 @@ import {
 } from "@simplewebauthn/browser"
 
 import { LoginService, UsersService } from "@/client"
+import { isRefusal, refusalMessage } from "@/lib/apiErrors"
 import { toastError } from "@/lib/toasts"
 
 /**
@@ -64,10 +65,20 @@ const asCredential = (
   response: RegistrationResponseJSON | AuthenticationResponseJSON,
 ) => response as unknown as Record<string, unknown>
 
+/**
+ * The API refused the address asked for, before any passkey was made: it is
+ * taken, or it is not an address. It is the email field's to say.
+ */
+export class EmailRefused extends Error {
+  name = "EmailRefused"
+}
+
 /** Create an account with its first passkey, and sign in (FR-12.2). */
 export async function registerAccount(email: string): Promise<string> {
   const { data: options } = await LoginService.registrationOptions({
     body: { email },
+  }).catch((error: unknown) => {
+    throw isRefusal(error) ? new EmailRefused(refusalMessage(error)) : error
   })
   const response = await startRegistration({
     optionsJSON: creationOptions(options),

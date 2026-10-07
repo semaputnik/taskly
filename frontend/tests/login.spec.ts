@@ -207,9 +207,17 @@ test("A passkey this installation does not know is refused", async ({
   await page.goto("/login")
   await page.getByRole("button", { name: "Sign in with a passkey" }).click()
 
-  await expect(
-    page.getByText("This passkey could not sign you in. Try again."),
-  ).toBeVisible()
+  // Said under the button as an alert, not in a notice that fades.
+  await expect(page.getByRole("alert")).toHaveText(
+    "This passkey could not sign you in. Try again.",
+  )
+  const button = page.getByRole("button", { name: "Sign in with a passkey" })
+  const alertBox = await page.getByRole("alert").boundingBox()
+  const buttonBox = await button.boundingBox()
+  expect(alertBox?.y).toBeGreaterThan(
+    (buttonBox?.y ?? Infinity) + (buttonBox?.height ?? 0) - 1,
+  )
+  await expect(page.locator("[data-sonner-toast]")).toHaveCount(0)
   await expect(page).toHaveURL(/\/login/)
 })
 
