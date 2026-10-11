@@ -178,9 +178,7 @@ def test_a_projects_open_task_count_matches_the_project_lists(
     create_task(client, owner, project_id=project["id"], title="One")
     create_task(client, owner, project_id=project["id"], title="Two")
     done = create_task(client, owner, project_id=project["id"], title="Done")
-    client.patch(
-        f"{API}/tasks/{done}", headers=owner, json={"status": "done"}
-    )
+    client.patch(f"{API}/tasks/{done}", headers=owner, json={"status": "done"})
     bot_headers = token_headers(
         client,
         owner,
@@ -261,9 +259,7 @@ def test_users_me_is_unchanged_and_still_refuses_a_bot_token(
     bot_headers = token_headers(
         client,
         owner,
-        create_bot_user(
-            client, owner, project_ids=[], permissions=READ_ONLY
-        )["id"],
+        create_bot_user(client, owner, project_ids=[], permissions=READ_ONLY)["id"],
     )
 
     r = client.get(f"{API}/users/me", headers=bot_headers)
