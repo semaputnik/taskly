@@ -36,11 +36,15 @@ def create_user_headers(client: TestClient, db: Session) -> dict[str, str]:
 
 
 def my_id(client: TestClient, headers: dict[str, str]) -> str:
-    """The id of the user (or bot user) these headers sign in as."""
-    r = client.get(f"{API}/users/me", headers=headers)
+    """
+    The id of the user or bot user these headers sign in as, resolved the way
+    an integration resolves its own id: `GET /caller` (issue #249), which
+    answers for a bot token as well as a human session, unlike `/users/me`.
+    """
+    r = client.get(f"{API}/caller", headers=headers)
     assert r.status_code == 200, r.text
-    user_id: str = r.json()["id"]
-    return user_id
+    actor_id: str = r.json()["actor"]["id"]
+    return actor_id
 
 
 def create_project_record(
