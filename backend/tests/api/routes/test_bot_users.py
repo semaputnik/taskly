@@ -156,6 +156,7 @@ def test_bot_users_are_not_accounts(
 # takes a human, so a new endpoint stays out of a bot's reach until it is
 # deliberately opened here.
 BOT_REACHABLE = {
+    f"GET {API}/caller",
     f"GET {API}/tasks/",
     f"POST {API}/tasks/",
     f"GET {API}/tasks/{{task_id}}",

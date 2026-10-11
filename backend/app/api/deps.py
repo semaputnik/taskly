@@ -175,17 +175,21 @@ class Caller:
     `owner_id` is whose data the request reaches: the user's own, or the
     owning user's for a bot, which never reaches anyone else's. For a bot,
     `bot` and the projects of its scope come along, so Task access
-    (`app.api.access`) can narrow what it reaches.
+    (`app.api.access`) can narrow what it reaches. `user` is the human caller
+    themselves, already resolved by `get_current_user`; it is `None` for a
+    bot, which is never a `User` row (FR-08.2's "not a kind of user account").
     """
 
     owner_id: uuid.UUID
     bot: BotUser | None = None
     project_ids: frozenset[uuid.UUID] = frozenset()
+    user: User | None = None
 
 
 def get_caller(session: SessionDep, token: TokenDep) -> Caller:
     if not security.is_bot_token(token):
-        return Caller(owner_id=get_current_user(session, token).id)
+        user = get_current_user(session, token)
+        return Caller(owner_id=user.id, user=user)
 
     bot = _authenticate_bot(session, token)
     # Whatever a bot's request changes is logged as the bot's doing, never as

@@ -423,6 +423,13 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
 - **FR-07.3** Creating, scoping, and issuing tokens for bot users is a human
   action available only in the web UI, not through the REST API. A bot cannot
   create or configure itself or another bot.
+- **FR-07.4** `GET /caller` is the one thing a bot user may read about
+  itself, read-only and open to a human session too: who is calling, the
+  owner id whose data the call reaches, exactly the permissions its scope
+  grants (every one `true` for a human), the projects of its scope with their
+  open-task counts (`null` for a human), and the server's current date. An
+  archived project never appears there (FR-05.13), and a scope change is
+  read on the bot's next call, with no new token needed.
 
 ### F-08. Bot users
 
