@@ -22,7 +22,7 @@ from tests.utils.accounts import (
 from tests.utils.mcp import ToolError, bot_headers, call_tool, list_tools
 
 API = settings.API_V1_STR
-TOMORROW = date.today().isoformat()
+DUE_DATE = date.today().isoformat()
 
 
 def _add_comment(client: TestClient, headers: dict[str, str], task_id: str, body: str):
@@ -71,7 +71,7 @@ def test_get_task_answers_the_full_record(client: TestClient, db: Session) -> No
         project_id=project_id,
         description="The whole thing",
         priority="P2",
-        due_date=TOMORROW,
+        due_date=DUE_DATE,
         tags=["ci"],
     )
     headers = bot_headers(client, owner, project_ids=[project_id])
@@ -83,7 +83,7 @@ def test_get_task_answers_the_full_record(client: TestClient, db: Session) -> No
     assert result["description"] == "The whole thing"
     assert result["status"] == "backlog"
     assert result["priority"] == "P2"
-    assert result["due_date"] == TOMORROW
+    assert result["due_date"] == DUE_DATE
     assert result["project_id"] == project_id
     assert result["tags"] == ["ci"]
     assert result["created_at"] is not None
