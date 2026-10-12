@@ -459,9 +459,8 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
   grants, and the server's current date. The nine tools for working tasks
   themselves (`search_tasks`, `get_task`, `list_tags`, `create_task`,
   `update_task`, `complete_task`, `comment_task`, `delete_task`, and
-  `whoami`) are spec #247's; `whoami`, `search_tasks`, `get_task`,
-  `list_tags`, `create_task`, `update_task` and `complete_task` are built as
-  of this entry.
+  `whoami`) are spec #247's, and every one of them is built as of this
+  entry.
 - **FR-07.10** Every tool reads its arguments, reports its results and
   raises its refusals the same way:
   - **Ids.** A task is named by its full id or by the short prefix a
@@ -594,6 +593,31 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
   `update_tasks` grant are each refused the way every other tool here
   refuses them (FR-07.10). Returns the closed task in full, alongside
   `next_occurrence` when closing created one.
+- **FR-07.17** `comment_task` adds a comment through the same route (`POST
+  /tasks/{id}/comments/`) and the same rules: its own `add_comments` grant,
+  checked without needing `update_tasks` at all, since reporting on a task
+  is not changing it (FR-08.10). Its description states the one thing an
+  agent needs to know before it writes: a bot user's comment is append-only,
+  never editable or deletable by anyone afterwards, its owner included
+  (FR-03.2, FR-08.10) — so it writes once, properly, rather than trying to
+  fix a previous note with a second call. `body` is trimmed and refused
+  blank, and the API's own length limit (10,000 characters) is declared in
+  the tool's own argument schema, so an over-long one is refused before the
+  call reaches the route at all. Annotated neither read-only nor
+  destructive. Returns the comment as recorded, with its author.
+- **FR-07.18** `delete_task` deletes a task through the same route (`DELETE
+  /tasks/{id}`) and the same rules, annotated destructive so a client
+  confirms it before it runs. A task with subtasks is refused until
+  `delete_subtasks` confirms the whole subtree goes too (FR-01.11,
+  FR-01.12); unlike the REST API's own refusal, this one names what would go
+  down with it, by id and title — every live descendant, open or already
+  done, since a delete cascades over all of them, not only the open ones a
+  close would ask about (`complete_task`, FR-07.16). The delete is recorded
+  as one event covering the whole subtree (FR-10.3), restorable only by the
+  owner from their own activity log — this tool's description says plainly
+  that the bot user which called it cannot undo it. The archive, the scope
+  and a missing `delete_tasks` grant are each refused the way every other
+  tool here refuses them (FR-07.10).
 
 ### F-08. Bot users
 

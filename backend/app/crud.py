@@ -1241,6 +1241,28 @@ def has_subtasks(*, session: Session, task: Task) -> bool:
     return session.exec(statement).first() is not None
 
 
+def subtasks(*, session: Session, task: Task) -> list[Task]:
+    """
+    Every live descendant of `task`, at any depth, whatever its own status —
+    the same subtree a delete cascades over (`app.deletions.delete_task`),
+    read out in full for a refusal that names what would go down with it
+    (`delete_task`, #258).
+
+    Deliberately not `open_subtasks`: that one filters to what is still open,
+    which is the right question for closing a task (only an open subtask
+    stands in the way, #257) but the wrong one for deleting it — a delete
+    takes a done subtask along with an open one, so a refusal built on
+    `open_subtasks` would undercount what is actually at stake.
+    """
+    subtree = _subtree_cte(task.id)
+    statement = (
+        select(Task)
+        .where(col(Task.id).in_(select(subtree.c.id)))
+        .order_by(col(Task.created_at))
+    )
+    return list(session.exec(statement).all())
+
+
 def bulk_update_tasks(
     *,
     session: Session,
