@@ -84,12 +84,8 @@ def test_completing_a_task_through_the_operation_attributes_to_the_bot_not_the_o
         # A `Caller` assembled by hand: nothing here calls `get_caller` or
         # `get_mcp_caller`, so if the entry below is attributed to the bot,
         # `complete` set the actor itself.
-        caller = Caller(
-            owner_id=owner.id, bot=bot, project_ids=frozenset([inbox.id])
-        )
-        result = complete(
-            session, caller, task.id, TaskUpdate(status=TaskStatus.DONE)
-        )
+        caller = Caller(owner_id=owner.id, bot=bot, project_ids=frozenset([inbox.id]))
+        result = complete(session, caller, task.id, TaskUpdate(status=TaskStatus.DONE))
 
         assert result.task.status is TaskStatus.DONE
         entries = _entries(session, owner.id)[len(seen) :]
