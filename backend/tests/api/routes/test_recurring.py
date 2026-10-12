@@ -6,9 +6,9 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
-from app import crud
 from app.core.config import settings
 from app.models import Task, TaskStatus
+from app.repositories import tasks as tasks_repo
 from tests.utils.accounts import (
     create_project,
     create_recurring_task,
@@ -568,7 +568,7 @@ def test_completion_and_the_next_occurrence_commit_together(
     def fail(**_kwargs: object) -> None:
         raise RuntimeError("storage fell over")
 
-    monkeypatch.setattr(crud, "_stage_next_occurrence", fail)
+    monkeypatch.setattr(tasks_repo, "_stage_next_occurrence", fail)
     with pytest.raises(RuntimeError):
         _patch(client, headers, task["id"], status="done")
     monkeypatch.undo()
