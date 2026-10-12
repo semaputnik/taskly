@@ -255,7 +255,11 @@ To connect an agent:
 2. **Issue the bot user's token** and give the agent two things: the URL `https://your-domain.example.com/mcp`, and the token as a bearer credential. Most MCP clients, Claude included, ask for exactly these two when adding a custom connector.
 3. **One bot user per agent.** Nothing stops two agents from sharing one bot user's token, but then the activity log cannot tell them apart, and revoking one means revoking both. A bot user costs nothing to create (FR-08.3): give each agent its own.
 
-A human session cannot use `/mcp` at all — it is refused for what it is, not offered a reduced set of tools — and a revoked, expired or deleted bot user's token is refused there exactly as it is on the REST API. Only `whoami` exists yet (spec #252); the tools for working tasks follow in later releases.
+A human session cannot use `/mcp` at all — it is refused for what it is, not offered a reduced set of tools — and a revoked, expired or deleted bot user's token is refused there exactly as it is on the REST API.
+
+Eleven tools are available. `whoami` tells the agent who it is, whose data it reaches, what its scope allows and what today's date is here. `search_tasks`, `get_task` and `list_tags` read; `create_task`, `update_task`, `complete_task`, `comment_task` and `delete_task` write, each confined by the bot user's scope and grants and each recorded in the activity log as that bot user's own doing. `search_activity` and `list_completions` read the activity log, and need the `read_activity` grant, which is off until the owner gives it.
+
+Nothing about `/mcp` needs a routing change: it is a path on the application Traefik already routes by host, and its responses are plain JSON rather than a server-sent stream, so no proxy buffering setting applies.
 
 ## URLs
 
