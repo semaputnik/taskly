@@ -4,8 +4,8 @@ type Permission = keyof BotPermissions
 
 /**
  * Everything a bot user can be granted, in the order the column lists it:
- * tasks, then comments, then tags. `note` is what a grant comes with that a
- * reader would otherwise find out by trying.
+ * tasks, then comments, then tags, then the activity log. `note` is what a
+ * grant comes with that a reader would otherwise find out by trying.
  */
 export const PERMISSIONS: {
   key: Permission
@@ -18,6 +18,11 @@ export const PERMISSIONS: {
   { key: "delete_tasks", label: "Delete tasks" },
   { key: "add_comments", label: "Add comments", note: "append-only" },
   { key: "create_tags", label: "Create tags" },
+  {
+    key: "read_activity",
+    label: "Read the activity log",
+    note: "narrowed to its scope",
+  },
 ]
 
 /**

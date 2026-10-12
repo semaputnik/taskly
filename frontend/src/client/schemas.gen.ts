@@ -206,6 +206,16 @@ export const ActivityOrderSchema = {
     description: 'Which end of the log a read starts from (FR-10.10).'
 } as const;
 
+export const ActorKindSchema = {
+    type: 'string',
+    enum: [
+        'user',
+        'bot_user'
+    ],
+    title: 'ActorKind',
+    description: 'The two kinds of caller `GET /caller` ever describes (spec #245).'
+} as const;
+
 export const AttachmentLocationSchema = {
     type: 'string',
     enum: [
@@ -369,6 +379,11 @@ export const BotPermissionsSchema = {
         create_tags: {
             type: 'boolean',
             title: 'Create Tags',
+            default: false
+        },
+        read_activity: {
+            type: 'boolean',
+            title: 'Read Activity',
             default: false
         }
     },
@@ -705,6 +720,106 @@ export const BulkResultSchema = {
     type: 'object',
     title: 'BulkResult',
     description: 'How many tasks one act changed.'
+} as const;
+
+export const CallerActorSchema = {
+    properties: {
+        kind: {
+            $ref: '#/components/schemas/ActorKind'
+        },
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        name: {
+            type: 'string',
+            title: 'Name'
+        }
+    },
+    type: 'object',
+    required: [
+        'kind',
+        'id',
+        'name'
+    ],
+    title: 'CallerActor',
+    description: 'Who is making a request to `GET /caller`: a human user by their own id\nand name, or a bot user by its own id and the name its owner gave it.'
+} as const;
+
+export const CallerProjectSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        is_inbox: {
+            type: 'boolean',
+            title: 'Is Inbox'
+        },
+        open_tasks: {
+            type: 'integer',
+            title: 'Open Tasks'
+        }
+    },
+    type: 'object',
+    required: [
+        'id',
+        'name',
+        'is_inbox',
+        'open_tasks'
+    ],
+    title: 'CallerProject',
+    description: 'One project in a bot user\'s scope, as `GET /caller` reports it: just\nenough to file work into the right place without guessing (stories 6-8 of\nspec #245). An archived project never appears here, whatever the scope\nsays (FR-05.13).'
+} as const;
+
+export const CallerPublicSchema = {
+    properties: {
+        actor: {
+            $ref: '#/components/schemas/CallerActor'
+        },
+        owner_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Owner Id'
+        },
+        permissions: {
+            $ref: '#/components/schemas/BotPermissions'
+        },
+        projects: {
+            anyOf: [
+                {
+                    items: {
+                        $ref: '#/components/schemas/CallerProject'
+                    },
+                    type: 'array'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Projects'
+        },
+        today: {
+            type: 'string',
+            format: 'date',
+            title: 'Today'
+        }
+    },
+    type: 'object',
+    required: [
+        'actor',
+        'owner_id',
+        'permissions',
+        'today'
+    ],
+    title: 'CallerPublic',
+    description: 'What `GET /caller` answers for whoever calls it, human or bot user: who is\ncalling, whose data the call reaches, what it may do there, and today\'s\ndate on this installation (spec #245). Read-only, so nothing here is ever\nlogged (FR-10.1).'
 } as const;
 
 export const CommentCreateSchema = {

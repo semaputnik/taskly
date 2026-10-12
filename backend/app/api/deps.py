@@ -175,21 +175,24 @@ class Caller:
     `owner_id` is whose data the request reaches: the user's own, or the
     owning user's for a bot, which never reaches anyone else's. For a bot,
     `bot` and the projects of its scope come along, so Task access
-    (`app.api.access`) can narrow what it reaches.
+    (`app.api.access`) can narrow what it reaches. `user` is the human caller
+    themselves, already resolved by `get_current_user`; it is `None` for a
+    bot, which is never a `User` row (FR-08.2's "not a kind of user account").
     """
 
     owner_id: uuid.UUID
     bot: BotUser | None = None
     project_ids: frozenset[uuid.UUID] = frozenset()
+    user: User | None = None
 
 
-def get_caller(session: SessionDep, token: TokenDep) -> Caller:
-    if not security.is_bot_token(token):
-        return Caller(owner_id=get_current_user(session, token).id)
-
-    bot = _authenticate_bot(session, token)
-    # Whatever a bot's request changes is logged as the bot's doing, never as
-    # its owner's (FR-10.2).
+def _bot_caller(session: Session, bot: BotUser) -> Caller:
+    """
+    A bot's `Caller`: its scope's project ids, and its activity attributed to
+    it rather than its owner (FR-10.2). Shared by `get_caller`, which builds
+    the REST API's caller, and `get_mcp_caller` below, which never reaches
+    this far for a human session.
+    """
     activity.set_bot_actor(session, bot.id)
     project_ids = session.exec(
         select(BotUserProject.project_id).where(BotUserProject.bot_user_id == bot.id)
@@ -197,7 +200,41 @@ def get_caller(session: SessionDep, token: TokenDep) -> Caller:
     return Caller(owner_id=bot.owner_id, bot=bot, project_ids=frozenset(project_ids))
 
 
+def get_caller(session: SessionDep, token: TokenDep) -> Caller:
+    if not security.is_bot_token(token):
+        user = get_current_user(session, token)
+        return Caller(owner_id=user.id, user=user)
+    return _bot_caller(session, _authenticate_bot(session, token))
+
+
 CallerDep = Annotated[Caller, Depends(get_caller)]
+
+
+# A human session reaching `/mcp` is refused for what it is, not for a
+# permission it lacks: there is no MCP tool built to serve one (spec #252),
+# the mirror of `HUMAN_ONLY_STATUS` above for the opposite direction.
+BOT_ONLY_STATUS = 403
+BOT_ONLY_CODE = "bot_only"
+
+
+def get_mcp_caller(session: Session, token: str) -> Caller:
+    """
+    The caller of a request to `/mcp` (spec #252, ADR-0012): always a bot
+    user, resolved through the same `_authenticate_bot` `get_caller` uses for
+    the REST API, so an unknown, revoked, expired or deleted bot user's token
+    is refused exactly as it is everywhere else. Takes a plain `token`
+    rather than `TokenDep`, so `app.mcp` can call it with a token read from
+    the MCP request's own headers, outside FastAPI's dependency injection.
+    """
+    if not security.is_bot_token(token):
+        raise HTTPException(
+            status_code=BOT_ONLY_STATUS,
+            detail={
+                "code": BOT_ONLY_CODE,
+                "message": "A human session cannot use the MCP server; connect with a bot user's token.",
+            },
+        )
+    return _bot_caller(session, _authenticate_bot(session, token))
 
 
 def get_current_active_superuser(current_user: CurrentUser) -> User:

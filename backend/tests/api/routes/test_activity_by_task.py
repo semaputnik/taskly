@@ -185,18 +185,28 @@ def test_the_superuser_gains_no_reach_through_the_filter(
     assert r.status_code == 404
 
 
-def test_a_bot_user_cannot_read_a_tasks_history(
+def test_a_bot_user_without_the_grant_cannot_read_a_tasks_history(
     client: TestClient, owner: Headers
 ) -> None:
+    """
+    `read_tasks` is not `read_activity` (#251): a bot user that may read the
+    task itself still needs its own grant to read the task's history. (With
+    the grant, narrowing by a task in scope is covered by
+    `tests/api/routes/test_activity_for_bots.py`.)
+    """
     project_id = create_project(client, owner)
     bot = issue_bot_headers(
-        client, owner, project_ids=[project_id], permissions=ALL_PERMISSIONS
+        client,
+        owner,
+        project_ids=[project_id],
+        permissions={**ALL_PERMISSIONS, "read_activity": False},
     )
     task_id = create_task(client, bot, project_id=project_id)
 
     r = client.get(f"{API}/activity-log/", headers=bot, params={"task_id": task_id})
     assert r.status_code == 403
-    assert r.json()["detail"]["code"] == "human_only"
+    assert r.json()["detail"]["code"] == "permission_not_granted"
+    assert r.json()["detail"]["permission"] == "read_activity"
 
 
 def test_the_bot_users_entries_name_it(client: TestClient, owner: Headers) -> None:

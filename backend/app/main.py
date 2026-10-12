@@ -12,7 +12,7 @@ from fastapi.routing import APIRoute
 from starlette.middleware.cors import CORSMiddleware
 from starlette.middleware.gzip import GZipMiddleware
 
-from app import passkeys, webhooks
+from app import mcp, passkeys, webhooks
 from app.api.main import api_router
 from app.core.config import settings
 
@@ -33,7 +33,7 @@ def frontend_cache_control(path: str) -> str | None:
     names the current hashes — is revalidated on every load, so a deploy
     reaches the reader on their next visit rather than a cache lifetime later.
     """
-    if path.startswith(settings.API_V1_STR):
+    if path.startswith(settings.API_V1_STR) or path.startswith(mcp.MCP_PATH):
         return None
     if HASHED_ASSET.match(path):
         return "public, max-age=31536000, immutable"
@@ -51,15 +51,19 @@ if settings.SENTRY_DSN and settings.FASTAPI_ENV != "development":
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     """
-    Run the webhook delivery loop for as long as this process serves requests
-    (ADR-0009). There is no separate worker: every API process drains the
-    outbox, and the table is the only state, so a restart loses nothing.
+    Run the webhook delivery loop and the MCP session manager for as long as
+    this process serves requests (ADR-0009, spec #252). There is no separate
+    worker for either: every API process drains the outbox and serves `/mcp`
+    itself, and all of a webhook's state lives in its row and all of an MCP
+    session's lives in this process's memory, so a restart loses nothing a
+    client cannot simply retry or reconnect for.
     """
     loop = None
     if settings.WEBHOOK_DELIVERY_LOOP:
         loop = asyncio.create_task(webhooks.drain_forever())
     try:
-        yield
+        async with mcp.run():
+            yield
     finally:
         if loop is not None:
             loop.cancel()
@@ -133,4 +137,7 @@ async def passkey_refused(_request: Request, error: Exception) -> Response:
 
 
 app.include_router(api_router, prefix=settings.API_V1_STR)
+# Outside the versioned prefix above: an MCP client is not a REST API
+# consumer (spec #252, ADR-0012).
+mcp.mount(app)
 app.frontend("/", directory=FRONTEND_DIR)

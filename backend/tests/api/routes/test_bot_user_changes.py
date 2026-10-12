@@ -104,6 +104,33 @@ def test_a_new_scope_replaces_the_old_one_whole(
     assert r.json()["name"] == bot["name"]
 
 
+def test_editing_turns_the_read_activity_grant_on_and_off(
+    client: TestClient, owner: Headers
+) -> None:
+    """
+    The grant toggles like any other permission, and what the next read
+    shows is exactly what was last set (issue #250) — the whole of this
+    slice's acceptance; the log itself stays closed until #251.
+    """
+    bot = create_bot_user(client, owner, project_ids=[], permissions=READ_ONLY)
+    assert bot["scope"]["permissions"]["read_activity"] is False
+
+    on = _update(
+        client,
+        owner,
+        bot["id"],
+        {"scope": _scope([], {**READ_ONLY, "read_activity": True})},
+    )
+    assert on.status_code == 200, on.text
+    assert on.json()["scope"]["permissions"]["read_activity"] is True
+    assert _listed(client, owner)[0]["scope"]["permissions"]["read_activity"] is True
+
+    off = _update(client, owner, bot["id"], {"scope": _scope([], READ_ONLY)})
+    assert off.status_code == 200, off.text
+    assert off.json()["scope"]["permissions"]["read_activity"] is False
+    assert _listed(client, owner)[0]["scope"]["permissions"]["read_activity"] is False
+
+
 def test_the_next_bot_request_is_authorized_against_the_new_scope(
     client: TestClient, owner: Headers
 ) -> None:

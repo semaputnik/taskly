@@ -513,11 +513,7 @@ def get_tasks(
     """
     conditions = _task_filters(owner_id=owner_id, query=query)
     if project_ids is not None:
-        conditions.append(
-            col(Task.id).in_(
-                _task_trees(col(Task.project_id).in_(project_ids), name="scope_tasks")
-            )
-        )
+        conditions.append(col(Task.id).in_(tasks_in_projects(project_ids)))
 
     count = session.exec(
         select(func.count()).select_from(Task).where(*conditions)
@@ -667,6 +663,7 @@ def get_tags(
     session: Session,
     owner_id: uuid.UUID,
     q: str | None = None,
+    contains: str | None = None,
     near: str | None = None,
     skip: int = 0,
     limit: int = 100,
@@ -676,13 +673,18 @@ def get_tags(
     The user's tags, each with the number of tasks carrying it. `q` matches
     from the start of the name, ignoring case, so what they type narrows to
     what they typed before rather than to every tag with those letters
-    somewhere inside. `near` finds the tags a name would read the same as
-    (`tag_key`), over the whole vocabulary: what a name about to become a new
-    tag would duplicate (FR-01.28).
+    somewhere inside — the autocomplete-while-typing read. `contains` matches
+    anywhere in the name instead, ignoring case, the way `search_tasks`'s own
+    `query` matches a title: a caller who does not know how a tag starts
+    (`list_tags`, spec #254) still finds it. `near` finds the tags a name
+    would read the same as (`tag_key`), over the whole vocabulary: what a
+    name about to become a new tag would duplicate (FR-01.28).
     """
     where: list[Any] = [Tag.owner_id == owner_id]
     if q:
         where.append(col(Tag.name).ilike(f"{q}%"))
+    if contains:
+        where.append(col(Tag.name).icontains(contains, autoescape=True))
     if near is not None:
         # Narrowed in the database to names that fold to the key with or
         # without a trailing "s", then held to `tag_key` exactly: this runs as
@@ -1211,6 +1213,21 @@ def has_open_subtasks(*, session: Session, task: Task) -> bool:
     return session.exec(statement).first() is not None
 
 
+def open_subtasks(*, session: Session, task: Task) -> list[Task]:
+    """
+    Every still-open descendant of `task`, at any depth — the same subtree
+    `has_open_subtasks` checks, read out in full rather than as a boolean,
+    for a refusal that names what is in the way (`complete_task`, #257)
+    instead of only saying something is.
+    """
+    subtree = _subtree_cte(task.id)
+    open_ids = select(subtree.c.id).where(subtree.c.status != TaskStatus.DONE)
+    statement = (
+        select(Task).where(col(Task.id).in_(open_ids)).order_by(col(Task.created_at))
+    )
+    return list(session.exec(statement).all())
+
+
 def has_subtasks(*, session: Session, task: Task) -> bool:
     """
     Whether the task still has subtasks that are not deleted.
@@ -1222,6 +1239,28 @@ def has_subtasks(*, session: Session, task: Task) -> bool:
         select(Task.id).where(Task.parent_id == task.id, not_deleted(Task)).limit(1)
     )
     return session.exec(statement).first() is not None
+
+
+def subtasks(*, session: Session, task: Task) -> list[Task]:
+    """
+    Every live descendant of `task`, at any depth, whatever its own status —
+    the same subtree a delete cascades over (`app.deletions.delete_task`),
+    read out in full for a refusal that names what would go down with it
+    (`delete_task`, #258).
+
+    Deliberately not `open_subtasks`: that one filters to what is still open,
+    which is the right question for closing a task (only an open subtask
+    stands in the way, #257) but the wrong one for deleting it — a delete
+    takes a done subtask along with an open one, so a refusal built on
+    `open_subtasks` would undercount what is actually at stake.
+    """
+    subtree = _subtree_cte(task.id)
+    statement = (
+        select(Task)
+        .where(col(Task.id).in_(select(subtree.c.id)))
+        .order_by(col(Task.created_at))
+    )
+    return list(session.exec(statement).all())
 
 
 def bulk_update_tasks(
@@ -1311,6 +1350,27 @@ def project_task_ids(project_id: uuid.UUID) -> Any:
     return _task_trees(Task.project_id == project_id, name="project_tasks")
 
 
+def tasks_in_projects(project_ids: Any, *, including_deleted: bool = False) -> Any:
+    """
+    Selects the ids of every task in any of `project_ids`: their root tasks
+    and everything under them, in one walk rather than one walk per project —
+    the many-project twin of `project_task_ids`, for a bot's task listing
+    (narrowed to its scope) and its activity-log scope (spec #246), neither
+    of which may OR one walk per project together. `project_ids` may be a
+    selectable, the way `archived_task_ids` above takes one, so a scope
+    already narrowed to its live projects is read once rather than twice.
+
+    Leaves deleted tasks out unless `including_deleted` asks to walk through
+    them too — the activity log needs to, since a deleted task's history
+    still reads (FR-10.4).
+    """
+    return _task_trees(
+        col(Task.project_id).in_(project_ids),
+        name="scope_tasks",
+        including_deleted=including_deleted,
+    )
+
+
 def archived_task_ids(owner_id: uuid.UUID) -> Any:
     """
     Selects the ids of every task of a user's archived projects that is not
@@ -1329,35 +1389,50 @@ def archived_task_ids(owner_id: uuid.UUID) -> Any:
     )
 
 
-def _task_trees(root_condition: Any, *, name: str) -> Any:
+def _task_trees(
+    root_condition: Any, *, name: str, including_deleted: bool = False
+) -> Any:
     """
     Selects the ids of the root tasks matching `root_condition` and of every
-    task under them, leaving deleted ones out.
+    task under them, leaving deleted ones out unless `including_deleted` asks
+    to walk through them too.
     """
-    return select(_tree_walk(root_condition, name=name).c.id)
+    return select(
+        _tree_walk(root_condition, name=name, including_deleted=including_deleted).c.id
+    )
 
 
-def _tree_walk(start_condition: Any, *, name: str) -> Any:
+def _tree_walk(
+    start_condition: Any, *, name: str, including_deleted: bool = False
+) -> Any:
     """
     The one walk down the task tree: the tasks matching `start_condition` and
-    every task under them, leaving deleted ones out, as (id, status,
-    project_id, due_date) rows. `project_id` is carried down from the starting task, so
-    a walk that starts at root tasks says which project each row resolves to.
+    every task under them, as (id, status, project_id, due_date) rows.
+    `project_id` is carried down from the starting task, so a walk that starts
+    at root tasks says which project each row resolves to — true of a
+    deleted root too, since nothing about deleting a task clears it.
+
+    Leaves deleted tasks out unless `including_deleted` asks to walk through
+    them: the activity log keeps a deleted task's history for ever (FR-10.4),
+    so the one question it asks of this walk — which scope a task's entries
+    belong to — has to resolve a deleted task exactly as it would a live one.
 
     Subtasks hold no project of their own, so the tasks of a project are only
     reachable by walking down from its root tasks. `name` names the CTE, which
     has to be unique among the ones a single statement uses.
     """
+    live: list[Any] = [] if including_deleted else [not_deleted(Task)]
     tree = (
         select(Task.id, Task.status, col(Task.project_id), col(Task.due_date))
-        .where(start_condition, not_deleted(Task))
+        .where(start_condition, *live)
         .cte(name, recursive=True)
     )
     child = aliased(Task)
+    live_child: list[Any] = [] if including_deleted else [not_deleted(child)]
     return tree.union_all(
         select(child.id, child.status, tree.c.project_id, col(child.due_date))
         .join(tree, col(child.parent_id) == tree.c.id)
-        .where(not_deleted(child))
+        .where(*live_child)
     )
 
 

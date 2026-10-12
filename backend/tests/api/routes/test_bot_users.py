@@ -48,6 +48,7 @@ def test_a_user_creates_a_bot_user_with_its_scope(
             "delete_tasks": False,
             "add_comments": True,
             "create_tags": False,
+            "read_activity": False,
         },
     }
     assert bot["has_token"] is False
@@ -55,6 +56,27 @@ def test_a_user_creates_a_bot_user_with_its_scope(
     r = client.get(f"{API}/bot-users/", headers=headers)
     assert [b["id"] for b in r.json()["data"]] == [bot["id"]]
     assert r.json()["data"][0]["scope"] == bot["scope"]
+
+
+def test_a_bot_user_created_with_the_read_activity_grant_stores_it(
+    client: TestClient, db: Session
+) -> None:
+    """
+    `read_activity` is granted and stored the way every other permission is
+    (issue #250). It opens nothing on the log itself yet — that is #251 — but
+    this slice is the grant existing and being settable.
+    """
+    headers = create_user_headers(client, db)
+
+    on = create_bot_user(
+        client, headers, project_ids=[], permissions={"read_activity": True}
+    )
+    assert on["scope"]["permissions"]["read_activity"] is True
+
+    off = create_bot_user(
+        client, headers, project_ids=[], permissions={}, name="Unnamed grant"
+    )
+    assert off["scope"]["permissions"]["read_activity"] is False
 
 
 def test_the_scope_has_no_all_projects_value_and_no_grants_that_are_never_allowed(
@@ -156,6 +178,7 @@ def test_bot_users_are_not_accounts(
 # takes a human, so a new endpoint stays out of a bot's reach until it is
 # deliberately opened here.
 BOT_REACHABLE = {
+    f"GET {API}/caller",
     f"GET {API}/tasks/",
     f"POST {API}/tasks/",
     f"GET {API}/tasks/{{task_id}}",
@@ -172,6 +195,10 @@ BOT_REACHABLE = {
     f"GET {API}/tags/",
     f"GET {API}/tags/{{tag_id}}",
     f"POST {API}/tags/",
+    # Opened by #251, with its own grant (`read_activity`) and narrowed to
+    # the bot's scope (app.api.access.activity_log_scope); restoring from an
+    # entry stays off this set, a human-only action.
+    f"GET {API}/activity-log/",
 }
 
 

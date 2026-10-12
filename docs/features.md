@@ -423,6 +423,279 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
 - **FR-07.3** Creating, scoping, and issuing tokens for bot users is a human
   action available only in the web UI, not through the REST API. A bot cannot
   create or configure itself or another bot.
+- **FR-07.4** `GET /caller` is the one thing a bot user may read about
+  itself, read-only and open to a human session too: who is calling, the
+  owner id whose data the call reaches, exactly the permissions its scope
+  grants (every one `true` for a human), the projects of its scope with their
+  open-task counts (`null` for a human), and the server's current date. An
+  archived project never appears there (FR-05.13), and a scope change is
+  read on the bot's next call, with no new token needed.
+
+#### MCP
+
+- **FR-07.5** Taskly also exposes an MCP server, at `/mcp`, mounted in this
+  same application rather than run as a second service (ADR-0012). It speaks
+  only tools — no resources, no prompts, no sampling.
+- **FR-07.6** A bot user's token authorises an MCP connection exactly as it
+  authorises a REST request: resolved through the same code that builds a
+  caller for the REST API, under the same scope and grants, with every
+  tool's writes attributed to the bot user in the activity log (FR-10.2). A
+  human session reaching `/mcp` is refused for what it is (`bot_only`), not
+  for a permission a scope could have granted; an unknown, revoked, expired
+  or deleted bot user's token is refused exactly as it is everywhere else
+  (FR-08.14, FR-08.15, FR-08.20).
+- **FR-07.7** Nothing about the caller is cached between calls: a scope
+  edited between two calls is read again before the second, the same
+  promise `GET /caller` makes (FR-07.4).
+- **FR-07.8** A protocol session is bound to the token that opened it. The
+  same session id presented with a different token is refused rather than
+  served, so one agent's session cannot be continued as another's; one
+  mounted server still serves any number of agents at once, because the
+  caller comes from each call's own token rather than from anything the
+  server was configured with.
+- **FR-07.9** `whoami` is the first tool: read-only, and answering exactly
+  what `GET /caller` answers (FR-07.4) — the actor, the owner, the scope's
+  projects (the Inbox marked) with their open-task counts, exactly its
+  grants, and the server's current date. The nine tools for working tasks
+  themselves (`search_tasks`, `get_task`, `list_tags`, `create_task`,
+  `update_task`, `complete_task`, `comment_task`, `delete_task`, and
+  `whoami`) are spec #247's, and every one of them is built as of this
+  entry.
+- **FR-07.10** Every tool reads its arguments, reports its results and
+  raises its refusals the same way:
+  - **Ids.** A task is named by its full id or by the short prefix a
+    compact line's own `id` prints (the first 8 hex characters of the full
+    id, dashes dropped). An ambiguous prefix is refused with the candidates
+    it matches, never resolved by guessing.
+  - **Names.** A project or a tag is accepted by name, case-insensitively,
+    as well as by id. Project names are not unique, so an ambiguous project
+    name is refused with the matching ids; a tag name ambiguous only by
+    letter case is refused the same way, since a tag's own name is
+    otherwise unique to its owner (ADR-0003).
+  - **Dates.** A date argument takes an ISO date, `today`, `tomorrow`, or a
+    count of days ahead prefixed with `+` and suffixed with `d` (e.g.
+    `+3d`), resolved against the server's own date — the caller's clock is
+    not this installation's.
+  - **Nulls.** An argument sent as JSON `null` is refused outright, never
+    read as absent: "absent means leave alone, null means clear" is a
+    distinction a model and a transport both lose, so a later tool's
+    `clear` convention (naming the fields to empty) can mean something.
+  - **Lists.** A tool that returns several tasks answers with compact
+    lines — id, status, priority, due date, title, project, tags, subtask
+    counts — never full records (`get_task`, FR-07.9's sibling tools, and
+    the tools that write answer in full). The total the filters matched is
+    always reported; a page that did not hold all of them says so and
+    names one filter still free to narrow with.
+  - **Refusals.** A tool reports a refusal as a tool error carrying the
+    API's own code and one sentence saying what to do next — which grant to
+    ask the owner for, or which project is outside the scope and what is
+    inside it — never a bare status code. Authorisation is never
+    reimplemented for this: every tool still goes through `app.api.access`,
+    the same layer the REST API uses.
+- **FR-07.11** `search_tasks` is the task list's own narrowing (F-06), read
+  as one call: title text, project, status, assignee, tag, priority, a due
+  date range, overdue-ness and parent task, combined so a task is listed
+  only if it satisfies every filter set, ordered by the task list's own
+  sorts in either direction. `assignee` takes `self`, `owner`, `any_bot`,
+  `nobody` or `any` (`self`/`owner` resolved to ids server-side); `preset`
+  offers `ready_for_me` (to do, on this bot user), `my_overdue` and
+  `recently_filed`, each equivalent to the filters it stands for, and
+  setting one of those same filters alongside a preset is refused rather
+  than silently overridden. `open_only` (true by default) keeps `done` out
+  of the answer regardless of `status`, matching the task list's own
+  baseline (FR-06.8); setting it to `false` is the one way `search_tasks`
+  reaches `done` work, which the task list itself never shows. The archive
+  is never listed, whatever the bot's scope says (FR-05.13).
+- **FR-07.12** `get_task` reads one task whole, in one call rather than
+  three: the full record `GET /tasks/{id}` returns — title, description,
+  status, priority, due date, project, tags, assignee, reporter,
+  recurrence, when it was filed, and its subtask counts, a subtask's own
+  project being its root task's (FR-02.4) and a task in Review a bot user
+  handed over reporting the hand-over (ADR-0008) — plus, each only when
+  asked for through its own argument so a caller that wants the task alone
+  pays for the task alone: `include_subtasks` (the direct subtasks, as
+  `search_tasks`'s own compact lines), `include_comments` (the task's
+  comments oldest first, each with its author — "owner", or a bot user by
+  name — and when it was written), and `include_attachments` (the task's
+  attachments by name and size, never their bytes).
+- **FR-07.13** `list_tags` is the owner's whole tag vocabulary (FR-01.26),
+  narrowable by `q` (a substring of the name, ignoring case, matching
+  anywhere in it rather than only at its start) and limited. Unlike every
+  other tool here it is never narrowed by the caller's own scope: tags
+  belong to the owner, not to a project (ADR-0003), so a bot user reads the
+  same vocabulary whatever projects it can itself reach, and needs no
+  permission to do it (`app.models.BotPermissions`'s own rule).
+- **FR-07.14** `create_task` files a task, a subtask, or the first
+  occurrence of a recurring series, with a title, a description, a due
+  date, a priority, tags and an assignee in one call, through the same
+  route (`POST /tasks`) and the same rules: a task left without a
+  `project` lands in the Inbox, which has to be in the bot user's scope
+  like any other project (FR-05.4); naming `parent_task_id` makes a
+  subtask, which always takes its parent's project, and naming `project`
+  alongside it is refused; a task starts in `backlog` unless `status`
+  names another; `recurrence` (FR-01.13) needs a due date, a root task,
+  and is refused on one created `done`. `assignee` takes `self` (this bot
+  user), `owner` (the account's human), or a bot user's id (FR-01.7); a
+  bot user not the account's own, or deleted, is refused (FR-08.21). The
+  reporter is always this bot user, and no argument sets it (FR-01.29).
+  `title` and `description` carry the same length limits the API itself
+  enforces (255 and 2000 characters), declared in the tool's own argument
+  schema so an over-long one is refused before the call reaches it at
+  all.
+- **FR-07.15** `update_task` changes a task through the same route (`PATCH
+  /tasks/{id}`) and the same rules, annotated idempotent and returning the
+  updated task in full. `title`, `description`, `priority`, `due_date`,
+  `project`, `assignee`, `status` and `tags` can each be changed on their
+  own, omitting a field leaves it alone, and `tags` replaces the task's
+  tags wholesale, as the REST API has it. `status` here reaches only the
+  open statuses (FR-01.4): moving a task to `done` is refused, naming
+  `complete_task` (#257) as the tool that closes one, which is also where
+  the open-subtasks question belongs; moving between open statuses never
+  touches a task's subtasks. Moving the due date of the open occurrence of
+  a recurring task needs `due_date_scope` (FR-01.17–FR-01.19) to say which
+  of the series moves with it, refused without one and refused where there
+  is no series to reschedule; reopening an earlier occurrence than the
+  latest is refused, naming it (FR-01.16). `project` moves the task, by
+  name or id, into or out of scope refused either way (FR-08.8); a subtask
+  cannot be moved this way at all, since it follows the task at the top of
+  its tree (FR-02.4). `assignee` reads exactly as `create_task`'s does
+  (FR-01.7, FR-08.21); the reporter is reached by no argument here either
+  (FR-01.29). `description`, `due_date`, `priority` and `assignee` are the
+  only fields an explicit `clear` list can empty — naming a field there
+  that was also sent a value is refused, and so, server-wide, is any
+  argument sent as JSON `null` (FR-07.10's own rule): omission is the only
+  way every other field here is left alone. This is also how a hand-over is
+  done (ADR-0008): moving `status` to `review` and setting `assignee` to
+  `owner` in the same call, with a comment (`comment_task`, #258) saying
+  what was done — the tool's own description teaches the convention, since
+  nothing in the product moves a task onto the owner because it entered
+  Review, and there is no tool of its own for a hand-over.
+- **FR-07.16** `complete_task` closes a task through the same route
+  (`PATCH /tasks/{id}` with `status: done`) — its own tool rather than an
+  argument to `update_task`, for the two things closing needs that no other
+  status change does. Annotated consequential (destructive) rather than
+  idempotent, so a client confirms it before it runs. A parent with open
+  subtasks is refused until `subtasks` says `complete` (closes them too) or
+  `leave_uncompleted` (leaves each in the status it had, FR-02.5–FR-02.7);
+  unlike the REST API's own refusal, this one names the open subtasks by id
+  and title, since nothing else about this call would have shown the
+  subtree first. `subtasks` sent on a call that closes nothing — the task
+  is already done — is refused instead; closing an already-done task
+  otherwise changes nothing and says so (`already_done`), creating no
+  occurrence. Closing an occurrence of a recurring task creates the next
+  one (FR-01.14) and reports its id and due date, read back since
+  `update_task`'s own return value never carried it; the due date comes
+  from the series' own schedule (FR-01.15), not from when this call ran.
+  `comment` records a note on the task as this bot user's, in the same
+  call (FR-03.1, FR-08.10) — its own `add_comments` grant is checked, and
+  refused by name, before anything closes, whether or not there turns out
+  to be anything to close; the archive, the scope and a missing
+  `update_tasks` grant are each refused the way every other tool here
+  refuses them (FR-07.10). Returns the closed task in full, alongside
+  `next_occurrence` when closing created one.
+- **FR-07.17** `comment_task` adds a comment through the same route (`POST
+  /tasks/{id}/comments/`) and the same rules: its own `add_comments` grant,
+  checked without needing `update_tasks` at all, since reporting on a task
+  is not changing it (FR-08.10). Its description states the one thing an
+  agent needs to know before it writes: a bot user's comment is append-only,
+  never editable or deletable by anyone afterwards, its owner included
+  (FR-03.2, FR-08.10) — so it writes once, properly, rather than trying to
+  fix a previous note with a second call. `body` is trimmed and refused
+  blank, and the API's own length limit (10,000 characters) is declared in
+  the tool's own argument schema, so an over-long one is refused before the
+  call reaches the route at all. Annotated neither read-only nor
+  destructive. Returns the comment as recorded, with its author.
+- **FR-07.18** `delete_task` deletes a task through the same route (`DELETE
+  /tasks/{id}`) and the same rules, annotated destructive so a client
+  confirms it before it runs. A task with subtasks is refused until
+  `delete_subtasks` confirms the whole subtree goes too (FR-01.11,
+  FR-01.12); unlike the REST API's own refusal, this one names what would go
+  down with it, by id and title — every live descendant, open or already
+  done, since a delete cascades over all of them, not only the open ones a
+  close would ask about (`complete_task`, FR-07.16). The delete is recorded
+  as one event covering the whole subtree (FR-10.3), restorable only by the
+  owner from their own activity log — this tool's description says plainly
+  that the bot user which called it cannot undo it. The archive, the scope
+  and a missing `delete_tasks` grant are each refused the way every other
+  tool here refuses them (FR-07.10).
+- **FR-07.19** `search_activity` is the activity log itself (F-10), read as
+  one call rather than a page of raw entries an agent would have to sort
+  "finished" out of by hand. Narrowed exactly the way `GET /activity-log/`
+  already narrows it for a bot user (FR-10.6, ADR-0011) — by `kind`
+  (`completed`, `created`, `changed`, `deleted`, `comments`, `tags`;
+  FR-10.8), by `task_id` (a task's own history: the entries about it, its
+  comments and files, and the batches that touched it, FR-10.3's own
+  reasoning for logging a batch as one act), by `project` (a project's
+  chronology, FR-10.11), by `actor` (`self`, `owner`, `any_bot`, or a bot
+  user by name or id, refused by name if none matches), and by `since`/
+  `until` (FR-10.12) — a date each, widened to the whole day it names so a
+  closed period ("last month") is asked for by its two calendar dates. It
+  invents no narrowing the endpoint does not have: it is built on
+  `app.api.routes.activity.read_activity_log` itself, called through to
+  directly the way the write tools call theirs, so the scope narrowing, the
+  all-or-nothing batch rule, the tag exemption, and the withholding of
+  `restorable` and the deletion id from a bot's own response all stay that
+  route's code. `order` (FR-10.10) and paging (`limit`, `offset`) work as
+  they do there. Each result is one compact line — `at`, `actor` ("owner",
+  or a bot user by name, the convention `get_task`'s own comment rows use),
+  `what` (one short phrase, ported from the web UI's own
+  `ActivityDescription.tsx`, there being no backend description of an entry
+  before this), and `subject` (the task, project or tag it happened to, with
+  its id, or, for a batch, the selection it acted on) — never inviting a
+  restore this bot user cannot perform. `count` is every entry the filters
+  matched, and a `truncated` answer names one filter (`narrow_with`) still
+  free to narrow with. Refused by name without `read_activity` (FR-08.9); a
+  task or project outside the scope is refused the way the API refuses it,
+  never an empty history that would look like one with nothing in it.
+- **FR-07.20** `list_completions` is finished work as a table, in one call:
+  the question "what did I finish last month?" needs and a task alone
+  cannot answer, since a task records `created_at` and a current status,
+  never when it reached Done (ADR-0011). Takes a period with both bounds
+  (`since` exclusive, `until` inclusive, both required, unlike
+  `search_activity`'s own optional pair), and narrows by `project`, by
+  `actor` and by `tag`, each read the same way `search_activity`'s own
+  arguments are. Composed from the activity log's own narrowing
+  (`app.api.access.activity_log_scope`) and the task read model
+  (`app.models.Task`, `app.crud.get_task_project_ids`/`get_task_tags`) —
+  no new REST endpoint — in one query over the period for the completion
+  entries and one more for the tasks they name, never a call per task.
+  Each row is one completion: `id`, `title`, `project`, `tags`,
+  `priority`, `filed` (when the task was created), `closed` (when this
+  completion happened), `days_to_close`, and `closed_by` ("owner", or a
+  bot user by name). Two rules keep the count here from reading like one
+  built by paging the log and fetching every task by hand:
+  - **A batch is one entry, many rows.** Closing several tasks in one act
+    writes a single entry naming the new status and every task it touched
+    (FR-10.3); this tool expands it into one row per task named, the one
+    place a count built from entries alone would undercount.
+  - **A reopened task closes twice.** Completing a task, reopening it and
+    completing it again writes two completion entries, and this tool
+    answers with two rows — both real. The summary's `completions` (every
+    row) and `distinct_tasks` (how many different tasks they are) are
+    reported side by side so neither is mistaken for the other.
+
+  A task deleted since it closed keeps its row, marked `deleted`, carrying
+  only what its own completion entry recorded (its title, or "Untitled
+  task" for one named only by a batch) and nulls for everything the task
+  itself would otherwise answer — `project`, `tags`, `priority`, `filed`
+  and `days_to_close` — rather than a current field a deletion since made
+  stale, or a lead time guessed at. An occurrence of a recurring task is
+  simply its own task (ADR-0001), so each occurrence's own completion is
+  already its own row without this tool doing anything further to keep a
+  series from collapsing. The `summary` alongside the rows always covers
+  every completion the filters matched, not only the page `limit`
+  returns: `completions`, `distinct_tasks`, `by_project` and `by_actor`
+  (each a count per name, summing back to `completions`), and
+  `median_days_to_close` (over the rows whose lead time is known). `count`
+  is `completions` again; a `truncated` answer names one filter
+  (`narrow_with`) still free to narrow with, so a partial count is never
+  reported as the whole. Refused by name without `read_activity`
+  (FR-08.9); nothing outside the scope is ever counted (ADR-0011).
+
+  Eleven tools now complete the MCP surface spec #247 and #248 set out:
+  `search_tasks`, `get_task`, `list_tags`, `create_task`, `update_task`,
+  `complete_task`, `comment_task`, `delete_task`, `whoami`,
+  `search_activity`, and `list_completions`.
 
 ### F-08. Bot users
 
@@ -452,6 +725,7 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
   | Task | configurable | configurable | configurable | configurable |
   | Tag | configurable | always | never | never |
   | Project | never | only projects in scope | never | never |
+  | Activity log | never | configurable (`read_activity`, off by default) | never | never |
 
   Tags (see ADR-0003):
   - Creating tags is a permission of its own. It covers both creating a tag
@@ -473,6 +747,27 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
 - **FR-08.11** Attachments:
   - A bot user can download a task's attachments if it can read the task.
   - A bot user can add and delete a task's attachments if it can update the task.
+
+#### Scope: activity log
+
+- **FR-08.22** With `read_activity`, a bot user reads its owner's activity
+  log (see [F-10](#f-10-activity-log-event-feed)) narrowed to its scope:
+  entries about the tasks, comments and attachments of the projects in
+  scope; about the projects themselves; a task's deletion and restore,
+  placed by the project the entry carries; and the owner's whole tag
+  vocabulary (ADR-0003), which is unaffected by scope. Entries made by any
+  actor — the owner, the bot user itself, or another of the owner's bot
+  users — are included: the point is to read the owner's work, not only the
+  bot's own. Anything touching an archived project is excluded whatever the
+  scope lists (FR-05.13), and an entry recording one act over several tasks
+  (FR-10.9) is included only when every task it names is in scope — never
+  trimmed to the ones that are.
+- **FR-08.23** A bot user's activity-log response omits `restorable` and the
+  deletion id. Restoring deleted work (FR-10.4) stays a human-only action,
+  unchanged by this grant.
+- **FR-08.24** Narrowing a bot user's activity-log read to a task or project
+  outside its reach — missing, not the owner's, archived, or outside the
+  scope — is a 404, the same answer for all four, never an empty feed.
 
 #### Token
 
@@ -548,7 +843,10 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
 - **FR-10.4** A deleted task or project can be restored from the log
   (see FR-01.10, FR-05.8).
 - **FR-10.5** Log entries are kept indefinitely.
-- **FR-10.6** Bot users cannot read the activity log.
+- **FR-10.6** A bot user reads the activity log only with the `read_activity`
+  grant, and then only its scope's entries (see FR-08.9, FR-08.22–FR-08.24).
+  Without the grant, it is refused by name (see FR-08.9's permission
+  refusal).
 - **FR-10.7** A user sees only their own activity log. The superuser is not an
   exception: they see only their own log, not other users'.
 - **FR-10.8** The log can be narrowed to one kind of change: Completed,
@@ -571,6 +869,11 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
   lives in the URL beside the others, the REST API's log accepts it
   (`project_id`), it combines with them, and it never widens the log past the
   reader's own entries (FR-10.7).
+- **FR-10.12** The REST API's log also accepts `until`, the upper bound to
+  `since`: entries up to and including that moment. A moment given without
+  an offset is read as UTC, like `since`, and `until` combines with every
+  other narrowing, so a closed period — "last month" — can be asked for in
+  one request instead of paged until the dates run out.
 
 ### F-11. Webhooks
 
@@ -730,7 +1033,6 @@ Not requirements yet. Recorded so they are not lost.
 - Bot users creating, updating or deleting projects.
 - Giving a bot user access to all projects at once.
 - More than one token per bot user.
-- Bot users reading the activity log.
 - Bot users editing or deleting comments.
 - Bot users renaming or deleting tags.
 - Webhooks set or read through the REST API, webhooks on a user rather

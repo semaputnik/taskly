@@ -109,6 +109,13 @@ export type ActivityKind = 'completed' | 'created' | 'changed' | 'deleted' | 'co
 export type ActivityOrder = 'newest' | 'oldest';
 
 /**
+ * ActorKind
+ *
+ * The two kinds of caller `GET /caller` ever describes (spec #245).
+ */
+export type ActorKind = 'user' | 'bot_user';
+
+/**
  * AttachmentLocation
  *
  * Where an attachment is kept (FR-04.11).
@@ -217,6 +224,10 @@ export type BotPermissions = {
      * Create Tags
      */
     create_tags?: boolean;
+    /**
+     * Read Activity
+     */
+    read_activity?: boolean;
 };
 
 /**
@@ -408,6 +419,76 @@ export type BulkResult = {
      * Deleted
      */
     deleted?: number;
+};
+
+/**
+ * CallerActor
+ *
+ * Who is making a request to `GET /caller`: a human user by their own id
+ * and name, or a bot user by its own id and the name its owner gave it.
+ */
+export type CallerActor = {
+    kind: ActorKind;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Name
+     */
+    name: string;
+};
+
+/**
+ * CallerProject
+ *
+ * One project in a bot user's scope, as `GET /caller` reports it: just
+ * enough to file work into the right place without guessing (stories 6-8 of
+ * spec #245). An archived project never appears here, whatever the scope
+ * says (FR-05.13).
+ */
+export type CallerProject = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Is Inbox
+     */
+    is_inbox: boolean;
+    /**
+     * Open Tasks
+     */
+    open_tasks: number;
+};
+
+/**
+ * CallerPublic
+ *
+ * What `GET /caller` answers for whoever calls it, human or bot user: who is
+ * calling, whose data the call reaches, what it may do there, and today's
+ * date on this installation (spec #245). Read-only, so nothing here is ever
+ * logged (FR-10.1).
+ */
+export type CallerPublic = {
+    actor: CallerActor;
+    /**
+     * Owner Id
+     */
+    owner_id: string;
+    permissions: BotPermissions;
+    /**
+     * Projects
+     */
+    projects?: Array<CallerProject> | null;
+    /**
+     * Today
+     */
+    today: string;
 };
 
 /**
@@ -1976,6 +2057,22 @@ export type usersIssueRecoveryCodeResponses = {
 
 export type usersIssueRecoveryCodeResponse = usersIssueRecoveryCodeResponses[keyof usersIssueRecoveryCodeResponses];
 
+export type callerReadCallerData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/caller';
+};
+
+export type callerReadCallerResponses = {
+    /**
+     * Successful Response
+     */
+    200: CallerPublic;
+};
+
+export type callerReadCallerResponse = callerReadCallerResponses[keyof callerReadCallerResponses];
+
 export type projectsReadProjectsData = {
     body?: never;
     path?: never;
@@ -3020,6 +3117,10 @@ export type activityReadActivityLogData = {
          * Since
          */
         since?: string | null;
+        /**
+         * Until
+         */
+        until?: string | null;
         /**
          * Task Id
          */

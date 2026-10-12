@@ -1320,6 +1320,11 @@ class BotPermissions(SQLModel):
     # Covers both creating a tag on its own and typing a name that is not a
     # tag yet onto a task (FR-08.9).
     create_tags: bool = False
+    # Reading the activity log does not follow from `read_tasks`: the log
+    # shows the owner's own work too, so it is its own grant (spec #246,
+    # FR-08.9). This slice only makes the grant exist and persist; serving
+    # the log to a bot user is #251.
+    read_activity: bool = False
 
 
 class BotScope(SQLModel):
@@ -1333,6 +1338,61 @@ class BotScope(SQLModel):
 
     project_ids: list[uuid.UUID]
     permissions: BotPermissions
+
+
+class ActorKind(StrEnum):
+    """The two kinds of caller `GET /caller` ever describes (spec #245)."""
+
+    USER = "user"
+    BOT_USER = "bot_user"
+
+
+class CallerActor(SQLModel):
+    """
+    Who is making a request to `GET /caller`: a human user by their own id
+    and name, or a bot user by its own id and the name its owner gave it.
+    """
+
+    kind: ActorKind
+    id: uuid.UUID
+    name: str
+
+
+class CallerProject(SQLModel):
+    """
+    One project in a bot user's scope, as `GET /caller` reports it: just
+    enough to file work into the right place without guessing (stories 6-8 of
+    spec #245). An archived project never appears here, whatever the scope
+    says (FR-05.13).
+    """
+
+    id: uuid.UUID
+    name: str
+    is_inbox: bool
+    open_tasks: int
+
+
+class CallerPublic(SQLModel):
+    """
+    What `GET /caller` answers for whoever calls it, human or bot user: who is
+    calling, whose data the call reaches, what it may do there, and today's
+    date on this installation (spec #245). Read-only, so nothing here is ever
+    logged (FR-10.1).
+    """
+
+    actor: CallerActor
+    # Whose data this request reaches: the caller's own id for a human, the
+    # owning user's for a bot user — never anyone else's (FR-08.2).
+    owner_id: uuid.UUID
+    # One boolean per grant a scope can hold. Every one is true for a human,
+    # who may do anything a scope could grant; exactly the bot user's own
+    # grants otherwise (FR-08.9).
+    permissions: BotPermissions
+    # The full scope for a bot user, Inbox first then by name ignoring case,
+    # the same order the project list uses; `None` for a human, who reads
+    # their projects from the project list instead (FR-08.6).
+    projects: list[CallerProject] | None = None
+    today: date
 
 
 class BotUserCreate(SQLModel):
@@ -1373,6 +1433,9 @@ class BotUser(SQLModel, table=True):
     delete_tasks: bool = False
     add_comments: bool = False
     create_tags: bool = False
+    # Off by default (spec #246, FR-08.9): reading the log is its own grant,
+    # not implied by `read_tasks`. See `BotPermissions.read_activity`.
+    read_activity: bool = False
     # A SHA-256 of the token, never the token itself, so the token cannot be
     # read back from anywhere once the response that issued it is gone
     # (FR-08.13). One column, so a bot user holds at most one token

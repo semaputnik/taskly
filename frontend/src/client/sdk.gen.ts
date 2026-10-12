@@ -2,7 +2,7 @@
 
 import { type Client, formDataBodySerializer, type Options as Options2, type TDataShape } from './client';
 import { client } from './client.gen';
-import type { activityReadActivityLogData, activityReadActivityLogErrors, activityReadActivityLogResponses, activityRestoreFromActivityEntryData, activityRestoreFromActivityEntryErrors, activityRestoreFromActivityEntryResponses, attachmentsDeleteAttachmentData, attachmentsDeleteAttachmentErrors, attachmentsDeleteAttachmentResponses, attachmentsDownloadAttachmentData, attachmentsDownloadAttachmentErrors, attachmentsDownloadAttachmentResponses, attachmentsReadAttachmentsData, attachmentsReadAttachmentsErrors, attachmentsReadAttachmentsResponses, attachmentsResendAttachmentData, attachmentsResendAttachmentErrors, attachmentsResendAttachmentResponses, attachmentsUploadAttachmentData, attachmentsUploadAttachmentErrors, attachmentsUploadAttachmentResponses, botsClearBotUserWebhookData, botsClearBotUserWebhookErrors, botsClearBotUserWebhookResponses, botsCreateBotUserData, botsCreateBotUserErrors, botsCreateBotUserResponses, botsDeleteBotUserData, botsDeleteBotUserErrors, botsDeleteBotUserResponses, botsIssueBotUserTokenData, botsIssueBotUserTokenErrors, botsIssueBotUserTokenResponses, botsReadBotUserData, botsReadBotUserErrors, botsReadBotUserResponses, botsReadBotUsersData, botsReadBotUsersErrors, botsReadBotUsersResponses, botsRegenerateBotUserWebhookSecretData, botsRegenerateBotUserWebhookSecretErrors, botsRegenerateBotUserWebhookSecretResponses, botsRevokeBotUserTokenData, botsRevokeBotUserTokenErrors, botsRevokeBotUserTokenResponses, botsSetBotUserWebhookData, botsSetBotUserWebhookErrors, botsSetBotUserWebhookResponses, botsTestBotUserWebhookData, botsTestBotUserWebhookErrors, botsTestBotUserWebhookResponses, botsUpdateBotUserData, botsUpdateBotUserErrors, botsUpdateBotUserResponses, commentsCreateCommentData, commentsCreateCommentErrors, commentsCreateCommentResponses, commentsDeleteCommentData, commentsDeleteCommentErrors, commentsDeleteCommentResponses, commentsReadCommentsData, commentsReadCommentsErrors, commentsReadCommentsResponses, commentsUpdateCommentData, commentsUpdateCommentErrors, commentsUpdateCommentResponses, loginRecoverData, loginRecoverErrors, loginRecoverResponses, loginRecoveryOptionsData, loginRecoveryOptionsErrors, loginRecoveryOptionsResponses, loginRegisterData, loginRegisterErrors, loginRegisterResponses, loginRegistrationOptionsData, loginRegistrationOptionsErrors, loginRegistrationOptionsResponses, loginSignInData, loginSignInErrors, loginSignInOptionsData, loginSignInOptionsResponses, loginSignInResponses, loginTestTokenData, loginTestTokenResponses, paperlessDisconnectData, paperlessDisconnectResponses, paperlessReadConnectionData, paperlessReadConnectionResponses, paperlessSetConnectionData, paperlessSetConnectionErrors, paperlessSetConnectionResponses, paperlessTestConnectionData, paperlessTestConnectionErrors, paperlessTestConnectionResponses, privateCreateUserData, privateCreateUserErrors, privateCreateUserResponses, privateIssueRecoveryCodeData, privateIssueRecoveryCodeErrors, privateIssueRecoveryCodeResponses, projectsArchiveProjectData, projectsArchiveProjectErrors, projectsArchiveProjectResponses, projectsCreateProjectData, projectsCreateProjectErrors, projectsCreateProjectResponses, projectsDeleteProjectData, projectsDeleteProjectErrors, projectsDeleteProjectResponses, projectsReadProjectData, projectsReadProjectErrors, projectsReadProjectResponses, projectsReadProjectsData, projectsReadProjectsErrors, projectsReadProjectsResponses, projectsUnarchiveProjectData, projectsUnarchiveProjectErrors, projectsUnarchiveProjectResponses, projectsUpdateProjectData, projectsUpdateProjectErrors, projectsUpdateProjectResponses, tagsCreateTagData, tagsCreateTagErrors, tagsCreateTagResponses, tagsDeleteTagData, tagsDeleteTagErrors, tagsDeleteTagResponses, tagsDismissTagDuplicatesData, tagsDismissTagDuplicatesErrors, tagsDismissTagDuplicatesResponses, tagsMergeTagsData, tagsMergeTagsErrors, tagsMergeTagsResponses, tagsPreviewTagMergeData, tagsPreviewTagMergeErrors, tagsPreviewTagMergeResponses, tagsReadTagData, tagsReadTagDuplicatesData, tagsReadTagDuplicatesResponses, tagsReadTagErrors, tagsReadTagResponses, tagsReadTagsData, tagsReadTagsErrors, tagsReadTagsResponses, tagsRenameTagData, tagsRenameTagErrors, tagsRenameTagResponses, tasksBulkDeleteTasksData, tasksBulkDeleteTasksErrors, tasksBulkDeleteTasksResponses, tasksBulkUpdateTasksData, tasksBulkUpdateTasksErrors, tasksBulkUpdateTasksResponses, tasksCreateTaskData, tasksCreateTaskErrors, tasksCreateTaskResponses, tasksDeleteTaskData, tasksDeleteTaskErrors, tasksDeleteTaskResponses, tasksReadTaskData, tasksReadTaskErrors, tasksReadTaskResponses, tasksReadTasksData, tasksReadTasksErrors, tasksReadTasksResponses, tasksUpdateTaskData, tasksUpdateTaskErrors, tasksUpdateTaskResponses, usersAddPasskeyData, usersAddPasskeyErrors, usersAddPasskeyResponses, usersConfirmationOptionsData, usersConfirmationOptionsResponses, usersDeleteUserMeData, usersDeleteUserMeResponses, usersIssueRecoveryCodeData, usersIssueRecoveryCodeErrors, usersIssueRecoveryCodeResponses, usersNewPasskeyOptionsData, usersNewPasskeyOptionsErrors, usersNewPasskeyOptionsResponses, usersReadPasskeysData, usersReadPasskeysResponses, usersReadUserMeData, usersReadUserMeResponses, usersReadUsersData, usersReadUsersErrors, usersReadUsersResponses, usersRemovePasskeyData, usersRemovePasskeyErrors, usersRemovePasskeyResponses, usersRenamePasskeyData, usersRenamePasskeyErrors, usersRenamePasskeyResponses, usersSignOutEverywhereData, usersSignOutEverywhereResponses, usersUpdateUserMeData, usersUpdateUserMeErrors, usersUpdateUserMeResponses, utilsHealthCheckData, utilsHealthCheckResponses, utilsTestEmailData, utilsTestEmailErrors, utilsTestEmailResponses } from './types.gen';
+import type { activityReadActivityLogData, activityReadActivityLogErrors, activityReadActivityLogResponses, activityRestoreFromActivityEntryData, activityRestoreFromActivityEntryErrors, activityRestoreFromActivityEntryResponses, attachmentsDeleteAttachmentData, attachmentsDeleteAttachmentErrors, attachmentsDeleteAttachmentResponses, attachmentsDownloadAttachmentData, attachmentsDownloadAttachmentErrors, attachmentsDownloadAttachmentResponses, attachmentsReadAttachmentsData, attachmentsReadAttachmentsErrors, attachmentsReadAttachmentsResponses, attachmentsResendAttachmentData, attachmentsResendAttachmentErrors, attachmentsResendAttachmentResponses, attachmentsUploadAttachmentData, attachmentsUploadAttachmentErrors, attachmentsUploadAttachmentResponses, botsClearBotUserWebhookData, botsClearBotUserWebhookErrors, botsClearBotUserWebhookResponses, botsCreateBotUserData, botsCreateBotUserErrors, botsCreateBotUserResponses, botsDeleteBotUserData, botsDeleteBotUserErrors, botsDeleteBotUserResponses, botsIssueBotUserTokenData, botsIssueBotUserTokenErrors, botsIssueBotUserTokenResponses, botsReadBotUserData, botsReadBotUserErrors, botsReadBotUserResponses, botsReadBotUsersData, botsReadBotUsersErrors, botsReadBotUsersResponses, botsRegenerateBotUserWebhookSecretData, botsRegenerateBotUserWebhookSecretErrors, botsRegenerateBotUserWebhookSecretResponses, botsRevokeBotUserTokenData, botsRevokeBotUserTokenErrors, botsRevokeBotUserTokenResponses, botsSetBotUserWebhookData, botsSetBotUserWebhookErrors, botsSetBotUserWebhookResponses, botsTestBotUserWebhookData, botsTestBotUserWebhookErrors, botsTestBotUserWebhookResponses, botsUpdateBotUserData, botsUpdateBotUserErrors, botsUpdateBotUserResponses, callerReadCallerData, callerReadCallerResponses, commentsCreateCommentData, commentsCreateCommentErrors, commentsCreateCommentResponses, commentsDeleteCommentData, commentsDeleteCommentErrors, commentsDeleteCommentResponses, commentsReadCommentsData, commentsReadCommentsErrors, commentsReadCommentsResponses, commentsUpdateCommentData, commentsUpdateCommentErrors, commentsUpdateCommentResponses, loginRecoverData, loginRecoverErrors, loginRecoverResponses, loginRecoveryOptionsData, loginRecoveryOptionsErrors, loginRecoveryOptionsResponses, loginRegisterData, loginRegisterErrors, loginRegisterResponses, loginRegistrationOptionsData, loginRegistrationOptionsErrors, loginRegistrationOptionsResponses, loginSignInData, loginSignInErrors, loginSignInOptionsData, loginSignInOptionsResponses, loginSignInResponses, loginTestTokenData, loginTestTokenResponses, paperlessDisconnectData, paperlessDisconnectResponses, paperlessReadConnectionData, paperlessReadConnectionResponses, paperlessSetConnectionData, paperlessSetConnectionErrors, paperlessSetConnectionResponses, paperlessTestConnectionData, paperlessTestConnectionErrors, paperlessTestConnectionResponses, privateCreateUserData, privateCreateUserErrors, privateCreateUserResponses, privateIssueRecoveryCodeData, privateIssueRecoveryCodeErrors, privateIssueRecoveryCodeResponses, projectsArchiveProjectData, projectsArchiveProjectErrors, projectsArchiveProjectResponses, projectsCreateProjectData, projectsCreateProjectErrors, projectsCreateProjectResponses, projectsDeleteProjectData, projectsDeleteProjectErrors, projectsDeleteProjectResponses, projectsReadProjectData, projectsReadProjectErrors, projectsReadProjectResponses, projectsReadProjectsData, projectsReadProjectsErrors, projectsReadProjectsResponses, projectsUnarchiveProjectData, projectsUnarchiveProjectErrors, projectsUnarchiveProjectResponses, projectsUpdateProjectData, projectsUpdateProjectErrors, projectsUpdateProjectResponses, tagsCreateTagData, tagsCreateTagErrors, tagsCreateTagResponses, tagsDeleteTagData, tagsDeleteTagErrors, tagsDeleteTagResponses, tagsDismissTagDuplicatesData, tagsDismissTagDuplicatesErrors, tagsDismissTagDuplicatesResponses, tagsMergeTagsData, tagsMergeTagsErrors, tagsMergeTagsResponses, tagsPreviewTagMergeData, tagsPreviewTagMergeErrors, tagsPreviewTagMergeResponses, tagsReadTagData, tagsReadTagDuplicatesData, tagsReadTagDuplicatesResponses, tagsReadTagErrors, tagsReadTagResponses, tagsReadTagsData, tagsReadTagsErrors, tagsReadTagsResponses, tagsRenameTagData, tagsRenameTagErrors, tagsRenameTagResponses, tasksBulkDeleteTasksData, tasksBulkDeleteTasksErrors, tasksBulkDeleteTasksResponses, tasksBulkUpdateTasksData, tasksBulkUpdateTasksErrors, tasksBulkUpdateTasksResponses, tasksCreateTaskData, tasksCreateTaskErrors, tasksCreateTaskResponses, tasksDeleteTaskData, tasksDeleteTaskErrors, tasksDeleteTaskResponses, tasksReadTaskData, tasksReadTaskErrors, tasksReadTaskResponses, tasksReadTasksData, tasksReadTasksErrors, tasksReadTasksResponses, tasksUpdateTaskData, tasksUpdateTaskErrors, tasksUpdateTaskResponses, usersAddPasskeyData, usersAddPasskeyErrors, usersAddPasskeyResponses, usersConfirmationOptionsData, usersConfirmationOptionsResponses, usersDeleteUserMeData, usersDeleteUserMeResponses, usersIssueRecoveryCodeData, usersIssueRecoveryCodeErrors, usersIssueRecoveryCodeResponses, usersNewPasskeyOptionsData, usersNewPasskeyOptionsErrors, usersNewPasskeyOptionsResponses, usersReadPasskeysData, usersReadPasskeysResponses, usersReadUserMeData, usersReadUserMeResponses, usersReadUsersData, usersReadUsersErrors, usersReadUsersResponses, usersRemovePasskeyData, usersRemovePasskeyErrors, usersRemovePasskeyResponses, usersRenamePasskeyData, usersRenamePasskeyErrors, usersRenamePasskeyResponses, usersSignOutEverywhereData, usersSignOutEverywhereResponses, usersUpdateUserMeData, usersUpdateUserMeErrors, usersUpdateUserMeResponses, utilsHealthCheckData, utilsHealthCheckResponses, utilsTestEmailData, utilsTestEmailErrors, utilsTestEmailResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -340,6 +340,29 @@ export class UsersService {
                 'Content-Type': 'application/json',
                 ...options.headers
             }
+        });
+    }
+}
+
+export class CallerService {
+    /**
+     * Read Caller
+     *
+     * Who is calling, whose data the call reaches, what it may do there, and
+     * today's date (spec #245).
+     *
+     * A bot user gets its own id and name, its owner's id, exactly the grants
+     * its scope holds, and the projects of that scope. A human session gets its
+     * own id as both actor and owner, every permission true, and `projects` as
+     * `null` — a human's projects are the project list's, not a finite scope
+     * (FR-08.6).
+     */
+    public static readCaller<ThrowOnError extends boolean = true>(options?: Options<callerReadCallerData, ThrowOnError>) {
+        return (options?.client ?? client).get<callerReadCallerResponses, unknown, ThrowOnError>({
+            responseType: 'json',
+            security: [{ scheme: 'bearer', type: 'http' }],
+            url: '/api/v1/caller',
+            ...options
         });
     }
 }
@@ -992,8 +1015,17 @@ export class ActivityService {
     /**
      * Read Activity Log
      *
-     * Retrieve the current user's activity log, newest first unless `order` says
+     * Retrieve the caller's activity log, newest first unless `order` says
      * `oldest` (FR-10.10).
+     *
+     * A human session reads exactly what it always has (spec #246): this
+     * endpoint only widens who may call it. A bot user needs the
+     * `read_activity` grant, off by default and checked before anything else
+     * (FR-08.9), and then reads only the entries about the projects, tasks,
+     * comments, attachments and tags of its scope — never an archived project,
+     * whatever the scope lists, and never a batch that touched a task outside
+     * it (`app.api.access.activity_log_scope`). Its response omits
+     * `restorable` and the deletion id; restoring stays a human-only action.
      *
      * `actor_bot_user_id` narrows it to one bot user's own changes — what an
      * operator asks when they want to read an integration rather than their
@@ -1014,24 +1046,30 @@ export class ActivityService {
      * counts when it says how many changes the user's bot users made since their
      * last visit (FR-06.12). A moment without an offset is read as UTC.
      *
+     * `until` is the upper bound to `since`, inclusive of its own moment, so a
+     * closed period — "last month" — can be asked for in one request instead
+     * of paged until the dates run out. Read as UTC when given without an
+     * offset, like `since`, and combines with every other narrowing.
+     *
      * `task_id` narrows it to one task's history: the entries about the task,
      * about the comments and files on it, and the batches that touched it. It
      * is what the task panel's Activity section reads, and it combines with the
-     * other narrowings. Unlike a bot user, a task is one of the caller's own
-     * records, so one that is not theirs, or does not exist, is a 404 — the
-     * same answer for both — rather than a history that looks empty. A deleted
-     * task's history still reads.
+     * other narrowings. A task is one of the caller's own records, and — for a
+     * bot user — one its scope reaches, so one that is not theirs, does not
+     * exist, or is outside the scope is a 404 — the same answer for all three —
+     * rather than a history that looks empty. A deleted task's history still
+     * reads.
      *
      * `project_id` narrows it to one project's chronology, the way `task_id`
      * does a task's: the entries about the project, the tasks in it and their
      * comments and files. It is what the project panel's Activity section
-     * reads, and a project that is not the caller's is a 404 like a task.
+     * reads, and a project the caller cannot reach is a 404 like a task.
      *
      * `order` turns the log around. It changes which end a page starts from and
      * nothing about what the log holds, so it combines with every narrowing and
      * with `skip` and `limit`.
      *
-     * Always the requesting user's own entries and nothing wider: there is no
+     * Always the caller's own owner's entries and nothing wider: there is no
      * parameter or role that reaches another user's log, the superuser's
      * included (FR-10.7). Narrowing by a bot user somebody else owns is
      * therefore an empty feed rather than a refusal — the caller's own entries,

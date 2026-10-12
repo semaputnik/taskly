@@ -4,12 +4,14 @@ from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
+from fastapi.responses import JSONResponse
 from sqlalchemy import Text, and_, cast, literal_column, not_, or_
 from sqlmodel import col, func, select
 
 from app import crud, deletions
+from app.api import access
 from app.api.access import archived_refusal
-from app.api.deps import CurrentUser, SessionDep
+from app.api.deps import CallerDep, CurrentUser, SessionDep
 from app.deletions import DeletionKind, Restorability, RestoreRefusal
 from app.models import (
     ACTIVITY_TASK_REF,
@@ -164,7 +166,7 @@ def _refuse(code: str, message: str) -> HTTPException:
 @router.get("/", response_model=ActivityEntriesPublic)
 def read_activity_log(
     session: SessionDep,
-    current_user: CurrentUser,
+    caller: CallerDep,
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=50, ge=1, le=200),
     actor_bot_user_id: uuid.UUID | None = Query(default=None),
@@ -172,13 +174,23 @@ def read_activity_log(
     by_bots: bool = Query(default=False),
     by_user: bool = Query(default=False),
     since: datetime | None = Query(default=None),
+    until: datetime | None = Query(default=None),
     task_id: uuid.UUID | None = Query(default=None),
     project_id: uuid.UUID | None = Query(default=None),
     order: ActivityOrder = Query(default=ActivityOrder.NEWEST),
 ) -> Any:
     """
-    Retrieve the current user's activity log, newest first unless `order` says
+    Retrieve the caller's activity log, newest first unless `order` says
     `oldest` (FR-10.10).
+
+    A human session reads exactly what it always has (spec #246): this
+    endpoint only widens who may call it. A bot user needs the
+    `read_activity` grant, off by default and checked before anything else
+    (FR-08.9), and then reads only the entries about the projects, tasks,
+    comments, attachments and tags of its scope — never an archived project,
+    whatever the scope lists, and never a batch that touched a task outside
+    it (`app.api.access.activity_log_scope`). Its response omits
+    `restorable` and the deletion id; restoring stays a human-only action.
 
     `actor_bot_user_id` narrows it to one bot user's own changes — what an
     operator asks when they want to read an integration rather than their
@@ -199,45 +211,59 @@ def read_activity_log(
     counts when it says how many changes the user's bot users made since their
     last visit (FR-06.12). A moment without an offset is read as UTC.
 
+    `until` is the upper bound to `since`, inclusive of its own moment, so a
+    closed period — "last month" — can be asked for in one request instead
+    of paged until the dates run out. Read as UTC when given without an
+    offset, like `since`, and combines with every other narrowing.
+
     `task_id` narrows it to one task's history: the entries about the task,
     about the comments and files on it, and the batches that touched it. It
     is what the task panel's Activity section reads, and it combines with the
-    other narrowings. Unlike a bot user, a task is one of the caller's own
-    records, so one that is not theirs, or does not exist, is a 404 — the
-    same answer for both — rather than a history that looks empty. A deleted
-    task's history still reads.
+    other narrowings. A task is one of the caller's own records, and — for a
+    bot user — one its scope reaches, so one that is not theirs, does not
+    exist, or is outside the scope is a 404 — the same answer for all three —
+    rather than a history that looks empty. A deleted task's history still
+    reads.
 
     `project_id` narrows it to one project's chronology, the way `task_id`
     does a task's: the entries about the project, the tasks in it and their
     comments and files. It is what the project panel's Activity section
-    reads, and a project that is not the caller's is a 404 like a task.
+    reads, and a project the caller cannot reach is a 404 like a task.
 
     `order` turns the log around. It changes which end a page starts from and
     nothing about what the log holds, so it combines with every narrowing and
     with `skip` and `limit`.
 
-    Always the requesting user's own entries and nothing wider: there is no
+    Always the caller's own owner's entries and nothing wider: there is no
     parameter or role that reaches another user's log, the superuser's
     included (FR-10.7). Narrowing by a bot user somebody else owns is
     therefore an empty feed rather than a refusal — the caller's own entries,
     of which that actor made none — so the filter says nothing about whose
     bot user it is, or whether it exists at all.
     """
-    where: list[Any] = [ActivityEntry.owner_id == current_user.id]
+    access.authorize_activity_log(caller)
+
+    where: list[Any] = [ActivityEntry.owner_id == caller.owner_id]
     if task_id is not None:
-        task_owner = session.exec(
-            select(Task.owner_id).where(Task.id == task_id)
-        ).first()
-        if task_owner != current_user.id:
+        task = session.get(Task, task_id)
+        if (
+            not task
+            or task.owner_id != caller.owner_id
+            or not access.bot_reaches_task(session, caller, task_id)
+        ):
             raise HTTPException(status_code=404, detail="Task not found")
         where.append(_on_task(task_id))
     if project_id is not None:
-        project_owner = session.exec(
-            select(Project.owner_id).where(Project.id == project_id)
-        ).first()
-        if project_owner != current_user.id:
+        project = session.get(Project, project_id)
+        if (
+            not project
+            or project.owner_id != caller.owner_id
+            or not access.bot_reaches_project(caller, project)
+        ):
             raise HTTPException(status_code=404, detail="Project not found")
         where.append(_in_project(project_id))
+    if (scope := access.activity_log_scope(caller)) is not None:
+        where.append(scope)
     if actor_bot_user_id is not None:
         where.append(ActivityEntry.actor_bot_user_id == actor_bot_user_id)
     if kind is not None:
@@ -250,6 +276,10 @@ def read_activity_log(
         if since.tzinfo is None:
             since = since.replace(tzinfo=UTC)
         where.append(col(ActivityEntry.created_at) > since)
+    if until is not None:
+        if until.tzinfo is None:
+            until = until.replace(tzinfo=UTC)
+        where.append(col(ActivityEntry.created_at) <= until)
 
     count = session.exec(
         select(func.count()).select_from(ActivityEntry).where(*where)
@@ -266,7 +296,7 @@ def read_activity_log(
         .limit(limit)
     ).all()
 
-    locations = _locate(session, current_user.id, entries)
+    locations = _locate(session, caller.owner_id, entries)
     bot_names = dict(
         session.exec(
             select(BotUser.id, BotUser.name).where(
@@ -277,10 +307,13 @@ def read_activity_log(
         ).all()
     )
     # The deletion events on this page, and whether each still has something
-    # to bring back: the same answer a restore of it would act on.
+    # to bring back: the same answer a restore of it would act on. A bot
+    # user's response drops this and the deletion id below — restoring stays
+    # the owner's alone (spec #246) — but it costs nothing to compute it the
+    # same way for everyone.
     verdicts = deletions.restorability(
         session,
-        current_user.id,
+        caller.owner_id,
         {
             entry.deletion_id
             for entry in entries
@@ -288,23 +321,39 @@ def read_activity_log(
         },
     )
 
-    return ActivityEntriesPublic(
-        data=[
-            ActivityEntryPublic.model_validate(
-                entry,
-                update={
-                    "entity_exists": entry.entity_id in locations,
-                    "entity_project_id": locations.get(entry.entity_id),
-                    "restorable": _restorable(entry, verdicts),
-                    "actor_bot_user_name": bot_names.get(entry.actor_bot_user_id)
-                    if entry.actor_bot_user_id
-                    else None,
-                },
-            )
-            for entry in entries
-        ],
-        count=count,
-    )
+    public_entries = [
+        ActivityEntryPublic.model_validate(
+            entry,
+            update={
+                "entity_exists": entry.entity_id in locations,
+                "entity_project_id": locations.get(entry.entity_id),
+                "restorable": _restorable(entry, verdicts),
+                "actor_bot_user_name": bot_names.get(entry.actor_bot_user_id)
+                if entry.actor_bot_user_id
+                else None,
+            },
+        )
+        for entry in entries
+    ]
+
+    if caller.bot is not None:
+        # A handle a bot user cannot use invites it to try: `restorable` and
+        # the deletion id are a human's alone (spec #246). Returned as a
+        # `Response`, which FastAPI passes through untouched, so the human
+        # path above — still built the ordinary way — is the only one this
+        # change can affect.
+        return JSONResponse(
+            {
+                "data": [
+                    public.model_dump(
+                        mode="json", exclude={"restorable", "deletion_id"}
+                    )
+                    for public in public_entries
+                ],
+                "count": count,
+            }
+        )
+    return ActivityEntriesPublic(data=public_entries, count=count)
 
 
 def _restorable(
