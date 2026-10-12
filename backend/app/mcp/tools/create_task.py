@@ -38,6 +38,7 @@ from app.models import (
     TaskStatus,
 )
 from app.read_models import task_publics
+from app.refusals import Refusal
 
 
 @mcp_server.tool()
@@ -120,7 +121,7 @@ def create_task(
                 status=status if status is not None else TaskStatus.BACKLOG,
             )
             result = tasks.create(session, caller, task_in)
-        except HTTPException as exc:
+        except (HTTPException, Refusal) as exc:
             raise refusal(exc) from exc
 
         [public] = task_publics(

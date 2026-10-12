@@ -87,16 +87,24 @@ def refusal(exc: HTTPException | Refusal) -> ToolError:
     A refusal, read the way a tool reports one: an `app.refusals.Refusal`
     (raised by an operation, `app.tasks` and its siblings as they grow)
     reads its own `code` and `message` straight off, the typed vocabulary
-    #279 introduced for exactly this; an `HTTPException` from
-    `app.api.access` or `app.crud` — a refusal that predates that vocabulary
-    and is not on a path a ticket has moved onto it yet — still has its code
-    read out of a dict `detail` where it carries one, or guessed from its
-    status for a plain-string `detail` that never needed one before this had
-    to read it back out. Either way, one sentence, never the bare status
-    code.
+    #279 introduced for exactly this — unless `code` is `None`, the shape
+    #282 taught this module too, for a refusal pinned as a bare string
+    (`app.refusals.plain`): read the same way a code-less `HTTPException`
+    already was, guessed from its status, since an MCP call needs one either
+    way. An `HTTPException` from `app.api.access` or `app.crud` — a refusal
+    that predates the vocabulary and is not on a path a ticket has moved onto
+    it yet — still has its code read out of a dict `detail` where it carries
+    one, or guessed from its status for a plain-string `detail` that never
+    needed one before this had to read it back out. Either way, one
+    sentence, never the bare status code.
     """
     if isinstance(exc, Refusal):
-        return ToolError(f"{exc.code}: {exc.message}")
+        code = (
+            exc.code.value
+            if exc.code is not None
+            else _DEFAULT_CODE.get(exc.status, "error")
+        )
+        return ToolError(f"{code}: {exc.message}")
     detail = exc.detail
     if isinstance(detail, Mapping):
         code = str(detail.get("code", _DEFAULT_CODE.get(exc.status_code, "error")))
