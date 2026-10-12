@@ -37,10 +37,13 @@ rather than re-deriving its own version of any of these rules:
 - **Lists.** `render_task_rows` and `list_result` build the compact lines
   every tool that returns several tasks uses, with the total and, when the
   page did not hold all of them, the filter that would narrow it.
-- **Refusals.** `refuse` and `refusal` turn a deliberate refusal, or an
-  `HTTPException` from `app.api.access`/`app.crud`, into the one thing a
-  tool ever raises to report one: a `ToolError` carrying the API's own code
-  and one sentence saying what to do next — never a bare status code.
+- **Refusals.** `refuse` and `refusal` turn a deliberate refusal — an
+  `app.refusals.Refusal` an operation raised (#279), or an `HTTPException`
+  from `app.api.access`/`app.crud` on a path no operation has reached yet —
+  into the one thing a tool ever raises to report one: a `ToolError`
+  carrying the refusal's own code and one sentence saying what to do next —
+  never a bare status code, and never a guess at a `Refusal`'s code, which
+  it already carries.
 """
 
 import re
@@ -63,6 +66,7 @@ from app.api.deps import Caller, get_mcp_caller
 from app.core.db import engine
 from app.crud import archived_task_ids, not_deleted, tasks_in_projects
 from app.models import BotUser, Project, Tag, Task
+from app.refusals import Refusal
 
 # Refusals
 
@@ -78,14 +82,21 @@ def refuse(code: str, message: str) -> NoReturn:
 _DEFAULT_CODE = {400: "invalid_argument", 404: "not_found", 422: "invalid_argument"}
 
 
-def refusal(exc: HTTPException) -> ToolError:
+def refusal(exc: HTTPException | Refusal) -> ToolError:
     """
-    An `HTTPException` from `app.api.access` or `app.crud`, read the way a
-    tool reports a refusal: the code it already carries (a dict `detail`,
-    every 403/409 in this codebase), or a sensible one for a plain-string
-    `detail` that never needed one before this had to read it back out —
-    plus the one sentence either way, never the bare status code.
+    A refusal, read the way a tool reports one: an `app.refusals.Refusal`
+    (raised by an operation, `app.tasks` and its siblings as they grow)
+    reads its own `code` and `message` straight off, the typed vocabulary
+    #279 introduced for exactly this; an `HTTPException` from
+    `app.api.access` or `app.crud` — a refusal that predates that vocabulary
+    and is not on a path a ticket has moved onto it yet — still has its code
+    read out of a dict `detail` where it carries one, or guessed from its
+    status for a plain-string `detail` that never needed one before this had
+    to read it back out. Either way, one sentence, never the bare status
+    code.
     """
+    if isinstance(exc, Refusal):
+        return ToolError(f"{exc.code}: {exc.message}")
     detail = exc.detail
     if isinstance(detail, Mapping):
         code = str(detail.get("code", _DEFAULT_CODE.get(exc.status_code, "error")))

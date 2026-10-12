@@ -97,6 +97,26 @@ keeps no such timestamp (ADR-0011) — so it is also how a bot user answers
 "what did I finish".
 _Avoid_: "audit log" (implies cross-user oversight, which does not exist here).
 
+**Operation**:
+One act over a task or a comment that the product can perform — create,
+update, complete, delete — in one place that decides whether the act is
+allowed, performs it in one transaction, and returns everything the act
+produced. A human over the REST API and a bot user over MCP both perform the
+same operation, through the same code, rather than each re-deriving its own
+version of the rules around it.
+_Avoid_: "route" or "endpoint" for this — those bind a request and shape a
+response; the operation underneath them is what a human and a bot user both
+reach.
+
+**Refusal**:
+A decision not to perform an **operation**, which names itself: a code a
+client matches on, one sentence for a person, and what stood in the way (the
+project, the permission, the tasks). A refusal knows nothing about HTTP;
+whoever answers over HTTP maps it to a status.
+_Avoid_: assembling a refusal's body where it is raised — a refusal is a
+value with its own shape, not a status code and a string a route happens to
+construct.
+
 **Subtask**:
 A task that is a child of another task, nestable to any depth. A subtask is
 a full task — every field, and everything a task supports — never a reduced

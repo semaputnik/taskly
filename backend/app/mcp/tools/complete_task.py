@@ -1,46 +1,36 @@
 """
 `complete_task` (spec #247, #257): close a task.
 
-Built on `app.api.routes.tasks.update_task` itself — the open-subtasks
-directive, the next-occurrence spawn (FR-01.14, ADR-0001) and the archive,
-scope and permission refusals are all that route's rules, called through to
-directly the same way `update_task` (#256) calls it. This tool's own job is
-the three things closing needs that no other status change does: naming the
-open subtasks in the refusal rather than just saying there are some, finding
-and reporting the occurrence that closing one creates (the route's own
-return value never carried it), and recording an optional comment (through
-`app.api.routes.comments.create_comment`, the same route a hand-over's own
-comment goes through) in the same call — refused by its own grant before
-anything closes, never after.
+Calls `app.tasks.complete` directly (#275, #279): the open-subtasks
+directive, the next-occurrence spawn (FR-01.14, ADR-0001), and the archive,
+scope and permission refusals are all that operation's own rules now, the
+same ones a human's `PATCH .../tasks/{id}` with `status: done` goes through —
+neither a route function nor a route-private constant is imported here any
+more. This tool's own job is what is special about asking for this over MCP:
+knowing before it even calls the operation whether there is anything left to
+close, naming the open subtasks straight from the refusal's own payload
+rather than finding them with a second query, reading the next occurrence
+the operation already found rather than looking for it again, and recording
+an optional comment as part of the same act — refused by its own grant
+before anything closes, and aborting the whole act if it is, since the
+comment is no longer a call this tool makes outside the operation's own
+error handling.
 """
 
-from collections.abc import Mapping
-from typing import Any, NoReturn
+from typing import Any
 
 from fastapi import HTTPException
 from mcp.server.mcpserver import Context
 from mcp.types import ToolAnnotations
-from sqlalchemy import not_
-from sqlmodel import Session, col, select
 
-from app import crud
+from app import tasks
 from app.api import access
 from app.api.access import TaskAction
-from app.api.routes.comments import create_comment as _create_comment
-from app.api.routes.tasks import OPEN_SUBTASKS_CODE
-from app.api.routes.tasks import update_task as _update_task
 from app.mcp.conventions import open_caller, refusal, refuse, resolve_task_id, short_id
 from app.mcp.server import mcp_server
-from app.models import (
-    CommentBody,
-    CommentCreate,
-    SubtaskCompletion,
-    Task,
-    TaskPublic,
-    TaskStatus,
-    TaskUpdate,
-)
+from app.models import CommentBody, SubtaskCompletion, TaskStatus, TaskUpdate
 from app.read_models import task_publics
+from app.refusals import Refusal, RefusalCode, TaskHasUncompletedSubtasks
 
 
 @mcp_server.tool(
@@ -85,104 +75,56 @@ def complete_task(
     with open_caller(ctx) as (session, caller):
         try:
             resolved_id = resolve_task_id(session, caller, task_id)
-            # The comment grant is its own check, ahead of anything that
-            # closes, so a call that cannot leave its note closes nothing
-            # either — never refused only after the fact.
-            if comment is not None:
-                access.get_task(session, caller, resolved_id, TaskAction.COMMENT)
             resolved = access.get_task(session, caller, resolved_id, TaskAction.UPDATE)
         except HTTPException as exc:
             raise refusal(exc) from exc
 
         task = resolved.task
-        already_done = task.status is TaskStatus.DONE
-
-        if already_done and subtasks is not None:
+        if task.status is TaskStatus.DONE and subtasks is not None:
             refuse(
                 "invalid_argument",
                 f"“{task.title}” is already done. `subtasks` only applies "
                 "to a call that closes something.",
             )
 
-        public: TaskPublic
-        if already_done:
-            [public] = task_publics(
-                session, [task], projects={task.id: resolved.project.id}
-            )
-        else:
-            task_in = TaskUpdate(status=TaskStatus.DONE, subtasks=subtasks)
-            try:
-                # `_update_task` is typed `-> Any` (a FastAPI route
-                # function, where that is how a `response_model` is
-                # declared); it always actually returns a `TaskPublic`, the
-                # full record this tool promises.
-                public = _update_task(
-                    session=session,
-                    caller=caller,
-                    task_id=resolved_id,
-                    task_in=task_in,
-                )
-            except HTTPException as exc:
-                _refuse_open_subtasks(session, task, exc)
-
-        result = public.model_dump(mode="json")
-        if already_done:
-            result["already_done"] = True
-        elif (occurrence := _next_occurrence(session, task)) is not None:
-            result["next_occurrence"] = occurrence
-
-        if comment is not None:
-            _create_comment(
+        task_in = TaskUpdate(status=TaskStatus.DONE, subtasks=subtasks)
+        try:
+            result = tasks.complete(
                 session=session,
                 caller=caller,
                 task_id=resolved_id,
-                comment_in=CommentCreate(body=comment),
+                task_in=task_in,
+                comment=comment,
             )
+        except Refusal as exc:
+            if exc.code is not RefusalCode.TASK_HAS_UNCOMPLETED_SUBTASKS:
+                raise refusal(exc) from exc
+            assert isinstance(exc.payload, TaskHasUncompletedSubtasks)
+            open_subtasks = exc.payload.subtasks
+            listed = "; ".join(f"{short_id(t.id)} “{t.title}”" for t in open_subtasks)
+            count = len(open_subtasks)
+            refuse(
+                exc.code,
+                f"“{task.title}” has {count} open subtask{'' if count == 1 else 's'}: "
+                f'{listed}. Send `subtasks: "complete"` to close them too, or '
+                f'`subtasks: "leave_uncompleted"` to leave each where it is.',
+            )
+        except HTTPException as exc:
+            raise refusal(exc) from exc
 
-    return result
-
-
-def _refuse_open_subtasks(session: Session, task: Task, exc: HTTPException) -> NoReturn:
-    """
-    `update_task`'s own open-subtasks refusal (FR-02.6) only says there is
-    something in the way; `complete_task` names it, by id and title, since
-    nothing else about this call would have shown the subtree first.
-    """
-    detail = exc.detail
-    if not isinstance(detail, Mapping) or detail.get("code") != OPEN_SUBTASKS_CODE:
-        raise refusal(exc) from exc
-
-    subtasks = crud.open_subtasks(session=session, task=task)
-    listed = "; ".join(f"{short_id(t.id)} “{t.title}”" for t in subtasks)
-    count = len(subtasks)
-    refuse(
-        OPEN_SUBTASKS_CODE,
-        f"“{task.title}” has {count} open subtask{'' if count == 1 else 's'}: "
-        f'{listed}. Send `subtasks: "complete"` to close them too, or '
-        f'`subtasks: "leave_uncompleted"` to leave each where it is.',
-    )
-
-
-def _next_occurrence(session: Session, closed: Task) -> dict[str, Any] | None:
-    """
-    The occurrence closing `closed` just created, if its series had one to
-    create (FR-01.14) — the one open occurrence left in that series
-    (FR-01.16), read back here since `update_task`'s own return value never
-    carried it.
-    """
-    if closed.series_id is None:
-        return None
-    successor = session.exec(
-        select(Task).where(
-            Task.series_id == closed.series_id,
-            not_(col(Task.status) == TaskStatus.DONE),
+        [public] = task_publics(
+            session, [result.task], projects={result.task.id: resolved.project.id}
         )
-    ).first()
-    if successor is None:
-        return None
-    return {
-        "id": short_id(successor.id),
-        "due_date": successor.due_date.isoformat()
-        if successor.due_date is not None
-        else None,
-    }
+        result_dict = public.model_dump(mode="json")
+        if result.already_done:
+            result_dict["already_done"] = True
+        elif result.next_occurrence is not None:
+            successor = result.next_occurrence
+            result_dict["next_occurrence"] = {
+                "id": short_id(successor.id),
+                "due_date": successor.due_date.isoformat()
+                if successor.due_date is not None
+                else None,
+            }
+
+    return result_dict
