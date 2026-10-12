@@ -1,8 +1,8 @@
 """
-The MCP server mounted at `/mcp` (spec #252, ADR-0012): the same Taskly a bot
-user already reaches over the REST API, read by an agent as a small set of
-tools instead of routes. Outside `app.api.main`'s versioned prefix: an MCP
-client is not a REST API consumer, and has no `/api/v1` of its own to carry.
+The ASGI gateway at `/mcp` (spec #252, ADR-0012): the same Taskly a bot user
+already reaches over the REST API, read by an agent as a small set of tools
+instead of routes. Outside `app.api.main`'s versioned prefix: an MCP client
+is not a REST API consumer, and has no `/api/v1` of its own to carry.
 
 Authorisation is never reimplemented here. `get_mcp_caller`
 (`app.api.deps`) is the same `_authenticate_bot` the REST API's `get_caller`
@@ -11,82 +11,39 @@ bot user's token are each refused exactly as `/caller` refuses them (spec
 #245, #249). `_BotGateway` below calls it once per HTTP request, before any
 MCP message on that request is read, so `initialize` and `tools/list` are
 refused the same as a `tools/call` would be; nothing it learns is cached —
-`whoami`, and every tool after it, calls `get_mcp_caller` again with its own
-session, so a scope edited between two calls shows in the second.
+every tool calls `get_mcp_caller` again, with its own session, through
+`app.mcp.conventions.open_caller`, so a scope edited between two calls shows
+in the second.
 
-Only `whoami` lives here. #253 and later add the other eight tools from spec
-#247 the same way: `@mcp_server.tool(...)` below it, a fresh `Session(engine)`,
-a caller from `get_mcp_caller`, then straight into `app.crud` /
-`app.api.access` — never HTTP back into this process, per spec #247's
-"Mounted in this app, not a separate service".
+This module is wiring only: the ASGI boundary, the session-to-token binding,
+and `mount`/`run`. The server instance every tool registers on lives in
+`app.mcp.server`; the rules a tool's arguments, output and refusals follow
+live in `app.mcp.conventions`; the tools themselves live in `app.mcp.tools`,
+one module per tool (or per small group), imported by `app.mcp.tools`'s own
+`__init__` so each registers itself with `@mcp_server.tool(...)` on import. A
+new tool adds a module there and nothing here.
 """
 
-from collections.abc import AsyncIterator, Iterable, Mapping
+from collections.abc import AsyncIterator, Iterable
 from contextlib import asynccontextmanager
 from typing import Any
 
 from fastapi import FastAPI, HTTPException
-from mcp.server.mcpserver import Context, MCPServer
 from mcp.server.streamable_http import MCP_SESSION_ID_HEADER
 from mcp.server.transport_security import TransportSecuritySettings
-from mcp.types import ToolAnnotations
 from sqlmodel import Session
 from starlette.datastructures import Headers
 from starlette.responses import JSONResponse
 from starlette.types import Message, Receive, Scope, Send
 
 from app.api.deps import get_mcp_caller
-from app.api.routes.caller import read_caller
 from app.core import security
 from app.core.db import engine
-from app.models import CallerPublic
+from app.mcp import tools as _tools  # noqa: F401 — import registers every tool
+from app.mcp.conventions import bearer_token
+from app.mcp.server import mcp_server
 
 MCP_PATH = "/mcp"
-
-mcp_server = MCPServer(
-    name="taskly",
-    instructions=(
-        "Taskly, reached as the bot user whose token authorised this "
-        "connection. Call `whoami` first, every session: it names the "
-        "actor, its owner, the scope's projects (the Inbox marked), "
-        "exactly its grants, and the server's own current date — the "
-        "caller's own clock is not this installation's."
-    ),
-)
-
-
-@mcp_server.tool(
-    annotations=ToolAnnotations(read_only_hint=True),
-)
-def whoami(ctx: Context) -> dict[str, Any]:
-    """
-    Who this connection is: the actor and its owner, the scope's projects
-    (Inbox marked) with their open-task counts, exactly its grants, and
-    today's server date. Answers exactly what `GET /caller` answers (spec
-    #245) — the two share `read_caller` rather than keeping two descriptions
-    of a caller in step by hand.
-    """
-    token = _bearer_token(ctx.headers)
-    with Session(engine) as session:
-        caller = get_mcp_caller(session, token)
-        # `read_caller` is typed `-> Any` (it is a FastAPI route function,
-        # where that is how a `response_model` is declared); it always
-        # actually returns a `CallerPublic`.
-        result: CallerPublic = read_caller(session, caller)
-    return result.model_dump(mode="json")
-
-
-def _bearer_token(headers: Mapping[str, str] | None) -> str:
-    """
-    The bearer token of an MCP request, read the way `ctx.headers` carries
-    it — a tool never trusts it as an identity on its own (`Context.headers`'
-    own warning); `get_mcp_caller` is what actually resolves it.
-    """
-    header = "" if headers is None else headers.get("authorization", "")
-    scheme, _, token = header.partition(" ")
-    if scheme.lower() != "bearer" or not token:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-    return token
 
 
 class _BotGateway:
@@ -122,7 +79,7 @@ class _BotGateway:
         session_manager = mcp_server.session_manager
         headers = Headers(scope=scope)
         try:
-            token = _bearer_token(headers)
+            token = bearer_token(headers)
             with Session(engine) as session:
                 get_mcp_caller(session, token)
         except HTTPException as exc:
