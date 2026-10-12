@@ -49,6 +49,7 @@ from app.models import (
     TaskStatus,
     TaskUpdate,
 )
+from app.unit_of_work import UnitOfWork
 
 
 def _unique_tag_names(names: list[str]) -> list[str]:
@@ -241,90 +242,96 @@ def complete(
     `comment` is part of the same act (#279): checked against the
     `add_comments` grant before anything closes, so a refusal over it aborts
     the whole act and nothing is closed either, and written only after the
-    close itself succeeds. This does not make the two one transaction — this
-    ticket introduces no unit of work (#284 does) — it is the same two
-    commits `app.mcp.tools.complete_task` already made, now made from here.
+    close itself succeeds. The two are one transaction (`UnitOfWork`, #284):
+    a failure writing the comment rolls the close back too, rather than
+    leaving the task closed with the note it was sent for still missing.
     """
     set_caller_actor(session, caller)
 
-    resolved = access.get_task(session, caller, task_id, TaskAction.UPDATE)
-    task = resolved.task
+    with UnitOfWork(session):
+        resolved = access.get_task(session, caller, task_id, TaskAction.UPDATE)
+        task = resolved.task
 
-    # The comment grant is its own check, ahead of anything that closes, so a
-    # call that cannot leave its note closes nothing either — never refused
-    # only after the fact.
-    if comment is not None:
-        access.get_task(session, caller, task_id, TaskAction.COMMENT)
+        # The comment grant is its own check, ahead of anything that closes,
+        # so a call that cannot leave its note closes nothing either — never
+        # refused only after the fact.
+        if comment is not None:
+            access.get_task(session, caller, task_id, TaskAction.COMMENT)
 
-    already_done = task.status is TaskStatus.DONE
+        already_done = task.status is TaskStatus.DONE
 
-    tag_names = _unique_tag_names(task_in.tags) if task_in.tags is not None else None
-    access.authorize_tag_names(session, caller, tag_names)
-    _check_recurrence_update(session=session, task=task, task_in=task_in)
+        tag_names = (
+            _unique_tag_names(task_in.tags) if task_in.tags is not None else None
+        )
+        access.authorize_tag_names(session, caller, tag_names)
+        _check_recurrence_update(session=session, task=task, task_in=task_in)
 
-    if "project_id" in task_in.model_fields_set:
-        if task_in.project_id is None:
-            raise refusals.plain(400, "A task must belong to a project")
-        if task.parent_id is not None:
+        if "project_id" in task_in.model_fields_set:
+            if task_in.project_id is None:
+                raise refusals.plain(400, "A task must belong to a project")
+            if task.parent_id is not None:
+                raise refusals.plain(
+                    400,
+                    "A subtask follows its parent's project; move the task at "
+                    "the top of the tree instead",
+                )
+            # Moving a task in is as much a change to the destination as
+            # creating one there. For a bot the source was checked above, so
+            # work can neither leave its scope nor enter from outside it.
+            access.get_project(session, caller, task_in.project_id, TaskAction.UPDATE)
+
+        assignee = None
+        if "assignee_id" in task_in.model_fields_set:
+            assignee = resolve_task_assignee(
+                session,
+                caller,
+                task_in.assignee_id,
+                current=crud.Assignee(task.assignee_id, task.assignee_bot_user_id),
+            )
+
+        if task_in.subtasks is not None and task_in.status is not TaskStatus.DONE:
             raise refusals.plain(
                 400,
-                "A subtask follows its parent's project; move the task at "
-                "the top of the tree instead",
+                "`subtasks` only applies to a request that moves the task to done",
             )
-        # Moving a task in is as much a change to the destination as creating
-        # one there. For a bot the source was checked above, so work can
-        # neither leave its scope nor enter from outside it.
-        access.get_project(session, caller, task_in.project_id, TaskAction.UPDATE)
 
-    assignee = None
-    if "assignee_id" in task_in.model_fields_set:
-        assignee = resolve_task_assignee(
-            session,
-            caller,
-            task_in.assignee_id,
-            current=crud.Assignee(task.assignee_id, task.assignee_bot_user_id),
-        )
+        if task_in.status is TaskStatus.DONE and crud.has_open_subtasks(
+            session=session, task=task
+        ):
+            if task_in.subtasks is None:
+                raise refusals.task_has_uncompleted_subtasks(
+                    crud.open_subtasks(session=session, task=task)
+                )
+            if task_in.subtasks is SubtaskCompletion.COMPLETE:
+                crud.complete_subtasks(session=session, task=task)
 
-    if task_in.subtasks is not None and task_in.status is not TaskStatus.DONE:
-        raise refusals.plain(
-            400, "`subtasks` only applies to a request that moves the task to done"
-        )
-
-    if task_in.status is TaskStatus.DONE and crud.has_open_subtasks(
-        session=session, task=task
-    ):
-        if task_in.subtasks is None:
-            raise refusals.task_has_uncompleted_subtasks(
-                crud.open_subtasks(session=session, task=task)
-            )
-        if task_in.subtasks is SubtaskCompletion.COMPLETE:
-            crud.complete_subtasks(session=session, task=task)
-
-    task = crud.update_task(
-        session=session,
-        db_task=task,
-        task_in=task_in,
-        assignee=assignee,
-        tag_names=tag_names,
-    )
-
-    next_occurrence = None
-    if (
-        not already_done
-        and task.status is TaskStatus.DONE
-        and task.series_id is not None
-    ):
-        next_occurrence = _open_occurrence(session, task.series_id)
-
-    comment_row = None
-    if comment is not None:
-        comment_row = crud.create_comment(
+        task = crud.update_task(
             session=session,
-            comment_create=CommentCreate(body=comment),
-            task_id=task_id,
-            owner_id=caller.owner_id,
-            author_bot_user_id=caller.bot.id if caller.bot else None,
+            db_task=task,
+            task_in=task_in,
+            assignee=assignee,
+            tag_names=tag_names,
+            commit=False,
         )
+
+        next_occurrence = None
+        if (
+            not already_done
+            and task.status is TaskStatus.DONE
+            and task.series_id is not None
+        ):
+            next_occurrence = _open_occurrence(session, task.series_id)
+
+        comment_row = None
+        if comment is not None:
+            comment_row = crud.create_comment(
+                session=session,
+                comment_create=CommentCreate(body=comment),
+                task_id=task_id,
+                owner_id=caller.owner_id,
+                author_bot_user_id=caller.bot.id if caller.bot else None,
+                commit=False,
+            )
 
     return CompleteResult(
         task=task,
@@ -388,49 +395,54 @@ def create(session: Session, caller: Caller, task_in: TaskCreate) -> CreateResul
 
     The reporter is the caller itself (FR-01.29): nothing in `task_in` can
     set it — the request body this takes has no field for it at all.
+
+    One transaction (`UnitOfWork`, #284): a refusal partway through — a tag
+    name needing a grant the caller lacks, say — leaves no task behind.
     """
     set_caller_actor(session, caller)
 
-    is_subtask = task_in.parent_id is not None
-    if task_in.parent_id is not None:
-        project = access.get_task(
-            session, caller, task_in.parent_id, TaskAction.CREATE
-        ).project
-    elif task_in.project_id is not None:
-        project = access.get_project(
-            session, caller, task_in.project_id, TaskAction.CREATE
+    with UnitOfWork(session):
+        is_subtask = task_in.parent_id is not None
+        if task_in.parent_id is not None:
+            project = access.get_task(
+                session, caller, task_in.parent_id, TaskAction.CREATE
+            ).project
+        elif task_in.project_id is not None:
+            project = access.get_project(
+                session, caller, task_in.project_id, TaskAction.CREATE
+            )
+        else:
+            project = access.get_project(
+                session,
+                caller,
+                crud.get_inbox_project(session=session, owner_id=caller.owner_id).id,
+                TaskAction.CREATE,
+            )
+        tag_names = _unique_tag_names(task_in.tags)
+        access.authorize_tag_names(session, caller, tag_names)
+
+        assignee = resolve_task_assignee(session, caller, task_in.assignee_id)
+        _check_recurrence(
+            parent_id=task_in.parent_id,
+            recurrence=task_in.recurrence,
+            due_date=task_in.due_date,
+            status=task_in.status,
         )
-    else:
-        project = access.get_project(
-            session,
-            caller,
-            crud.get_inbox_project(session=session, owner_id=caller.owner_id).id,
-            TaskAction.CREATE,
+
+        if is_subtask and task_in.project_id is not None:
+            raise refusals.plain(400, "A subtask belongs to the project of its parent")
+
+        task = crud.create_task(
+            session=session,
+            task_create=task_in,
+            # A subtask's own project is derived from its parent's tree.
+            project_id=None if is_subtask else project.id,
+            owner_id=caller.owner_id,
+            reporter=_reporter(caller),
+            assignee=assignee,
+            tag_names=tag_names,
+            commit=False,
         )
-    tag_names = _unique_tag_names(task_in.tags)
-    access.authorize_tag_names(session, caller, tag_names)
-
-    assignee = resolve_task_assignee(session, caller, task_in.assignee_id)
-    _check_recurrence(
-        parent_id=task_in.parent_id,
-        recurrence=task_in.recurrence,
-        due_date=task_in.due_date,
-        status=task_in.status,
-    )
-
-    if is_subtask and task_in.project_id is not None:
-        raise refusals.plain(400, "A subtask belongs to the project of its parent")
-
-    task = crud.create_task(
-        session=session,
-        task_create=task_in,
-        # A subtask's own project is derived from its parent's tree.
-        project_id=None if is_subtask else project.id,
-        owner_id=caller.owner_id,
-        reporter=_reporter(caller),
-        assignee=assignee,
-        tag_names=tag_names,
-    )
     return CreateResult(task=task, project=project)
 
 
@@ -478,58 +490,70 @@ def update(
     FR-01.7, FR-08.21) — and refusing `subtasks` on a request that closes
     nothing, since that argument only ever answers the question closing
     asks.
+
+    One transaction either way (`UnitOfWork`, #284): delegating to `complete`
+    whole means its own unit of work is the one that commits or rolls back;
+    every other request opens its own here.
     """
     if task_in.status is TaskStatus.DONE:
         return complete(session, caller, task_id, task_in)
 
     set_caller_actor(session, caller)
 
-    resolved = access.get_task(session, caller, task_id, TaskAction.UPDATE)
-    task, project = resolved.task, resolved.project
+    with UnitOfWork(session):
+        resolved = access.get_task(session, caller, task_id, TaskAction.UPDATE)
+        task, project = resolved.task, resolved.project
 
-    tag_names = _unique_tag_names(task_in.tags) if task_in.tags is not None else None
-    access.authorize_tag_names(session, caller, tag_names)
-    recurrence = _check_recurrence_update(session=session, task=task, task_in=task_in)
+        tag_names = (
+            _unique_tag_names(task_in.tags) if task_in.tags is not None else None
+        )
+        access.authorize_tag_names(session, caller, tag_names)
+        recurrence = _check_recurrence_update(
+            session=session, task=task, task_in=task_in
+        )
 
-    if "project_id" in task_in.model_fields_set:
-        if task_in.project_id is None:
-            raise refusals.plain(400, "A task must belong to a project")
-        if task.parent_id is not None:
+        if "project_id" in task_in.model_fields_set:
+            if task_in.project_id is None:
+                raise refusals.plain(400, "A task must belong to a project")
+            if task.parent_id is not None:
+                raise refusals.plain(
+                    400,
+                    "A subtask follows its parent's project; move the task at "
+                    "the top of the tree instead",
+                )
+            # Moving a task in is as much a change to the destination as
+            # creating one there. For a bot the source was checked with the
+            # task, so work can neither leave its scope nor enter from
+            # outside it.
+            project = access.get_project(
+                session, caller, task_in.project_id, TaskAction.UPDATE
+            )
+
+        assignee = None
+        if "assignee_id" in task_in.model_fields_set:
+            assignee = resolve_task_assignee(
+                session,
+                caller,
+                task_in.assignee_id,
+                current=crud.Assignee(task.assignee_id, task.assignee_bot_user_id),
+            )
+
+        if task_in.subtasks is not None:
+            # `status: done` returned above before this line is ever reached,
+            # so a `subtasks` sent here is never paired with it.
             raise refusals.plain(
                 400,
-                "A subtask follows its parent's project; move the task at "
-                "the top of the tree instead",
+                "`subtasks` only applies to a request that moves the task to done",
             )
-        # Moving a task in is as much a change to the destination as creating
-        # one there. For a bot the source was checked with the task, so work
-        # can neither leave its scope nor enter from outside it.
-        project = access.get_project(
-            session, caller, task_in.project_id, TaskAction.UPDATE
-        )
 
-    assignee = None
-    if "assignee_id" in task_in.model_fields_set:
-        assignee = resolve_task_assignee(
-            session,
-            caller,
-            task_in.assignee_id,
-            current=crud.Assignee(task.assignee_id, task.assignee_bot_user_id),
+        task = crud.update_task(
+            session=session,
+            db_task=task,
+            task_in=task_in,
+            assignee=assignee,
+            tag_names=tag_names,
+            commit=False,
         )
-
-    if task_in.subtasks is not None:
-        # `status: done` returned above before this line is ever reached, so
-        # a `subtasks` sent here is never paired with it.
-        raise refusals.plain(
-            400, "`subtasks` only applies to a request that moves the task to done"
-        )
-
-    task = crud.update_task(
-        session=session,
-        db_task=task,
-        task_in=task_in,
-        assignee=assignee,
-        tag_names=tag_names,
-    )
     return UpdateResult(task=task, project=project, recurrence=recurrence)
 
 
@@ -556,12 +580,17 @@ def delete(
     delete_task`), restorable as the one act it was, and only by the owner —
     restoring is `app.deletions.restore`'s own rule, unchanged by this
     operation existing.
+
+    One transaction (`UnitOfWork`, #284): the refusal over an unconfirmed
+    cascade is raised before anything is marked, so it rolls back nothing;
+    recorded here so a later refusal added to this operation gets it too.
     """
     set_caller_actor(session, caller)
-    task = access.get_task(session, caller, task_id, TaskAction.DELETE).task
-    if not delete_subtasks and crud.has_subtasks(session=session, task=task):
-        raise refusals.task_has_subtasks(crud.subtasks(session=session, task=task))
-    deletions.delete_task(session, task)
+    with UnitOfWork(session):
+        task = access.get_task(session, caller, task_id, TaskAction.DELETE).task
+        if not delete_subtasks and crud.has_subtasks(session=session, task=task):
+            raise refusals.task_has_subtasks(crud.subtasks(session=session, task=task))
+        deletions.delete_task(session, task, commit=False)
     return task
 
 

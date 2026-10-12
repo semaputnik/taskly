@@ -488,7 +488,10 @@ def fetch_original(
             status=409,
         )
     api = api_for(connection, client)
-    # No connection is held while Paperless takes its time to answer.
+    # One of the three exceptions ADR-0013 names to "one act, one
+    # transaction": no database connection is held while Paperless takes its
+    # time to answer a slow HTTP call, which a single outer transaction would
+    # otherwise hold for the whole request.
     session.commit()
     try:
         return api.download_original(document_id)

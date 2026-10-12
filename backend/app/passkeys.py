@@ -58,6 +58,7 @@ from app.models import (
     WebAuthnChallenge,
 )
 from app.passkey_names import passkey_name
+from app.unit_of_work import UnitOfWork
 
 # How long either half of a ceremony waits for the other (FR-12.10). Also the
 # timeout the browser is given, so it stops asking when the server stops
@@ -186,15 +187,20 @@ def finish_registration(
     is_superuser = (
         row.email == settings.FIRST_SUPERUSER and find_superuser(session) is None
     )
-    user = crud.create_user(
-        session=session,
-        user_create=UserCreate(email=row.email, is_superuser=is_superuser),
-        user_id=row.user_handle,
-        commit=False,
-    )
-    # Registering signs in with the new passkey: that is its first use.
-    session.add(_new_passkey(user.id, credential, verified, user_agent, used=True))
-    session.commit()
+    # One transaction (`UnitOfWork`, #284): the account and its first passkey
+    # land together, the precedent this ticket's unit of work generalises —
+    # `commit=False` is `crud.create_user`'s own opt-out for exactly this, so
+    # this `UnitOfWork` decides when the pair commits instead of the ad hoc
+    # `session.commit()` that used to sit here.
+    with UnitOfWork(session):
+        user = crud.create_user(
+            session=session,
+            user_create=UserCreate(email=row.email, is_superuser=is_superuser),
+            user_id=row.user_handle,
+            commit=False,
+        )
+        # Registering signs in with the new passkey: that is its first use.
+        session.add(_new_passkey(user.id, credential, verified, user_agent, used=True))
     session.refresh(user)
     return user
 
