@@ -13,6 +13,6 @@ every refusal raised with `conventions.refuse` or caught and re-raised with
 `conventions.refusal` — then import it below.
 """
 
-from app.mcp.tools import search_tasks, whoami
+from app.mcp.tools import get_task, list_tags, search_tasks, whoami
 
-__all__ = ["search_tasks", "whoami"]
+__all__ = ["get_task", "list_tags", "search_tasks", "whoami"]

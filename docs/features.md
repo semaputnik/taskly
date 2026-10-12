@@ -459,8 +459,8 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
   grants, and the server's current date. The nine tools for working tasks
   themselves (`search_tasks`, `get_task`, `list_tags`, `create_task`,
   `update_task`, `complete_task`, `comment_task`, `delete_task`, and
-  `whoami`) are spec #247's; `whoami` and `search_tasks` are built as of
-  this entry.
+  `whoami`) are spec #247's; `whoami`, `search_tasks`, `get_task` and
+  `list_tags` are built as of this entry.
 - **FR-07.10** Every tool reads its arguments, reports its results and
   raises its refusals the same way:
   - **Ids.** A task is named by its full id or by the short prefix a
@@ -506,6 +506,25 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
   baseline (FR-06.8); setting it to `false` is the one way `search_tasks`
   reaches `done` work, which the task list itself never shows. The archive
   is never listed, whatever the bot's scope says (FR-05.13).
+- **FR-07.12** `get_task` reads one task whole, in one call rather than
+  three: the full record `GET /tasks/{id}` returns — title, description,
+  status, priority, due date, project, tags, assignee, reporter,
+  recurrence, when it was filed, and its subtask counts, a subtask's own
+  project being its root task's (FR-02.4) and a task in Review a bot user
+  handed over reporting the hand-over (ADR-0008) — plus, each only when
+  asked for through its own argument so a caller that wants the task alone
+  pays for the task alone: `include_subtasks` (the direct subtasks, as
+  `search_tasks`'s own compact lines), `include_comments` (the task's
+  comments oldest first, each with its author — "owner", or a bot user by
+  name — and when it was written), and `include_attachments` (the task's
+  attachments by name and size, never their bytes).
+- **FR-07.13** `list_tags` is the owner's whole tag vocabulary (FR-01.26),
+  narrowable by `q` (a substring of the name, ignoring case, matching
+  anywhere in it rather than only at its start) and limited. Unlike every
+  other tool here it is never narrowed by the caller's own scope: tags
+  belong to the owner, not to a project (ADR-0003), so a bot user reads the
+  same vocabulary whatever projects it can itself reach, and needs no
+  permission to do it (`app.models.BotPermissions`'s own rule).
 
 ### F-08. Bot users
 

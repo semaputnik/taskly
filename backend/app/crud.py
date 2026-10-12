@@ -663,6 +663,7 @@ def get_tags(
     session: Session,
     owner_id: uuid.UUID,
     q: str | None = None,
+    contains: str | None = None,
     near: str | None = None,
     skip: int = 0,
     limit: int = 100,
@@ -672,13 +673,18 @@ def get_tags(
     The user's tags, each with the number of tasks carrying it. `q` matches
     from the start of the name, ignoring case, so what they type narrows to
     what they typed before rather than to every tag with those letters
-    somewhere inside. `near` finds the tags a name would read the same as
-    (`tag_key`), over the whole vocabulary: what a name about to become a new
-    tag would duplicate (FR-01.28).
+    somewhere inside — the autocomplete-while-typing read. `contains` matches
+    anywhere in the name instead, ignoring case, the way `search_tasks`'s own
+    `query` matches a title: a caller who does not know how a tag starts
+    (`list_tags`, spec #254) still finds it. `near` finds the tags a name
+    would read the same as (`tag_key`), over the whole vocabulary: what a
+    name about to become a new tag would duplicate (FR-01.28).
     """
     where: list[Any] = [Tag.owner_id == owner_id]
     if q:
         where.append(col(Tag.name).ilike(f"{q}%"))
+    if contains:
+        where.append(col(Tag.name).icontains(contains, autoescape=True))
     if near is not None:
         # Narrowed in the database to names that fold to the key with or
         # without a trailing "s", then held to `tag_key` exactly: this runs as
