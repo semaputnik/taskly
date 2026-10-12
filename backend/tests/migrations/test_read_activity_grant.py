@@ -99,9 +99,7 @@ def test_round_trip_and_the_downgrade_leaves_no_type_behind(
     # An existing bot user is unaffected: the grant arrives off, and nothing
     # else about it changes (issue #250's acceptance).
     row = connection.execute(
-        text(
-            "SELECT name, create_tasks, read_activity FROM botuser WHERE id = :id"
-        ),
+        text("SELECT name, create_tasks, read_activity FROM botuser WHERE id = :id"),
         {"id": bot_id},
     ).one()
     assert tuple(row) == ("Veteran agent", True, False)
@@ -124,6 +122,9 @@ def test_round_trip_and_the_downgrade_leaves_no_type_behind(
     # dropped grant comes back off, like any fresh column would.
     _migrate(connection, "upgrade", AFTER)
     assert "read_activity" in _columns(connection, "botuser")
-    assert connection.execute(
-        text("SELECT read_activity FROM botuser WHERE id = :id"), {"id": bot_id}
-    ).scalar_one() is False
+    assert (
+        connection.execute(
+            text("SELECT read_activity FROM botuser WHERE id = :id"), {"id": bot_id}
+        ).scalar_one()
+        is False
+    )

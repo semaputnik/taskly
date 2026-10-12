@@ -70,9 +70,9 @@ describe("permissions in words", () => {
   })
 
   test("the activity log grant is its own word (issue #250)", () => {
-    expect(
-      permissionsInWords({ ...NONE, read_activity: true }),
-    ).toBe("reads the log")
+    expect(permissionsInWords({ ...NONE, read_activity: true })).toBe(
+      "reads the log",
+    )
   })
 })
 
