@@ -353,7 +353,11 @@ def complete(
     )
 
     next_occurrence = None
-    if not already_done and task.status is TaskStatus.DONE and task.series_id is not None:
+    if (
+        not already_done
+        and task.status is TaskStatus.DONE
+        and task.series_id is not None
+    ):
         next_occurrence = _open_occurrence(session, task.series_id)
 
     comment_row = None
