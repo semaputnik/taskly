@@ -59,6 +59,7 @@ def test_a_human_session_sees_itself_as_the_actor_with_every_permission_and_no_p
         "delete_tasks": True,
         "add_comments": True,
         "create_tags": True,
+        "read_activity": True,
     }
     assert body["projects"] is None
 
@@ -103,7 +104,30 @@ def test_a_bot_user_sees_its_own_identity_its_owners_id_and_exactly_its_grants(
         "delete_tasks": False,
         "add_comments": True,
         "create_tags": False,
+        "read_activity": False,
     }
+
+
+def test_a_bot_users_read_activity_grant_is_reported_true_when_granted(
+    client: TestClient, db: Session
+) -> None:
+    """
+    `read_activity` is false by default (previous test) and reads back true
+    once the owner grants it — the only thing this slice makes happen; the
+    grant opens nothing on the log itself until #251.
+    """
+    owner = create_user_headers(client, db)
+    bot = create_bot_user(
+        client,
+        owner,
+        project_ids=[],
+        permissions={"read_activity": True},
+        name="Reporter",
+    )
+    bot_headers = token_headers(client, owner, bot["id"])
+
+    body = _caller(client, bot_headers)
+    assert body["permissions"]["read_activity"] is True
 
 
 def test_a_bot_users_projects_are_its_scope_inbox_first_then_by_name(

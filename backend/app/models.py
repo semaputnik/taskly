@@ -1320,6 +1320,11 @@ class BotPermissions(SQLModel):
     # Covers both creating a tag on its own and typing a name that is not a
     # tag yet onto a task (FR-08.9).
     create_tags: bool = False
+    # Reading the activity log does not follow from `read_tasks`: the log
+    # shows the owner's own work too, so it is its own grant (spec #246,
+    # FR-08.9). This slice only makes the grant exist and persist; serving
+    # the log to a bot user is #251.
+    read_activity: bool = False
 
 
 class BotScope(SQLModel):
@@ -1428,6 +1433,9 @@ class BotUser(SQLModel, table=True):
     delete_tasks: bool = False
     add_comments: bool = False
     create_tags: bool = False
+    # Off by default (spec #246, FR-08.9): reading the log is its own grant,
+    # not implied by `read_tasks`. See `BotPermissions.read_activity`.
+    read_activity: bool = False
     # A SHA-256 of the token, never the token itself, so the token cannot be
     # read back from anywhere once the response that issued it is gone
     # (FR-08.13). One column, so a bot user holds at most one token

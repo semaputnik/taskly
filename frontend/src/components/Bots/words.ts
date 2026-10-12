@@ -30,6 +30,7 @@ const GRANTS: { key: keyof BotPermissions; words: string; reach: string }[] = [
   { key: "delete_tasks", words: "deletes", reach: "deletes" },
   { key: "add_comments", words: "comments", reach: "comments" },
   { key: "create_tags", words: "tags", reach: "creates tags" },
+  { key: "read_activity", words: "reads the log", reach: "reads the log" },
 ]
 
 /** What it may do: "reads, updates, comments", or that it may do nothing. */

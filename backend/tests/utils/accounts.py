@@ -27,6 +27,7 @@ ALL_PERMISSIONS = {
     "delete_tasks": True,
     "add_comments": True,
     "create_tags": True,
+    "read_activity": True,
 }
 READ_ONLY = {"read_tasks": True}
 

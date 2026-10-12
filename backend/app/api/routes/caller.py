@@ -35,6 +35,7 @@ _HUMAN_PERMISSIONS = BotPermissions(
     delete_tasks=True,
     add_comments=True,
     create_tags=True,
+    read_activity=True,
 )
 
 

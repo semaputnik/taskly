@@ -18,6 +18,7 @@ const NONE: BotPermissions = {
   delete_tasks: false,
   add_comments: false,
   create_tags: false,
+  read_activity: false,
 }
 
 const bot = (patch: Partial<BotUserPublic> = {}): BotUserPublic => ({
@@ -66,6 +67,12 @@ describe("permissions in words", () => {
 
   test("none at all is said", () => {
     expect(permissionsInWords(NONE)).toBe("no permissions")
+  })
+
+  test("the activity log grant is its own word (issue #250)", () => {
+    expect(
+      permissionsInWords({ ...NONE, read_activity: true }),
+    ).toBe("reads the log")
   })
 })
 

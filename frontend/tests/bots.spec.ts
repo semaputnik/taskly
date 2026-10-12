@@ -39,6 +39,12 @@ test("A bot user is drafted in the column and its token is shown once", async ({
   await expect(
     draft.getByRole("checkbox", { name: "Read tasks" }),
   ).toBeChecked()
+  // Off until ticked, like every grant (issue #250).
+  const readActivity = draft.getByRole("checkbox", {
+    name: "Read the activity log",
+  })
+  await expect(readActivity).not.toBeChecked()
+  await readActivity.check()
   await draft.getByRole("button", { name: "Create and issue token" }).click()
 
   const dialog = page.getByRole("dialog", { name: "Token for Triage agent" })
@@ -78,6 +84,11 @@ test("A bot user is drafted in the column and its token is shown once", async ({
   await expect(column).toContainText("never expires")
   await expect(column).not.toContainText("Never used")
   expect(await page.content()).not.toContain(token)
+
+  // What was ticked in the draft is what the saved record shows, read fresh.
+  await expect(
+    column.getByRole("checkbox", { name: "Read the activity log" }),
+  ).toBeChecked()
 })
 
 test("A draft that is closed leaves nothing behind", async ({ page }) => {
@@ -219,6 +230,14 @@ test("A bot's scope is narrowed and the bot is deleted from the Bots page", asyn
   const createTasks = panel.getByRole("checkbox", { name: "Create tasks" })
   await createTasks.click()
   await expect(createTasks).not.toBeChecked()
+  // Off by default, granted here, and still on once the column is reopened
+  // below — exactly what editing last set (issue #250).
+  const readActivity = panel.getByRole("checkbox", {
+    name: "Read the activity log",
+  })
+  await expect(readActivity).not.toBeChecked()
+  await readActivity.check()
+  await expect(readActivity).toBeChecked()
   // Renaming last: the column is announced by the record's name, and the
   // record's name is what is being changed.
   const name = panel.getByRole("textbox", { name: "Bot name" })
@@ -240,9 +259,11 @@ test("A bot's scope is narrowed and the bot is deleted from the Bots page", asyn
   expect((await outside.json()).detail.code).toBe("outside_scope")
 
   await openBot(page, "Docs agent")
-  await botColumn(page, "Docs agent")
-    .getByRole("button", { name: "Delete bot user" })
-    .click()
+  const reopened = botColumn(page, "Docs agent")
+  await expect(
+    reopened.getByRole("checkbox", { name: "Read the activity log" }),
+  ).toBeChecked()
+  await reopened.getByRole("button", { name: "Delete bot user" }).click()
   await page
     .getByRole("dialog", { name: "Delete Docs agent?" })
     .getByRole("button", { name: "Delete" })

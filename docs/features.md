@@ -459,6 +459,7 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
   | Task | configurable | configurable | configurable | configurable |
   | Tag | configurable | always | never | never |
   | Project | never | only projects in scope | never | never |
+  | Activity log | never | configurable (`read_activity`, off by default) | never | never |
 
   Tags (see ADR-0003):
   - Creating tags is a permission of its own. It covers both creating a tag
