@@ -459,8 +459,8 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
   grants, and the server's current date. The nine tools for working tasks
   themselves (`search_tasks`, `get_task`, `list_tags`, `create_task`,
   `update_task`, `complete_task`, `comment_task`, `delete_task`, and
-  `whoami`) are spec #247's; `whoami`, `search_tasks`, `get_task` and
-  `list_tags` are built as of this entry.
+  `whoami`) are spec #247's; `whoami`, `search_tasks`, `get_task`,
+  `list_tags` and `create_task` are built as of this entry.
 - **FR-07.10** Every tool reads its arguments, reports its results and
   raises its refusals the same way:
   - **Ids.** A task is named by its full id or by the short prefix a
@@ -525,6 +525,23 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
   belong to the owner, not to a project (ADR-0003), so a bot user reads the
   same vocabulary whatever projects it can itself reach, and needs no
   permission to do it (`app.models.BotPermissions`'s own rule).
+- **FR-07.14** `create_task` files a task, a subtask, or the first
+  occurrence of a recurring series, with a title, a description, a due
+  date, a priority, tags and an assignee in one call, through the same
+  route (`POST /tasks`) and the same rules: a task left without a
+  `project` lands in the Inbox, which has to be in the bot user's scope
+  like any other project (FR-05.4); naming `parent_task_id` makes a
+  subtask, which always takes its parent's project, and naming `project`
+  alongside it is refused; a task starts in `backlog` unless `status`
+  names another; `recurrence` (FR-01.13) needs a due date, a root task,
+  and is refused on one created `done`. `assignee` takes `self` (this bot
+  user), `owner` (the account's human), or a bot user's id (FR-01.7); a
+  bot user not the account's own, or deleted, is refused (FR-08.21). The
+  reporter is always this bot user, and no argument sets it (FR-01.29).
+  `title` and `description` carry the same length limits the API itself
+  enforces (255 and 2000 characters), declared in the tool's own argument
+  schema so an over-long one is refused before the call reaches it at
+  all.
 
 ### F-08. Bot users
 
