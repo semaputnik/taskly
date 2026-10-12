@@ -48,10 +48,9 @@ mcp_server = MCPServer(
     instructions=(
         "Taskly, reached as the bot user whose token authorised this "
         "connection. Call `whoami` first, every session: it names the "
-        "actor, its owner, the scope's projects (the Inbox marked) and "
-        "today's server date, which every date this server resolves "
-        "('today', 'tomorrow', '+Nd') is relative to — the caller's own "
-        "clock is not this installation's."
+        "actor, its owner, the scope's projects (the Inbox marked), "
+        "exactly its grants, and the server's own current date — the "
+        "caller's own clock is not this installation's."
     ),
 )
 
@@ -210,7 +209,7 @@ def mount(app: FastAPI) -> None:
         # accepts a raw ASGI app (any non-function/method callable) and
         # runs it as one — confirmed empirically — which is what `_gateway`
         # is. The stub is narrower than the runtime behaviour it wraps.
-        _gateway,  # type: ignore[arg-type]
+        _gateway,  # type: ignore[arg-type] # ty: ignore[invalid-argument-type]
         methods=["GET", "POST", "DELETE"],
         include_in_schema=False,
     )
