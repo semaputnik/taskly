@@ -224,6 +224,10 @@ export type BotPermissions = {
      * Create Tags
      */
     create_tags?: boolean;
+    /**
+     * Read Activity
+     */
+    read_activity?: boolean;
 };
 
 /**

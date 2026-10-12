@@ -380,6 +380,11 @@ export const BotPermissionsSchema = {
             type: 'boolean',
             title: 'Create Tags',
             default: false
+        },
+        read_activity: {
+            type: 'boolean',
+            title: 'Read Activity',
+            default: false
         }
     },
     type: 'object',
