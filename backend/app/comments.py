@@ -13,27 +13,11 @@ import uuid
 
 from sqlmodel import Session
 
-from app import activity, crud
+from app import crud
 from app.api import access
 from app.api.access import TaskAction
-from app.api.deps import Caller
+from app.caller import Caller, set_caller_actor
 from app.models import Comment, CommentCreate
-
-
-def _set_actor(session: Session, caller: Caller) -> None:
-    """
-    Attribute whatever this transaction commits to the caller itself
-    (FR-10.2): a bot user's comment is never recorded as its owner's.
-
-    A near-duplicate of `app.tasks._set_actor` rather than a shared import
-    of it: the two operation modules are siblings, and reaching into one
-    private name from the other would be the same cross-module private
-    reach this batch exists to remove, just moved rather than ended.
-    """
-    if caller.bot is not None:
-        activity.set_bot_actor(session, caller.bot.id)
-    else:
-        activity.set_actor(session, caller.owner_id)
 
 
 def comment(
@@ -54,7 +38,7 @@ def comment(
     (FR-03.2, FR-08.10); nothing in this slice gives this module a
     counterpart that would change or remove one.
     """
-    _set_actor(session, caller)
+    set_caller_actor(session, caller)
     access.get_task(session, caller, task_id, TaskAction.COMMENT)
     return crud.create_comment(
         session=session,

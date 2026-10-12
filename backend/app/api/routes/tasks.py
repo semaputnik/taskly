@@ -35,15 +35,17 @@ OPEN_SUBTASKS_CODE = RefusalCode.TASK_HAS_UNCOMPLETED_SUBTASKS.value
 
 # Deleting takes the whole subtree with it, so the same shape of refusal guards
 # it: the request has to confirm the cascade before anything goes (FR-01.12).
-HAS_SUBTASKS_STATUS = 409
-HAS_SUBTASKS_CODE = "task_has_subtasks"
+# `app.tasks.delete` is what the single-task `DELETE` now raises this code
+# through, as a `Refusal` (#282); a batch has no operation of its own yet, so
+# it keeps assembling this one refusal inline, from the same code.
+HAS_SUBTASKS_CODE = RefusalCode.TASK_HAS_SUBTASKS.value
 
 # A later occurrence already exists: reopening this one would leave the series
-# with two open occurrences (FR-01.16). Kept alongside `OCCURRENCE_SUPERSEDED_CODE`
-# in `app.tasks` (where `_check_recurrence_update` now lives) for the bulk
-# path below, which raises its own `TaskRefusal` rather than calling through
-# to that check.
-OCCURRENCE_SUPERSEDED_CODE = "occurrence_superseded"
+# with two open occurrences (FR-01.16). Kept alongside `RefusalCode.
+# OCCURRENCE_SUPERSEDED`, which `app.tasks._check_recurrence_update` now
+# raises through (#282), for the bulk path below, which raises its own
+# `TaskRefusal` rather than calling through to that check.
+OCCURRENCE_SUPERSEDED_CODE = RefusalCode.OCCURRENCE_SUPERSEDED.value
 
 
 @router.get("/", response_model=TasksPublic)
@@ -350,11 +352,11 @@ def update_task(
     """
     Update a task: its fields, status, assignee, or project.
 
-    `status: done` delegates whole to `app.tasks.complete` (#275, #279): the
-    open-subtasks directive, the next occurrence a recurring task's close
-    spawns, and everything else this request can combine with the move are
-    all that operation's own rules now, so this branch keeps nothing but
-    binding the request and shaping the response.
+    Every rule is `app.tasks.update`'s own (#275, #282): the due-date scope,
+    the superseded-occurrence refusal, the subtask-project rule, the
+    assignee rules, tags replacing wholesale, and delegating whole to
+    `app.tasks.complete` when the request moves `status` to `done` — this
+    route keeps only binding the request and shaping the response.
 
     Moving between open statuses never touches the subtasks. Handing finished
     work over: a bot user that has done a task sets its status to `review`
@@ -371,77 +373,20 @@ def update_task(
     too (FR-08.8). It applies and removes its owner's tags freely, and needs
     the permission to create tags for a name that is not one yet (FR-08.9).
     """
-    if task_in.status is TaskStatus.DONE:
-        result = tasks.complete(session, caller, task_id, task_in)
+    result = tasks.update(session, caller, task_id, task_in)
+    if isinstance(result, tasks.CompleteResult):
         [public] = task_publics(session, [result.task])
         return public
 
-    resolved = access.get_task(session, caller, task_id, TaskAction.UPDATE)
-    task, project_id = resolved.task, resolved.project.id
-    # `update_task` is not becoming an operation in this ticket (#282 does
-    # that), so it keeps calling these three public helpers across the
-    # module boundary rather than re-deriving its own copies of the rules.
-    tag_names = (
-        tasks.unique_tag_names(task_in.tags) if task_in.tags is not None else None
-    )
-    access.authorize_tag_names(session, caller, tag_names)
-    recurrence = tasks.check_recurrence_update(
-        session=session, task=task, task_in=task_in
-    )
-
-    if "project_id" in task_in.model_fields_set:
-        if task_in.project_id is None:
-            raise HTTPException(
-                status_code=400, detail="A task must belong to a project"
-            )
-        if task.parent_id is not None:
-            raise HTTPException(
-                status_code=400,
-                detail=(
-                    "A subtask follows its parent's project; move the task at "
-                    "the top of the tree instead"
-                ),
-            )
-        # Moving a task in is as much a change to the destination as creating
-        # one there. For a bot the source was checked with the task, so work
-        # can neither leave its scope nor enter from outside it.
-        access.get_project(session, caller, task_in.project_id, TaskAction.UPDATE)
-        project_id = task_in.project_id
-
-    assignee = None
-    if "assignee_id" in task_in.model_fields_set:
-        assignee = tasks.resolve_task_assignee(
-            session,
-            caller,
-            task_in.assignee_id,
-            current=crud.Assignee(task.assignee_id, task.assignee_bot_user_id),
-        )
-
-    if task_in.subtasks is not None:
-        # `status: done` returned above before this line is ever reached, so
-        # a `subtasks` sent here is never paired with it.
-        raise HTTPException(
-            status_code=400,
-            detail="`subtasks` only applies to a request that moves the task to done",
-        )
-
-    task = crud.update_task(
-        session=session,
-        db_task=task,
-        task_in=task_in,
-        assignee=assignee,
-        tag_names=tag_names,
-    )
-
-    # The recurrence the check read is still the task's unless the update
-    # set a new one, which is read back as stored.
+    # The recurrence `update` already read is still the task's unless this
+    # request set a new one, which is read back as stored.
     [public] = task_publics(
         session,
-        [task],
-        projects={task.id: project_id},
+        [result.task],
+        projects={result.task.id: result.project.id},
         recurrences={}
         if "recurrence" in task_in.model_fields_set
-        else {task.id: recurrence},
+        else {result.task.id: result.recurrence},
     )
     return public
 
@@ -457,24 +402,12 @@ def delete_task(
     """
     Delete a task, and its subtasks with it.
 
-    The rows are marked deleted rather than removed, so the deletion can be
-    reversed from the activity log later (FR-01.8). Because the cascade can
-    take down far more than the task named here, a task that still has subtasks
-    is only deleted when `delete_subtasks` says so (FR-01.11, FR-01.12).
+    Every rule is `app.tasks.delete`'s own (#275, #282): the rows are marked
+    deleted rather than removed, so the deletion can be reversed from the
+    activity log later (FR-01.8), and a task that still has subtasks is
+    refused until `delete_subtasks` confirms the cascade (FR-01.11,
+    FR-01.12). This route keeps only binding the request and shaping the
+    response.
     """
-    task = access.get_task(session, caller, task_id, TaskAction.DELETE).task
-
-    if not delete_subtasks and crud.has_subtasks(session=session, task=task):
-        raise HTTPException(
-            status_code=HAS_SUBTASKS_STATUS,
-            detail={
-                "code": HAS_SUBTASKS_CODE,
-                "message": (
-                    "This task has subtasks, which would be deleted with it. "
-                    "Confirm with delete_subtasks to go ahead."
-                ),
-            },
-        )
-
-    deletions.delete_task(session, task)
+    tasks.delete(session, caller, task_id, delete_subtasks=delete_subtasks)
     return Message(message="Task deleted successfully")

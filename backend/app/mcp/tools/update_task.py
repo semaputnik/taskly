@@ -2,15 +2,17 @@
 `update_task` (spec #247, #256): change a task's fields, move it between open
 statuses or projects, hand it over, or clear a field.
 
-Built on `app.api.routes.tasks.update_task` itself — the subtasks directive,
-the due-date scope, the superseded-occurrence refusal, the subtask project
-rule, and the archive and scope checks are all that route's rules, called
-through to directly the same way `create_task` (#255) calls
-`app.api.routes.tasks.create_task`, rather than re-derived here. This tool's
+Calls `app.tasks.update` directly (#275, #282): the subtasks directive, the
+due-date scope, the superseded-occurrence refusal, the subtask-project rule,
+and the archive and scope checks are all that operation's own rules now, the
+same ones a human's `PATCH /tasks/{id}` goes through — neither a route
+function nor a route-private constant is imported here any more. This tool's
 own job is only to translate its MCP-style arguments (a project by name or
 id, an assignee as `self`, `owner` or an id, a due date read by
 `app.mcp.conventions.resolve_date`, an explicit `clear` naming the fields to
-empty) into the `TaskUpdate` that route already takes.
+empty) into the `TaskUpdate` that operation already takes, and to refuse
+`status: done` itself before the operation is ever called, pointing at
+`complete_task` — so `update` never delegates to `complete` from here.
 """
 
 from typing import Annotated, Any, Literal
@@ -20,7 +22,7 @@ from mcp.server.mcpserver import Context
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
-from app.api.routes.tasks import update_task as _update_task
+from app import tasks
 from app.mcp.conventions import (
     open_caller,
     refusal,
@@ -35,10 +37,11 @@ from app.models import (
     DueDateScope,
     TagName,
     TaskPriority,
-    TaskPublic,
     TaskStatus,
     TaskUpdate,
 )
+from app.read_models import task_publics
+from app.refusals import Refusal
 
 # What `clear` may name: every field a task can be emptied of. `title` and
 # `status` cannot be (a task always has both; emptying either would reach the
@@ -166,15 +169,21 @@ def update_task(
                 fields["due_date_scope"] = due_date_scope
 
             task_in = TaskUpdate(**fields)
-            # `_update_task` is typed `-> Any` (a FastAPI route function,
-            # where that is how a `response_model` is declared); it always
-            # actually returns a `TaskPublic`, the full record this tool
-            # promises.
-            public: TaskPublic = _update_task(
+            result = tasks.update(
                 session=session, caller=caller, task_id=resolved_id, task_in=task_in
             )
-        except HTTPException as exc:
+        except (HTTPException, Refusal) as exc:
             raise refusal(exc) from exc
+
+        # `status: done` is refused above, before the operation is ever
+        # called, so `update` never delegates to `complete` on this path.
+        assert isinstance(result, tasks.UpdateResult)
+        [public] = task_publics(
+            session,
+            [result.task],
+            projects={result.task.id: result.project.id},
+            recurrences={result.task.id: result.recurrence},
+        )
 
     return public.model_dump(mode="json")
 
