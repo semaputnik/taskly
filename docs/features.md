@@ -647,6 +647,55 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
   free to narrow with. Refused by name without `read_activity` (FR-08.9); a
   task or project outside the scope is refused the way the API refuses it,
   never an empty history that would look like one with nothing in it.
+- **FR-07.20** `list_completions` is finished work as a table, in one call:
+  the question "what did I finish last month?" needs and a task alone
+  cannot answer, since a task records `created_at` and a current status,
+  never when it reached Done (ADR-0011). Takes a period with both bounds
+  (`since` exclusive, `until` inclusive, both required, unlike
+  `search_activity`'s own optional pair), and narrows by `project`, by
+  `actor` and by `tag`, each read the same way `search_activity`'s own
+  arguments are. Composed from the activity log's own narrowing
+  (`app.api.access.activity_log_scope`) and the task read model
+  (`app.models.Task`, `app.crud.get_task_project_ids`/`get_task_tags`) —
+  no new REST endpoint — in one query over the period for the completion
+  entries and one more for the tasks they name, never a call per task.
+  Each row is one completion: `id`, `title`, `project`, `tags`,
+  `priority`, `filed` (when the task was created), `closed` (when this
+  completion happened), `days_to_close`, and `closed_by` ("owner", or a
+  bot user by name). Two rules keep the count here from reading like one
+  built by paging the log and fetching every task by hand:
+  - **A batch is one entry, many rows.** Closing several tasks in one act
+    writes a single entry naming the new status and every task it touched
+    (FR-10.3); this tool expands it into one row per task named, the one
+    place a count built from entries alone would undercount.
+  - **A reopened task closes twice.** Completing a task, reopening it and
+    completing it again writes two completion entries, and this tool
+    answers with two rows — both real. The summary's `completions` (every
+    row) and `distinct_tasks` (how many different tasks they are) are
+    reported side by side so neither is mistaken for the other.
+
+  A task deleted since it closed keeps its row, marked `deleted`, carrying
+  only what its own completion entry recorded (its title, or "Untitled
+  task" for one named only by a batch) and nulls for everything the task
+  itself would otherwise answer — `project`, `tags`, `priority`, `filed`
+  and `days_to_close` — rather than a current field a deletion since made
+  stale, or a lead time guessed at. An occurrence of a recurring task is
+  simply its own task (ADR-0001), so each occurrence's own completion is
+  already its own row without this tool doing anything further to keep a
+  series from collapsing. The `summary` alongside the rows always covers
+  every completion the filters matched, not only the page `limit`
+  returns: `completions`, `distinct_tasks`, `by_project` and `by_actor`
+  (each a count per name, summing back to `completions`), and
+  `median_days_to_close` (over the rows whose lead time is known). `count`
+  is `completions` again; a `truncated` answer names one filter
+  (`narrow_with`) still free to narrow with, so a partial count is never
+  reported as the whole. Refused by name without `read_activity`
+  (FR-08.9); nothing outside the scope is ever counted (ADR-0011).
+
+  Eleven tools now complete the MCP surface spec #247 and #248 set out:
+  `search_tasks`, `get_task`, `list_tags`, `create_task`, `update_task`,
+  `complete_task`, `comment_task`, `delete_task`, `whoami`,
+  `search_activity`, and `list_completions`.
 
 ### F-08. Bot users
 

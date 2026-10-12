@@ -22,11 +22,16 @@ tag (or, for a batch, the selection) the entry is about — ported from the
 web UI's own `ActivityDescription.tsx`, since there is no backend
 description of an entry yet and this tool is the first thing besides a human
 reading the page that needs one.
+
+`actor` and the `since`/`until` widening are read through
+`app.mcp.conventions.resolve_actor`/`since_datetime`/`until_datetime`:
+settled here first, then moved there once `list_completions` (#260) needed
+the exact same reading of a period and of who acted, rather than its own
+copy of either.
 """
 
 import json
 import uuid
-from datetime import UTC, datetime, time
 from typing import Annotated, Any
 
 from fastapi import HTTPException
@@ -34,27 +39,26 @@ from fastapi.responses import JSONResponse
 from mcp.server.mcpserver import Context
 from mcp.types import ToolAnnotations
 from pydantic import Field
-from sqlmodel import Session, col, func, select
+from sqlmodel import Session
 
 from app import crud
-from app.api.deps import Caller
 from app.api.routes.activity import read_activity_log as _read_activity_log
 from app.mcp.conventions import (
     list_result,
     open_caller,
     refusal,
-    refuse,
-    resolve_date,
+    resolve_actor,
     resolve_project_id,
     resolve_task_id,
     short_id,
+    since_datetime,
+    until_datetime,
 )
 from app.mcp.server import mcp_server
 from app.models import (
     ActivityAction,
     ActivityKind,
     ActivityOrder,
-    BotUser,
     BotUserRef,
     TaskStatus,
 )
@@ -157,12 +161,12 @@ def search_activity(
                 else None
             )
             actor_bot_user_id, by_bots, by_user = (
-                _resolve_actor(session, caller, actor)
+                resolve_actor(session, caller, actor)
                 if actor is not None
                 else (None, False, False)
             )
-            since_at = _since_datetime(since) if since is not None else None
-            until_at = _until_datetime(until) if until is not None else None
+            since_at = since_datetime(since) if since is not None else None
+            until_at = until_datetime(until) if until is not None else None
 
             response = _read_activity_log(
                 session=session,
@@ -205,69 +209,6 @@ def search_activity(
     return list_result(
         rows, key="entries", count=count, offset=offset, narrow_with=narrow_with
     )
-
-
-# Actors
-
-
-def _resolve_actor(
-    session: Session, caller: Caller, raw: str
-) -> tuple[uuid.UUID | None, bool, bool]:
-    """
-    `actor` as the three arguments `read_activity_log` takes for it:
-    `actor_bot_user_id`, `by_bots`, `by_user`. `self` is the connecting
-    bot's own id; `owner` and `any_bot` read as the log's own flags for
-    "the human" and "any bot user"; anything else names a sibling bot user,
-    by id or by name case-insensitively, the same ambiguous-name rule
-    `resolve_project` follows, since a bot user's name is no more unique than
-    a project's. Unlike a tag name (`resolve_tag_name`), a name matching no
-    bot user is refused rather than narrowed to nothing: there is no reading
-    of "show me what Nonexistent Bot did" where silently answering "nothing"
-    is more useful than saying the name is wrong.
-    """
-    assert caller.bot is not None, "an MCP caller is always a bot"
-    if raw == "self":
-        return caller.bot.id, False, False
-    if raw == "owner":
-        return None, False, True
-    if raw == "any_bot":
-        return None, True, False
-    try:
-        return uuid.UUID(raw), False, False
-    except ValueError:
-        return _bot_id_by_name(session, caller.owner_id, raw), False, False
-
-
-def _bot_id_by_name(session: Session, owner_id: uuid.UUID, name: str) -> uuid.UUID:
-    """
-    A bot user's id by name, case-insensitively — deleted ones included, so
-    an actor narrowing still finds what a deleted bot user did (FR-08.19).
-    """
-    matches = session.exec(
-        select(BotUser.id).where(
-            BotUser.owner_id == owner_id, func.lower(col(BotUser.name)) == name.lower()
-        )
-    ).all()
-    if not matches:
-        refuse("not_found", f"No bot user is named “{name}”.")
-    if len(matches) > 1:
-        ids = ", ".join(str(bot_id) for bot_id in matches)
-        refuse(
-            "ambiguous_bot_name",
-            f"“{name}” names {len(matches)} bot users: {ids}. Use one of their ids.",
-        )
-    return matches[0]
-
-
-# Dates: since/until widen a calendar date to the whole day it names
-
-
-def _since_datetime(raw: str) -> datetime:
-    return datetime.combine(resolve_date(raw), time.min, tzinfo=UTC)
-
-
-def _until_datetime(raw: str) -> datetime:
-    return datetime.combine(resolve_date(raw), time.max, tzinfo=UTC)
 
 
 # Rows: one compact line per entry
