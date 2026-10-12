@@ -18,7 +18,10 @@ concurrency:
 jobs:
   test-backend:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    # The suite grew past four and a half minutes while the MCP surface was
+    # built, and a five-minute budget started cancelling runs that had already
+    # passed every test. Fifteen matches the Playwright job's own budget.
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
