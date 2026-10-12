@@ -337,9 +337,7 @@ def test_moving_an_open_occurrences_due_date_needs_a_scope(
 ) -> None:
     owner = create_user_headers(client, db)
     project_id = create_project(client, owner)
-    task = create_recurring_task(
-        client, owner, date(2026, 3, 2), project_id=project_id
-    )
+    task = create_recurring_task(client, owner, date(2026, 3, 2), project_id=project_id)
     headers = bot_headers(
         client, owner, project_ids=[project_id], permissions=UPDATE_ONLY
     )
@@ -361,9 +359,7 @@ def test_a_due_date_scope_moves_a_recurring_occurrence(
 ) -> None:
     owner = create_user_headers(client, db)
     project_id = create_project(client, owner)
-    task = create_recurring_task(
-        client, owner, date(2026, 3, 2), project_id=project_id
-    )
+    task = create_recurring_task(client, owner, date(2026, 3, 2), project_id=project_id)
     headers = bot_headers(
         client, owner, project_ids=[project_id], permissions=UPDATE_ONLY
     )
@@ -415,9 +411,7 @@ def test_reopening_an_earlier_occurrence_is_refused_naming_the_latest(
 ) -> None:
     owner = create_user_headers(client, db)
     project_id = create_project(client, owner)
-    task = create_recurring_task(
-        client, owner, date(2026, 3, 2), project_id=project_id
-    )
+    task = create_recurring_task(client, owner, date(2026, 3, 2), project_id=project_id)
     r = _patch(client, owner, task["id"], status="done")
     assert r.status_code == 200, r.text
     headers = bot_headers(
@@ -488,9 +482,7 @@ def test_moving_into_a_project_outside_scope_is_refused_by_name(
     work = create_project(client, owner, "Work")
     outside = create_project(client, owner, "Outside")
     task = create_task_record(client, owner, "T", project_id=work)
-    headers = bot_headers(
-        client, owner, project_ids=[work], permissions=UPDATE_ONLY
-    )
+    headers = bot_headers(client, owner, project_ids=[work], permissions=UPDATE_ONLY)
 
     try:
         call_tool(
@@ -509,9 +501,7 @@ def test_a_task_whose_own_project_is_outside_scope_cannot_be_moved_out_of_it(
     outside = create_project(client, owner, "Outside")
     inside = create_project(client, owner, "Inside")
     task = create_task_record(client, owner, "T", project_id=outside)
-    headers = bot_headers(
-        client, owner, project_ids=[inside], permissions=UPDATE_ONLY
-    )
+    headers = bot_headers(client, owner, project_ids=[inside], permissions=UPDATE_ONLY)
 
     try:
         call_tool(
