@@ -17,7 +17,12 @@ rather than re-deriving its own version of any of these rules:
   unique (tags are, so an ambiguous tag name only happens between two that
   differ by letter case alone). `resolve_project_id` is `resolve_project`
   without the access decision, for a caller that defers that decision to
-  somewhere else (`create_task` (#255), to the route it calls through to).
+  somewhere else (`create_task` (#255), `update_task` (#256), to the route
+  each calls through to).
+- **Assignees.** `resolve_assignee` reads `self`, `owner` or a bot user's
+  id, the way `create_task` (#255) and `update_task` (#256) both take one;
+  whether the bot it names is really one of this owner's, and not deleted,
+  is still the route's own decision a moment later.
 - **Dates.** `resolve_date` reads an ISO date, `today`, `tomorrow` and
   `+<count>d`, against the server's own date.
 - **Nulls.** Refused before any of the above runs at all —
@@ -261,6 +266,34 @@ def resolve_tag_name(session: Session, owner_id: uuid.UUID, raw: str) -> str:
             f"case: {', '.join(matches)}. Use the exact name.",
         )
     return matches[0] if matches else raw
+
+
+# Assignees
+
+
+def resolve_assignee(caller: Caller, raw: str | None) -> uuid.UUID | None:
+    """
+    `assignee` the way every tool that takes one reads it (`create_task`,
+    #255; `update_task`, #256): `self` is the connecting bot's own id,
+    `owner` is the human owner's, anything else is read as a bot user's id
+    outright. The real decision (one of the owner's, deleted, nonexistent)
+    is still `app.api.routes.tasks._resolve_assignee`'s, a moment later, in
+    the route a tool calls through to.
+    """
+    if raw is None:
+        return None
+    if raw == "self":
+        assert caller.bot is not None, "an MCP caller is always a bot"
+        return caller.bot.id
+    if raw == "owner":
+        return caller.owner_id
+    try:
+        return uuid.UUID(raw)
+    except ValueError:
+        refuse(
+            "invalid_argument",
+            f"“{raw}” is not “self”, “owner”, or a bot user id.",
+        )
 
 
 # Dates
