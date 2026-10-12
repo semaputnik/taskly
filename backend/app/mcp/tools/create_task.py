@@ -12,19 +12,18 @@ a full id or the short prefix a compact line prints, an assignee as `self`,
 the `TaskCreate` that route already takes.
 """
 
-import uuid
 from typing import Annotated, Any
 
 from fastapi import HTTPException
 from mcp.server.mcpserver import Context
 from pydantic import Field
 
-from app.api.deps import Caller
 from app.api.routes.tasks import create_task as _create_task
 from app.mcp.conventions import (
     open_caller,
     refusal,
     refuse,
+    resolve_assignee,
     resolve_date,
     resolve_project_id,
     resolve_task_id,
@@ -105,7 +104,7 @@ def create_task(
                 else None
             )
             due = resolve_date(due_date) if due_date is not None else None
-            assignee_id = _resolve_assignee(caller, assignee)
+            assignee_id = resolve_assignee(caller, assignee)
 
             task_in = TaskCreate(
                 title=title,
@@ -130,27 +129,3 @@ def create_task(
             raise refusal(exc) from exc
 
     return public.model_dump(mode="json")
-
-
-def _resolve_assignee(caller: Caller, raw: str | None) -> uuid.UUID | None:
-    """
-    `assignee` as `TaskCreate.assignee_id` wants it: `self` is the
-    connecting bot's own id, `owner` is the human owner's, anything else is
-    read as a bot user's id outright.
-    `app.api.routes.tasks._resolve_assignee` still makes the real decision
-    (not one of the owner's, deleted, nonexistent) a moment later.
-    """
-    if raw is None:
-        return None
-    if raw == "self":
-        assert caller.bot is not None, "an MCP caller is always a bot"
-        return caller.bot.id
-    if raw == "owner":
-        return caller.owner_id
-    try:
-        return uuid.UUID(raw)
-    except ValueError:
-        refuse(
-            "invalid_argument",
-            f"“{raw}” is not “self”, “owner”, or a bot user id.",
-        )

@@ -460,7 +460,7 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
   themselves (`search_tasks`, `get_task`, `list_tags`, `create_task`,
   `update_task`, `complete_task`, `comment_task`, `delete_task`, and
   `whoami`) are spec #247's; `whoami`, `search_tasks`, `get_task`,
-  `list_tags` and `create_task` are built as of this entry.
+  `list_tags`, `create_task` and `update_task` are built as of this entry.
 - **FR-07.10** Every tool reads its arguments, reports its results and
   raises its refusals the same way:
   - **Ids.** A task is named by its full id or by the short prefix a
@@ -542,6 +542,34 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
   enforces (255 and 2000 characters), declared in the tool's own argument
   schema so an over-long one is refused before the call reaches it at
   all.
+- **FR-07.15** `update_task` changes a task through the same route (`PATCH
+  /tasks/{id}`) and the same rules, annotated idempotent and returning the
+  updated task in full. `title`, `description`, `priority`, `due_date`,
+  `project`, `assignee`, `status` and `tags` can each be changed on their
+  own, omitting a field leaves it alone, and `tags` replaces the task's
+  tags wholesale, as the REST API has it. `status` here reaches only the
+  open statuses (FR-01.4): moving a task to `done` is refused, naming
+  `complete_task` (#257) as the tool that closes one, which is also where
+  the open-subtasks question belongs; moving between open statuses never
+  touches a task's subtasks. Moving the due date of the open occurrence of
+  a recurring task needs `due_date_scope` (FR-01.17–FR-01.19) to say which
+  of the series moves with it, refused without one and refused where there
+  is no series to reschedule; reopening an earlier occurrence than the
+  latest is refused, naming it (FR-01.16). `project` moves the task, by
+  name or id, into or out of scope refused either way (FR-08.8); a subtask
+  cannot be moved this way at all, since it follows the task at the top of
+  its tree (FR-02.4). `assignee` reads exactly as `create_task`'s does
+  (FR-01.7, FR-08.21); the reporter is reached by no argument here either
+  (FR-01.29). `description`, `due_date`, `priority` and `assignee` are the
+  only fields an explicit `clear` list can empty — naming a field there
+  that was also sent a value is refused, and so, server-wide, is any
+  argument sent as JSON `null` (FR-07.10's own rule): omission is the only
+  way every other field here is left alone. This is also how a hand-over is
+  done (ADR-0008): moving `status` to `review` and setting `assignee` to
+  `owner` in the same call, with a comment (`comment_task`, #258) saying
+  what was done — the tool's own description teaches the convention, since
+  nothing in the product moves a task onto the owner because it entered
+  Review, and there is no tool of its own for a hand-over.
 
 ### F-08. Bot users
 
