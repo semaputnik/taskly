@@ -241,6 +241,18 @@ A user can connect their own Paperless-ngx instance in Settings, and from then o
 
 Taskly never deletes anything from Paperless, and a user who disconnects leaves their documents there, out of reach until they connect again.
 
+## Agents (MCP)
+
+Taskly also speaks MCP, at `/mcp` on the same application, so an agent (Claude, or any MCP-capable client) can work tasks directly instead of going through a hand-written REST client (ADR-0012). There is nothing to deploy for this beyond the application itself: no second service, no extra port, no setting to turn it on.
+
+To connect an agent:
+
+1. **Create a bot user for it**, in Settings → Bots, and scope it to the projects and permissions it should have — the same scope and grants a REST integration would get, because it is the same mechanism (F-08).
+2. **Issue the bot user's token** and give the agent two things: the URL `https://your-domain.example.com/mcp`, and the token as a bearer credential. Most MCP clients, Claude included, ask for exactly these two when adding a custom connector.
+3. **One bot user per agent.** Nothing stops two agents from sharing one bot user's token, but then the activity log cannot tell them apart, and revoking one means revoking both. A bot user costs nothing to create (FR-08.3): give each agent its own.
+
+A human session cannot use `/mcp` at all — it is refused for what it is, not offered a reduced set of tools — and a revoked, expired or deleted bot user's token is refused there exactly as it is on the REST API. Only `whoami` exists yet (spec #252); the tools for working tasks follow in later releases.
+
 ## URLs
 
 Replace `fastapi-project.example.com` with your domain.
@@ -248,5 +260,7 @@ Replace `fastapi-project.example.com` with your domain.
 Application (frontend and API): `https://fastapi-project.example.com`
 
 Interactive API docs: `https://fastapi-project.example.com/docs`
+
+MCP, for an agent: `https://fastapi-project.example.com/mcp` (see [Agents (MCP)](#agents-mcp)).
 
 Adminer: `https://adminer.fastapi-project.example.com`, for the stack built from source. The `compose.release.yml` stack does not run it.
