@@ -372,16 +372,25 @@ def render_task_rows(
 
 
 def list_result(
-    rows: list[dict[str, Any]], *, count: int, offset: int, narrow_with: str | None
+    rows: list[dict[str, Any]],
+    *,
+    key: str = "tasks",
+    count: int,
+    offset: int = 0,
+    narrow_with: str | None,
 ) -> dict[str, Any]:
     """
-    The envelope a tool that returns several tasks replies with (spec #247):
-    the compact rows, the total the filters matched (not just this page),
+    The envelope a tool that returns several rows replies with (spec #247,
+    generalised by #259 for its third shape): the compact rows under `key`
+    (`"tasks"` for `search_tasks`, `"tags"` for `list_tags` — migrated here
+    rather than kept as #254's own small copy — and `"entries"` for
+    `search_activity`), the total the filters matched (not just this page),
     and, only when the page did not hold all of them, the filter that would
     narrow it — named by the caller, since only it knows which of its own
-    arguments is still free to narrow with.
+    arguments is still free to narrow with. `offset` defaults to 0 for a
+    tool like `list_tags` that takes no page to skip.
     """
-    result: dict[str, Any] = {"tasks": rows, "count": count}
+    result: dict[str, Any] = {key: rows, "count": count}
     if offset + len(rows) < count:
         result["truncated"] = True
         if narrow_with is not None:

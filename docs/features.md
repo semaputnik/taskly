@@ -618,6 +618,35 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
   that the bot user which called it cannot undo it. The archive, the scope
   and a missing `delete_tasks` grant are each refused the way every other
   tool here refuses them (FR-07.10).
+- **FR-07.19** `search_activity` is the activity log itself (F-10), read as
+  one call rather than a page of raw entries an agent would have to sort
+  "finished" out of by hand. Narrowed exactly the way `GET /activity-log/`
+  already narrows it for a bot user (FR-10.6, ADR-0011) — by `kind`
+  (`completed`, `created`, `changed`, `deleted`, `comments`, `tags`;
+  FR-10.8), by `task_id` (a task's own history: the entries about it, its
+  comments and files, and the batches that touched it, FR-10.3's own
+  reasoning for logging a batch as one act), by `project` (a project's
+  chronology, FR-10.11), by `actor` (`self`, `owner`, `any_bot`, or a bot
+  user by name or id, refused by name if none matches), and by `since`/
+  `until` (FR-10.12) — a date each, widened to the whole day it names so a
+  closed period ("last month") is asked for by its two calendar dates. It
+  invents no narrowing the endpoint does not have: it is built on
+  `app.api.routes.activity.read_activity_log` itself, called through to
+  directly the way the write tools call theirs, so the scope narrowing, the
+  all-or-nothing batch rule, the tag exemption, and the withholding of
+  `restorable` and the deletion id from a bot's own response all stay that
+  route's code. `order` (FR-10.10) and paging (`limit`, `offset`) work as
+  they do there. Each result is one compact line — `at`, `actor` ("owner",
+  or a bot user by name, the convention `get_task`'s own comment rows use),
+  `what` (one short phrase, ported from the web UI's own
+  `ActivityDescription.tsx`, there being no backend description of an entry
+  before this), and `subject` (the task, project or tag it happened to, with
+  its id, or, for a batch, the selection it acted on) — never inviting a
+  restore this bot user cannot perform. `count` is every entry the filters
+  matched, and a `truncated` answer names one filter (`narrow_with`) still
+  free to narrow with. Refused by name without `read_activity` (FR-08.9); a
+  task or project outside the scope is refused the way the API refuses it,
+  never an empty history that would look like one with nothing in it.
 
 ### F-08. Bot users
 
