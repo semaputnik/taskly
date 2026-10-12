@@ -4,7 +4,7 @@ from typing import Any
 
 from fastapi import APIRouter
 
-from app import crud
+from app import comments, crud
 from app.api import access
 from app.api.access import TaskAction
 from app.api.deps import Caller, CallerDep, CurrentUser, SessionDep
@@ -62,15 +62,11 @@ def create_comment(
 
     A bot user needs the add-comments permission, and not update on tasks: it
     can report on a task without being able to change it (FR-08.10).
+
+    Every rule above is `app.comments.comment`'s own (#275, #281); this
+    route keeps only binding the request and shaping the response.
     """
-    access.get_task(session, caller, task_id, TaskAction.COMMENT)
-    comment = crud.create_comment(
-        session=session,
-        comment_create=comment_in,
-        task_id=task_id,
-        owner_id=caller.owner_id,
-        author_bot_user_id=caller.bot.id if caller.bot else None,
-    )
+    comment = comments.comment(session, caller, task_id, comment_in)
     return _public(session, [comment])[0]
 
 

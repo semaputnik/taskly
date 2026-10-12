@@ -4,21 +4,29 @@ performed in one place so a human over REST and a bot over MCP both go
 through the same rules rather than each re-deriving its own version of them
 (#275).
 
-`complete` is the first of them, and the slice that proves the shape (#279):
-closing is the one status change that asks a question — what happens to a
-parent's open subtasks — and can bring a new task into being, so it gets an
-operation of its own rather than living as a branch inside
-`app.api.routes.tasks.update_task`. `create`, `update` and `delete` follow in
-later tickets, copying whatever shape this one establishes; `update` will
-delegate to `complete` itself once it exists (#282), the way
-`app.api.routes.tasks.update_task` already does below.
+`complete` was the first of them (#279), and the slice that proved the
+shape: closing is the one status change that asks a question — what happens
+to a parent's open subtasks — and can bring a new task into being, so it
+got an operation of its own rather than living as a branch inside
+`app.api.routes.tasks.update_task`. `create` is the second (#281); `update`
+and `delete` follow in later tickets, copying whatever shape these two
+establish — `update` will delegate to `complete` itself once it exists
+(#282), the way `app.api.routes.tasks.update_task` already does below.
 
-The helpers below (`_unique`, `_resolve_assignee`, `_check_recurrence`,
-`_check_recurrence_update`) moved here from the route with `complete`: they
-are not only `complete`'s — `create_task` and `bulk_update_tasks` still call
-them too — but an operation is where this product's write rules now live,
-not a route function, so this is where they stay even while some of their
-callers are still routes.
+The helpers below moved here with `complete` (#279): they are not only
+`complete`'s — `create` (this ticket) needed three of them too, until it
+became an operation and could call them as the same module's own, not
+across a route's boundary. `_check_recurrence` stays private: nothing
+outside this module calls it directly, now that `create` is here alongside
+`_check_recurrence_update`, the other caller. `unique_tag_names`,
+`resolve_task_assignee` and `check_recurrence_update` are public because
+`app.api.routes.tasks.update_task` and (the last two only)
+`bulk_update_tasks` still need them — `update` and `bulk_update_tasks` are
+not becoming operations in this ticket (`bulk_update_tasks` never will: it
+is human-only, #282 owns `update`) — named for what they do rather than
+merely unprefixed, since a name that only drops its leading underscore
+documents nothing about why a module outside this one is allowed to call
+it now.
 """
 
 import uuid
@@ -38,9 +46,11 @@ from app.models import (
     Comment,
     CommentBody,
     CommentCreate,
+    Project,
     Recurrence,
     SubtaskCompletion,
     Task,
+    TaskCreate,
     TaskStatus,
     TaskUpdate,
 )
@@ -58,16 +68,20 @@ OCCURRENCE_SUPERSEDED_STATUS = 409
 OCCURRENCE_SUPERSEDED_CODE = "occurrence_superseded"
 
 
-def _unique(names: list[str]) -> list[str]:
+def unique_tag_names(names: list[str]) -> list[str]:
     """
     Tag names with repeats dropped, keeping the order they were sent in. They
     arrive trimmed and non-blank from `TagName`; the same name twice is the one
     thing left that a task cannot store.
+
+    Public: `app.api.routes.tasks.update_task` still calls this across the
+    module boundary, for the same dedup `create` (below) needs — `update` is
+    not becoming an operation in this ticket (#282 does that).
     """
     return list(dict.fromkeys(names))
 
 
-def _resolve_assignee(
+def resolve_task_assignee(
     session: Session,
     caller: Caller,
     assignee_id: uuid.UUID | None,
@@ -79,6 +93,11 @@ def _resolve_assignee(
 
     A deleted bot user takes no new tasks, but stays on the ones it already
     has (FR-08.21), so resending `current` is not a new assignment.
+
+    Public: `app.api.routes.tasks.update_task` and `bulk_update_tasks` both
+    still call this across the module boundary for their own assignee
+    changes — neither is becoming an operation in this ticket (#282 owns
+    `update`; `bulk_update_tasks` is human-only and never will).
     """
     if assignee_id is None:
         return crud.Assignee()
@@ -127,12 +146,16 @@ def _check_recurrence(
         raise HTTPException(status_code=400, detail="A recurring task needs a due date")
 
 
-def _check_recurrence_update(
+def check_recurrence_update(
     *, session: Session, task: Task, task_in: TaskUpdate
 ) -> Recurrence | None:
     """
     Everything an update has to get right about the task's series. Returns
     the recurrence the task has now, which it read to decide.
+
+    Public: `app.api.routes.tasks.update_task` still calls this across the
+    module boundary — `update` is not becoming an operation in this ticket
+    (#282 does that).
     """
     fields_set = task_in.model_fields_set
     current = crud.get_recurrences(session=session, tasks=[task])[task.id]
@@ -297,9 +320,9 @@ def complete(
 
     already_done = task.status is TaskStatus.DONE
 
-    tag_names = _unique(task_in.tags) if task_in.tags is not None else None
+    tag_names = unique_tag_names(task_in.tags) if task_in.tags is not None else None
     access.authorize_tag_names(session, caller, tag_names)
-    _check_recurrence_update(session=session, task=task, task_in=task_in)
+    check_recurrence_update(session=session, task=task, task_in=task_in)
 
     if "project_id" in task_in.model_fields_set:
         if task_in.project_id is None:
@@ -321,7 +344,7 @@ def complete(
 
     assignee = None
     if "assignee_id" in task_in.model_fields_set:
-        assignee = _resolve_assignee(
+        assignee = resolve_task_assignee(
             session,
             caller,
             task_in.assignee_id,
@@ -378,11 +401,116 @@ def complete(
     )
 
 
+@dataclass(frozen=True)
+class CreateResult:
+    """
+    What filing a task produced (#275, #281): the task exactly as
+    `crud.create_task` left it, and the project it landed in.
+
+    The project rides along rather than being read back off the task,
+    because a subtask's own row carries none — it derives its project from
+    its parent's tree (FR-01.2) — so whoever shapes the response (`app.api.
+    routes.tasks.create_task`, `app.mcp.tools.create_task`) would otherwise
+    have to walk that tree a second time for exactly what this operation
+    already resolved to decide access.
+    """
+
+    task: Task
+    project: Project
+
+
+def _reporter(caller: Caller) -> crud.Reporter:
+    """
+    Who is filing this task: the caller, and nobody the request can name
+    instead (FR-01.29). A bot user's work is recorded as its own, never as
+    its owner's, so the two are never interchangeable here.
+    """
+    if caller.bot is not None:
+        return crud.Reporter(bot_user_id=caller.bot.id)
+    return crud.Reporter(user_id=caller.owner_id)
+
+
+def create(session: Session, caller: Caller, task_in: TaskCreate) -> CreateResult:
+    """
+    File a task, or a subtask of one (FR-01.1, FR-01.2, #281) — `create`'s
+    own act, alongside `complete`'s (#279): decides access itself, rather
+    than taking it as already settled, and sets the activity actor itself
+    from `caller`, the same way `complete` does.
+
+    Where the task lands is settled first, so a bot user is refused by its
+    scope, and anyone by the archive, before anything about the request
+    itself is looked at: no project names the Inbox, which has to be in a
+    bot's scope like any other project; a subtask instead takes its
+    parent's own project, and naming `project_id` alongside `parent_id` is
+    refused rather than picked between.
+
+    A task starts in `backlog` unless `task_in.status` names another. A
+    recurring task needs a due date, must be a root task, and cannot be
+    created done (`_check_recurrence`). The assignee is the owner or one of
+    the owner's bot users, and a deleted bot user takes no new task
+    (`resolve_task_assignee`, FR-01.7, FR-08.21). A tag name that is not one
+    of the owner's yet needs the `create_tags` grant
+    (`access.authorize_tag_names`), and the refusal names which names were
+    new.
+
+    The reporter is the caller itself (FR-01.29): nothing in `task_in` can
+    set it — the request body this takes has no field for it at all.
+    """
+    _set_actor(session, caller)
+
+    is_subtask = task_in.parent_id is not None
+    if task_in.parent_id is not None:
+        project = access.get_task(
+            session, caller, task_in.parent_id, TaskAction.CREATE
+        ).project
+    elif task_in.project_id is not None:
+        project = access.get_project(
+            session, caller, task_in.project_id, TaskAction.CREATE
+        )
+    else:
+        project = access.get_project(
+            session,
+            caller,
+            crud.get_inbox_project(session=session, owner_id=caller.owner_id).id,
+            TaskAction.CREATE,
+        )
+    tag_names = unique_tag_names(task_in.tags)
+    access.authorize_tag_names(session, caller, tag_names)
+
+    assignee = resolve_task_assignee(session, caller, task_in.assignee_id)
+    _check_recurrence(
+        parent_id=task_in.parent_id,
+        recurrence=task_in.recurrence,
+        due_date=task_in.due_date,
+        status=task_in.status,
+    )
+
+    if is_subtask and task_in.project_id is not None:
+        raise HTTPException(
+            status_code=400,
+            detail="A subtask belongs to the project of its parent",
+        )
+
+    task = crud.create_task(
+        session=session,
+        task_create=task_in,
+        # A subtask's own project is derived from its parent's tree.
+        project_id=None if is_subtask else project.id,
+        owner_id=caller.owner_id,
+        reporter=_reporter(caller),
+        assignee=assignee,
+        tag_names=tag_names,
+    )
+    return CreateResult(task=task, project=project)
+
+
 __all__ = [
     "DUE_DATE_SCOPE_REQUIRED_CODE",
     "DUE_DATE_SCOPE_REQUIRED_STATUS",
     "OCCURRENCE_SUPERSEDED_CODE",
     "OCCURRENCE_SUPERSEDED_STATUS",
     "CompleteResult",
+    "CreateResult",
     "complete",
+    "create",
 ]

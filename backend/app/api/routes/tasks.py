@@ -46,17 +46,6 @@ HAS_SUBTASKS_CODE = "task_has_subtasks"
 OCCURRENCE_SUPERSEDED_CODE = "occurrence_superseded"
 
 
-def _reporter(caller: Caller) -> crud.Reporter:
-    """
-    Who is filing this task: the caller, and nobody the request can name
-    instead (FR-01.29). A bot user's work is recorded as its own, never as
-    its owner's, so the two are never interchangeable here.
-    """
-    if caller.bot is not None:
-        return crud.Reporter(bot_user_id=caller.bot.id)
-    return crud.Reporter(user_id=caller.owner_id)
-
-
 @router.get("/", response_model=TasksPublic)
 def read_tasks(
     session: SessionDep,
@@ -118,54 +107,14 @@ def create_task(*, session: SessionDep, caller: CallerDep, task_in: TaskCreate) 
     has to be in its scope like any other project. It applies its owner's tags
     freely, and needs the permission to create tags for a name that is not one
     yet (FR-08.9).
+
+    Every rule above is `app.tasks.create`'s own (#275, #281); this route
+    keeps only binding the request and shaping the response.
     """
-    # Where the task goes is settled first, so a bot user is refused by its
-    # scope, and anyone by the archive, before anything about the request
-    # itself is looked at.
-    is_subtask = task_in.parent_id is not None
-    if task_in.parent_id is not None:
-        project = access.get_task(
-            session, caller, task_in.parent_id, TaskAction.CREATE
-        ).project
-    elif task_in.project_id is not None:
-        project = access.get_project(
-            session, caller, task_in.project_id, TaskAction.CREATE
-        )
-    else:
-        project = access.get_project(
-            session,
-            caller,
-            crud.get_inbox_project(session=session, owner_id=caller.owner_id).id,
-            TaskAction.CREATE,
-        )
-    tag_names = tasks._unique(task_in.tags)
-    access.authorize_tag_names(session, caller, tag_names)
-
-    assignee = tasks._resolve_assignee(session, caller, task_in.assignee_id)
-    tasks._check_recurrence(
-        parent_id=task_in.parent_id,
-        recurrence=task_in.recurrence,
-        due_date=task_in.due_date,
-        status=task_in.status,
+    result = tasks.create(session, caller, task_in)
+    [public] = task_publics(
+        session, [result.task], projects={result.task.id: result.project.id}
     )
-
-    if is_subtask and task_in.project_id is not None:
-        raise HTTPException(
-            status_code=400,
-            detail="A subtask belongs to the project of its parent",
-        )
-
-    task = crud.create_task(
-        session=session,
-        task_create=task_in,
-        # A subtask's own project is derived from its parent's tree.
-        project_id=None if is_subtask else project.id,
-        owner_id=caller.owner_id,
-        reporter=_reporter(caller),
-        assignee=assignee,
-        tag_names=tag_names,
-    )
-    [public] = task_publics(session, [task], projects={task.id: project.id})
     return public
 
 
@@ -297,7 +246,10 @@ def bulk_update_tasks(
 
     assignee = None
     if "assignee_id" in changes.model_fields_set:
-        assignee = tasks._resolve_assignee(session, caller, changes.assignee_id)
+        # `bulk_update_tasks` is human-only and is not becoming an operation
+        # (#275), so it keeps calling this public helper across the module
+        # boundary rather than growing its own copy of the assignee rule.
+        assignee = tasks.resolve_task_assignee(session, caller, changes.assignee_id)
 
     activity.set_batch(
         session,
@@ -426,9 +378,14 @@ def update_task(
 
     resolved = access.get_task(session, caller, task_id, TaskAction.UPDATE)
     task, project_id = resolved.task, resolved.project.id
-    tag_names = tasks._unique(task_in.tags) if task_in.tags is not None else None
+    # `update_task` is not becoming an operation in this ticket (#282 does
+    # that), so it keeps calling these three public helpers across the
+    # module boundary rather than re-deriving its own copies of the rules.
+    tag_names = (
+        tasks.unique_tag_names(task_in.tags) if task_in.tags is not None else None
+    )
     access.authorize_tag_names(session, caller, tag_names)
-    recurrence = tasks._check_recurrence_update(
+    recurrence = tasks.check_recurrence_update(
         session=session, task=task, task_in=task_in
     )
 
@@ -453,7 +410,7 @@ def update_task(
 
     assignee = None
     if "assignee_id" in task_in.model_fields_set:
-        assignee = tasks._resolve_assignee(
+        assignee = tasks.resolve_task_assignee(
             session,
             caller,
             task_in.assignee_id,
