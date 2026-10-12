@@ -6,6 +6,11 @@ every other tool here this one is never narrowed by the caller's own scope —
 and, for the same reason, it is the one tool that reads straight through
 `crud.get_tags` rather than resolving anything through `app.api.access`,
 which has nothing to say about a tag.
+
+Its envelope was its own small copy of the shape `search_tasks` already had,
+until `search_activity` (#259) needed a third one: `list_result` is
+generalised there to take the row's own key (`"tags"` here), and this module
+moved onto it rather than keep its own.
 """
 
 from typing import Annotated, Any
@@ -15,7 +20,7 @@ from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from app import crud
-from app.mcp.conventions import open_caller
+from app.mcp.conventions import list_result, open_caller
 from app.mcp.server import mcp_server
 
 
@@ -57,9 +62,6 @@ def list_tags(
         }
         for tag in tags
     ]
-    result: dict[str, Any] = {"tags": rows, "count": count}
-    if len(rows) < count:
-        result["truncated"] = True
-        if q is None:
-            result["narrow_with"] = "q"
-    return result
+    return list_result(
+        rows, key="tags", count=count, narrow_with="q" if q is None else None
+    )
