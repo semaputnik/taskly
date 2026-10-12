@@ -2,14 +2,15 @@
 `comment_task` (spec #247, #258): leave a note on a task, where the owner
 will read it.
 
-Built on `app.api.routes.comments.create_comment` itself — the `add_comments`
-grant, the archive and the scope refusals are all that route's rules, called
-through to directly the same way `complete_task` (#257) calls it for its own
-optional comment, rather than re-derived here. This tool's own job is only
-the argument translation (a task by a full id or the short prefix a compact
-line prints) and the description teaching the one rule an agent needs before
-it writes: a bot user's comment is append-only, so there is no second call
-that fixes it (FR-03.2, FR-08.10).
+Calls `app.comments.comment` directly (#275, #281): the `add_comments`
+grant, the archive and the scope refusals are all that operation's own
+rules now, the same ones `complete_task` (#257) already reaches for its own
+optional comment and a human's `POST /tasks/{id}/comments` goes through —
+neither a route function nor a route-private constant is imported here any
+more. This tool's own job is only the argument translation (a task by a
+full id or the short prefix a compact line prints) and the description
+teaching the one rule an agent needs before it writes: a bot user's comment
+is append-only, so there is no second call that fixes it (FR-03.2, FR-08.10).
 """
 
 from typing import Any
@@ -17,10 +18,10 @@ from typing import Any
 from fastapi import HTTPException
 from mcp.server.mcpserver import Context
 
-from app.api.routes.comments import create_comment as _create_comment
+from app import comments
 from app.mcp.conventions import open_caller, refusal, resolve_task_id
 from app.mcp.server import mcp_server
-from app.models import CommentBody, CommentCreate, CommentPublic
+from app.models import BotUserRef, CommentBody, CommentCreate, CommentPublic
 
 
 @mcp_server.tool()
@@ -48,17 +49,24 @@ def comment_task(ctx: Context, task_id: str, body: CommentBody) -> dict[str, Any
     with open_caller(ctx) as (session, caller):
         try:
             resolved_id = resolve_task_id(session, caller, task_id)
-            # `_create_comment` is typed `-> Any` (a FastAPI route function,
-            # where that is how a `response_model` is declared); it always
-            # actually returns a `CommentPublic`, the full record this tool
-            # promises.
-            comment: CommentPublic = _create_comment(
-                session=session,
-                caller=caller,
-                task_id=resolved_id,
-                comment_in=CommentCreate(body=body),
+            comment_row = comments.comment(
+                session, caller, resolved_id, CommentCreate(body=body)
             )
         except HTTPException as exc:
             raise refusal(exc) from exc
 
-    return comment.model_dump(mode="json")
+        # The author is always this call's own bot user — an MCP caller is
+        # always a bot (ADR-0012) — already loaded on `caller`, so there is
+        # no need to query it back the way `app.api.routes.comments._public`
+        # does for a reader that does not already know who wrote it.
+        assert caller.bot is not None, "an MCP caller is always a bot"
+        author = BotUserRef(
+            id=caller.bot.id,
+            name=caller.bot.name,
+            deleted=caller.bot.deleted_at is not None,
+        )
+        public = CommentPublic.model_validate(
+            comment_row, update={"author_bot_user": author}
+        )
+
+    return public.model_dump(mode="json")
