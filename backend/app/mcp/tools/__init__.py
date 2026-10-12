@@ -14,8 +14,10 @@ every refusal raised with `conventions.refuse` or caught and re-raised with
 """
 
 from app.mcp.tools import (
+    comment_task,
     complete_task,
     create_task,
+    delete_task,
     get_task,
     list_tags,
     search_tasks,
@@ -24,8 +26,10 @@ from app.mcp.tools import (
 )
 
 __all__ = [
+    "comment_task",
     "complete_task",
     "create_task",
+    "delete_task",
     "get_task",
     "list_tags",
     "search_tasks",
