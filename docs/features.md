@@ -431,6 +431,37 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
   archived project never appears there (FR-05.13), and a scope change is
   read on the bot's next call, with no new token needed.
 
+#### MCP
+
+- **FR-07.5** Taskly also exposes an MCP server, at `/mcp`, mounted in this
+  same application rather than run as a second service (ADR-0012). It speaks
+  only tools — no resources, no prompts, no sampling.
+- **FR-07.6** A bot user's token authorises an MCP connection exactly as it
+  authorises a REST request: resolved through the same code that builds a
+  caller for the REST API, under the same scope and grants, with every
+  tool's writes attributed to the bot user in the activity log (FR-10.2). A
+  human session reaching `/mcp` is refused for what it is (`bot_only`), not
+  for a permission a scope could have granted; an unknown, revoked, expired
+  or deleted bot user's token is refused exactly as it is everywhere else
+  (FR-08.14, FR-08.15, FR-08.20).
+- **FR-07.7** Nothing about the caller is cached between calls: a scope
+  edited between two calls is read again before the second, the same
+  promise `GET /caller` makes (FR-07.4).
+- **FR-07.8** A protocol session is bound to the token that opened it. The
+  same session id presented with a different token is refused rather than
+  served, so one agent's session cannot be continued as another's; one
+  mounted server still serves any number of agents at once, because the
+  caller comes from each call's own token rather than from anything the
+  server was configured with.
+- **FR-07.9** `whoami` is the one tool this slice adds: read-only, and
+  answering exactly what `GET /caller` answers (FR-07.4) — the actor, the
+  owner, the scope's projects (the Inbox marked) with their open-task
+  counts, exactly its grants, and the server's current date. The nine tools
+  for working tasks themselves (`search_tasks`, `get_task`, `list_tags`,
+  `create_task`, `update_task`, `complete_task`, `comment_task`,
+  `delete_task`, and `whoami`) are spec #247's; only `whoami` is built as of
+  this entry.
+
 ### F-08. Bot users
 
 #### Creation and ownership

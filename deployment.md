@@ -90,6 +90,8 @@ Application (frontend and API): `https://your-app.fastapicloud.dev`
 
 Interactive API docs: `https://your-app.fastapicloud.dev/docs`
 
+MCP, for an agent: `https://your-app.fastapicloud.dev/mcp` (see [Agents (MCP)](deployment-docker-compose.md#agents-mcp)).
+
 ## Docker Compose
 
 For deployment to your own server, see the [Docker Compose deployment guide](./deployment-docker-compose.md).
