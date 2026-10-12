@@ -519,10 +519,14 @@ def activity_log_scope(caller: Caller) -> Any | None:
         return None
 
     is_archived = False
-    live_scope_projects = select(Project.id).where(
-        col(Project.id).in_(caller.project_ids),
-        Project.is_archived == is_archived,
-    ).subquery()
+    live_scope_projects = (
+        select(Project.id)
+        .where(
+            col(Project.id).in_(caller.project_ids),
+            Project.is_archived == is_archived,
+        )
+        .subquery()
+    )
     # Including deleted tasks: a completion the log recorded before a task
     # was deleted still has to resolve to the scope it happened in
     # (FR-10.4) — a root task keeps its `project_id` once deleted, which is
@@ -552,9 +556,7 @@ def activity_log_scope(caller: Caller) -> Any | None:
             or_(
                 and_(
                     col(ActivityEntry.entity_type) == ActivityEntityType.PROJECT,
-                    col(ActivityEntry.entity_id).in_(
-                        select(live_scope_projects.c.id)
-                    ),
+                    col(ActivityEntry.entity_id).in_(select(live_scope_projects.c.id)),
                 ),
                 col(ActivityEntry.entity_id).in_(select(scope_tasks.c.id)),
                 literal_column(ACTIVITY_TASK_REF).in_(

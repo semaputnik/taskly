@@ -93,9 +93,7 @@ def _bot(db: Session, world: World, project_ids: list[uuid.UUID]) -> Caller:
         ),
         owner_id=world.owner_id,
     )
-    return Caller(
-        owner_id=world.owner_id, bot=bot, project_ids=frozenset(project_ids)
-    )
+    return Caller(owner_id=world.owner_id, bot=bot, project_ids=frozenset(project_ids))
 
 
 def _visible(db: Session, caller: Caller) -> list[ActivityEntry]:
@@ -122,9 +120,7 @@ def test_a_bot_reads_only_the_tasks_in_its_scope(db: Session, world: World) -> N
     assert world.outside_task.id not in task_ids
 
 
-def test_a_bot_reads_the_scopes_projects_themselves(
-    db: Session, world: World
-) -> None:
+def test_a_bot_reads_the_scopes_projects_themselves(db: Session, world: World) -> None:
     bot = _bot(db, world, [world.in_scope.id])
 
     entries = _visible(db, bot)

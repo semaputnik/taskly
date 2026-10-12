@@ -67,7 +67,9 @@ def _comment(client: TestClient, headers: Headers, task_id: str, body: str) -> s
     return comment_id
 
 
-def _bulk(client: TestClient, headers: Headers, task_ids: list[str], **body: Any) -> Any:
+def _bulk(
+    client: TestClient, headers: Headers, task_ids: list[str], **body: Any
+) -> Any:
     return client.post(
         f"{API}/tasks/bulk", headers=headers, json={"task_ids": task_ids, **body}
     )
@@ -206,9 +208,10 @@ def test_nothing_touching_an_archived_project_is_visible_even_when_scoped(
     )
     task_id = create_task(client, owner, project_id=project_id, title="Shelved task")
     # The scope still lists it: archiving does not touch a bot's scope.
-    assert client.post(
-        f"{API}/projects/{project_id}/archive", headers=owner
-    ).status_code == 200
+    assert (
+        client.post(f"{API}/projects/{project_id}/archive", headers=owner).status_code
+        == 200
+    )
 
     page = _log(client, bot)
     assert "project_created" not in _actions(page)
@@ -290,9 +293,7 @@ def test_the_bot_reads_tag_entries_outside_its_scope(
         client, owner, project_ids=[in_scope], permissions=ALL_PERMISSIONS
     )
     task_id = create_task(client, owner, project_id=out_of_scope)
-    client.patch(
-        f"{API}/tasks/{task_id}", headers=owner, json={"tags": ["Urgent"]}
-    )
+    client.patch(f"{API}/tasks/{task_id}", headers=owner, json={"tags": ["Urgent"]})
 
     page = _log(client, bot, kind="tags")
     assert _actions(page) == ["tag_created"]
@@ -301,15 +302,16 @@ def test_the_bot_reads_tag_entries_outside_its_scope(
 # --- Actors: the owner, the bot itself, a sibling bot -----------------------
 
 
-def test_the_bot_reads_entries_by_any_actor(
-    client: TestClient, owner: Headers
-) -> None:
+def test_the_bot_reads_entries_by_any_actor(client: TestClient, owner: Headers) -> None:
     project_id = create_project(client, owner)
     sibling = issue_bot_headers(
         client, owner, project_ids=[project_id], permissions=ALL_PERMISSIONS
     )
     reader_user = create_bot_user(
-        client, owner, project_ids=[project_id], permissions=ALL_PERMISSIONS,
+        client,
+        owner,
+        project_ids=[project_id],
+        permissions=ALL_PERMISSIONS,
         name="Reader",
     )
     reader = token_headers(client, owner, reader_user["id"])
@@ -451,9 +453,10 @@ def test_narrowing_by_an_archived_project_in_scope_is_not_found(
     bot = issue_bot_headers(
         client, owner, project_ids=[project_id], permissions=ALL_PERMISSIONS
     )
-    assert client.post(
-        f"{API}/projects/{project_id}/archive", headers=owner
-    ).status_code == 200
+    assert (
+        client.post(f"{API}/projects/{project_id}/archive", headers=owner).status_code
+        == 200
+    )
 
     r = _get(client, bot, project_id=project_id)
     assert r.status_code == 404
@@ -467,9 +470,10 @@ def test_narrowing_by_a_task_in_an_archived_project_in_scope_is_not_found(
         client, owner, project_ids=[project_id], permissions=ALL_PERMISSIONS
     )
     task_id = create_task(client, owner, project_id=project_id)
-    assert client.post(
-        f"{API}/projects/{project_id}/archive", headers=owner
-    ).status_code == 200
+    assert (
+        client.post(f"{API}/projects/{project_id}/archive", headers=owner).status_code
+        == 200
+    )
 
     r = _get(client, bot, task_id=task_id)
     assert r.status_code == 404
