@@ -86,7 +86,9 @@ def get_task(
     return result
 
 
-def _comment_rows(session: Session, comments: Sequence[Comment]) -> list[dict[str, Any]]:
+def _comment_rows(
+    session: Session, comments: Sequence[Comment]
+) -> list[dict[str, Any]]:
     """
     A task's comments as spec #254 asks for them: oldest first (already
     `crud.get_comments`' own order), each with its author — "owner", or a bot
@@ -99,7 +101,9 @@ def _comment_rows(session: Session, comments: Sequence[Comment]) -> list[dict[st
     )
     rows = []
     for comment in comments:
-        bot = bots.get(comment.author_bot_user_id) if comment.author_bot_user_id else None
+        bot = (
+            bots.get(comment.author_bot_user_id) if comment.author_bot_user_id else None
+        )
         rows.append(
             {
                 "body": comment.body,

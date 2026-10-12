@@ -192,7 +192,11 @@ def test_include_comments_lists_authors_and_moments(
     task = create_task_record(client, owner, "Task", project_id=project_id)
     _add_comment(client, owner, task["id"], "From the owner")
     headers = bot_headers(
-        client, owner, project_ids=[project_id], permissions=ALL_PERMISSIONS, name="Agent"
+        client,
+        owner,
+        project_ids=[project_id],
+        permissions=ALL_PERMISSIONS,
+        name="Agent",
     )
     _add_comment(client, headers, task["id"], "From the bot")
 
