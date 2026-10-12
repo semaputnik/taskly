@@ -139,20 +139,25 @@ async def passkey_refused(_request: Request, error: Exception) -> Response:
 @app.exception_handler(refusals.Refusal)
 async def refusal_refused(_request: Request, error: Exception) -> Response:
     """
-    A deliberate refusal an operation (`app.tasks`) raises, mapped to the
-    HTTP body routes on its path used to assemble inline, byte for byte
-    (#275, #279) — the same shape `passkey_refused` above already gives
-    `app.passkeys.PasskeyError`. The payload a refusal carries beyond its
-    code and message (the open subtasks `complete_task` names, say) is for a
-    caller that reads the refusal directly, such as `app.mcp.conventions`;
-    the REST body never grows it, so this handler stays indifferent to what
-    a given code's payload holds.
+    A deliberate refusal an operation (`app.tasks`, `app.comments`) raises,
+    mapped to the HTTP body routes on its path used to assemble inline, byte
+    for byte (#275, #279, #282) — the same shape `passkey_refused` above
+    already gives `app.passkeys.PasskeyError`. A refusal carries which of two
+    body shapes it is: `error.code` names which coded dict the route used to
+    raise, or is `None` for the bare string a route raised instead (#276
+    pinned both, so this handler renders both rather than choosing one). The
+    payload a refusal carries beyond its code and message (the open subtasks
+    `complete_task` names, say) is for a caller that reads the refusal
+    directly, such as `app.mcp.conventions`; the REST body never grows it,
+    so this handler stays indifferent to what a given code's payload holds.
     """
     assert isinstance(error, refusals.Refusal)
-    return JSONResponse(
-        status_code=error.status,
-        content={"detail": {"code": error.code.value, "message": error.message}},
+    detail: object = (
+        error.message
+        if error.code is None
+        else {"code": error.code.value, "message": error.message}
     )
+    return JSONResponse(status_code=error.status, content={"detail": detail})
 
 
 app.include_router(api_router, prefix=settings.API_V1_STR)

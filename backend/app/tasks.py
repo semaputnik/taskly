@@ -8,39 +8,34 @@ through the same rules rather than each re-deriving its own version of them
 shape: closing is the one status change that asks a question — what happens
 to a parent's open subtasks — and can bring a new task into being, so it
 got an operation of its own rather than living as a branch inside
-`app.api.routes.tasks.update_task`. `create` is the second (#281); `update`
-and `delete` follow in later tickets, copying whatever shape these two
-establish — `update` will delegate to `complete` itself once it exists
-(#282), the way `app.api.routes.tasks.update_task` already does below.
+`app.api.routes.tasks.update_task`. `create` (#281) and now `update` and
+`delete` (#282) are the rest: `app.api.routes.tasks.update_task` and
+`.delete_task` are left binding the request and shaping the response, same
+as `.create_task` already does. `update` delegates to `complete` itself,
+the way `app.api.routes.tasks.update_task` used to.
 
-The helpers below moved here with `complete` (#279): they are not only
-`complete`'s — `create` (this ticket) needed three of them too, until it
-became an operation and could call them as the same module's own, not
-across a route's boundary. `_check_recurrence` stays private: nothing
-outside this module calls it directly, now that `create` is here alongside
-`_check_recurrence_update`, the other caller. `unique_tag_names`,
-`resolve_task_assignee` and `check_recurrence_update` are public because
-`app.api.routes.tasks.update_task` and (the last two only)
-`bulk_update_tasks` still need them — `update` and `bulk_update_tasks` are
-not becoming operations in this ticket (`bulk_update_tasks` never will: it
-is human-only, #282 owns `update`) — named for what they do rather than
-merely unprefixed, since a name that only drops its leading underscore
-documents nothing about why a module outside this one is allowed to call
-it now.
+Every raise in this module is a `Refusal` (`app.refusals`), never an
+`HTTPException` (#282's first correction): an operation knows nothing about
+HTTP, and the one handler that used to have no way to render a bare-string
+body (`app.main.refusal_refused`) now can. `resolve_task_assignee` stays
+public because `app.api.routes.tasks.bulk_update_tasks` still needs it for
+its own assignee changes — `bulk_update_tasks` is human-only and is not
+becoming an operation. `_unique_tag_names` and `_check_recurrence_update`
+went private once `update_task` (the route) had nothing left to call them
+for: `update` is the only caller left, now that it is this module's own.
 """
 
 import uuid
 from dataclasses import dataclass
 from datetime import date
 
-from fastapi import HTTPException
 from sqlalchemy import not_
 from sqlmodel import Session, col, select
 
-from app import activity, crud
+from app import crud, deletions, refusals
 from app.api import access
 from app.api.access import TaskAction
-from app.api.deps import Caller
+from app.caller import Caller, set_caller_actor
 from app.models import (
     BotUser,
     Comment,
@@ -54,29 +49,17 @@ from app.models import (
     TaskStatus,
     TaskUpdate,
 )
-from app.refusals import task_has_uncompleted_subtasks
-
-# Moving an open occurrence's due date means something different for the rest
-# of its series depending on the scope, so a request that does not say which
-# is malformed rather than defaulted (FR-01.17).
-DUE_DATE_SCOPE_REQUIRED_STATUS = 400
-DUE_DATE_SCOPE_REQUIRED_CODE = "due_date_scope_required"
-
-# A later occurrence already exists: reopening this one would leave the series
-# with two open occurrences (FR-01.16).
-OCCURRENCE_SUPERSEDED_STATUS = 409
-OCCURRENCE_SUPERSEDED_CODE = "occurrence_superseded"
 
 
-def unique_tag_names(names: list[str]) -> list[str]:
+def _unique_tag_names(names: list[str]) -> list[str]:
     """
     Tag names with repeats dropped, keeping the order they were sent in. They
-    arrive trimmed and non-blank from `TagName`; the same name twice is the one
-    thing left that a task cannot store.
+    arrive trimmed and non-blank from `TagName`; the same name twice is the
+    one thing left that a task cannot store.
 
-    Public: `app.api.routes.tasks.update_task` still calls this across the
-    module boundary, for the same dedup `create` (below) needs — `update` is
-    not becoming an operation in this ticket (#282 does that).
+    Private: `create` and `update`, below, are this module's only callers
+    now that `update_task` (the route) delegates to `update` instead of
+    calling this itself (#282).
     """
     return list(dict.fromkeys(names))
 
@@ -94,10 +77,11 @@ def resolve_task_assignee(
     A deleted bot user takes no new tasks, but stays on the ones it already
     has (FR-08.21), so resending `current` is not a new assignment.
 
-    Public: `app.api.routes.tasks.update_task` and `bulk_update_tasks` both
-    still call this across the module boundary for their own assignee
-    changes — neither is becoming an operation in this ticket (#282 owns
-    `update`; `bulk_update_tasks` is human-only and never will).
+    Public: `app.api.routes.tasks.bulk_update_tasks` still calls this across
+    the module boundary for its own assignee changes — it is human-only and
+    is not becoming an operation (#275). `update` (below) is this module's
+    own caller for everything else; `update_task` (the route) has nothing
+    left to call this for, now that `update` calls it instead (#282).
     """
     if assignee_id is None:
         return crud.Assignee()
@@ -105,15 +89,13 @@ def resolve_task_assignee(
         return crud.Assignee(user_id=assignee_id)
     bot = session.get(BotUser, assignee_id)
     if bot is None or bot.owner_id != caller.owner_id:
-        raise HTTPException(
-            status_code=400,
-            detail="A task can only be assigned to you or to one of your bot users",
+        raise refusals.plain(
+            400, "A task can only be assigned to you or to one of your bot users"
         )
     assignee = crud.Assignee(bot_user_id=bot.id)
     if bot.deleted_at is not None and assignee != current:
-        raise HTTPException(
-            status_code=400,
-            detail=f"The bot user “{bot.name}” is deleted and takes no new tasks",
+        raise refusals.plain(
+            400, f"The bot user “{bot.name}” is deleted and takes no new tasks"
         )
     return assignee
 
@@ -133,29 +115,23 @@ def _check_recurrence(
     if recurrence is None:
         return
     if status is TaskStatus.DONE:
-        raise HTTPException(
-            status_code=400,
-            detail="Only an open task can recur",
-        )
+        raise refusals.plain(400, "Only an open task can recur")
     if parent_id is not None:
-        raise HTTPException(
-            status_code=400,
-            detail="Only a task at the top of its tree can recur",
-        )
+        raise refusals.plain(400, "Only a task at the top of its tree can recur")
     if due_date is None:
-        raise HTTPException(status_code=400, detail="A recurring task needs a due date")
+        raise refusals.plain(400, "A recurring task needs a due date")
 
 
-def check_recurrence_update(
+def _check_recurrence_update(
     *, session: Session, task: Task, task_in: TaskUpdate
 ) -> Recurrence | None:
     """
     Everything an update has to get right about the task's series. Returns
     the recurrence the task has now, which it read to decide.
 
-    Public: `app.api.routes.tasks.update_task` still calls this across the
-    module boundary — `update` is not becoming an operation in this ticket
-    (#282 does that).
+    Private: `update`, below, is this module's only caller now that
+    `update_task` (the route) delegates to it instead of calling this
+    itself (#282).
     """
     fields_set = task_in.model_fields_set
     current = crud.get_recurrences(session=session, tasks=[task])[task.id]
@@ -168,15 +144,12 @@ def check_recurrence_update(
         if is_done:
             # Its series has already moved on, or it would start one that
             # nothing ever moves to done to create a next occurrence.
-            raise HTTPException(
-                status_code=400,
-                detail="Only an open task can change how it recurs",
-            )
+            raise refusals.plain(400, "Only an open task can change how it recurs")
         _check_recurrence(
             parent_id=task.parent_id, recurrence=recurrence, due_date=due_date
         )
     elif recurrence is not None and due_date is None:
-        raise HTTPException(status_code=400, detail="A recurring task needs a due date")
+        raise refusals.plain(400, "A recurring task needs a due date")
 
     # A new rule restarts the schedule from this occurrence anyway, so only a
     # date moving on its own asks what happens to the rest of the series.
@@ -187,23 +160,12 @@ def check_recurrence_update(
         and due_date != task.due_date
     )
     if reschedules and task_in.due_date_scope is None:
-        raise HTTPException(
-            status_code=DUE_DATE_SCOPE_REQUIRED_STATUS,
-            detail={
-                "code": DUE_DATE_SCOPE_REQUIRED_CODE,
-                "message": (
-                    "This task recurs. Say whether the new due date applies to "
-                    "this occurrence only or to this and all following ones."
-                ),
-            },
-        )
+        raise refusals.due_date_scope_required()
     if not reschedules and task_in.due_date_scope is not None:
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                "`due_date_scope` only applies to changing the due date of a "
-                "recurring task that is open"
-            ),
+        raise refusals.plain(
+            400,
+            "`due_date_scope` only applies to changing the due date of a "
+            "recurring task that is open",
         )
 
     if (
@@ -212,16 +174,7 @@ def check_recurrence_update(
         and is_done
         and crud.is_superseded(session=session, task=task)
     ):
-        raise HTTPException(
-            status_code=OCCURRENCE_SUPERSEDED_STATUS,
-            detail={
-                "code": OCCURRENCE_SUPERSEDED_CODE,
-                "message": (
-                    "A later occurrence of this recurring task already exists. "
-                    "Only the latest occurrence can be reopened."
-                ),
-            },
-        )
+        raise refusals.occurrence_superseded()
     return current
 
 
@@ -242,21 +195,6 @@ class CompleteResult:
     next_occurrence: Task | None
     already_done: bool
     comment: Comment | None
-
-
-def _set_actor(session: Session, caller: Caller) -> None:
-    """
-    Attribute whatever this transaction commits to the caller itself
-    (FR-10.2): a bot user's close is never recorded as its owner's. Set here
-    rather than relied on from wherever `caller` was resolved — every path
-    today happens to run through the one `app.api.deps` dependency that
-    already does this, but a second caller already exists (#275), so this
-    operation does not take that on faith.
-    """
-    if caller.bot is not None:
-        activity.set_bot_actor(session, caller.bot.id)
-    else:
-        activity.set_actor(session, caller.owner_id)
 
 
 def _open_occurrence(session: Session, series_id: uuid.UUID) -> Task | None:
@@ -307,7 +245,7 @@ def complete(
     ticket introduces no unit of work (#284 does) — it is the same two
     commits `app.mcp.tools.complete_task` already made, now made from here.
     """
-    _set_actor(session, caller)
+    set_caller_actor(session, caller)
 
     resolved = access.get_task(session, caller, task_id, TaskAction.UPDATE)
     task = resolved.task
@@ -320,22 +258,18 @@ def complete(
 
     already_done = task.status is TaskStatus.DONE
 
-    tag_names = unique_tag_names(task_in.tags) if task_in.tags is not None else None
+    tag_names = _unique_tag_names(task_in.tags) if task_in.tags is not None else None
     access.authorize_tag_names(session, caller, tag_names)
-    check_recurrence_update(session=session, task=task, task_in=task_in)
+    _check_recurrence_update(session=session, task=task, task_in=task_in)
 
     if "project_id" in task_in.model_fields_set:
         if task_in.project_id is None:
-            raise HTTPException(
-                status_code=400, detail="A task must belong to a project"
-            )
+            raise refusals.plain(400, "A task must belong to a project")
         if task.parent_id is not None:
-            raise HTTPException(
-                status_code=400,
-                detail=(
-                    "A subtask follows its parent's project; move the task at "
-                    "the top of the tree instead"
-                ),
+            raise refusals.plain(
+                400,
+                "A subtask follows its parent's project; move the task at "
+                "the top of the tree instead",
             )
         # Moving a task in is as much a change to the destination as creating
         # one there. For a bot the source was checked above, so work can
@@ -352,16 +286,15 @@ def complete(
         )
 
     if task_in.subtasks is not None and task_in.status is not TaskStatus.DONE:
-        raise HTTPException(
-            status_code=400,
-            detail="`subtasks` only applies to a request that moves the task to done",
+        raise refusals.plain(
+            400, "`subtasks` only applies to a request that moves the task to done"
         )
 
     if task_in.status is TaskStatus.DONE and crud.has_open_subtasks(
         session=session, task=task
     ):
         if task_in.subtasks is None:
-            raise task_has_uncompleted_subtasks(
+            raise refusals.task_has_uncompleted_subtasks(
                 crud.open_subtasks(session=session, task=task)
             )
         if task_in.subtasks is SubtaskCompletion.COMPLETE:
@@ -456,7 +389,7 @@ def create(session: Session, caller: Caller, task_in: TaskCreate) -> CreateResul
     The reporter is the caller itself (FR-01.29): nothing in `task_in` can
     set it — the request body this takes has no field for it at all.
     """
-    _set_actor(session, caller)
+    set_caller_actor(session, caller)
 
     is_subtask = task_in.parent_id is not None
     if task_in.parent_id is not None:
@@ -474,7 +407,7 @@ def create(session: Session, caller: Caller, task_in: TaskCreate) -> CreateResul
             crud.get_inbox_project(session=session, owner_id=caller.owner_id).id,
             TaskAction.CREATE,
         )
-    tag_names = unique_tag_names(task_in.tags)
+    tag_names = _unique_tag_names(task_in.tags)
     access.authorize_tag_names(session, caller, tag_names)
 
     assignee = resolve_task_assignee(session, caller, task_in.assignee_id)
@@ -486,10 +419,7 @@ def create(session: Session, caller: Caller, task_in: TaskCreate) -> CreateResul
     )
 
     if is_subtask and task_in.project_id is not None:
-        raise HTTPException(
-            status_code=400,
-            detail="A subtask belongs to the project of its parent",
-        )
+        raise refusals.plain(400, "A subtask belongs to the project of its parent")
 
     task = crud.create_task(
         session=session,
@@ -504,13 +434,144 @@ def create(session: Session, caller: Caller, task_in: TaskCreate) -> CreateResul
     return CreateResult(task=task, project=project)
 
 
+@dataclass(frozen=True)
+class UpdateResult:
+    """
+    What changing a task — short of closing it — produced (#275, #282): the
+    task exactly as `crud.update_task` left it, the project it belongs to
+    now (so a caller never re-derives where it landed after a move), and the
+    recurrence `_check_recurrence_update` already read while deciding
+    whether a due-date move needed a scope (so a caller never reads it back
+    a second time just to report it).
+
+    Never what `update` returns for a request that closes the task: that
+    case is `complete`'s own act, delegated to whole, and `CompleteResult`
+    is what comes back instead.
+    """
+
+    task: Task
+    project: Project
+    recurrence: Recurrence | None
+
+
+def update(
+    session: Session, caller: Caller, task_id: uuid.UUID, task_in: TaskUpdate
+) -> UpdateResult | CompleteResult:
+    """
+    Change a task: its fields, status between open ones, assignee, or
+    project — every rule `PATCH /tasks/{id}` has ever enforced, now this
+    operation's own (#275, #282) rather than split between a route and the
+    helpers above it used to reach across this module's own boundary for.
+
+    A request that moves `status` to `done` is `complete`'s own act (#279):
+    delegated to it whole, `task_in` unchanged, and its result
+    (`CompleteResult`) returned exactly as `complete` left it — the
+    open-subtasks directive, the next occurrence a recurring close spawns,
+    and an optional comment are all `complete`'s rules, not repeated here.
+
+    Every other request is this operation's own: the due-date scope an open
+    occurrence's move needs and the superseded-occurrence refusal
+    (`_check_recurrence_update`, FR-01.16, FR-01.17), a task belonging to a
+    project and a subtask following its parent's tree rather than moving on
+    its own, moving into or out of a bot's scope (`access.get_project`),
+    tags replacing wholesale, the assignee rules (`resolve_task_assignee`,
+    FR-01.7, FR-08.21) — and refusing `subtasks` on a request that closes
+    nothing, since that argument only ever answers the question closing
+    asks.
+    """
+    if task_in.status is TaskStatus.DONE:
+        return complete(session, caller, task_id, task_in)
+
+    set_caller_actor(session, caller)
+
+    resolved = access.get_task(session, caller, task_id, TaskAction.UPDATE)
+    task, project = resolved.task, resolved.project
+
+    tag_names = _unique_tag_names(task_in.tags) if task_in.tags is not None else None
+    access.authorize_tag_names(session, caller, tag_names)
+    recurrence = _check_recurrence_update(session=session, task=task, task_in=task_in)
+
+    if "project_id" in task_in.model_fields_set:
+        if task_in.project_id is None:
+            raise refusals.plain(400, "A task must belong to a project")
+        if task.parent_id is not None:
+            raise refusals.plain(
+                400,
+                "A subtask follows its parent's project; move the task at "
+                "the top of the tree instead",
+            )
+        # Moving a task in is as much a change to the destination as creating
+        # one there. For a bot the source was checked with the task, so work
+        # can neither leave its scope nor enter from outside it.
+        project = access.get_project(
+            session, caller, task_in.project_id, TaskAction.UPDATE
+        )
+
+    assignee = None
+    if "assignee_id" in task_in.model_fields_set:
+        assignee = resolve_task_assignee(
+            session,
+            caller,
+            task_in.assignee_id,
+            current=crud.Assignee(task.assignee_id, task.assignee_bot_user_id),
+        )
+
+    if task_in.subtasks is not None:
+        # `status: done` returned above before this line is ever reached, so
+        # a `subtasks` sent here is never paired with it.
+        raise refusals.plain(
+            400, "`subtasks` only applies to a request that moves the task to done"
+        )
+
+    task = crud.update_task(
+        session=session,
+        db_task=task,
+        task_in=task_in,
+        assignee=assignee,
+        tag_names=tag_names,
+    )
+    return UpdateResult(task=task, project=project, recurrence=recurrence)
+
+
+def delete(
+    session: Session,
+    caller: Caller,
+    task_id: uuid.UUID,
+    delete_subtasks: bool = False,
+) -> Task:
+    """
+    Delete a task, and its subtasks with it (FR-01.8, FR-01.11, FR-01.12,
+    #275, #282).
+
+    Decides access itself (`app.api.access.get_task`), the same as every
+    other operation. A task with subtasks is refused until `delete_subtasks`
+    confirms the cascade; the refusal carries the whole live subtree — done
+    descendants included, since the cascade takes them along with the open
+    ones (`crud.subtasks`, not `crud.open_subtasks`, which only reads what
+    `complete`'s own refusal needs) — so a caller that wants to name them
+    (`app.mcp.tools.delete_task`) reads them off the refusal itself, never
+    with a subtree query of its own.
+
+    Recorded as one event over the whole subtree (`app.deletions.
+    delete_task`), restorable as the one act it was, and only by the owner —
+    restoring is `app.deletions.restore`'s own rule, unchanged by this
+    operation existing.
+    """
+    set_caller_actor(session, caller)
+    task = access.get_task(session, caller, task_id, TaskAction.DELETE).task
+    if not delete_subtasks and crud.has_subtasks(session=session, task=task):
+        raise refusals.task_has_subtasks(crud.subtasks(session=session, task=task))
+    deletions.delete_task(session, task)
+    return task
+
+
 __all__ = [
-    "DUE_DATE_SCOPE_REQUIRED_CODE",
-    "DUE_DATE_SCOPE_REQUIRED_STATUS",
-    "OCCURRENCE_SUPERSEDED_CODE",
-    "OCCURRENCE_SUPERSEDED_STATUS",
     "CompleteResult",
     "CreateResult",
+    "UpdateResult",
     "complete",
     "create",
+    "delete",
+    "resolve_task_assignee",
+    "update",
 ]

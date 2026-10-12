@@ -1,6 +1,4 @@
-import uuid
 from collections.abc import Generator
-from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from functools import lru_cache
 from typing import Annotated
@@ -15,6 +13,7 @@ from sqlalchemy import or_, update
 from sqlmodel import Session, col, select
 
 from app import activity, webhooks
+from app.caller import Caller as Caller
 from app.core import security
 from app.core.config import settings
 from app.core.db import engine
@@ -164,26 +163,6 @@ def get_current_user(session: SessionDep, token: TokenDep) -> User:
 
 
 CurrentUser = Annotated[User, Depends(get_current_user)]
-
-
-@dataclass(frozen=True)
-class Caller:
-    """
-    Whoever is making a request to an endpoint that humans and bot users may
-    both call.
-
-    `owner_id` is whose data the request reaches: the user's own, or the
-    owning user's for a bot, which never reaches anyone else's. For a bot,
-    `bot` and the projects of its scope come along, so Task access
-    (`app.api.access`) can narrow what it reaches. `user` is the human caller
-    themselves, already resolved by `get_current_user`; it is `None` for a
-    bot, which is never a `User` row (FR-08.2's "not a kind of user account").
-    """
-
-    owner_id: uuid.UUID
-    bot: BotUser | None = None
-    project_ids: frozenset[uuid.UUID] = frozenset()
-    user: User | None = None
 
 
 def _bot_caller(session: Session, bot: BotUser) -> Caller:
