@@ -453,14 +453,59 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
   mounted server still serves any number of agents at once, because the
   caller comes from each call's own token rather than from anything the
   server was configured with.
-- **FR-07.9** `whoami` is the one tool this slice adds: read-only, and
-  answering exactly what `GET /caller` answers (FR-07.4) — the actor, the
-  owner, the scope's projects (the Inbox marked) with their open-task
-  counts, exactly its grants, and the server's current date. The nine tools
-  for working tasks themselves (`search_tasks`, `get_task`, `list_tags`,
-  `create_task`, `update_task`, `complete_task`, `comment_task`,
-  `delete_task`, and `whoami`) are spec #247's; only `whoami` is built as of
+- **FR-07.9** `whoami` is the first tool: read-only, and answering exactly
+  what `GET /caller` answers (FR-07.4) — the actor, the owner, the scope's
+  projects (the Inbox marked) with their open-task counts, exactly its
+  grants, and the server's current date. The nine tools for working tasks
+  themselves (`search_tasks`, `get_task`, `list_tags`, `create_task`,
+  `update_task`, `complete_task`, `comment_task`, `delete_task`, and
+  `whoami`) are spec #247's; `whoami` and `search_tasks` are built as of
   this entry.
+- **FR-07.10** Every tool reads its arguments, reports its results and
+  raises its refusals the same way:
+  - **Ids.** A task is named by its full id or by the short prefix a
+    compact line's own `id` prints (the first 8 hex characters of the full
+    id, dashes dropped). An ambiguous prefix is refused with the candidates
+    it matches, never resolved by guessing.
+  - **Names.** A project or a tag is accepted by name, case-insensitively,
+    as well as by id. Project names are not unique, so an ambiguous project
+    name is refused with the matching ids; a tag name ambiguous only by
+    letter case is refused the same way, since a tag's own name is
+    otherwise unique to its owner (ADR-0003).
+  - **Dates.** A date argument takes an ISO date, `today`, `tomorrow`, or a
+    count of days ahead prefixed with `+` and suffixed with `d` (e.g.
+    `+3d`), resolved against the server's own date — the caller's clock is
+    not this installation's.
+  - **Nulls.** An argument sent as JSON `null` is refused outright, never
+    read as absent: "absent means leave alone, null means clear" is a
+    distinction a model and a transport both lose, so a later tool's
+    `clear` convention (naming the fields to empty) can mean something.
+  - **Lists.** A tool that returns several tasks answers with compact
+    lines — id, status, priority, due date, title, project, tags, subtask
+    counts — never full records (`get_task`, FR-07.9's sibling tools, and
+    the tools that write answer in full). The total the filters matched is
+    always reported; a page that did not hold all of them says so and
+    names one filter still free to narrow with.
+  - **Refusals.** A tool reports a refusal as a tool error carrying the
+    API's own code and one sentence saying what to do next — which grant to
+    ask the owner for, or which project is outside the scope and what is
+    inside it — never a bare status code. Authorisation is never
+    reimplemented for this: every tool still goes through `app.api.access`,
+    the same layer the REST API uses.
+- **FR-07.11** `search_tasks` is the task list's own narrowing (F-06), read
+  as one call: title text, project, status, assignee, tag, priority, a due
+  date range, overdue-ness and parent task, combined so a task is listed
+  only if it satisfies every filter set, ordered by the task list's own
+  sorts in either direction. `assignee` takes `self`, `owner`, `any_bot`,
+  `nobody` or `any` (`self`/`owner` resolved to ids server-side); `preset`
+  offers `ready_for_me` (to do, on this bot user), `my_overdue` and
+  `recently_filed`, each equivalent to the filters it stands for, and
+  setting one of those same filters alongside a preset is refused rather
+  than silently overridden. `open_only` (true by default) keeps `done` out
+  of the answer regardless of `status`, matching the task list's own
+  baseline (FR-06.8); setting it to `false` is the one way `search_tasks`
+  reaches `done` work, which the task list itself never shows. The archive
+  is never listed, whatever the bot's scope says (FR-05.13).
 
 ### F-08. Bot users
 

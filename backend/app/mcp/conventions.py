@@ -17,7 +17,7 @@ rather than re-deriving its own version of any of these rules:
   unique (tags are, so an ambiguous tag name only happens between two that
   differ by letter case alone).
 - **Dates.** `resolve_date` reads an ISO date, `today`, `tomorrow` and
-  `+Nd`, against the server's own date.
+  `+<count>d`, against the server's own date.
 - **Nulls.** Refused before any of the above runs at all —
   `app.mcp.server._RefuseNullArguments` is the `tools/call` interceptor
   that does it, once, for every tool's arguments.
@@ -256,7 +256,7 @@ _PLUS_DAYS = re.compile(r"\+(\d+)d")
 def resolve_date(raw: str) -> date:
     """
     A date, the way every tool that takes one reads it (spec #247): an ISO
-    date, `today`, `tomorrow`, or `+Nd`, resolved against the server's own
+    date, `today`, `tomorrow`, or `+<count>d`, resolved against the server's own
     date — the caller's clock is not this installation's, and a due date is
     a date with no time of day.
     """
@@ -272,7 +272,7 @@ def resolve_date(raw: str) -> date:
         refuse(
             "invalid_date",
             f"“{raw}” is not a date. Use an ISO date (YYYY-MM-DD), “today”, "
-            "“tomorrow”, or “+Nd”.",
+            "“tomorrow”, or “+<count>d”.",
         )
 
 
@@ -310,7 +310,9 @@ def render_task_rows(
             "id": short_id(task.id),
             "status": task.status.value,
             "priority": task.priority.value if task.priority is not None else None,
-            "due_date": task.due_date.isoformat() if task.due_date is not None else None,
+            "due_date": task.due_date.isoformat()
+            if task.due_date is not None
+            else None,
             "title": task.title,
             "project": projects.get(project_id) if project_id is not None else None,
             "tags": tags.get(task.id, []),

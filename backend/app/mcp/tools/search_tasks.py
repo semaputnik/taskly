@@ -44,8 +44,8 @@ from app.api.deps import Caller
 from app.mcp.conventions import (
     list_result,
     open_caller,
-    refuse,
     refusal,
+    refuse,
     render_task_rows,
     resolve_date,
     resolve_project,
@@ -127,7 +127,7 @@ def search_tasks(
     `project` and `tag` take a name, case-insensitively, as well as an id.
     `parent_task_id` takes a full id or the short prefix a compact line's
     own `id` prints. `due_before`/`due_after` take an ISO date, `today`,
-    `tomorrow`, or `+Nd`, read against the server's date.
+    `tomorrow`, or `+<count>d`, read against the server's date.
 
     Results are compact lines — id, status, priority, due date, title,
     project, tags, subtask counts — never full records; `get_task` reads
@@ -137,10 +137,20 @@ def search_tasks(
     """
     if preset is not None:
         _refuse_preset_conflicts(
-            preset, status=status, assignee=assignee, overdue=overdue, sort=sort, order=order
+            preset,
+            status=status,
+            assignee=assignee,
+            overdue=overdue,
+            sort=sort,
+            order=order,
         )
         status, assignee, overdue, sort, order = _apply_preset(
-            preset, status=status, assignee=assignee, overdue=overdue, sort=sort, order=order
+            preset,
+            status=status,
+            assignee=assignee,
+            overdue=overdue,
+            sort=sort,
+            order=order,
         )
 
     try:
@@ -152,7 +162,9 @@ def search_tasks(
         try:
             project_id = None
             if project is not None:
-                project_id = resolve_project(session, caller, project, TaskAction.READ).id
+                project_id = resolve_project(
+                    session, caller, project, TaskAction.READ
+                ).id
             else:
                 access.authorize_tasks(caller, TaskAction.READ)
 
@@ -165,11 +177,17 @@ def search_tasks(
                 access.get_task(session, caller, parent_id, TaskAction.READ)
 
             tag_name = (
-                resolve_tag_name(session, caller.owner_id, tag) if tag is not None else None
+                resolve_tag_name(session, caller.owner_id, tag)
+                if tag is not None
+                else None
             )
-            due_before_date = resolve_date(due_before) if due_before is not None else None
+            due_before_date = (
+                resolve_date(due_before) if due_before is not None else None
+            )
             due_after_date = resolve_date(due_after) if due_after is not None else None
-            assignee_id, unassigned, assigned_to_bots = _assignee_filters(assignee, caller)
+            assignee_id, unassigned, assigned_to_bots = _assignee_filters(
+                assignee, caller
+            )
 
             built_query = TaskQuery(
                 title=query,
@@ -300,13 +318,25 @@ def _apply_preset(
     overdue: bool,
     sort: TaskSort | None,
     order: SortOrder | None,
-) -> tuple[list[TaskStatus] | None, SearchAssignee | None, bool, TaskSort | None, SortOrder | None]:
+) -> tuple[
+    list[TaskStatus] | None,
+    SearchAssignee | None,
+    bool,
+    TaskSort | None,
+    SortOrder | None,
+]:
     """The filters `preset` stands for, equivalent to setting them by hand (spec #247)."""
     if preset is SearchPreset.READY_FOR_ME:
         return [TaskStatus.TODO], SearchAssignee.SELF, overdue, sort, order
     if preset is SearchPreset.MY_OVERDUE:
         return status, SearchAssignee.SELF, True, sort, order
-    return status, assignee, overdue, TaskSort.CREATED_AT, SortOrder.DESC  # RECENTLY_FILED
+    return (
+        status,
+        assignee,
+        overdue,
+        TaskSort.CREATED_AT,
+        SortOrder.DESC,
+    )  # RECENTLY_FILED
 
 
 def _narrow_hint(

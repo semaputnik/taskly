@@ -104,7 +104,10 @@ def test_narrows_by_due_before_and_due_after(client: TestClient, db: Session) ->
         client, owner, "Due tomorrow", project_id=project_id, due_date=str(TOMORROW)
     )
     create_task_record(
-        client, owner, "Due in three days", project_id=project_id,
+        client,
+        owner,
+        "Due in three days",
+        project_id=project_id,
         due_date=str(IN_THREE_DAYS),
     )
     headers = bot_headers(client, owner, project_ids=[project_id])
@@ -141,9 +144,7 @@ def test_narrows_by_parent_task_id(client: TestClient, db: Session) -> None:
     create_task_record(client, owner, "Unrelated", project_id=project_id)
     headers = bot_headers(client, owner, project_ids=[project_id])
 
-    result = call_tool(
-        client, headers, "search_tasks", {"parent_task_id": root["id"]}
-    )
+    result = call_tool(client, headers, "search_tasks", {"parent_task_id": root["id"]})
     assert _titles(result) == ["Sub"]
 
 
@@ -263,7 +264,7 @@ def test_ambiguous_short_prefix_is_refused_with_candidates(
         assert second["id"] in exc.message
 
 
-# Dates: ISO, today, tomorrow, +Nd
+# Dates: ISO, today, tomorrow, +<count>d
 
 
 def test_invalid_date_is_refused(client: TestClient, db: Session) -> None:
@@ -300,7 +301,9 @@ def test_a_null_argument_is_refused_rather_than_treated_as_absent(
 # Assignee
 
 
-def test_assignee_self_names_the_connecting_bot(client: TestClient, db: Session) -> None:
+def test_assignee_self_names_the_connecting_bot(
+    client: TestClient, db: Session
+) -> None:
     owner = create_user_headers(client, db)
     project_id = create_project(client, owner)
     headers = bot_headers(client, owner, project_ids=[project_id])
@@ -320,8 +323,12 @@ def test_assignee_owner_any_bot_and_nobody(client: TestClient, db: Session) -> N
     bot_id = my_id(client, headers)
     owner_id = my_id(client, owner)
 
-    create_task_record(client, owner, "On owner", project_id=project_id, assignee_id=owner_id)
-    create_task_record(client, owner, "On bot", project_id=project_id, assignee_id=bot_id)
+    create_task_record(
+        client, owner, "On owner", project_id=project_id, assignee_id=owner_id
+    )
+    create_task_record(
+        client, owner, "On bot", project_id=project_id, assignee_id=bot_id
+    )
     create_task_record(client, owner, "On nobody", project_id=project_id)
 
     assert _titles(
@@ -404,7 +411,11 @@ def test_preset_ready_for_me(client: TestClient, db: Session) -> None:
         client, owner, "Ready", project_id=project_id, assignee_id=bot_id, status="todo"
     )
     create_task_record(
-        client, owner, "Not ready yet", project_id=project_id, assignee_id=bot_id,
+        client,
+        owner,
+        "Not ready yet",
+        project_id=project_id,
+        assignee_id=bot_id,
         status="backlog",
     )
     create_task_record(
@@ -422,15 +433,26 @@ def test_preset_my_overdue(client: TestClient, db: Session) -> None:
     bot_id = my_id(client, headers)
 
     create_task_record(
-        client, owner, "My overdue", project_id=project_id, assignee_id=bot_id,
+        client,
+        owner,
+        "My overdue",
+        project_id=project_id,
+        assignee_id=bot_id,
         due_date=str(YESTERDAY),
     )
     create_task_record(
-        client, owner, "Overdue, not mine", project_id=project_id,
+        client,
+        owner,
+        "Overdue, not mine",
+        project_id=project_id,
         due_date=str(YESTERDAY),
     )
     create_task_record(
-        client, owner, "Mine, not overdue", project_id=project_id, assignee_id=bot_id,
+        client,
+        owner,
+        "Mine, not overdue",
+        project_id=project_id,
+        assignee_id=bot_id,
         due_date=str(TOMORROW),
     )
 
@@ -496,8 +518,13 @@ def test_compact_row_shape_and_subtask_counts(client: TestClient, db: Session) -
     owner = create_user_headers(client, db)
     project_id = create_project(client, owner, name="Work")
     root = create_task_record(
-        client, owner, "Root", project_id=project_id, priority="P2",
-        due_date=str(TOMORROW), tags=["ci"],
+        client,
+        owner,
+        "Root",
+        project_id=project_id,
+        priority="P2",
+        due_date=str(TOMORROW),
+        tags=["ci"],
     )
     sub = create_task_record(client, owner, "Sub", parent_id=root["id"])
     r = client.patch(f"{API}/tasks/{sub['id']}", headers=owner, json={"status": "done"})
