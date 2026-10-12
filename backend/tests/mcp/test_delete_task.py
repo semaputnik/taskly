@@ -71,9 +71,7 @@ def test_a_short_id_prefix_resolves(client: TestClient, db: Session) -> None:
         client, owner, project_ids=[project_id], permissions=DELETE_ONLY
     )
 
-    result = call_tool(
-        client, headers, "delete_task", {"task_id": task["id"][:8]}
-    )
+    result = call_tool(client, headers, "delete_task", {"task_id": task["id"][:8]})
     assert result["deleted"] is True
     assert _get(client, owner, task["id"]).status_code == 404
 
@@ -180,9 +178,7 @@ def test_outside_scope_is_refused_by_name(client: TestClient, db: Session) -> No
     inside = create_project(client, owner, "Inside")
     outside = create_project(client, owner, "Outside")
     task = create_task_record(client, owner, "T", project_id=outside)
-    headers = bot_headers(
-        client, owner, project_ids=[inside], permissions=DELETE_ONLY
-    )
+    headers = bot_headers(client, owner, project_ids=[inside], permissions=DELETE_ONLY)
 
     try:
         call_tool(client, headers, "delete_task", {"task_id": task["id"]})

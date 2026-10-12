@@ -96,7 +96,9 @@ def test_a_blank_comment_is_refused(client: TestClient, db: Session) -> None:
     )
 
     try:
-        call_tool(client, headers, "comment_task", {"task_id": task["id"], "body": "  "})
+        call_tool(
+            client, headers, "comment_task", {"task_id": task["id"], "body": "  "}
+        )
         raise AssertionError("expected a refusal")
     except ToolError:
         pass
@@ -159,7 +161,9 @@ def test_without_add_comments_permission_is_refused_by_name(
     )
 
     try:
-        call_tool(client, headers, "comment_task", {"task_id": task["id"], "body": "No."})
+        call_tool(
+            client, headers, "comment_task", {"task_id": task["id"], "body": "No."}
+        )
         raise AssertionError("expected a refusal")
     except ToolError as exc:
         assert "permission_not_granted" in exc.message
@@ -174,12 +178,12 @@ def test_outside_scope_is_refused_by_name(client: TestClient, db: Session) -> No
     inside = create_project(client, owner, "Inside")
     outside = create_project(client, owner, "Outside")
     task = create_task_record(client, owner, "T", project_id=outside)
-    headers = bot_headers(
-        client, owner, project_ids=[inside], permissions=COMMENT_ONLY
-    )
+    headers = bot_headers(client, owner, project_ids=[inside], permissions=COMMENT_ONLY)
 
     try:
-        call_tool(client, headers, "comment_task", {"task_id": task["id"], "body": "No."})
+        call_tool(
+            client, headers, "comment_task", {"task_id": task["id"], "body": "No."}
+        )
         raise AssertionError("expected a refusal")
     except ToolError as exc:
         assert "outside_scope" in exc.message
@@ -197,7 +201,9 @@ def test_the_archive_refuses_a_comment(client: TestClient, db: Session) -> None:
     assert r.status_code == 200, r.text
 
     try:
-        call_tool(client, headers, "comment_task", {"task_id": task["id"], "body": "No."})
+        call_tool(
+            client, headers, "comment_task", {"task_id": task["id"], "body": "No."}
+        )
         raise AssertionError("expected a refusal")
     except ToolError as exc:
         assert "project_archived" in exc.message
