@@ -23,8 +23,14 @@ rather than re-deriving its own version of any of these rules:
   id, the way `create_task` (#255) and `update_task` (#256) both take one;
   whether the bot it names is really one of this owner's, and not deleted,
   is still the route's own decision a moment later.
+- **Actors.** `resolve_actor` reads `self`, `owner`, `any_bot`, or a sibling
+  bot user by name or id, the way `search_activity` (#259) and
+  `list_completions` (#260) both narrow by who acted; moved here once a
+  second tool needed the exact same reading rather than its own copy.
 - **Dates.** `resolve_date` reads an ISO date, `today`, `tomorrow` and
-  `+<count>d`, against the server's own date.
+  `+<count>d`, against the server's own date. `since_datetime`/
+  `until_datetime` widen such a date to the whole day it names, the way
+  `search_activity` and `list_completions` both read a period's two bounds.
 - **Nulls.** Refused before any of the above runs at all —
   `app.mcp.server._RefuseNullArguments` is the `tools/call` interceptor
   that does it, once, for every tool's arguments.
@@ -41,7 +47,7 @@ import re
 import uuid
 from collections.abc import Iterator, Mapping, Sequence
 from contextlib import contextmanager
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, time, timedelta
 from typing import Any, NoReturn
 
 from fastapi import HTTPException
@@ -56,7 +62,7 @@ from app.api.access import TaskAction
 from app.api.deps import Caller, get_mcp_caller
 from app.core.db import engine
 from app.crud import archived_task_ids, not_deleted, tasks_in_projects
-from app.models import Project, Tag, Task
+from app.models import BotUser, Project, Tag, Task
 
 # Refusals
 
@@ -322,6 +328,73 @@ def resolve_date(raw: str) -> date:
             f"“{raw}” is not a date. Use an ISO date (YYYY-MM-DD), “today”, "
             "“tomorrow”, or “+<count>d”.",
         )
+
+
+def since_datetime(raw: str) -> datetime:
+    """
+    `since` as a moment rather than a date (spec #248, #259): the start of
+    the day `resolve_date` reads, exclusive — so a closed period ("last
+    month") is named by its two calendar dates rather than by exact moments
+    a caller would otherwise have to know.
+    """
+    return datetime.combine(resolve_date(raw), time.min, tzinfo=UTC)
+
+
+def until_datetime(raw: str) -> datetime:
+    """`until`'s own widening: the end of the day, inclusive — `since_datetime`'s other bound."""
+    return datetime.combine(resolve_date(raw), time.max, tzinfo=UTC)
+
+
+# Actors
+
+
+def resolve_actor(
+    session: Session, caller: Caller, raw: str
+) -> tuple[uuid.UUID | None, bool, bool]:
+    """
+    `actor` as the three arguments `read_activity_log` takes for it
+    (spec #248, #259): `actor_bot_user_id`, `by_bots`, `by_user`. `self` is
+    the connecting bot's own id; `owner` and `any_bot` read as the log's own
+    flags for "the human" and "any bot user"; anything else names a sibling
+    bot user, by id or by name case-insensitively, the same ambiguous-name
+    rule `resolve_project` follows, since a bot user's name is no more
+    unique than a project's. Unlike a tag name (`resolve_tag_name`), a name
+    matching no bot user is refused rather than narrowed to nothing: there
+    is no reading of "show me what Nonexistent Bot did" where silently
+    answering "nothing" is more useful than saying the name is wrong.
+    """
+    assert caller.bot is not None, "an MCP caller is always a bot"
+    if raw == "self":
+        return caller.bot.id, False, False
+    if raw == "owner":
+        return None, False, True
+    if raw == "any_bot":
+        return None, True, False
+    try:
+        return uuid.UUID(raw), False, False
+    except ValueError:
+        return _bot_id_by_name(session, caller.owner_id, raw), False, False
+
+
+def _bot_id_by_name(session: Session, owner_id: uuid.UUID, name: str) -> uuid.UUID:
+    """
+    A bot user's id by name, case-insensitively — deleted ones included, so
+    an actor narrowing still finds what a deleted bot user did (FR-08.19).
+    """
+    matches = session.exec(
+        select(BotUser.id).where(
+            BotUser.owner_id == owner_id, func.lower(col(BotUser.name)) == name.lower()
+        )
+    ).all()
+    if not matches:
+        refuse("not_found", f"No bot user is named “{name}”.")
+    if len(matches) > 1:
+        ids = ", ".join(str(bot_id) for bot_id in matches)
+        refuse(
+            "ambiguous_bot_name",
+            f"“{name}” names {len(matches)} bot users: {ids}. Use one of their ids.",
+        )
+    return matches[0]
 
 
 # Lists
