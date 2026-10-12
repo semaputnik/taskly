@@ -12,7 +12,7 @@ from fastapi.routing import APIRoute
 from starlette.middleware.cors import CORSMiddleware
 from starlette.middleware.gzip import GZipMiddleware
 
-from app import mcp, passkeys, webhooks
+from app import mcp, passkeys, refusals, webhooks
 from app.api.main import api_router
 from app.core.config import settings
 
@@ -133,6 +133,25 @@ async def passkey_refused(_request: Request, error: Exception) -> Response:
     not_found = isinstance(error, passkeys.PasskeyNotFound | passkeys.UserNotFound)
     return JSONResponse(
         status_code=404 if not_found else 400, content={"detail": str(error)}
+    )
+
+
+@app.exception_handler(refusals.Refusal)
+async def refusal_refused(_request: Request, error: Exception) -> Response:
+    """
+    A deliberate refusal an operation (`app.tasks`) raises, mapped to the
+    HTTP body routes on its path used to assemble inline, byte for byte
+    (#275, #279) — the same shape `passkey_refused` above already gives
+    `app.passkeys.PasskeyError`. The payload a refusal carries beyond its
+    code and message (the open subtasks `complete_task` names, say) is for a
+    caller that reads the refusal directly, such as `app.mcp.conventions`;
+    the REST body never grows it, so this handler stays indifferent to what
+    a given code's payload holds.
+    """
+    assert isinstance(error, refusals.Refusal)
+    return JSONResponse(
+        status_code=error.status,
+        content={"detail": {"code": error.code.value, "message": error.message}},
     )
 
 
