@@ -74,12 +74,17 @@ def create_task(
     reporter: Reporter,
     assignee: Assignee = Assignee(),
     tag_names: Sequence[str] = (),
+    commit: bool = True,
 ) -> Task:
     """
     Create a task. `project_id` is set on root tasks and None on subtasks,
     which derive their project from their root ancestor. A task created with a
     recurrence is the first occurrence of a new series, which the caller has
     checked it can be: a root task with a due date.
+
+    With `commit=False` the caller commits (#284, ADR-0013): `app.tasks.
+    create` is the only caller that passes it, so its own `UnitOfWork` decides
+    when the creation lands rather than this function deciding on its own.
     """
     db_obj = Task.model_validate(
         task_create,
@@ -102,7 +107,12 @@ def create_task(
         _stage_recurrence(
             session=session, task=db_obj, recurrence=task_create.recurrence
         )
-    session.commit()
+    if commit:
+        session.commit()
+    else:
+        # `refresh` needs the row persistent, which a flush (never the commit
+        # this call opted out of) gives it.
+        session.flush()
     session.refresh(db_obj)
     return db_obj
 
@@ -114,6 +124,7 @@ def update_task(
     task_in: TaskUpdate,
     assignee: Assignee | None = None,
     tag_names: Sequence[str] | None = None,
+    commit: bool = True,
 ) -> Task:
     """
     Apply an update to a task, including what it means for the task's series,
@@ -122,6 +133,10 @@ def update_task(
     Moving an occurrence of a recurring task to done creates the next one here,
     in the same commit as the move (FR-01.14): there is never a moment with
     the series left with no open occurrence, or with two.
+
+    With `commit=False` the caller commits (#284, ADR-0013): `app.tasks.
+    update` and `.complete` are this function's only callers, and each owns
+    the transaction through its own `UnitOfWork`.
     """
     # The directives steer what happens around the row (the subtree, the
     # series) rather than naming columns of it, so they never reach it as such.
@@ -165,7 +180,12 @@ def update_task(
     ):
         _stage_next_occurrence(session=session, task=db_task)
 
-    session.commit()
+    if commit:
+        session.commit()
+    else:
+        # `refresh` needs the row persistent, which a flush (never the commit
+        # this call opted out of) gives it.
+        session.flush()
     session.refresh(db_task)
     return db_task
 

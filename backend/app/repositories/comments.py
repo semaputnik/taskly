@@ -19,7 +19,14 @@ def create_comment(
     task_id: uuid.UUID,
     owner_id: uuid.UUID,
     author_bot_user_id: uuid.UUID | None = None,
+    commit: bool = True,
 ) -> Comment:
+    """
+    With `commit=False` the caller commits (#284, ADR-0013): `app.comments.
+    comment` and `app.tasks.complete` (its own optional note) are this
+    function's only callers that pass it, each owning the transaction
+    through its own `UnitOfWork`.
+    """
     db_obj = Comment.model_validate(
         comment_create,
         update={
@@ -29,7 +36,12 @@ def create_comment(
         },
     )
     session.add(db_obj)
-    session.commit()
+    if commit:
+        session.commit()
+    else:
+        # `refresh` needs the row persistent, which a flush (never the commit
+        # this call opted out of) gives it.
+        session.flush()
     session.refresh(db_obj)
     return db_obj
 
@@ -83,6 +95,11 @@ def create_attachment(
         size=size,
     )
     session.add(db_obj)
+    # One of the three exceptions ADR-0013 names to "one act, one
+    # transaction": the row commits here, before `app.api.routes.attachments.
+    # upload_attachment` writes the bytes to storage, so a crash between the
+    # two leaves metadata with nothing to download rather than bytes nothing
+    # points at.
     session.commit()
     session.refresh(db_obj)
     return db_obj
