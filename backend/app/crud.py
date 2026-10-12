@@ -513,11 +513,7 @@ def get_tasks(
     """
     conditions = _task_filters(owner_id=owner_id, query=query)
     if project_ids is not None:
-        conditions.append(
-            col(Task.id).in_(
-                _task_trees(col(Task.project_id).in_(project_ids), name="scope_tasks")
-            )
-        )
+        conditions.append(col(Task.id).in_(tasks_in_projects(project_ids)))
 
     count = session.exec(
         select(func.count()).select_from(Task).where(*conditions)
@@ -1311,6 +1307,27 @@ def project_task_ids(project_id: uuid.UUID) -> Any:
     return _task_trees(Task.project_id == project_id, name="project_tasks")
 
 
+def tasks_in_projects(project_ids: Any, *, including_deleted: bool = False) -> Any:
+    """
+    Selects the ids of every task in any of `project_ids`: their root tasks
+    and everything under them, in one walk rather than one walk per project —
+    the many-project twin of `project_task_ids`, for a bot's task listing
+    (narrowed to its scope) and its activity-log scope (spec #246), neither
+    of which may OR one walk per project together. `project_ids` may be a
+    selectable, the way `archived_task_ids` above takes one, so a scope
+    already narrowed to its live projects is read once rather than twice.
+
+    Leaves deleted tasks out unless `including_deleted` asks to walk through
+    them too — the activity log needs to, since a deleted task's history
+    still reads (FR-10.4).
+    """
+    return _task_trees(
+        col(Task.project_id).in_(project_ids),
+        name="scope_tasks",
+        including_deleted=including_deleted,
+    )
+
+
 def archived_task_ids(owner_id: uuid.UUID) -> Any:
     """
     Selects the ids of every task of a user's archived projects that is not
@@ -1329,35 +1346,50 @@ def archived_task_ids(owner_id: uuid.UUID) -> Any:
     )
 
 
-def _task_trees(root_condition: Any, *, name: str) -> Any:
+def _task_trees(
+    root_condition: Any, *, name: str, including_deleted: bool = False
+) -> Any:
     """
     Selects the ids of the root tasks matching `root_condition` and of every
-    task under them, leaving deleted ones out.
+    task under them, leaving deleted ones out unless `including_deleted` asks
+    to walk through them too.
     """
-    return select(_tree_walk(root_condition, name=name).c.id)
+    return select(
+        _tree_walk(root_condition, name=name, including_deleted=including_deleted).c.id
+    )
 
 
-def _tree_walk(start_condition: Any, *, name: str) -> Any:
+def _tree_walk(
+    start_condition: Any, *, name: str, including_deleted: bool = False
+) -> Any:
     """
     The one walk down the task tree: the tasks matching `start_condition` and
-    every task under them, leaving deleted ones out, as (id, status,
-    project_id, due_date) rows. `project_id` is carried down from the starting task, so
-    a walk that starts at root tasks says which project each row resolves to.
+    every task under them, as (id, status, project_id, due_date) rows.
+    `project_id` is carried down from the starting task, so a walk that starts
+    at root tasks says which project each row resolves to — true of a
+    deleted root too, since nothing about deleting a task clears it.
+
+    Leaves deleted tasks out unless `including_deleted` asks to walk through
+    them: the activity log keeps a deleted task's history for ever (FR-10.4),
+    so the one question it asks of this walk — which scope a task's entries
+    belong to — has to resolve a deleted task exactly as it would a live one.
 
     Subtasks hold no project of their own, so the tasks of a project are only
     reachable by walking down from its root tasks. `name` names the CTE, which
     has to be unique among the ones a single statement uses.
     """
+    live: list[Any] = [] if including_deleted else [not_deleted(Task)]
     tree = (
         select(Task.id, Task.status, col(Task.project_id), col(Task.due_date))
-        .where(start_condition, not_deleted(Task))
+        .where(start_condition, *live)
         .cte(name, recursive=True)
     )
     child = aliased(Task)
+    live_child: list[Any] = [] if including_deleted else [not_deleted(child)]
     return tree.union_all(
         select(child.id, child.status, tree.c.project_id, col(child.due_date))
         .join(tree, col(child.parent_id) == tree.c.id)
-        .where(not_deleted(child))
+        .where(*live_child)
     )
 
 

@@ -482,6 +482,27 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
   - A bot user can download a task's attachments if it can read the task.
   - A bot user can add and delete a task's attachments if it can update the task.
 
+#### Scope: activity log
+
+- **FR-08.22** With `read_activity`, a bot user reads its owner's activity
+  log (see [F-10](#f-10-activity-log-event-feed)) narrowed to its scope:
+  entries about the tasks, comments and attachments of the projects in
+  scope; about the projects themselves; a task's deletion and restore,
+  placed by the project the entry carries; and the owner's whole tag
+  vocabulary (ADR-0003), which is unaffected by scope. Entries made by any
+  actor — the owner, the bot user itself, or another of the owner's bot
+  users — are included: the point is to read the owner's work, not only the
+  bot's own. Anything touching an archived project is excluded whatever the
+  scope lists (FR-05.13), and an entry recording one act over several tasks
+  (FR-10.9) is included only when every task it names is in scope — never
+  trimmed to the ones that are.
+- **FR-08.23** A bot user's activity-log response omits `restorable` and the
+  deletion id. Restoring deleted work (FR-10.4) stays a human-only action,
+  unchanged by this grant.
+- **FR-08.24** Narrowing a bot user's activity-log read to a task or project
+  outside its reach — missing, not the owner's, archived, or outside the
+  scope — is a 404, the same answer for all four, never an empty feed.
+
 #### Token
 
 - **FR-08.12** A bot user has exactly one token.
@@ -556,7 +577,10 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
 - **FR-10.4** A deleted task or project can be restored from the log
   (see FR-01.10, FR-05.8).
 - **FR-10.5** Log entries are kept indefinitely.
-- **FR-10.6** Bot users cannot read the activity log.
+- **FR-10.6** A bot user reads the activity log only with the `read_activity`
+  grant, and then only its scope's entries (see FR-08.9, FR-08.22–FR-08.24).
+  Without the grant, it is refused by name (see FR-08.9's permission
+  refusal).
 - **FR-10.7** A user sees only their own activity log. The superuser is not an
   exception: they see only their own log, not other users'.
 - **FR-10.8** The log can be narrowed to one kind of change: Completed,
@@ -579,6 +603,11 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
   lives in the URL beside the others, the REST API's log accepts it
   (`project_id`), it combines with them, and it never widens the log past the
   reader's own entries (FR-10.7).
+- **FR-10.12** The REST API's log also accepts `until`, the upper bound to
+  `since`: entries up to and including that moment. A moment given without
+  an offset is read as UTC, like `since`, and `until` combines with every
+  other narrowing, so a closed period — "last month" — can be asked for in
+  one request instead of paged until the dates run out.
 
 ### F-11. Webhooks
 
@@ -738,7 +767,6 @@ Not requirements yet. Recorded so they are not lost.
 - Bot users creating, updating or deleting projects.
 - Giving a bot user access to all projects at once.
 - More than one token per bot user.
-- Bot users reading the activity log.
 - Bot users editing or deleting comments.
 - Bot users renaming or deleting tags.
 - Webhooks set or read through the REST API, webhooks on a user rather

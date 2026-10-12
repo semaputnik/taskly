@@ -195,6 +195,10 @@ BOT_REACHABLE = {
     f"GET {API}/tags/",
     f"GET {API}/tags/{{tag_id}}",
     f"POST {API}/tags/",
+    # Opened by #251, with its own grant (`read_activity`) and narrowed to
+    # the bot's scope (app.api.access.activity_log_scope); restoring from an
+    # entry stays off this set, a human-only action.
+    f"GET {API}/activity-log/",
 }
 
 
