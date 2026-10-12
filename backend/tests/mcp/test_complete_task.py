@@ -82,9 +82,7 @@ def test_a_short_id_prefix_resolves(client: TestClient, db: Session) -> None:
         client, owner, project_ids=[project_id], permissions=COMPLETE_ONLY
     )
 
-    result = call_tool(
-        client, headers, "complete_task", {"task_id": task["id"][:8]}
-    )
+    result = call_tool(client, headers, "complete_task", {"task_id": task["id"][:8]})
     assert result["id"] == task["id"]
     assert result["status"] == "done"
 
@@ -246,7 +244,9 @@ def test_the_next_due_date_is_counted_from_the_schedule_not_the_closing_moment(
     result = call_tool(client, headers, "complete_task", {"task_id": task["id"]})
 
     # From the due date, not from today — even though that is still overdue.
-    assert result["next_occurrence"]["due_date"] == (due + timedelta(days=7)).isoformat()
+    assert (
+        result["next_occurrence"]["due_date"] == (due + timedelta(days=7)).isoformat()
+    )
 
 
 def test_closing_an_occurrence_leaves_exactly_one_open_occurrence(
@@ -276,9 +276,9 @@ def _get_by_short_id(
 ) -> dict[str, Any]:
     r = client.get(f"{API}/tasks/", headers=headers)
     assert r.status_code == 200, r.text
-    [found] = [t for t in r.json()["data"] if t["id"].replace("-", "").startswith(
-        short_id
-    )]
+    [found] = [
+        t for t in r.json()["data"] if t["id"].replace("-", "").startswith(short_id)
+    ]
     return found
 
 
@@ -362,7 +362,9 @@ def test_outside_scope_is_refused_by_name(client: TestClient, db: Session) -> No
     inside = create_project(client, owner, "Inside")
     outside = create_project(client, owner, "Outside")
     task = create_task_record(client, owner, "T", project_id=outside)
-    headers = bot_headers(client, owner, project_ids=[inside], permissions=COMPLETE_ONLY)
+    headers = bot_headers(
+        client, owner, project_ids=[inside], permissions=COMPLETE_ONLY
+    )
 
     try:
         call_tool(client, headers, "complete_task", {"task_id": task["id"]})

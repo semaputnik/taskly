@@ -1222,7 +1222,9 @@ def open_subtasks(*, session: Session, task: Task) -> list[Task]:
     """
     subtree = _subtree_cte(task.id)
     open_ids = select(subtree.c.id).where(subtree.c.status != TaskStatus.DONE)
-    statement = select(Task).where(col(Task.id).in_(open_ids)).order_by(col(Task.created_at))
+    statement = (
+        select(Task).where(col(Task.id).in_(open_ids)).order_by(col(Task.created_at))
+    )
     return list(session.exec(statement).all())
 
 

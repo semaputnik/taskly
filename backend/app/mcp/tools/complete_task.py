@@ -158,8 +158,8 @@ def _refuse_open_subtasks(session: Session, task: Task, exc: HTTPException) -> N
     refuse(
         OPEN_SUBTASKS_CODE,
         f"“{task.title}” has {count} open subtask{'' if count == 1 else 's'}: "
-        f"{listed}. Send `subtasks: \"complete\"` to close them too, or "
-        f"`subtasks: \"leave_uncompleted\"` to leave each where it is.",
+        f'{listed}. Send `subtasks: "complete"` to close them too, or '
+        f'`subtasks: "leave_uncompleted"` to leave each where it is.',
     )
 
 
