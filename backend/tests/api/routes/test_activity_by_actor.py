@@ -165,16 +165,32 @@ def test_the_superuser_gains_no_reach_through_the_filter(
     assert page == {"data": [], "count": 0}
 
 
-def test_a_bot_user_cannot_read_any_log_at_all(
+def test_a_bot_user_without_the_grant_cannot_read_even_its_own_entries(
     client: TestClient, owner: Headers
 ) -> None:
-    bot_id, bot, _ = _bot_with_work(client, owner)
+    """
+    Narrowing to itself is not a back door around the grant (#251): a bot
+    user needs `read_activity` to read any of the log, its own entries
+    included. (With the grant, a bot reading its scope narrowed to itself is
+    covered by `tests/api/routes/test_activity_for_bots.py`.)
+    """
+    project_id = create_project(client, owner)
+    bot_user = create_bot_user(
+        client,
+        owner,
+        project_ids=[project_id],
+        permissions={**ALL_PERMISSIONS, "read_activity": False},
+    )
+    bot = token_headers(client, owner, bot_user["id"])
 
     r = client.get(
-        f"{API}/activity-log/", headers=bot, params={"actor_bot_user_id": bot_id}
+        f"{API}/activity-log/",
+        headers=bot,
+        params={"actor_bot_user_id": bot_user["id"]},
     )
     assert r.status_code == 403
-    assert r.json()["detail"]["code"] == "human_only"
+    assert r.json()["detail"]["code"] == "permission_not_granted"
+    assert r.json()["detail"]["permission"] == "read_activity"
 
 
 # --- After the bot user is gone ------------------------------------------------

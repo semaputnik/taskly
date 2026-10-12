@@ -88,7 +88,13 @@ none of them is the pattern the others are stamped from.
 The record of every change in Taskly. Each entry names who made the change:
 the user, or the one of their **bot users** that made it — a bot user's change
 is never recorded as its owner's. Each user sees only their own log —
-including the superuser, who has no visibility into other users' logs.
+including the superuser, who has no visibility into other users' logs. A bot
+user with its `read_activity` grant reads its owner's log too, narrowed to
+its **scope**: entries by any actor, but nothing outside the scope and
+nothing touching an archived project whatever the scope says. It is the one
+place a task's completion, and when, is recorded at all — a task itself
+keeps no such timestamp (ADR-0011) — so it is also how a bot user answers
+"what did I finish".
 _Avoid_: "audit log" (implies cross-user oversight, which does not exist here).
 
 **Subtask**:
@@ -168,8 +174,8 @@ they belong to is simply the user.
 **Scope**:
 What a bot user may reach and do: an explicit list of the owner's projects,
 each named one by one with no "all projects" value, and the permissions it
-holds there — create, read, update and delete on tasks, adding comments, and
-creating tags.
+holds there — create, read, update and delete on tasks, adding comments,
+creating tags, and reading the **activity log**.
 Anything a bot user can never do has no permission to grant at all. An
 archived project is out of reach whatever the scope says, and a subtask is in
 scope exactly when its root task's project is. The user can change a scope at

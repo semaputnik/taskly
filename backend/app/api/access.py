@@ -30,11 +30,22 @@ from enum import StrEnum
 from typing import Any
 
 from fastapi import HTTPException
+from sqlalchemy import Text, and_, cast, func, literal_column, not_, or_
 from sqlmodel import Session, col, select
 
 from app import crud
 from app.api.deps import Caller
-from app.models import Attachment, Comment, Project, Task, TaskRefusal
+from app.models import (
+    ACTIVITY_TASK_REF,
+    ActivityAction,
+    ActivityEntityType,
+    ActivityEntry,
+    Attachment,
+    Comment,
+    Project,
+    Task,
+    TaskRefusal,
+)
 
 BOT_REFUSED_STATUS = 403
 OUTSIDE_SCOPE_CODE = "outside_scope"
@@ -203,6 +214,24 @@ def authorize_tag_names(
             + (" is not a tag yet." if len(new) == 1 else " are not tags yet."),
             permission="create_tags",
             tags=new,
+        )
+
+
+def authorize_activity_log(caller: Caller) -> None:
+    """
+    Refuse a bot without `read_activity` (spec #246, FR-08.9). Reading the
+    log does not follow from reading tasks: it shows the owner's own work
+    too, so it is its own grant, checked once up front rather than per
+    project — a bot without it is refused by name whatever it asks for,
+    which also keeps the refusal from leaking whether any id in the request
+    is real.
+    """
+    bot = caller.bot
+    if bot is not None and not bot.read_activity:
+        raise _refuse(
+            PERMISSION_NOT_GRANTED_CODE,
+            "This bot user is not allowed to read the activity log.",
+            permission="read_activity",
         )
 
 
@@ -418,3 +447,122 @@ def get_attachment(
     resolved = _live_task(session, caller, attachment.task_id, not_found)
     _authorize(caller, action, resolved.project)
     return attachment
+
+
+# Activity log
+
+
+def bot_reaches_project(caller: Caller, project: Project) -> bool:
+    """
+    Whether `caller` can reach `project` at all, for a read that is not tied
+    to one task action: always true for a human, and for a bot exactly when
+    neither the archive nor the scope refuses it — the same order
+    `_bot_project_refusal` already checks in (FR-05.13, FR-08.7).
+
+    Used by the activity log's own task and project narrowing (spec #246),
+    which answers an id outside the bot's reach with the same 404 a missing
+    one gets rather than the 403 every other endpoint gives: a scope refusal
+    here would confirm the id is real, which the log's narrowing must not do.
+    """
+    return caller.bot is None or _bot_project_refusal(caller, project) is None
+
+
+def bot_reaches_task(session: Session, caller: Caller, task_id: uuid.UUID) -> bool:
+    """
+    The task twin of `bot_reaches_project`, resolving through deleted
+    ancestors too: a deleted task's history still reads (FR-10.4), so this
+    has to find the project it would restore to, not fail the way a live
+    lookup would.
+    """
+    if caller.bot is None:
+        return True
+    project_id = crud.get_task_project_ids(
+        session=session,
+        owner_id=caller.owner_id,
+        task_ids=[task_id],
+        including_deleted=True,
+    ).get(task_id)
+    if project_id is None:
+        return False
+    project = session.get(Project, project_id)
+    return project is not None and bot_reaches_project(caller, project)
+
+
+def activity_log_scope(caller: Caller) -> Any | None:
+    """
+    What a bot user's activity-log read may see, as one condition built once
+    over its whole scope (spec #246) — never the single-project filter OR'd
+    per project, the way `app.api.routes.activity._in_project` builds it for
+    one id. The log is kept for ever (FR-10.5), so this has to stay indexed:
+    the entity-id and `ACTIVITY_TASK_REF` matches below ride
+    `ix_activityentry_owner_id_entity_id` and `ix_activityentry_owner_id_task`
+    under the base owner filter's `ix_activityentry_owner_id_position`, the
+    same indexes a human's read already uses.
+
+    None for a human: there is no scope to narrow by, and the caller's own
+    log, unfiltered, is the whole of what FR-10.7 lets through.
+
+    The archive is excluded before the scope is even read — nothing touching
+    an archived project is visible whatever the scope lists (FR-05.13) — and
+    then the scope itself: the projects, the tasks in them (which carries
+    their comments, attachments, deletions and restores, since those name
+    their task in `details` rather than pointing at it), and the owner's
+    whole tag vocabulary, which a bot user already reads unconstrained
+    whatever its scope (ADR-0003). A batch (`tasks_bulk_changed`) is the one
+    entry the ordinary task match below cannot answer for: it names several
+    tasks in `details.task_ids` and is visible only when every one of them
+    is in scope, never trimmed to the ones that are — so it is carved out of
+    the ordinary match (which would otherwise pass it on the strength of its
+    first task, `entity_id`, alone) and given its own all-or-nothing check.
+    """
+    if caller.bot is None:
+        return None
+
+    is_archived = False
+    live_scope_projects = select(Project.id).where(
+        col(Project.id).in_(caller.project_ids),
+        Project.is_archived == is_archived,
+    ).subquery()
+    # Including deleted tasks: a completion the log recorded before a task
+    # was deleted still has to resolve to the scope it happened in
+    # (FR-10.4) — a root task keeps its `project_id` once deleted, which is
+    # what this walk follows.
+    scope_tasks = crud.tasks_in_projects(
+        select(live_scope_projects.c.id), including_deleted=True
+    ).subquery()
+
+    is_batch = col(ActivityEntry.action) == ActivityAction.TASKS_BULK_CHANGED
+    # The scope's task ids, as a JSON array of strings, matching how a
+    # batch's own `task_ids` are stored (app.activity). `<@` ("is contained
+    # by") is false, not an error, when the left side is NULL — the case for
+    # every entry this check does not apply to.
+    scope_task_ids_json = func.coalesce(
+        select(func.jsonb_agg(cast(scope_tasks.c.id, Text))).scalar_subquery(),
+        literal_column("'[]'::jsonb"),
+    )
+    batch_wholly_in_scope = col(ActivityEntry.details)["task_ids"].op("<@")(
+        scope_task_ids_json
+    )
+
+    return or_(
+        col(ActivityEntry.entity_type) == ActivityEntityType.TAG,
+        and_(is_batch, batch_wholly_in_scope),
+        and_(
+            not_(is_batch),
+            or_(
+                and_(
+                    col(ActivityEntry.entity_type) == ActivityEntityType.PROJECT,
+                    col(ActivityEntry.entity_id).in_(
+                        select(live_scope_projects.c.id)
+                    ),
+                ),
+                col(ActivityEntry.entity_id).in_(select(scope_tasks.c.id)),
+                literal_column(ACTIVITY_TASK_REF).in_(
+                    select(cast(scope_tasks.c.id, Text))
+                ),
+                col(ActivityEntry.details)["project"]["id"].astext.in_(
+                    select(cast(live_scope_projects.c.id, Text))
+                ),
+            ),
+        ),
+    )

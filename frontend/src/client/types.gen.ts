@@ -3118,6 +3118,10 @@ export type activityReadActivityLogData = {
          */
         since?: string | null;
         /**
+         * Until
+         */
+        until?: string | null;
+        /**
          * Task Id
          */
         task_id?: string | null;

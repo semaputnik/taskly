@@ -26,7 +26,14 @@ def test_the_superuser_can_list_registered_accounts(
 ) -> None:
     user, _ = _new_user(client, db)
 
-    r = client.get(f"{API}/users/", headers=superuser_token_headers)
+    # The default page is the newest 100 (`created_at` descending); the
+    # session-scoped `db` fixture accumulates users across the whole test
+    # run, so the superuser — created once, early — can fall off it long
+    # before this test gets its own account checked. A limit that covers the
+    # whole table is the fix, not a guess at how many other tests ran first.
+    r = client.get(
+        f"{API}/users/", headers=superuser_token_headers, params={"limit": 10000}
+    )
     assert r.status_code == 200
     emails = {account["email"] for account in r.json()["data"]}
     assert user.email in emails
