@@ -603,10 +603,12 @@ export class TasksService {
      *
      * Delete a task, and its subtasks with it.
      *
-     * The rows are marked deleted rather than removed, so the deletion can be
-     * reversed from the activity log later (FR-01.8). Because the cascade can
-     * take down far more than the task named here, a task that still has subtasks
-     * is only deleted when `delete_subtasks` says so (FR-01.11, FR-01.12).
+     * Every rule is `app.tasks.delete`'s own (#275, #282): the rows are marked
+     * deleted rather than removed, so the deletion can be reversed from the
+     * activity log later (FR-01.8), and a task that still has subtasks is
+     * refused until `delete_subtasks` confirms the cascade (FR-01.11,
+     * FR-01.12). This route keeps only binding the request and shaping the
+     * response.
      */
     public static deleteTask<ThrowOnError extends boolean = true>(options: Options<tasksDeleteTaskData, ThrowOnError>) {
         return (options.client ?? client).delete<tasksDeleteTaskResponses, tasksDeleteTaskErrors, ThrowOnError>({
@@ -636,11 +638,11 @@ export class TasksService {
      *
      * Update a task: its fields, status, assignee, or project.
      *
-     * `status: done` delegates whole to `app.tasks.complete` (#275, #279): the
-     * open-subtasks directive, the next occurrence a recurring task's close
-     * spawns, and everything else this request can combine with the move are
-     * all that operation's own rules now, so this branch keeps nothing but
-     * binding the request and shaping the response.
+     * Every rule is `app.tasks.update`'s own (#275, #282): the due-date scope,
+     * the superseded-occurrence refusal, the subtask-project rule, the
+     * assignee rules, tags replacing wholesale, and delegating whole to
+     * `app.tasks.complete` when the request moves `status` to `done` — this
+     * route keeps only binding the request and shaping the response.
      *
      * Moving between open statuses never touches the subtasks. Handing finished
      * work over: a bot user that has done a task sets its status to `review`
