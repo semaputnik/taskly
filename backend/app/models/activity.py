@@ -99,7 +99,15 @@ class ActivityEntityType(StrEnum):
 # the index below and the filter that reads it are exactly one expression: a
 # bound path would leave the planner unable to match the two. (The migration
 # that created the index spells it out again, as a migration must.)
-ACTIVITY_TASK_REF = "(details -> 'task' ->> 'id')"
+#
+# Cast explicitly to `text`, matching the spelling Postgres normalizes this
+# expression to once the index exists (confirmed against a database at head
+# with `SELECT indexdef FROM pg_indexes`): without the casts here,
+# `alembic revision --autogenerate` reads the stored index as having changed
+# and proposes dropping and recreating it, on every run (#293). The casts are
+# a no-op for `->` and `->>`, which already take and return `text`, so this
+# changes no behaviour of the index or of the filters that share it.
+ACTIVITY_TASK_REF = "((details -> 'task'::text) ->> 'id'::text)"
 
 
 class ActivityEntry(SQLModel, table=True):
