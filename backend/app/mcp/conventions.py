@@ -15,7 +15,9 @@ rather than re-deriving its own version of any of these rules:
   tag by name, case-insensitively, as well as by id; an ambiguous project
   name is refused with the matching ids, since project names are not
   unique (tags are, so an ambiguous tag name only happens between two that
-  differ by letter case alone).
+  differ by letter case alone). `resolve_project_id` is `resolve_project`
+  without the access decision, for a caller that defers that decision to
+  somewhere else (`create_task` (#255), to the route it calls through to).
 - **Dates.** `resolve_date` reads an ISO date, `today`, `tomorrow` and
   `+<count>d`, against the server's own date.
 - **Nulls.** Refused before any of the above runs at all —
@@ -174,6 +176,22 @@ def resolve_task_id(session: Session, caller: Caller, raw: str) -> uuid.UUID:
 # Names
 
 
+def resolve_project_id(session: Session, caller: Caller, raw: str) -> uuid.UUID:
+    """
+    Which project `raw` names, by a full id or by name case-insensitively —
+    the half of `resolve_project` that only decides which project was meant,
+    with no access decision made yet. `create_task` (#255) uses this on its
+    own for a root task's `project`, deferring the access decision itself to
+    `app.api.routes.tasks.create_task`, the route it calls through to; a
+    subtask that also names a project is refused before any name needs
+    resolving at all, so that refusal never reaches here.
+    """
+    try:
+        return uuid.UUID(raw)
+    except ValueError:
+        return _project_id_by_name(session, caller.owner_id, raw)
+
+
 def resolve_project(
     session: Session, caller: Caller, raw: str, action: TaskAction
 ) -> Project:
@@ -184,10 +202,7 @@ def resolve_project(
     makes the real decision (not found, outside scope, archived, lacking the
     permission): this only decides which project the caller meant.
     """
-    try:
-        project_id = uuid.UUID(raw)
-    except ValueError:
-        project_id = _project_id_by_name(session, caller.owner_id, raw)
+    project_id = resolve_project_id(session, caller, raw)
     return access.get_project(session, caller, project_id, action)
 
 
