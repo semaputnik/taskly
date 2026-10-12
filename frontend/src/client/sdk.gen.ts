@@ -532,6 +532,9 @@ export class TasksService {
      * has to be in its scope like any other project. It applies its owner's tags
      * freely, and needs the permission to create tags for a name that is not one
      * yet (FR-08.9).
+     *
+     * Every rule above is `app.tasks.create`'s own (#275, #281); this route
+     * keeps only binding the request and shaping the response.
      */
     public static createTask<ThrowOnError extends boolean = true>(options: Options<tasksCreateTaskData, ThrowOnError>) {
         return (options.client ?? client).post<tasksCreateTaskResponses, tasksCreateTaskErrors, ThrowOnError>({
@@ -691,6 +694,9 @@ export class CommentsService {
      *
      * A bot user needs the add-comments permission, and not update on tasks: it
      * can report on a task without being able to change it (FR-08.10).
+     *
+     * Every rule above is `app.comments.comment`'s own (#275, #281); this
+     * route keeps only binding the request and shaping the response.
      */
     public static createComment<ThrowOnError extends boolean = true>(options: Options<commentsCreateCommentData, ThrowOnError>) {
         return (options.client ?? client).post<commentsCreateCommentResponses, commentsCreateCommentErrors, ThrowOnError>({
