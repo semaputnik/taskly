@@ -460,7 +460,8 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
   themselves (`search_tasks`, `get_task`, `list_tags`, `create_task`,
   `update_task`, `complete_task`, `comment_task`, `delete_task`, and
   `whoami`) are spec #247's; `whoami`, `search_tasks`, `get_task`,
-  `list_tags`, `create_task` and `update_task` are built as of this entry.
+  `list_tags`, `create_task`, `update_task` and `complete_task` are built as
+  of this entry.
 - **FR-07.10** Every tool reads its arguments, reports its results and
   raises its refusals the same way:
   - **Ids.** A task is named by its full id or by the short prefix a
@@ -570,6 +571,29 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
   what was done — the tool's own description teaches the convention, since
   nothing in the product moves a task onto the owner because it entered
   Review, and there is no tool of its own for a hand-over.
+- **FR-07.16** `complete_task` closes a task through the same route
+  (`PATCH /tasks/{id}` with `status: done`) — its own tool rather than an
+  argument to `update_task`, for the two things closing needs that no other
+  status change does. Annotated consequential (destructive) rather than
+  idempotent, so a client confirms it before it runs. A parent with open
+  subtasks is refused until `subtasks` says `complete` (closes them too) or
+  `leave_uncompleted` (leaves each in the status it had, FR-02.5–FR-02.7);
+  unlike the REST API's own refusal, this one names the open subtasks by id
+  and title, since nothing else about this call would have shown the
+  subtree first. `subtasks` sent on a call that closes nothing — the task
+  is already done — is refused instead; closing an already-done task
+  otherwise changes nothing and says so (`already_done`), creating no
+  occurrence. Closing an occurrence of a recurring task creates the next
+  one (FR-01.14) and reports its id and due date, read back since
+  `update_task`'s own return value never carried it; the due date comes
+  from the series' own schedule (FR-01.15), not from when this call ran.
+  `comment` records a note on the task as this bot user's, in the same
+  call (FR-03.1, FR-08.10) — its own `add_comments` grant is checked, and
+  refused by name, before anything closes, whether or not there turns out
+  to be anything to close; the archive, the scope and a missing
+  `update_tasks` grant are each refused the way every other tool here
+  refuses them (FR-07.10). Returns the closed task in full, alongside
+  `next_occurrence` when closing created one.
 
 ### F-08. Bot users
 
