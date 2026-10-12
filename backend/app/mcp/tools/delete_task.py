@@ -88,9 +88,11 @@ def delete_task(
         except HTTPException as exc:
             raise refusal(exc) from exc
 
-        # Built before the session closes: `deletions.delete_task` committed
-        # above, which expires every attribute SQLAlchemy would otherwise
-        # have to refresh from a now-closed session.
+        # `task` was loaded before the delete and the delete never renames a
+        # task, so its title is read here unchanged rather than queried back
+        # — `tasks.delete`'s own `UnitOfWork` (#284) has by now committed the
+        # deletion, but nothing about reading an already-loaded attribute
+        # depends on that.
         result = {"id": short_id(resolved_id), "title": task.title, "deleted": True}
 
     return result
