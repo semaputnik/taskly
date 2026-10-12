@@ -1213,6 +1213,19 @@ def has_open_subtasks(*, session: Session, task: Task) -> bool:
     return session.exec(statement).first() is not None
 
 
+def open_subtasks(*, session: Session, task: Task) -> list[Task]:
+    """
+    Every still-open descendant of `task`, at any depth — the same subtree
+    `has_open_subtasks` checks, read out in full rather than as a boolean,
+    for a refusal that names what is in the way (`complete_task`, #257)
+    instead of only saying something is.
+    """
+    subtree = _subtree_cte(task.id)
+    open_ids = select(subtree.c.id).where(subtree.c.status != TaskStatus.DONE)
+    statement = select(Task).where(col(Task.id).in_(open_ids)).order_by(col(Task.created_at))
+    return list(session.exec(statement).all())
+
+
 def has_subtasks(*, session: Session, task: Task) -> bool:
     """
     Whether the task still has subtasks that are not deleted.
