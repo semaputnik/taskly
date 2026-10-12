@@ -1,15 +1,16 @@
 """
 `create_task` (spec #247, #255): file a task, a subtask or a recurring one.
 
-Built on `app.api.routes.tasks.create_task` itself — the Inbox default for a
-task created without a project, a subtask's own project, the assignee, the
-reporter, the tag grant and the recurrence checks are all that route's rules,
-called through to directly the same way `app.mcp.tools.whoami` calls
-`read_caller` — rather than re-derived here. This tool's own job is only to
-translate its MCP-style arguments (a project by name or id, a parent task by
-a full id or the short prefix a compact line prints, an assignee as `self`,
-`owner` or an id, a due date read by `app.mcp.conventions.resolve_date`) into
-the `TaskCreate` that route already takes.
+Calls `app.tasks.create` directly (#275, #281): the Inbox default for a task
+created without a project, a subtask's own project, the assignee, the
+reporter, the tag grant and the recurrence checks are all that operation's
+own rules now, the same ones a human's `POST /tasks` goes through — neither
+a route function nor a route-private constant is imported here any more.
+This tool's own job is only to translate its MCP-style arguments (a project
+by name or id, a parent task by a full id or the short prefix a compact line
+prints, an assignee as `self`, `owner` or an id, a due date read by
+`app.mcp.conventions.resolve_date`) into the `TaskCreate` that operation
+already takes.
 """
 
 from typing import Annotated, Any
@@ -18,7 +19,7 @@ from fastapi import HTTPException
 from mcp.server.mcpserver import Context
 from pydantic import Field
 
-from app.api.routes.tasks import create_task as _create_task
+from app import tasks
 from app.mcp.conventions import (
     open_caller,
     refusal,
@@ -34,9 +35,10 @@ from app.models import (
     TagName,
     TaskCreate,
     TaskPriority,
-    TaskPublic,
     TaskStatus,
 )
+from app.read_models import task_publics
+from app.refusals import Refusal
 
 
 @mcp_server.tool()
@@ -118,14 +120,12 @@ def create_task(
                 recurrence=recurrence,
                 status=status if status is not None else TaskStatus.BACKLOG,
             )
-            # `_create_task` is typed `-> Any` (a FastAPI route function,
-            # where that is how a `response_model` is declared); it always
-            # actually returns a `TaskPublic`, the full record this tool
-            # promises.
-            public: TaskPublic = _create_task(
-                session=session, caller=caller, task_in=task_in
-            )
-        except HTTPException as exc:
+            result = tasks.create(session, caller, task_in)
+        except (HTTPException, Refusal) as exc:
             raise refusal(exc) from exc
+
+        [public] = task_publics(
+            session, [result.task], projects={result.task.id: result.project.id}
+        )
 
     return public.model_dump(mode="json")

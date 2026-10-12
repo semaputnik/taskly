@@ -532,6 +532,9 @@ export class TasksService {
      * has to be in its scope like any other project. It applies its owner's tags
      * freely, and needs the permission to create tags for a name that is not one
      * yet (FR-08.9).
+     *
+     * Every rule above is `app.tasks.create`'s own (#275, #281); this route
+     * keeps only binding the request and shaping the response.
      */
     public static createTask<ThrowOnError extends boolean = true>(options: Options<tasksCreateTaskData, ThrowOnError>) {
         return (options.client ?? client).post<tasksCreateTaskResponses, tasksCreateTaskErrors, ThrowOnError>({
@@ -600,10 +603,12 @@ export class TasksService {
      *
      * Delete a task, and its subtasks with it.
      *
-     * The rows are marked deleted rather than removed, so the deletion can be
-     * reversed from the activity log later (FR-01.8). Because the cascade can
-     * take down far more than the task named here, a task that still has subtasks
-     * is only deleted when `delete_subtasks` says so (FR-01.11, FR-01.12).
+     * Every rule is `app.tasks.delete`'s own (#275, #282): the rows are marked
+     * deleted rather than removed, so the deletion can be reversed from the
+     * activity log later (FR-01.8), and a task that still has subtasks is
+     * refused until `delete_subtasks` confirms the cascade (FR-01.11,
+     * FR-01.12). This route keeps only binding the request and shaping the
+     * response.
      */
     public static deleteTask<ThrowOnError extends boolean = true>(options: Options<tasksDeleteTaskData, ThrowOnError>) {
         return (options.client ?? client).delete<tasksDeleteTaskResponses, tasksDeleteTaskErrors, ThrowOnError>({
@@ -633,20 +638,22 @@ export class TasksService {
      *
      * Update a task: its fields, status, assignee, or project.
      *
-     * Moving a task to done while it still has open subtasks is refused unless
-     * the request says what happens to them, through `subtasks`. Moving between
-     * open statuses never touches the subtasks.
+     * Every rule is `app.tasks.update`'s own (#275, #282): the due-date scope,
+     * the superseded-occurrence refusal, the subtask-project rule, the
+     * assignee rules, tags replacing wholesale, and delegating whole to
+     * `app.tasks.complete` when the request moves `status` to `done` — this
+     * route keeps only binding the request and shaping the response.
      *
-     * Handing finished work over: a bot user that has done a task sets its
-     * status to `review` and, by convention, assigns it to the owner
-     * (`assignee_id` set to the owner's id) in the same request. The two are
-     * independent — nothing assigns a task to the owner because it entered
-     * review, and a task left assigned to the bot does not reach the owner's
-     * dashboard (FR-01.4a, FR-06.7).
+     * Moving between open statuses never touches the subtasks. Handing finished
+     * work over: a bot user that has done a task sets its status to `review`
+     * and, by convention, assigns it to the owner (`assignee_id` set to the
+     * owner's id) in the same request. The two are independent — nothing
+     * assigns a task to the owner because it entered review, and a task left
+     * assigned to the bot does not reach the owner's dashboard (FR-01.4a,
+     * FR-06.7).
      *
-     * Moving an occurrence of a recurring task to done creates the next one. Moving
-     * the due date of an open occurrence needs `due_date_scope` to say whether
-     * the rest of the series moves with it.
+     * Moving the due date of an open occurrence needs `due_date_scope` to say
+     * whether the rest of the series moves with it.
      *
      * A bot user needs the task in its scope and, to move it, the destination
      * too (FR-08.8). It applies and removes its owner's tags freely, and needs
@@ -689,6 +696,9 @@ export class CommentsService {
      *
      * A bot user needs the add-comments permission, and not update on tasks: it
      * can report on a task without being able to change it (FR-08.10).
+     *
+     * Every rule above is `app.comments.comment`'s own (#275, #281); this
+     * route keeps only binding the request and shaping the response.
      */
     public static createComment<ThrowOnError extends boolean = true>(options: Options<commentsCreateCommentData, ThrowOnError>) {
         return (options.client ?? client).post<commentsCreateCommentResponses, commentsCreateCommentErrors, ThrowOnError>({

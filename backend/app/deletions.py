@@ -60,13 +60,23 @@ def _begin(session: Session, deletion: Deletion) -> Deletion:
     return deletion
 
 
-def delete_task(session: Session, task: Task) -> uuid.UUID:
-    """Delete a task and its subtree as one event (FR-01.8, FR-01.11)."""
+def delete_task(session: Session, task: Task, *, commit: bool = True) -> uuid.UUID:
+    """
+    Delete a task and its subtree as one event (FR-01.8, FR-01.11).
+
+    With `commit=False` the caller commits (#284, ADR-0013): `app.tasks.
+    delete` is this function's only caller that passes it, so its own
+    `UnitOfWork` decides when the whole act — marking the subtree, and
+    whatever else the operation staged before calling this — lands together.
+    """
     deletion = _begin(session, Deletion(owner_id=task.owner_id, task_id=task.id))
     _mark(session, deletion, crud.subtree_ids(task.id))
     task.deletion_id = deletion.id
     session.add(task)
-    session.commit()
+    if commit:
+        session.commit()
+    else:
+        session.flush()
     return deletion.id
 
 
