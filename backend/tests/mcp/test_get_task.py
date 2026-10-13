@@ -1,14 +1,20 @@
 """
 `get_task` (spec #247, #254): one task read whole, its subtasks, comments and
 attachment names included only when asked for.
+
+Exercised against `get_task_body` directly (#302) — see `test_whoami.py`'s
+own module docstring for why, and where the protocol itself is still tested.
 """
 
 from datetime import date
 
+import pytest
 from fastapi.testclient import TestClient
+from mcp.server.mcpserver.exceptions import ToolError
 from sqlmodel import Session
 
 from app.core.config import settings
+from app.mcp.tools.get_task import get_task_body
 from tests.utils.accounts import (
     ALL_PERMISSIONS,
     archive_project,
@@ -19,7 +25,8 @@ from tests.utils.accounts import (
     my_id,
     token_headers,
 )
-from tests.utils.mcp import ToolError, bot_headers, call_tool, list_tools
+from tests.utils.mcp import bot_headers
+from tests.utils.mcp_body import caller_for
 
 API = settings.API_V1_STR
 DUE_DATE = date.today().isoformat()
@@ -49,18 +56,6 @@ def _upload(
     return r.json()
 
 
-def test_tools_list_advertises_get_task_read_only(
-    client: TestClient, db: Session
-) -> None:
-    owner = create_user_headers(client, db)
-    headers = bot_headers(client, owner)
-
-    tools = list_tools(client, headers)
-    get_task = next(t for t in tools if t["name"] == "get_task")
-    assert get_task["description"]
-    assert get_task["annotations"]["readOnlyHint"] is True
-
-
 def test_get_task_answers_the_full_record(client: TestClient, db: Session) -> None:
     owner = create_user_headers(client, db)
     project_id = create_project(client, owner, name="Work")
@@ -75,8 +70,9 @@ def test_get_task_answers_the_full_record(client: TestClient, db: Session) -> No
         tags=["ci"],
     )
     headers = bot_headers(client, owner, project_ids=[project_id])
+    caller = caller_for(db, headers)
 
-    result = call_tool(client, headers, "get_task", {"task_id": task["id"]})
+    result = get_task_body(db, caller, task_id=task["id"])
 
     assert result["id"] == task["id"]
     assert result["title"] == "Ship it"
@@ -98,9 +94,10 @@ def test_get_task_accepts_the_short_id_prefix(client: TestClient, db: Session) -
     project_id = create_project(client, owner)
     task = create_task_record(client, owner, "Root", project_id=project_id)
     headers = bot_headers(client, owner, project_ids=[project_id])
+    caller = caller_for(db, headers)
 
     short_id = task["id"].replace("-", "")[:8]
-    result = call_tool(client, headers, "get_task", {"task_id": short_id})
+    result = get_task_body(db, caller, task_id=short_id)
     assert result["id"] == task["id"]
 
 
@@ -112,8 +109,9 @@ def test_a_subtask_reports_its_root_tasks_project(
     root = create_task_record(client, owner, "Root", project_id=project_id)
     sub = create_task_record(client, owner, "Sub", parent_id=root["id"])
     headers = bot_headers(client, owner, project_ids=[project_id])
+    caller = caller_for(db, headers)
 
-    result = call_tool(client, headers, "get_task", {"task_id": sub["id"]})
+    result = get_task_body(db, caller, task_id=sub["id"])
     assert result["project_id"] == project_id
 
 
@@ -126,6 +124,7 @@ def test_a_bot_users_handover_to_review_is_reported(
     headers = bot_headers(
         client, owner, project_ids=[project_id], permissions=ALL_PERMISSIONS
     )
+    caller = caller_for(db, headers)
     owner_id = my_id(client, owner)
 
     r = client.patch(
@@ -135,7 +134,7 @@ def test_a_bot_users_handover_to_review_is_reported(
     )
     assert r.status_code == 200, r.text
 
-    result = call_tool(client, headers, "get_task", {"task_id": task["id"]})
+    result = get_task_body(db, caller, task_id=task["id"])
     assert result["handover"] is not None
     assert result["handover"]["bot_user"]["name"] == "Agent"
 
@@ -156,10 +155,9 @@ def test_include_subtasks_lists_direct_subtasks_as_compact_lines(
     )
     assert r.status_code == 200, r.text
     headers = bot_headers(client, owner, project_ids=[project_id])
+    caller = caller_for(db, headers)
 
-    result = call_tool(
-        client, headers, "get_task", {"task_id": root["id"], "include_subtasks": True}
-    )
+    result = get_task_body(db, caller, task_id=root["id"], include_subtasks=True)
     subtasks = {row["title"]: row for row in result["subtasks"]}
     assert set(subtasks) == {"Sub one", "Sub two"}
     assert subtasks["Sub one"]["status"] == "backlog"
@@ -176,8 +174,9 @@ def test_without_include_subtasks_no_subtasks_key_is_present(
     root = create_task_record(client, owner, "Root", project_id=project_id)
     create_task_record(client, owner, "Sub", parent_id=root["id"])
     headers = bot_headers(client, owner, project_ids=[project_id])
+    caller = caller_for(db, headers)
 
-    result = call_tool(client, headers, "get_task", {"task_id": root["id"]})
+    result = get_task_body(db, caller, task_id=root["id"])
     assert "subtasks" not in result
 
 
@@ -198,11 +197,10 @@ def test_include_comments_lists_authors_and_moments(
         permissions=ALL_PERMISSIONS,
         name="Agent",
     )
+    caller = caller_for(db, headers)
     _add_comment(client, headers, task["id"], "From the bot")
 
-    result = call_tool(
-        client, headers, "get_task", {"task_id": task["id"], "include_comments": True}
-    )
+    result = get_task_body(db, caller, task_id=task["id"], include_comments=True)
     comments = result["comments"]
     assert [c["body"] for c in comments] == ["From the owner", "From the bot"]
     assert comments[0]["author"] == "owner"
@@ -221,13 +219,9 @@ def test_include_attachments_lists_names_and_sizes_never_bytes(
     task = create_task_record(client, owner, "Task", project_id=project_id)
     _upload(client, owner, task["id"], filename="notes.txt", content=b"hello world")
     headers = bot_headers(client, owner, project_ids=[project_id])
+    caller = caller_for(db, headers)
 
-    result = call_tool(
-        client,
-        headers,
-        "get_task",
-        {"task_id": task["id"], "include_attachments": True},
-    )
+    result = get_task_body(db, caller, task_id=task["id"], include_attachments=True)
     [attachment] = result["attachments"]
     assert attachment == {"filename": "notes.txt", "size": len(b"hello world")}
 
@@ -245,13 +239,13 @@ def test_without_read_tasks_permission_is_refused_by_name(
         client, owner, project_ids=[project_id], permissions={}, name="No read"
     )
     headers = token_headers(client, owner, bot["id"])
+    caller = caller_for(db, headers)
 
-    try:
-        call_tool(client, headers, "get_task", {"task_id": task["id"]})
-        raise AssertionError("expected a refusal")
-    except ToolError as exc:
-        assert "permission_not_granted" in exc.message
-        assert "read tasks" in exc.message
+    with pytest.raises(ToolError) as exc_info:
+        get_task_body(db, caller, task_id=task["id"])
+    message = str(exc_info.value)
+    assert "permission_not_granted" in message
+    assert "read tasks" in message
 
 
 def test_a_task_outside_scope_is_refused_by_name(
@@ -262,13 +256,13 @@ def test_a_task_outside_scope_is_refused_by_name(
     outside = create_project(client, owner, name="Outside")
     task = create_task_record(client, owner, "Task", project_id=outside)
     headers = bot_headers(client, owner, project_ids=[in_scope])
+    caller = caller_for(db, headers)
 
-    try:
-        call_tool(client, headers, "get_task", {"task_id": task["id"]})
-        raise AssertionError("expected a refusal")
-    except ToolError as exc:
-        assert "outside_scope" in exc.message
-        assert "Outside" in exc.message
+    with pytest.raises(ToolError) as exc_info:
+        get_task_body(db, caller, task_id=task["id"])
+    message = str(exc_info.value)
+    assert "outside_scope" in message
+    assert "Outside" in message
 
 
 def test_a_task_in_the_archive_is_refused(client: TestClient, db: Session) -> None:
@@ -276,29 +270,22 @@ def test_a_task_in_the_archive_is_refused(client: TestClient, db: Session) -> No
     project_id = create_project(client, owner, name="Shelved")
     task = create_task_record(client, owner, "Task", project_id=project_id)
     headers = bot_headers(client, owner, project_ids=[project_id])
+    caller = caller_for(db, headers)
 
     r = archive_project(client, owner, project_id)
     assert r.status_code == 200, r.text
 
-    try:
-        call_tool(client, headers, "get_task", {"task_id": task["id"]})
-        raise AssertionError("expected a refusal")
-    except ToolError as exc:
-        assert "project_archived" in exc.message
+    with pytest.raises(ToolError) as exc_info:
+        get_task_body(db, caller, task_id=task["id"])
+    assert "project_archived" in str(exc_info.value)
 
 
 def test_a_task_not_there_at_all_is_refused(client: TestClient, db: Session) -> None:
     owner = create_user_headers(client, db)
     project_id = create_project(client, owner)
     headers = bot_headers(client, owner, project_ids=[project_id])
+    caller = caller_for(db, headers)
 
-    try:
-        call_tool(
-            client,
-            headers,
-            "get_task",
-            {"task_id": "00000000-0000-0000-0000-000000000000"},
-        )
-        raise AssertionError("expected a refusal")
-    except ToolError as exc:
-        assert "not_found" in exc.message
+    with pytest.raises(ToolError) as exc_info:
+        get_task_body(db, caller, task_id="00000000-0000-0000-0000-000000000000")
+    assert "not_found" in str(exc_info.value)

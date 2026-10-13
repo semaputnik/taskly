@@ -44,6 +44,7 @@ from sqlmodel import Session
 
 from app import crud
 from app.activity_log import ActivityNarrowing, read_activity
+from app.api.deps import Caller
 from app.mcp.conventions import (
     actor_label,
     list_result,
@@ -153,46 +154,74 @@ def search_activity(
     still free to narrow with.
     """
     with open_caller(ctx) as (session, caller):
-        try:
-            resolved_task_id = (
-                resolve_task_id(session, caller, task_id)
-                if task_id is not None
-                else None
-            )
-            resolved_project_id = (
-                resolve_project_id(session, caller, project)
-                if project is not None
-                else None
-            )
-            actor_bot_user_id, by_bots, by_user = (
-                resolve_actor(session, caller, actor)
-                if actor is not None
-                else (None, False, False)
-            )
-            since_at = since_datetime(since) if since is not None else None
-            until_at = until_datetime(until) if until is not None else None
+        return search_activity_body(
+            session,
+            caller,
+            kind=kind,
+            task_id=task_id,
+            project=project,
+            actor=actor,
+            since=since,
+            until=until,
+            order=order,
+            limit=limit,
+            offset=offset,
+        )
 
-            page = read_activity(
-                session,
-                caller,
-                ActivityNarrowing(
-                    kind=kind,
-                    task_id=resolved_task_id,
-                    project_id=resolved_project_id,
-                    actor_bot_user_id=actor_bot_user_id,
-                    by_bots=by_bots,
-                    by_user=by_user,
-                    since=since_at,
-                    until=until_at,
-                    order=order,
-                    skip=offset,
-                    limit=limit,
-                ),
-            )
-        except HTTPException as exc:
-            raise refusal(exc) from exc
 
-        rows = _rows(session, page.entries)
+def search_activity_body(
+    session: Session,
+    caller: Caller,
+    *,
+    kind: ActivityKind | None = None,
+    task_id: str | None = None,
+    project: str | None = None,
+    actor: str | None = None,
+    since: str | None = None,
+    until: str | None = None,
+    order: ActivityOrder = ActivityOrder.NEWEST,
+    limit: int = 50,
+    offset: int = 0,
+) -> dict[str, Any]:
+    """`search_activity`'s own body (#302): callable directly, with any session and any `Caller`, with no protocol in between."""
+    try:
+        resolved_task_id = (
+            resolve_task_id(session, caller, task_id) if task_id is not None else None
+        )
+        resolved_project_id = (
+            resolve_project_id(session, caller, project)
+            if project is not None
+            else None
+        )
+        actor_bot_user_id, by_bots, by_user = (
+            resolve_actor(session, caller, actor)
+            if actor is not None
+            else (None, False, False)
+        )
+        since_at = since_datetime(since) if since is not None else None
+        until_at = until_datetime(until) if until is not None else None
+
+        page = read_activity(
+            session,
+            caller,
+            ActivityNarrowing(
+                kind=kind,
+                task_id=resolved_task_id,
+                project_id=resolved_project_id,
+                actor_bot_user_id=actor_bot_user_id,
+                by_bots=by_bots,
+                by_user=by_user,
+                since=since_at,
+                until=until_at,
+                order=order,
+                skip=offset,
+                limit=limit,
+            ),
+        )
+    except HTTPException as exc:
+        raise refusal(exc) from exc
+
+    rows = _rows(session, page.entries)
 
     narrow_with = narrow_hint(
         ("kind", kind is not None),

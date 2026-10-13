@@ -17,7 +17,14 @@ from tests.utils.accounts import (
     create_user_headers,
     token_headers,
 )
-from tests.utils.mcp import bot_headers, call_tool, open_session, rpc, start_session
+from tests.utils.mcp import (
+    bot_headers,
+    call_tool,
+    list_tools,
+    open_session,
+    rpc,
+    start_session,
+)
 
 API = settings.API_V1_STR
 
@@ -149,3 +156,87 @@ def test_two_bot_users_with_different_scopes_are_served_through_the_same_endpoin
     assert [p["id"] for p in beta_who["projects"]] == [second_project]
     assert alpha_who["actor"]["name"] == "Alpha"
     assert beta_who["actor"]["name"] == "Beta"
+
+
+# Registration: one `tools/list` call covers every tool's own annotations
+# (#302) — each tool used to assert this for itself, over its own protocol
+# round trip; the decorator's wiring is the one thing here that can only be
+# checked this way, so it is checked once, for all eleven at once, rather
+# than eleven times.
+
+_EXPECTED_ANNOTATIONS = {
+    "whoami": {"readOnlyHint": True},
+    "get_task": {"readOnlyHint": True},
+    "search_tasks": {"readOnlyHint": True},
+    "search_activity": {"readOnlyHint": True},
+    "list_completions": {"readOnlyHint": True},
+    "list_tags": {"readOnlyHint": True},
+    "create_task": {},
+    "comment_task": {},
+    "update_task": {"idempotentHint": True},
+    "complete_task": {"destructiveHint": True},
+    "delete_task": {"destructiveHint": True},
+}
+
+
+def test_tools_advertise_their_annotations(client: TestClient, db: Session) -> None:
+    owner = create_user_headers(client, db)
+    headers = bot_headers(client, owner)
+
+    tools = {t["name"]: t for t in list_tools(client, headers)}
+    assert set(tools) == set(_EXPECTED_ANNOTATIONS)
+
+    for name, expected in _EXPECTED_ANNOTATIONS.items():
+        tool = tools[name]
+        assert tool["description"], name
+        annotations = tool.get("annotations") or {}
+        for flag in ("readOnlyHint", "destructiveHint", "idempotentHint"):
+            assert bool(annotations.get(flag)) == bool(expected.get(flag)), (
+                name,
+                flag,
+            )
+
+
+# The refusal envelope: what a tool call that fails actually puts on the
+# wire, underneath `tests.utils.mcp.call_tool`'s own `ToolError` (#302) —
+# every other refusal test here reaches for a tool body directly and never
+# sees this shape at all.
+
+
+def test_the_refusal_envelope_is_a_code_and_one_sentence_iserror_true(
+    client: TestClient, db: Session
+) -> None:
+    owner = create_user_headers(client, db)
+    headers = bot_headers(client, owner)
+    session = start_session(client, headers)
+
+    response = rpc(
+        client,
+        session.headers,
+        {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "tools/call",
+            "params": {
+                "name": "get_task",
+                "arguments": {"task_id": "00000000-0000-0000-0000-000000000000"},
+            },
+        },
+        session_id=session.session_id,
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert "error" not in body, body.get("error")
+    result = body["result"]
+    assert result["isError"] is True
+    [content] = result["content"]
+    assert content["type"] == "text"
+    # The SDK's own tool runner prefixes every failure, anticipated or not,
+    # with "Error executing tool <name>: " (`mcp.server.mcpserver.tools.base.
+    # ToolRunner.run`); what a tool itself raises (`app.mcp.conventions.refuse`)
+    # is the "<code>: <message>" after that prefix — never a bare status code.
+    prefix = "Error executing tool get_task: "
+    assert content["text"].startswith(prefix)
+    code, _, message = content["text"].removeprefix(prefix).partition(": ")
+    assert code == "not_found"
+    assert message

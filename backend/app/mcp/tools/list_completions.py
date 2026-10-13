@@ -184,46 +184,68 @@ def list_completions(
     counted (ADR-0011).
     """
     with open_caller(ctx) as (session, caller):
-        try:
-            access.authorize_activity_log(caller)
-            project_id = (
-                _resolve_narrowing_project_id(session, caller, project)
-                if project is not None
-                else None
-            )
-            actor_bot_user_id, by_bots, by_user = (
-                resolve_actor(session, caller, actor)
-                if actor is not None
-                else (None, False, False)
-            )
-            tag_name = (
-                resolve_tag_name(session, caller.owner_id, tag)
-                if tag is not None
-                else None
-            )
-            since_at = since_datetime(since)
-            until_at = until_datetime(until)
-        except HTTPException as exc:
-            raise refusal(exc) from exc
-
-        entries = _completion_entries(
+        return list_completions_body(
             session,
             caller,
-            actor_bot_user_id=actor_bot_user_id,
-            by_bots=by_bots,
-            by_user=by_user,
-            since_at=since_at,
-            until_at=until_at,
+            since=since,
+            until=until,
+            project=project,
+            actor=actor,
+            tag=tag,
+            limit=limit,
         )
-        completions = [c for entry in entries for c in _expand(entry)]
-        enriched, bots = _enrich(session, caller, completions)
 
-        if project_id is not None:
-            enriched = [e for e in enriched if e.project_id == project_id]
-        if tag_name is not None:
-            enriched = [e for e in enriched if tag_name in e.tags]
 
-        summary = _summary(enriched, bots)
+def list_completions_body(
+    session: Session,
+    caller: Caller,
+    *,
+    since: str,
+    until: str,
+    project: str | None = None,
+    actor: str | None = None,
+    tag: str | None = None,
+    limit: int = 50,
+) -> dict[str, Any]:
+    """`list_completions`'s own body (#302): callable directly, with any session and any `Caller`, with no protocol in between."""
+    try:
+        access.authorize_activity_log(caller)
+        project_id = (
+            _resolve_narrowing_project_id(session, caller, project)
+            if project is not None
+            else None
+        )
+        actor_bot_user_id, by_bots, by_user = (
+            resolve_actor(session, caller, actor)
+            if actor is not None
+            else (None, False, False)
+        )
+        tag_name = (
+            resolve_tag_name(session, caller.owner_id, tag) if tag is not None else None
+        )
+        since_at = since_datetime(since)
+        until_at = until_datetime(until)
+    except HTTPException as exc:
+        raise refusal(exc) from exc
+
+    entries = _completion_entries(
+        session,
+        caller,
+        actor_bot_user_id=actor_bot_user_id,
+        by_bots=by_bots,
+        by_user=by_user,
+        since_at=since_at,
+        until_at=until_at,
+    )
+    completions = [c for entry in entries for c in _expand(entry)]
+    enriched, bots = _enrich(session, caller, completions)
+
+    if project_id is not None:
+        enriched = [e for e in enriched if e.project_id == project_id]
+    if tag_name is not None:
+        enriched = [e for e in enriched if tag_name in e.tags]
+
+    summary = _summary(enriched, bots)
 
     enriched.sort(key=lambda e: e.completion.closed_at, reverse=True)
     rows = [_row(e, bots) for e in enriched[:limit]]

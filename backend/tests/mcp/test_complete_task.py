@@ -1,16 +1,23 @@
 """
 `complete_task` (spec #247, #257): close a task, answer for its subtasks,
-meet the next occurrence — driven over the protocol with a bot user's token,
-the same way an agent would.
+meet the next occurrence.
+
+Exercised against `complete_task_body` directly (#302) — see
+`test_whoami.py`'s own module docstring for why, and where the protocol
+itself is still tested.
 """
 
 from datetime import date, timedelta
 from typing import Any
 
+import pytest
 from fastapi.testclient import TestClient
+from mcp.server.mcpserver.exceptions import ToolError
 from sqlmodel import Session
 
 from app.core.config import settings
+from app.mcp.tools.complete_task import complete_task_body
+from app.models import SubtaskCompletion
 from tests.utils.accounts import (
     archive_project,
     create_project,
@@ -18,7 +25,8 @@ from tests.utils.accounts import (
     create_task_record,
     create_user_headers,
 )
-from tests.utils.mcp import ToolError, bot_headers, call_tool, list_tools
+from tests.utils.mcp import bot_headers
+from tests.utils.mcp_body import caller_for
 
 API = settings.API_V1_STR
 
@@ -39,18 +47,15 @@ def _comments(client: TestClient, headers: dict[str, str], task_id: str) -> list
     return r.json()["data"]
 
 
-def test_tools_list_advertises_complete_task_as_consequential(
-    client: TestClient, db: Session
-) -> None:
-    owner = create_user_headers(client, db)
-    headers = bot_headers(client, owner)
-
-    tools = list_tools(client, headers)
-    complete_task = next(t for t in tools if t["name"] == "complete_task")
-    assert complete_task["description"]
-    annotations = complete_task.get("annotations") or {}
-    assert annotations.get("destructiveHint")
-    assert not annotations.get("readOnlyHint")
+def _get_by_short_id(
+    client: TestClient, headers: dict[str, str], short_id: str
+) -> dict[str, Any]:
+    r = client.get(f"{API}/tasks/", headers=headers)
+    assert r.status_code == 200, r.text
+    [found] = [
+        t for t in r.json()["data"] if t["id"].replace("-", "").startswith(short_id)
+    ]
+    return found
 
 
 # --- No subtasks: the id is enough -------------------------------------------
@@ -65,8 +70,9 @@ def test_closing_a_task_with_no_open_subtasks_needs_only_its_id(
     headers = bot_headers(
         client, owner, project_ids=[project_id], permissions=COMPLETE_ONLY
     )
+    caller = caller_for(db, headers)
 
-    result = call_tool(client, headers, "complete_task", {"task_id": task["id"]})
+    result = complete_task_body(db, caller, task_id=task["id"])
 
     assert result["status"] == "done"
     assert result["title"] == "Ship it"
@@ -81,8 +87,9 @@ def test_a_short_id_prefix_resolves(client: TestClient, db: Session) -> None:
     headers = bot_headers(
         client, owner, project_ids=[project_id], permissions=COMPLETE_ONLY
     )
+    caller = caller_for(db, headers)
 
-    result = call_tool(client, headers, "complete_task", {"task_id": task["id"][:8]})
+    result = complete_task_body(db, caller, task_id=task["id"][:8])
     assert result["id"] == task["id"]
     assert result["status"] == "done"
 
@@ -100,16 +107,16 @@ def test_closing_a_parent_with_open_subtasks_is_refused_naming_them(
     headers = bot_headers(
         client, owner, project_ids=[project_id], permissions=COMPLETE_ONLY
     )
+    caller = caller_for(db, headers)
 
-    try:
-        call_tool(client, headers, "complete_task", {"task_id": root["id"]})
-        raise AssertionError("expected a refusal")
-    except ToolError as exc:
-        assert "task_has_uncompleted_subtasks" in exc.message
-        assert "Child" in exc.message
-        assert child["id"][:8] in exc.message
-        assert "complete" in exc.message
-        assert "leave_uncompleted" in exc.message
+    with pytest.raises(ToolError) as exc_info:
+        complete_task_body(db, caller, task_id=root["id"])
+    message = str(exc_info.value)
+    assert "task_has_uncompleted_subtasks" in message
+    assert "Child" in message
+    assert child["id"][:8] in message
+    assert "complete" in message
+    assert "leave_uncompleted" in message
     assert _get(client, owner, root["id"])["status"] == "backlog"
 
 
@@ -123,12 +130,10 @@ def test_answering_complete_closes_the_subtasks_too(
     headers = bot_headers(
         client, owner, project_ids=[project_id], permissions=COMPLETE_ONLY
     )
+    caller = caller_for(db, headers)
 
-    result = call_tool(
-        client,
-        headers,
-        "complete_task",
-        {"task_id": root["id"], "subtasks": "complete"},
+    result = complete_task_body(
+        db, caller, task_id=root["id"], subtasks=SubtaskCompletion.COMPLETE
     )
 
     assert result["status"] == "done"
@@ -147,12 +152,10 @@ def test_answering_leave_uncompleted_leaves_them_as_they_were(
     headers = bot_headers(
         client, owner, project_ids=[project_id], permissions=COMPLETE_ONLY
     )
+    caller = caller_for(db, headers)
 
-    result = call_tool(
-        client,
-        headers,
-        "complete_task",
-        {"task_id": root["id"], "subtasks": "leave_uncompleted"},
+    result = complete_task_body(
+        db, caller, task_id=root["id"], subtasks=SubtaskCompletion.LEAVE_UNCOMPLETED
     )
 
     assert result["status"] == "done"
@@ -171,9 +174,10 @@ def test_closing_an_already_done_task_changes_nothing_and_says_so(
     headers = bot_headers(
         client, owner, project_ids=[project_id], permissions=COMPLETE_ONLY
     )
-    call_tool(client, headers, "complete_task", {"task_id": task["id"]})
+    caller = caller_for(db, headers)
+    complete_task_body(db, caller, task_id=task["id"])
 
-    result = call_tool(client, headers, "complete_task", {"task_id": task["id"]})
+    result = complete_task_body(db, caller, task_id=task["id"])
 
     assert result["status"] == "done"
     assert result["already_done"] is True
@@ -189,19 +193,16 @@ def test_the_subtasks_answer_is_refused_on_a_call_that_closes_nothing(
     headers = bot_headers(
         client, owner, project_ids=[project_id], permissions=COMPLETE_ONLY
     )
-    call_tool(client, headers, "complete_task", {"task_id": task["id"]})
+    caller = caller_for(db, headers)
+    complete_task_body(db, caller, task_id=task["id"])
 
-    try:
-        call_tool(
-            client,
-            headers,
-            "complete_task",
-            {"task_id": task["id"], "subtasks": "complete"},
+    with pytest.raises(ToolError) as exc_info:
+        complete_task_body(
+            db, caller, task_id=task["id"], subtasks=SubtaskCompletion.COMPLETE
         )
-        raise AssertionError("expected a refusal")
-    except ToolError as exc:
-        assert "invalid_argument" in exc.message
-        assert "already done" in exc.message
+    message = str(exc_info.value)
+    assert "invalid_argument" in message
+    assert "already done" in message
 
 
 # --- Recurrence: the next occurrence reported, to the series' own schedule --
@@ -217,8 +218,9 @@ def test_closing_a_recurring_occurrence_reports_the_next_ones_id_and_due_date(
     headers = bot_headers(
         client, owner, project_ids=[project_id], permissions=COMPLETE_ONLY
     )
+    caller = caller_for(db, headers)
 
-    result = call_tool(client, headers, "complete_task", {"task_id": task["id"]})
+    result = complete_task_body(db, caller, task_id=task["id"])
 
     assert result["status"] == "done"
     next_occurrence = result["next_occurrence"]
@@ -240,8 +242,9 @@ def test_the_next_due_date_is_counted_from_the_schedule_not_the_closing_moment(
     headers = bot_headers(
         client, owner, project_ids=[project_id], permissions=COMPLETE_ONLY
     )
+    caller = caller_for(db, headers)
 
-    result = call_tool(client, headers, "complete_task", {"task_id": task["id"]})
+    result = complete_task_body(db, caller, task_id=task["id"])
 
     # From the due date, not from today — even though that is still overdue.
     assert (
@@ -260,8 +263,9 @@ def test_closing_an_occurrence_leaves_exactly_one_open_occurrence(
     headers = bot_headers(
         client, owner, project_ids=[project_id], permissions=COMPLETE_ONLY
     )
+    caller = caller_for(db, headers)
 
-    call_tool(client, headers, "complete_task", {"task_id": task["id"]})
+    complete_task_body(db, caller, task_id=task["id"])
 
     r = client.get(f"{API}/tasks/", headers=owner)
     assert r.status_code == 200, r.text
@@ -269,17 +273,6 @@ def test_closing_an_occurrence_leaves_exactly_one_open_occurrence(
     open_ones = [t for t in matching if t["status"] != "done"]
     assert len(matching) == 2
     assert len(open_ones) == 1
-
-
-def _get_by_short_id(
-    client: TestClient, headers: dict[str, str], short_id: str
-) -> dict[str, Any]:
-    r = client.get(f"{API}/tasks/", headers=headers)
-    assert r.status_code == 200, r.text
-    [found] = [
-        t for t in r.json()["data"] if t["id"].replace("-", "").startswith(short_id)
-    ]
-    return found
 
 
 # --- Comment: recorded in the same call, its own grant checked first --------
@@ -298,12 +291,10 @@ def test_a_comment_is_recorded_as_the_bot_users_in_the_same_call(
         permissions={**COMPLETE_ONLY, "add_comments": True},
         name="Closer bot",
     )
+    caller = caller_for(db, headers)
 
-    result = call_tool(
-        client,
-        headers,
-        "complete_task",
-        {"task_id": task["id"], "comment": "Shipped and verified."},
+    result = complete_task_body(
+        db, caller, task_id=task["id"], comment="Shipped and verified."
     )
 
     assert result["status"] == "done"
@@ -321,18 +312,13 @@ def test_a_comment_without_the_grant_is_refused_by_name_before_anything_closes(
     headers = bot_headers(
         client, owner, project_ids=[project_id], permissions=COMPLETE_ONLY
     )
+    caller = caller_for(db, headers)
 
-    try:
-        call_tool(
-            client,
-            headers,
-            "complete_task",
-            {"task_id": task["id"], "comment": "Done."},
-        )
-        raise AssertionError("expected a refusal")
-    except ToolError as exc:
-        assert "permission_not_granted" in exc.message
-        assert "add comments" in exc.message
+    with pytest.raises(ToolError) as exc_info:
+        complete_task_body(db, caller, task_id=task["id"], comment="Done.")
+    message = str(exc_info.value)
+    assert "permission_not_granted" in message
+    assert "add comments" in message
 
     assert _get(client, owner, task["id"])["status"] == "backlog"
     assert _comments(client, owner, task["id"]) == []
@@ -348,13 +334,13 @@ def test_without_update_tasks_permission_is_refused_by_name(
     project_id = create_project(client, owner)
     task = create_task_record(client, owner, "T", project_id=project_id)
     headers = bot_headers(client, owner, project_ids=[project_id], permissions={})
+    caller = caller_for(db, headers)
 
-    try:
-        call_tool(client, headers, "complete_task", {"task_id": task["id"]})
-        raise AssertionError("expected a refusal")
-    except ToolError as exc:
-        assert "permission_not_granted" in exc.message
-        assert "update tasks" in exc.message
+    with pytest.raises(ToolError) as exc_info:
+        complete_task_body(db, caller, task_id=task["id"])
+    message = str(exc_info.value)
+    assert "permission_not_granted" in message
+    assert "update tasks" in message
 
 
 def test_outside_scope_is_refused_by_name(client: TestClient, db: Session) -> None:
@@ -365,13 +351,13 @@ def test_outside_scope_is_refused_by_name(client: TestClient, db: Session) -> No
     headers = bot_headers(
         client, owner, project_ids=[inside], permissions=COMPLETE_ONLY
     )
+    caller = caller_for(db, headers)
 
-    try:
-        call_tool(client, headers, "complete_task", {"task_id": task["id"]})
-        raise AssertionError("expected a refusal")
-    except ToolError as exc:
-        assert "outside_scope" in exc.message
-        assert "Outside" in exc.message
+    with pytest.raises(ToolError) as exc_info:
+        complete_task_body(db, caller, task_id=task["id"])
+    message = str(exc_info.value)
+    assert "outside_scope" in message
+    assert "Outside" in message
 
 
 def test_the_archive_refuses_a_close(client: TestClient, db: Session) -> None:
@@ -381,11 +367,10 @@ def test_the_archive_refuses_a_close(client: TestClient, db: Session) -> None:
     headers = bot_headers(
         client, owner, project_ids=[project_id], permissions=COMPLETE_ONLY
     )
+    caller = caller_for(db, headers)
     r = archive_project(client, owner, project_id)
     assert r.status_code == 200, r.text
 
-    try:
-        call_tool(client, headers, "complete_task", {"task_id": task["id"]})
-        raise AssertionError("expected a refusal")
-    except ToolError as exc:
-        assert "project_archived" in exc.message
+    with pytest.raises(ToolError) as exc_info:
+        complete_task_body(db, caller, task_id=task["id"])
+    assert "project_archived" in str(exc_info.value)
