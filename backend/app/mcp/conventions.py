@@ -198,15 +198,19 @@ def _resolve_by_name[T](raw: str, table: _Table[T], not_found: Callable[[], T]) 
     to write out on their own (#301): try `raw` as a uuid; failing that,
     run `table`'s own case-insensitive match; refuse with every candidate
     listed if more than one comes back, in the one shared shape ("“raw”
-    names N <noun>: <ids>. <instruction>") an ambiguous prefix, an
-    ambiguous project name and an ambiguous bot name all now share, rather
-    than each drifting on its own. `not_found` is the one step that
-    legitimately differs per caller — everywhere but `resolve_tag_name`, no
-    match at all is refused the same way (worded by the caller, since "no
-    task's id starts with" and "no project is named" are not the same
-    sentence); for `resolve_tag_name` alone, it is a pass-through instead,
-    since a tag name is a filter nothing satisfies, never a reference that
-    could be wrong.
+    names N <noun>: <candidates>. <instruction>") an ambiguous prefix, an
+    ambiguous project name and an ambiguous bot name all now share — what
+    a candidate's own label says still differs by table, since a project
+    or a bot user sharing the same name is only told apart by its id,
+    while two tasks sharing a prefix are told apart by their (different)
+    titles, quoted next to the short id a compact line already showed.
+
+    `not_found` is the one step that legitimately differs per caller —
+    everywhere but `resolve_tag_name`, no match at all is refused the same
+    way (worded by the caller, since "no task's id starts with" and "no
+    project is named" are not the same sentence); for `resolve_tag_name`
+    alone, it is a pass-through instead, since a tag name is a filter
+    nothing satisfies, never a reference that could be wrong.
     """
     try:
         parsed = uuid.UUID(raw)
@@ -273,9 +277,11 @@ def resolve_task_id(session: Session, caller: Caller, raw: str) -> uuid.UUID:
         if caller.bot is not None:
             conditions.append(col(Task.id).in_(tasks_in_projects(caller.project_ids)))
         rows = session.exec(
-            select(Task.id).where(*conditions).order_by(col(Task.created_at))
+            select(Task.id, Task.title)
+            .where(*conditions)
+            .order_by(col(Task.created_at))
         ).all()
-        return [(task_id, str(task_id)) for task_id in rows]
+        return [(task_id, f"{short_id(task_id)} “{title}”") for task_id, title in rows]
 
     return _resolve_by_name(
         raw,
