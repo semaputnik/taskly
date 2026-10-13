@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 
 import type { ActivityEntryPublic } from "@/client"
-import { entryWords, type EntryWords } from "./entryWords"
+import { type EntryWords, entryWords } from "./entryWords"
 
 function entry(
   action: ActivityEntryPublic["action"],
@@ -37,7 +37,11 @@ const cases: Case[] = [
       task: { project: { id: "p1", name: "Family Budget" } },
     }),
     names: { verb: "Created", subject: true, after: " in Family Budget" },
-    implicit: { verb: "created this in Family Budget", subject: false, after: "" },
+    implicit: {
+      verb: "created this in Family Budget",
+      subject: false,
+      after: "",
+    },
   },
   {
     name: "task_created, no project",
@@ -86,7 +90,9 @@ const cases: Case[] = [
     // A field `subject-implicit` does not recognise says nothing in that
     // voice, even though `names-its-subject` still lists its raw key.
     name: "task_changed, an unrecognised field",
-    entry: entry("task_changed", { changes: { custom_field: { from: 1, to: 2 } } }),
+    entry: entry("task_changed", {
+      changes: { custom_field: { from: 1, to: 2 } },
+    }),
     names: { verb: "Changed the custom_field of", subject: true, after: "" },
     implicit: null,
   },
@@ -157,14 +163,22 @@ const cases: Case[] = [
       subject: true,
       after: " from A to a project that no longer exists",
     },
-    implicit: { verb: "moved it to another project", subject: false, after: "" },
+    implicit: {
+      verb: "moved it to another project",
+      subject: false,
+      after: "",
+    },
   },
   {
     name: "task_assigned, to a bot user",
     entry: entry("task_assigned", {
       assignee: { type: "bot_user", id: "bot1", name: "release-bot" },
     }),
-    names: { verb: "Assigned", subject: true, after: " to the bot user release-bot" },
+    names: {
+      verb: "Assigned",
+      subject: true,
+      after: " to the bot user release-bot",
+    },
     implicit: { verb: "assigned it to release-bot", subject: false, after: "" },
   },
   {
@@ -210,7 +224,11 @@ const cases: Case[] = [
     entry: entry("task_unassigned", {
       previous_assignee: { type: "bot_user", id: "bot1", name: "release-bot" },
     }),
-    names: { verb: "Removed the bot user release-bot from", subject: true, after: "" },
+    names: {
+      verb: "Removed the bot user release-bot from",
+      subject: true,
+      after: "",
+    },
     implicit: { verb: "removed the assignee", subject: false, after: "" },
   },
   {
@@ -285,7 +303,11 @@ const cases: Case[] = [
   {
     name: "project_deleted, with tasks",
     entry: entry("project_deleted", { task_count: 5 }),
-    names: { verb: "Deleted the project", subject: true, after: " and 5 tasks" },
+    names: {
+      verb: "Deleted the project",
+      subject: true,
+      after: " and 5 tasks",
+    },
     implicit: null,
   },
   {
@@ -297,7 +319,11 @@ const cases: Case[] = [
   {
     name: "project_restored, with one task",
     entry: entry("project_restored", { task_count: 1 }),
-    names: { verb: "Restored the project", subject: true, after: " and 1 task" },
+    names: {
+      verb: "Restored the project",
+      subject: true,
+      after: " and 1 task",
+    },
     implicit: null,
   },
   {
@@ -331,7 +357,11 @@ const cases: Case[] = [
   {
     name: "tag_deleted, taking it off some tasks",
     entry: entry("tag_deleted", { task_count: 2 }),
-    names: { verb: "Deleted the tag", subject: true, after: ", taking it off 2 tasks" },
+    names: {
+      verb: "Deleted the tag",
+      subject: true,
+      after: ", taking it off 2 tasks",
+    },
     implicit: null,
   },
 ]

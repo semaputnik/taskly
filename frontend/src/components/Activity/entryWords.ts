@@ -34,12 +34,20 @@ function detail<T>(entry: ActivityEntryPublic, key: string): T | undefined {
 }
 
 /** "1 task" or "3 tasks": the count a reader needs for either voice. */
-function pluralize(n: number, singular: string, plural = `${singular}s`): string {
+function pluralize(
+  n: number,
+  singular: string,
+  plural = `${singular}s`,
+): string {
   return n === 1 ? `1 ${singular}` : `${n} ${plural}`
 }
 
 /** "task" or "tasks" on its own, for a phrase that already carries the count. */
-function plural(n: number, singular: string, pluralForm = `${singular}s`): string {
+function plural(
+  n: number,
+  singular: string,
+  pluralForm = `${singular}s`,
+): string {
   return n === 1 ? singular : pluralForm
 }
 
@@ -227,8 +235,7 @@ export function entryWords(
     }
     case "task_changed": {
       if (implicit) {
-        const changes =
-          detail<Record<string, Change>>(entry, "changes") ?? {}
+        const changes = detail<Record<string, Change>>(entry, "changes") ?? {}
         const said = changedFields(changes)
         return said ? whole(said) : null
       }
@@ -245,14 +252,18 @@ export function entryWords(
       if (implicit) {
         return whole(to ? `moved it to ${STATUS_LABELS[to]}` : "moved it")
       }
-      return withSubject("Moved", ` to ${to ? STATUS_LABELS[to] : "another status"}`)
+      return withSubject(
+        "Moved",
+        ` to ${to ? STATUS_LABELS[to] : "another status"}`,
+      )
     }
     case "task_deleted": {
       if (implicit) return whole("deleted it")
       // A batch names no single task: what it deleted is the selection, and
       // the count is what the entry has to say.
       const batch = detail<number>(entry, "task_count")
-      if (batch !== undefined) return whole(`Deleted ${pluralize(batch, "task")}`)
+      if (batch !== undefined)
+        return whole(`Deleted ${pluralize(batch, "task")}`)
       const subtasks = detail<number>(entry, "subtask_count") ?? 0
       return withSubject(
         "Deleted",
@@ -290,7 +301,7 @@ export function entryWords(
         // did it themselves it is "yourself", when a bot user did it, "you".
         const who =
           assignee?.type === "bot_user"
-            ? assignee.name ?? "a bot user"
+            ? (assignee.name ?? "a bot user")
             : entry.actor_bot_user_id
               ? "you"
               : "yourself"
@@ -325,7 +336,9 @@ export function entryWords(
       }
       const changes = detail<Record<string, unknown>>(entry, "changes") ?? {}
       const batch = describeBatch(changes)
-      return whole(`Changed ${pluralize(count, "task")}${batch ? `: ${batch}` : ""}`)
+      return whole(
+        `Changed ${pluralize(count, "task")}${batch ? `: ${batch}` : ""}`,
+      )
     }
     case "attachment_added": {
       const filename = detail<string>(entry, "filename")
@@ -355,7 +368,9 @@ export function entryWords(
     case "project_changed": {
       if (implicit) return null
       const changes = detail<Record<string, unknown>>(entry, "changes") ?? {}
-      return withSubject(`Changed the ${Object.keys(changes).join(", ")} of the project`)
+      return withSubject(
+        `Changed the ${Object.keys(changes).join(", ")} of the project`,
+      )
     }
     case "project_deleted": {
       if (implicit) return null
