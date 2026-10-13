@@ -1,7 +1,40 @@
 import { describe, expect, test } from "bun:test"
 
-import type { ActivityEntryPublic } from "@/client"
+import type { ActivityAction, ActivityEntryPublic } from "@/client"
 import { type EntryWords, entryWords } from "./entryWords"
+
+/**
+ * A row for every action, typed over `ActivityAction` itself rather than a
+ * hand-kept count: a 25th action with no row here yet is a type error on
+ * this object, in the same edit that adds the case `entryWords` demands for
+ * it, not something a reviewer has to notice is missing.
+ */
+const COVERED: Record<ActivityAction, true> = {
+  task_created: true,
+  task_changed: true,
+  tasks_bulk_changed: true,
+  task_completed: true,
+  task_reopened: true,
+  task_status_changed: true,
+  task_deleted: true,
+  task_restored: true,
+  task_moved: true,
+  task_assigned: true,
+  task_unassigned: true,
+  project_created: true,
+  project_changed: true,
+  project_deleted: true,
+  project_restored: true,
+  comment_added: true,
+  comment_edited: true,
+  comment_deleted: true,
+  attachment_added: true,
+  attachment_deleted: true,
+  tag_created: true,
+  tag_renamed: true,
+  tag_deleted: true,
+  tag_merged: true,
+}
 
 function entry(
   action: ActivityEntryPublic["action"],
@@ -377,36 +410,9 @@ describe("entryWords", () => {
     expect(entryWords(c.entry, "subject-implicit")).toEqual(c.implicit)
   })
 
-  test("every one of the 24 actions is covered by this table", () => {
+  test("every action in COVERED has at least one case in this table", () => {
     const actions = new Set(cases.map((c) => c.entry.action))
-    const all: ActivityEntryPublic["action"][] = [
-      "task_created",
-      "task_changed",
-      "tasks_bulk_changed",
-      "task_completed",
-      "task_reopened",
-      "task_status_changed",
-      "task_deleted",
-      "task_restored",
-      "task_moved",
-      "task_assigned",
-      "task_unassigned",
-      "project_created",
-      "project_changed",
-      "project_deleted",
-      "project_restored",
-      "comment_added",
-      "comment_edited",
-      "comment_deleted",
-      "attachment_added",
-      "attachment_deleted",
-      "tag_created",
-      "tag_renamed",
-      "tag_deleted",
-      "tag_merged",
-    ]
-    expect(all.length).toBe(24)
-    for (const action of all) {
+    for (const action of Object.keys(COVERED) as ActivityAction[]) {
       expect(actions.has(action)).toBe(true)
     }
   })

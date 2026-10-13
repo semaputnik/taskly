@@ -69,6 +69,12 @@ export function ActivityDescription({
   currentUserId,
 }: ActivityDescriptionProps) {
   const words = entryWords(entry, "names-its-subject", currentUserId)
+  // Every one of the 24 actions has a case in this voice, so this is never
+  // actually null; the compiler does not know that, since `entryWords`'
+  // return type is shared with the voice that does say nothing for some
+  // actions. Render nothing rather than throw if a future action arrives
+  // here with no case yet.
+  if (!words) return null
   const name = subjectName(entry)
   const linkClass = "font-medium underline-offset-4 hover:underline"
 

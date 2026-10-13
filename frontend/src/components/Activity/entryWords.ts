@@ -1,4 +1,5 @@
 import type { ActivityEntryPublic, TaskStatus } from "@/client"
+import { nameList, plural } from "@/components/Common/words"
 import { STATUS_LABELS } from "@/components/Tasks/statuses"
 import { formatDayPlain } from "@/lib/dates"
 
@@ -31,24 +32,6 @@ export interface EntryWords {
 
 function detail<T>(entry: ActivityEntryPublic, key: string): T | undefined {
   return entry.details[key] as T | undefined
-}
-
-/** "1 task" or "3 tasks": the count a reader needs for either voice. */
-function pluralize(
-  n: number,
-  singular: string,
-  plural = `${singular}s`,
-): string {
-  return n === 1 ? `1 ${singular}` : `${n} ${plural}`
-}
-
-/** "task" or "tasks" on its own, for a phrase that already carries the count. */
-function plural(
-  n: number,
-  singular: string,
-  pluralForm = `${singular}s`,
-): string {
-  return n === 1 ? singular : pluralForm
 }
 
 interface ProjectRef {
@@ -155,7 +138,7 @@ function changedFields(changes: Record<string, Change>): string | null {
       changes.recurrence.to ? "changed how it repeats" : "stopped it repeating",
     )
   }
-  return said.length ? joined(said) : null
+  return said.length ? nameList(said) : null
 }
 
 function changedTags({ from, to }: Change): string {
@@ -168,11 +151,6 @@ function changedTags({ from, to }: Change): string {
     removed.length ? `untagged ${removed.join(", ")}` : null,
   ].filter(Boolean)
   return said.length ? said.join(" and ") : "changed the tags"
-}
-
-function joined(parts: string[]): string {
-  if (parts.length < 2) return parts[0]
-  return `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`
 }
 
 /** A sentence with nothing after the verb and no subject of its own. */
@@ -197,17 +175,11 @@ function withSubject(verb: string, after = ""): EntryWords {
  * panel), so it says less, and sometimes says nothing at all — a comment,
  * a project or a tag is not among the actions it speaks, so this returns
  * `null` for those. `names-its-subject` speaks every action, because the
- * log page is the one place every kind of entry is read.
+ * log page is the one place every kind of entry is read — a caller in that
+ * voice should never actually see `null`, but the return type stays
+ * nullable for both, so a 25th action with no case yet fails safely rather
+ * than throwing.
  */
-export function entryWords(
-  entry: ActivityEntryPublic,
-  voice: "names-its-subject",
-  currentUserId?: string,
-): EntryWords
-export function entryWords(
-  entry: ActivityEntryPublic,
-  voice: "subject-implicit",
-): EntryWords | null
 export function entryWords(
   entry: ActivityEntryPublic,
   voice: Voice,
@@ -262,12 +234,11 @@ export function entryWords(
       // A batch names no single task: what it deleted is the selection, and
       // the count is what the entry has to say.
       const batch = detail<number>(entry, "task_count")
-      if (batch !== undefined)
-        return whole(`Deleted ${pluralize(batch, "task")}`)
+      if (batch !== undefined) return whole(`Deleted ${plural(batch, "task")}`)
       const subtasks = detail<number>(entry, "subtask_count") ?? 0
       return withSubject(
         "Deleted",
-        subtasks > 0 ? ` and ${pluralize(subtasks, "subtask")}` : "",
+        subtasks > 0 ? ` and ${plural(subtasks, "subtask")}` : "",
       )
     }
     case "task_restored": {
@@ -275,7 +246,7 @@ export function entryWords(
       const subtasks = detail<number>(entry, "subtask_count") ?? 0
       return withSubject(
         "Restored",
-        subtasks > 0 ? ` and ${pluralize(subtasks, "subtask")}` : "",
+        subtasks > 0 ? ` and ${plural(subtasks, "subtask")}` : "",
       )
     }
     case "task_moved": {
@@ -313,6 +284,8 @@ export function entryWords(
       )
     }
     case "task_unassigned": {
+      // Unlike the other voice, this never names who was removed, bot user
+      // or not — "removed the assignee" covers every case.
       if (implicit) return whole("removed the assignee")
       const previous = detail<AssigneeRef>(entry, "previous_assignee")
       if (previous?.type === "bot_user") {
@@ -330,14 +303,14 @@ export function entryWords(
         const others = count - 1
         return whole(
           others > 0
-            ? `changed it along with ${others} other ${plural(others, "task")}`
+            ? `changed it along with ${others} other ${others === 1 ? "task" : "tasks"}`
             : "changed it",
         )
       }
       const changes = detail<Record<string, unknown>>(entry, "changes") ?? {}
       const batch = describeBatch(changes)
       return whole(
-        `Changed ${pluralize(count, "task")}${batch ? `: ${batch}` : ""}`,
+        `Changed ${plural(count, "task")}${batch ? `: ${batch}` : ""}`,
       )
     }
     case "attachment_added": {
@@ -377,7 +350,7 @@ export function entryWords(
       const tasks = detail<number>(entry, "task_count") ?? 0
       return withSubject(
         "Deleted the project",
-        tasks > 0 ? ` and ${pluralize(tasks, "task")}` : "",
+        tasks > 0 ? ` and ${plural(tasks, "task")}` : "",
       )
     }
     case "project_restored": {
@@ -385,7 +358,7 @@ export function entryWords(
       const tasks = detail<number>(entry, "task_count") ?? 0
       return withSubject(
         "Restored the project",
-        tasks > 0 ? ` and ${pluralize(tasks, "task")}` : "",
+        tasks > 0 ? ` and ${plural(tasks, "task")}` : "",
       )
     }
     case "tag_created":
@@ -401,7 +374,7 @@ export function entryWords(
       const tasks = detail<number>(entry, "task_count") ?? 0
       return withSubject(
         `Merged ${sources.map((name) => `“${name}”`).join(", ")} into`,
-        tasks > 0 ? `, moving ${pluralize(tasks, "task")} onto it` : "",
+        tasks > 0 ? `, moving ${plural(tasks, "task")} onto it` : "",
       )
     }
     case "tag_deleted": {
@@ -409,7 +382,7 @@ export function entryWords(
       const tasks = detail<number>(entry, "task_count") ?? 0
       return withSubject(
         "Deleted the tag",
-        tasks > 0 ? `, taking it off ${pluralize(tasks, "task")}` : "",
+        tasks > 0 ? `, taking it off ${plural(tasks, "task")}` : "",
       )
     }
   }
