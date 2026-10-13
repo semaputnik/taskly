@@ -11,6 +11,7 @@ from fastapi.testclient import TestClient
 from sqlmodel import Session
 
 from app.core.config import settings
+from app.models import BotPermissions
 from tests.utils.accounts import (
     ALL_PERMISSIONS,
     READ_ONLY,
@@ -62,6 +63,25 @@ def test_a_human_session_sees_itself_as_the_actor_with_every_permission_and_no_p
         "read_activity": True,
     }
     assert body["projects"] is None
+
+
+def test_every_grant_bot_permissions_declares_is_true_for_a_human_caller(
+    client: TestClient, db: Session
+) -> None:
+    """
+    A human may do anything a scope could grant (FR-08.9), so every field
+    `BotPermissions` declares has to read back true for a human caller. This
+    walks the model's own fields rather than a literal list, so a grant added
+    to `BotPermissions` with nothing else touched here is the one thing that
+    makes this fail — the point of issue #264.
+    """
+    headers = create_user_headers(client, db)
+
+    permissions = _caller(client, headers)["permissions"]
+
+    assert set(permissions) == set(BotPermissions.model_fields)
+    for grant in BotPermissions.model_fields:
+        assert permissions[grant] is True, grant
 
 
 def test_a_human_with_no_full_name_is_named_by_their_email(

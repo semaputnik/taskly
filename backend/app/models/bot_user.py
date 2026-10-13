@@ -59,6 +59,17 @@ class BotPermissions(SQLModel):
     # the log to a bot user is #251.
     read_activity: bool = False
 
+    @classmethod
+    def all_granted(cls) -> BotPermissions:
+        """
+        Every grant true: what a human caller holds, by construction, since a
+        human may do anything a scope could grant (FR-08.9). Built from this
+        model's own fields rather than listed by hand, so a grant added here
+        is true for a human the moment it exists — nothing else to edit
+        (issue #264).
+        """
+        return cls(**dict.fromkeys(cls.model_fields, True))
+
 
 class BotScope(SQLModel):
     """
