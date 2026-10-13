@@ -4,22 +4,22 @@ the way `GET /activity-log/` already narrows it — by kind of change, by task,
 by project, by actor and by period — read as compact lines rather than a page
 of raw entries an agent would have to sort "finished" out of by hand.
 
-Built on `app.api.routes.activity.read_activity_log` itself, called through
-to directly the same way the write tools call their own route — not
-re-derived from `app.api.access`/`crud` the way `search_tasks` is. The scope
-narrowing (ADR-0011), the all-or-nothing batch rule, the tag exemption and
-the withholding of `restorable` and the deletion id from a bot's response are
-all that route's own code; this tool only maps its arguments onto the
-route's and turns each entry into one compact line. The route, called from
-here, always takes its bot branch — a plain `JSONResponse` — since an MCP
-caller is always a bot (ADR-0012); there is no human branch this module ever
-reaches.
+Built on `app.activity_log.read_activity` (#298), the reader both this tool
+and the REST route call — not re-derived from `app.access`/`crud` the way
+`search_tasks` is. The scope narrowing (ADR-0011), the all-or-nothing batch
+rule, the tag exemption and the permission check are all that reader's own
+code; this tool only maps its arguments onto the reader's narrowing and
+turns each row it hands back into one compact line, straight through, with
+nothing to serialise and re-parse: an MCP caller is always a bot
+(ADR-0012), so there is no `restorable` or deletion id to read here even if
+this tool wanted to show one — it never asks the reader to compute them,
+rather than asking a route to compute and then hide them.
 
-This tool's own job, once the route has answered: naming who acted ("owner",
-or a bot user by name, the same convention `get_task`'s comment rows use),
-saying what happened in one short phrase, and naming the task, project or
-tag (or, for a batch, the selection) the entry is about — ported from the
-web UI's own `ActivityDescription.tsx`, since there is no backend
+This tool's own job, once the reader has answered: naming who acted
+("owner", or a bot user by name, the same convention `get_task`'s comment
+rows use), saying what happened in one short phrase, and naming the task,
+project or tag (or, for a batch, the selection) the entry is about — ported
+from the web UI's own `ActivityDescription.tsx`, since there is no backend
 description of an entry yet and this tool is the first thing besides a human
 reading the page that needs one.
 
@@ -30,19 +30,18 @@ the exact same reading of a period and of who acted, rather than its own
 copy of either.
 """
 
-import json
 import uuid
+from collections.abc import Sequence
 from typing import Annotated, Any
 
 from fastapi import HTTPException
-from fastapi.responses import JSONResponse
 from mcp.server.mcpserver import Context
 from mcp.types import ToolAnnotations
 from pydantic import Field
 from sqlmodel import Session
 
 from app import crud
-from app.api.routes.activity import read_activity_log as _read_activity_log
+from app.activity_log import ActivityNarrowing, read_activity
 from app.mcp.conventions import (
     list_result,
     open_caller,
@@ -57,6 +56,7 @@ from app.mcp.conventions import (
 from app.mcp.server import mcp_server
 from app.models import (
     ActivityAction,
+    ActivityEntry,
     ActivityKind,
     ActivityOrder,
     BotUserRef,
@@ -168,35 +168,27 @@ def search_activity(
             since_at = since_datetime(since) if since is not None else None
             until_at = until_datetime(until) if until is not None else None
 
-            response = _read_activity_log(
-                session=session,
-                caller=caller,
-                skip=offset,
-                limit=limit,
-                actor_bot_user_id=actor_bot_user_id,
-                kind=kind,
-                by_bots=by_bots,
-                by_user=by_user,
-                since=since_at,
-                until=until_at,
-                task_id=resolved_task_id,
-                project_id=resolved_project_id,
-                order=order,
+            page = read_activity(
+                session,
+                caller,
+                ActivityNarrowing(
+                    kind=kind,
+                    task_id=resolved_task_id,
+                    project_id=resolved_project_id,
+                    actor_bot_user_id=actor_bot_user_id,
+                    by_bots=by_bots,
+                    by_user=by_user,
+                    since=since_at,
+                    until=until_at,
+                    order=order,
+                    skip=offset,
+                    limit=limit,
+                ),
             )
         except HTTPException as exc:
             raise refusal(exc) from exc
 
-        # An MCP caller is always a bot (ADR-0012), so the route above always
-        # takes its bot branch: a plain `JSONResponse`, never the human
-        # `ActivityEntriesPublic` FastAPI would otherwise serialise through
-        # `response_model` — there is no `restorable` or deletion id to read
-        # back here even if this tool wanted to show one.
-        assert isinstance(response, JSONResponse)
-        body = json.loads(bytes(response.body))
-        entries: list[dict[str, Any]] = body["data"]
-        count: int = body["count"]
-
-        rows = _rows(session, entries)
+        rows = _rows(session, page.entries)
 
     narrow_with = _narrow_hint(
         kind=kind,
@@ -207,23 +199,19 @@ def search_activity(
         until=until,
     )
     return list_result(
-        rows, key="entries", count=count, offset=offset, narrow_with=narrow_with
+        rows, key="entries", count=page.total, offset=offset, narrow_with=narrow_with
     )
 
 
 # Rows: one compact line per entry
 
 
-def _rows(session: Session, entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    bot_ids = (
-        uuid.UUID(entry["actor_bot_user_id"])
-        for entry in entries
-        if entry.get("actor_bot_user_id") is not None
-    )
+def _rows(session: Session, entries: Sequence[ActivityEntry]) -> list[dict[str, Any]]:
+    bot_ids = {entry.actor_bot_user_id for entry in entries if entry.actor_bot_user_id}
     bots = crud.get_bot_user_refs(session=session, bot_user_ids=bot_ids)
     return [
         {
-            "at": entry["created_at"],
+            "at": entry.created_at.isoformat() if entry.created_at else None,
             "actor": _actor_label(entry, bots),
             "what": _describe(entry),
             "subject": _subject(entry),
@@ -232,36 +220,36 @@ def _rows(session: Session, entries: list[dict[str, Any]]) -> list[dict[str, Any
     ]
 
 
-def _actor_label(entry: dict[str, Any], bots: dict[uuid.UUID, BotUserRef]) -> str:
+def _actor_label(entry: ActivityEntry, bots: dict[uuid.UUID, BotUserRef]) -> str:
     """
     Who acted, the same convention `get_task`'s own comment rows use: "owner"
     for the human, or a bot user by the name the entry itself carries
     (present whatever its scope, FR-08.19), "(deleted)" appended if it no
     longer exists.
     """
-    if entry["actor_id"] is not None:
+    if entry.actor_id is not None:
         return "owner"
-    bot_id = uuid.UUID(entry["actor_bot_user_id"])
-    name = entry["actor_bot_user_name"]
-    bot = bots.get(bot_id)
-    return f"{name} (deleted)" if bot is not None and bot.deleted else name
+    assert entry.actor_bot_user_id is not None
+    bot = bots.get(entry.actor_bot_user_id)
+    assert bot is not None, "a bot user is kept, not removed, once it acted (FR-08.19)"
+    return f"{bot.name} (deleted)" if bot.deleted else bot.name
 
 
 # Subjects: the task, project, tag, or batch an entry is about
 
 
-def _subject(entry: dict[str, Any]) -> dict[str, Any]:
-    details = entry["details"]
-    entity_type = entry["entity_type"]
+def _subject(entry: ActivityEntry) -> dict[str, Any]:
+    details = entry.details
+    entity_type = entry.entity_type
 
-    if entry["action"] == ActivityAction.TASKS_BULK_CHANGED or (
+    if entry.action == ActivityAction.TASKS_BULK_CHANGED or (
         "task_count" in details and "title" not in details
     ):
         # A batch deletion or restore (`app.activity._deletion_entry`,
         # `_restore_entry`) names no task ids, only a count; a bulk status
         # change (`app.activity._write`) names them in `task_ids`. Either
         # way the subject is the selection, not any one task it happened to
-        # be filed under (`app.api.routes.activity._on_task`'s own reason).
+        # be filed under (`app.activity_log._on_task`'s own reason).
         subject: dict[str, Any] = {"type": "tasks", "count": details["task_count"]}
         if "task_ids" in details:
             subject["ids"] = [short_id(uuid.UUID(i)) for i in details["task_ids"]]
@@ -269,27 +257,27 @@ def _subject(entry: dict[str, Any]) -> dict[str, Any]:
 
     if entity_type in ("comment", "attachment"):
         task = details.get("task") or {}
-        task_id = task.get("id", entry["entity_id"])
+        task_id = uuid.UUID(task["id"]) if "id" in task else entry.entity_id
         return {
             "type": "task",
-            "id": short_id(uuid.UUID(task_id)),
+            "id": short_id(task_id),
             "title": task.get("title") or "Untitled task",
         }
     if entity_type == "project":
         return {
             "type": "project",
-            "id": entry["entity_id"],
+            "id": str(entry.entity_id),
             "name": details.get("name") or "Untitled project",
         }
     if entity_type == "tag":
         return {
             "type": "tag",
-            "id": entry["entity_id"],
+            "id": str(entry.entity_id),
             "name": details.get("name") or "Untitled tag",
         }
     return {
         "type": "task",
-        "id": short_id(uuid.UUID(entry["entity_id"])),
+        "id": short_id(entry.entity_id),
         "title": details.get("title") or "Untitled task",
     }
 
@@ -299,9 +287,9 @@ def _subject(entry: dict[str, Any]) -> dict[str, Any]:
 # yet, and this tool is the first thing besides that page that needs one.
 
 
-def _describe(entry: dict[str, Any]) -> str:
-    action = entry["action"]
-    details = entry["details"]
+def _describe(entry: ActivityEntry) -> str:
+    action = entry.action
+    details: Any = entry.details
 
     if action == ActivityAction.TASK_CREATED:
         task = details.get("task") or {}

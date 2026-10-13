@@ -17,6 +17,8 @@ from .activity import (
     ActivityEntryPublic,
     ActivityKind,
     ActivityOrder,
+    BotActivityEntriesPublic,
+    BotActivityEntryPublic,
 )
 from .attachment import (
     Attachment,
@@ -170,6 +172,8 @@ __all__ = [
     "AttachmentLocation",
     "AttachmentPublic",
     "AttachmentsPublic",
+    "BotActivityEntriesPublic",
+    "BotActivityEntryPublic",
     "BotPermissions",
     "BotScope",
     "BotTokenIssue",

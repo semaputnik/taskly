@@ -6,13 +6,14 @@ when it reached Done (ADR-0011, `docs/adr/0011-bot-users-read-the-activity-
 log-in-scope.md`). The only record of that moment is the activity log: a
 `task_completed` entry, or a batch entry naming `done` as the new status.
 
-Built the way spec #248's own decision reads: the log's own narrowing
-(`app.api.access.activity_log_scope`, the same scope `search_activity`,
-#259, reads through its route) composed with the task read model
-(`app.models.Task`, `app.crud.get_task_project_ids`/`get_task_tags`) —
-never a new REST endpoint, and never a call per task. One query gathers
-every completion entry the period and the narrowing match; one more reads
-the tasks they name, batched by id rather than fetched one at a time.
+Built the way spec #248's own decision reads: the log's own narrowing —
+`app.activity_log.read_activity` (#298), the same reader `search_activity`
+(#259) and the REST route both call, composed with `kind=ActivityKind.
+COMPLETED` — joined to the task read model (`app.models.Task`,
+`app.crud.get_task_project_ids`/`get_task_tags`) — never a new REST
+endpoint, and never a call per task. One query gathers every completion
+entry the period and the narrowing match; one more reads the tasks they
+name, batched by id rather than fetched one at a time.
 
 Three things make the count here different from one built by reading the
 log by hand, each worth saying plainly because each is the one place that
@@ -62,9 +63,9 @@ from pydantic import Field
 from sqlmodel import Session, col, select
 
 from app import crud
+from app.activity_log import ActivityNarrowing, read_activity
 from app.api import access
 from app.api.deps import Caller
-from app.api.routes.activity import _of_kind
 from app.mcp.conventions import (
     list_result,
     open_caller,
@@ -81,6 +82,7 @@ from app.models import (
     ActivityAction,
     ActivityEntry,
     ActivityKind,
+    ActivityOrder,
     BotUserRef,
     Project,
     Task,
@@ -237,12 +239,12 @@ def _resolve_narrowing_project_id(
 ) -> uuid.UUID:
     """
     Which project `project` narrows to, refused the way narrowing the
-    activity log itself is refused (`app.api.routes.activity
-    .read_activity_log`'s own `project_id` handling, which this mirrors
-    rather than `app.api.access.get_project`'s): a 404 for either a project
-    that is not there or one outside this bot user's scope, the same
-    answer for both, since a scope refusal here would otherwise confirm an
-    id the caller has no business learning is real.
+    activity log itself is refused (`app.activity_log.read_activity`'s own
+    `project_id` handling, which this mirrors rather than
+    `app.api.access.get_project`'s): a 404 for either a project that is not
+    there or one outside this bot user's scope, the same answer for both,
+    since a scope refusal here would otherwise confirm an id the caller has
+    no business learning is real.
     """
     project_id = resolve_project_id(session, caller, raw)
     project = session.get(Project, project_id)
@@ -271,34 +273,39 @@ def _completion_entries(
     """
     Every entry this period and this narrowing match that is a completion —
     a `task_completed` entry, or a batch entry that moved its tasks to Done
-    (`_of_kind(ActivityKind.COMPLETED)`, the exact grouping
-    `app.api.routes.activity` already uses for `search_activity`'s own
-    `kind="completed"`, reused rather than re-derived here).
+    — read through the shared reader (`app.activity_log.read_activity`,
+    #298) with `kind=ActivityKind.COMPLETED`, the exact grouping
+    `search_activity`'s own `kind="completed"` uses, composed here rather
+    than re-derived: the reader already applies the scope and the actor
+    narrowing the same way for every caller.
 
-    The scope (`access.activity_log_scope`) and the actor narrowing are the
-    same conditions `read_activity_log` applies; `project` and `tag` are not
-    applied here at all, because a batch entry's `task_ids` can span more
-    than one project and this tool's own project/tag narrowing is a
-    per-task question, answered once the tasks are read back (`_enrich`),
-    not a per-entry one.
+    `limit=None` asks for every match in the period rather than a page: the
+    summary below has to total every completion, not only the page this
+    tool's own `limit` (applied to the rendered rows afterwards) would
+    return. `order=OLDEST` keeps the entries in the order this function has
+    always read them in, so a tie at the final truncation below breaks the
+    same way it always has.
+
+    `project` and `tag` are not applied here at all, because a batch
+    entry's `task_ids` can span more than one project and this tool's own
+    project/tag narrowing is a per-task question, answered once the tasks
+    are read back (`_enrich`), not a per-entry one.
     """
-    where: list[Any] = [
-        ActivityEntry.owner_id == caller.owner_id,
-        _of_kind(ActivityKind.COMPLETED),
-        col(ActivityEntry.created_at) > since_at,
-        col(ActivityEntry.created_at) <= until_at,
-    ]
-    if (scope := access.activity_log_scope(caller)) is not None:
-        where.append(scope)
-    if actor_bot_user_id is not None:
-        where.append(ActivityEntry.actor_bot_user_id == actor_bot_user_id)
-    if by_bots:
-        where.append(col(ActivityEntry.actor_bot_user_id).is_not(None))
-    if by_user:
-        where.append(col(ActivityEntry.actor_bot_user_id).is_(None))
-    return session.exec(
-        select(ActivityEntry).where(*where).order_by(col(ActivityEntry.position))
-    ).all()
+    page = read_activity(
+        session,
+        caller,
+        ActivityNarrowing(
+            kind=ActivityKind.COMPLETED,
+            actor_bot_user_id=actor_bot_user_id,
+            by_bots=by_bots,
+            by_user=by_user,
+            since=since_at,
+            until=until_at,
+            order=ActivityOrder.OLDEST,
+            limit=None,
+        ),
+    )
+    return page.entries
 
 
 def _expand(entry: ActivityEntry) -> list[_Completion]:

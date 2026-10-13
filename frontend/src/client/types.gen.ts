@@ -57,10 +57,6 @@ export type ActivityEntryPublic = {
      */
     actor_bot_user_name?: string | null;
     /**
-     * Deletion Id
-     */
-    deletion_id?: string | null;
-    /**
      * Details
      */
     details: {
@@ -78,6 +74,10 @@ export type ActivityEntryPublic = {
      * Entity Project Id
      */
     entity_project_id?: string | null;
+    /**
+     * Deletion Id
+     */
+    deletion_id?: string | null;
     /**
      * Restorable
      */
@@ -184,6 +184,74 @@ export type Body_attachments_upload_attachment = {
      * File
      */
     file: Blob | File;
+};
+
+/**
+ * BotActivityEntriesPublic
+ */
+export type BotActivityEntriesPublic = {
+    /**
+     * Data
+     */
+    data: Array<BotActivityEntryPublic>;
+    /**
+     * Count
+     */
+    count: number;
+};
+
+/**
+ * BotActivityEntryPublic
+ *
+ * What a bot user's own read of the activity log carries (#298, ADR-0011):
+ * everything a human's read does except `restorable` and the deletion id.
+ * Restoring stays a human-only action, and a handle a bot user cannot act
+ * on is a field worth withholding from its response, not a dead one worth
+ * keeping at `False`/`None` — so this is the base shape, and
+ * `ActivityEntryPublic` is the one that adds the two restore-related
+ * fields back for a human, rather than the other way around.
+ */
+export type BotActivityEntryPublic = {
+    /**
+     * Id
+     */
+    id: string;
+    action: ActivityAction;
+    entity_type: ActivityEntityType;
+    /**
+     * Entity Id
+     */
+    entity_id: string;
+    /**
+     * Actor Id
+     */
+    actor_id?: string | null;
+    /**
+     * Actor Bot User Id
+     */
+    actor_bot_user_id?: string | null;
+    /**
+     * Actor Bot User Name
+     */
+    actor_bot_user_name?: string | null;
+    /**
+     * Details
+     */
+    details: {
+        [key: string]: unknown;
+    };
+    /**
+     * Created At
+     */
+    created_at?: string | null;
+    /**
+     * Entity Exists
+     */
+    entity_exists: boolean;
+    /**
+     * Entity Project Id
+     */
+    entity_project_id?: string | null;
 };
 
 /**
@@ -3145,9 +3213,11 @@ export type activityReadActivityLogError = activityReadActivityLogErrors[keyof a
 
 export type activityReadActivityLogResponses = {
     /**
+     * Response Activity-Read Activity Log
+     *
      * Successful Response
      */
-    200: ActivityEntriesPublic;
+    200: ActivityEntriesPublic | BotActivityEntriesPublic;
 };
 
 export type activityReadActivityLogResponse = activityReadActivityLogResponses[keyof activityReadActivityLogResponses];
