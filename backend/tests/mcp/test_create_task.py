@@ -1,15 +1,23 @@
 """
-`create_task` (spec #247, #255): file a task, a subtask, or a recurring one,
-driven over the protocol with a bot user's token, the same way an agent
-would.
+`create_task` (spec #247, #255): file a task, a subtask, or a recurring one.
+
+Exercised against `create_task_body` directly (#302) — see
+`test_whoami.py`'s own module docstring for why, and where the protocol
+itself is still tested. The two argument-limit tests at the bottom are the
+exception: `title` and `description`'s length caps are declared in the
+tool's own argument schema, enforced by the MCP SDK before a call ever
+reaches `create_task_body`, so they still go through the protocol.
 """
 
 from datetime import date
 
+import pytest
 from fastapi.testclient import TestClient
+from mcp.server.mcpserver.exceptions import ToolError
 from sqlmodel import Session
 
 from app.core.config import settings
+from app.mcp.tools.create_task import create_task_body
 from tests.utils.accounts import (
     ALL_PERMISSIONS,
     READ_ONLY,
@@ -21,7 +29,9 @@ from tests.utils.accounts import (
     inbox_project_id,
     my_id,
 )
-from tests.utils.mcp import ToolError, bot_headers, call_tool, list_tools
+from tests.utils.mcp import ToolError as ProtocolToolError
+from tests.utils.mcp import bot_headers, call_tool
+from tests.utils.mcp_body import caller_for
 
 API = settings.API_V1_STR
 TODAY = date.today().isoformat()
@@ -29,19 +39,6 @@ TODAY = date.today().isoformat()
 # `create_task` writes, so every test needs the one permission that lets a
 # bot user do it at all, alongside whatever scope the test is about.
 CREATE_ONLY = {"create_tasks": True}
-
-
-def test_tools_list_advertises_create_task_not_read_only(
-    client: TestClient, db: Session
-) -> None:
-    owner = create_user_headers(client, db)
-    headers = bot_headers(client, owner)
-
-    tools = list_tools(client, headers)
-    create_task = next(t for t in tools if t["name"] == "create_task")
-    assert create_task["description"]
-    annotations = create_task.get("annotations") or {}
-    assert not annotations.get("readOnlyHint")
 
 
 def test_creates_a_task_with_every_field_in_one_call(
@@ -52,21 +49,19 @@ def test_creates_a_task_with_every_field_in_one_call(
     headers = bot_headers(
         client, owner, project_ids=[project_id], permissions=ALL_PERMISSIONS
     )
+    caller = caller_for(db, headers)
 
-    result = call_tool(
-        client,
-        headers,
-        "create_task",
-        {
-            "title": "Ship it",
-            "description": "The whole thing",
-            "project": "Work",
-            "status": "todo",
-            "priority": "P2",
-            "due_date": "today",
-            "tags": ["release"],
-            "assignee": "self",
-        },
+    result = create_task_body(
+        db,
+        caller,
+        title="Ship it",
+        description="The whole thing",
+        project="Work",
+        status="todo",
+        priority="P2",
+        due_date="today",
+        tags=["release"],
+        assignee="self",
     )
 
     assert result["id"]
@@ -91,10 +86,9 @@ def test_project_is_accepted_by_name_case_insensitively(
     headers = bot_headers(
         client, owner, project_ids=[project_id], permissions=CREATE_ONLY
     )
+    caller = caller_for(db, headers)
 
-    result = call_tool(
-        client, headers, "create_task", {"title": "T", "project": "work"}
-    )
+    result = create_task_body(db, caller, title="T", project="work")
     assert result["project_id"] == project_id
 
 
@@ -107,14 +101,14 @@ def test_ambiguous_project_name_is_refused_with_matching_ids(
     headers = bot_headers(
         client, owner, project_ids=[first, second], permissions=CREATE_ONLY
     )
+    caller = caller_for(db, headers)
 
-    try:
-        call_tool(client, headers, "create_task", {"title": "T", "project": "Dup"})
-        raise AssertionError("expected a refusal")
-    except ToolError as exc:
-        assert "ambiguous_project_name" in exc.message
-        assert first in exc.message
-        assert second in exc.message
+    with pytest.raises(ToolError) as exc_info:
+        create_task_body(db, caller, title="T", project="Dup")
+    message = str(exc_info.value)
+    assert "ambiguous_project_name" in message
+    assert first in message
+    assert second in message
 
 
 def test_a_task_without_a_project_lands_in_the_inbox_when_in_scope(
@@ -126,8 +120,9 @@ def test_a_task_without_a_project_lands_in_the_inbox_when_in_scope(
     headers = bot_headers(
         client, owner, project_ids=[inbox, other], permissions=CREATE_ONLY
     )
+    caller = caller_for(db, headers)
 
-    result = call_tool(client, headers, "create_task", {"title": "Unsorted"})
+    result = create_task_body(db, caller, title="Unsorted")
     assert result["project_id"] == inbox
 
 
@@ -137,12 +132,11 @@ def test_a_task_without_a_project_is_refused_when_the_inbox_is_out_of_scope(
     owner = create_user_headers(client, db)
     other = create_project(client, owner)
     headers = bot_headers(client, owner, project_ids=[other], permissions=CREATE_ONLY)
+    caller = caller_for(db, headers)
 
-    try:
-        call_tool(client, headers, "create_task", {"title": "Unsorted"})
-        raise AssertionError("expected a refusal")
-    except ToolError as exc:
-        assert "outside_scope" in exc.message
+    with pytest.raises(ToolError) as exc_info:
+        create_task_body(db, caller, title="Unsorted")
+    assert "outside_scope" in str(exc_info.value)
 
 
 # --- Subtasks: inheriting and refusing a project of their own ----------------
@@ -155,13 +149,9 @@ def test_a_subtask_follows_its_parents_project(client: TestClient, db: Session) 
     headers = bot_headers(
         client, owner, project_ids=[project_id], permissions=CREATE_ONLY
     )
+    caller = caller_for(db, headers)
 
-    result = call_tool(
-        client,
-        headers,
-        "create_task",
-        {"title": "Sub", "parent_task_id": root["id"]},
-    )
+    result = create_task_body(db, caller, title="Sub", parent_task_id=root["id"])
     assert result["project_id"] == project_id
     assert result["parent_id"] == root["id"]
 
@@ -175,22 +165,15 @@ def test_a_subtask_naming_its_own_project_is_refused(
     headers = bot_headers(
         client, owner, project_ids=[project_id], permissions=CREATE_ONLY
     )
+    caller = caller_for(db, headers)
 
-    try:
-        call_tool(
-            client,
-            headers,
-            "create_task",
-            {
-                "title": "Sub",
-                "parent_task_id": root["id"],
-                "project": "Work",
-            },
+    with pytest.raises(ToolError) as exc_info:
+        create_task_body(
+            db, caller, title="Sub", parent_task_id=root["id"], project="Work"
         )
-        raise AssertionError("expected a refusal")
-    except ToolError as exc:
-        assert "invalid_argument" in exc.message
-        assert "parent" in exc.message
+    message = str(exc_info.value)
+    assert "invalid_argument" in message
+    assert "parent" in message
 
 
 # --- Status -------------------------------------------------------------------
@@ -202,10 +185,9 @@ def test_status_defaults_to_backlog(client: TestClient, db: Session) -> None:
     headers = bot_headers(
         client, owner, project_ids=[project_id], permissions=CREATE_ONLY
     )
+    caller = caller_for(db, headers)
 
-    result = call_tool(
-        client, headers, "create_task", {"title": "T", "project": project_id}
-    )
+    result = create_task_body(db, caller, title="T", project=project_id)
     assert result["status"] == "backlog"
 
 
@@ -215,12 +197,10 @@ def test_a_named_status_is_honored(client: TestClient, db: Session) -> None:
     headers = bot_headers(
         client, owner, project_ids=[project_id], permissions=CREATE_ONLY
     )
+    caller = caller_for(db, headers)
 
-    result = call_tool(
-        client,
-        headers,
-        "create_task",
-        {"title": "T", "project": project_id, "status": "waiting"},
+    result = create_task_body(
+        db, caller, title="T", project=project_id, status="waiting"
     )
     assert result["status"] == "waiting"
 
@@ -236,22 +216,17 @@ def test_a_recurring_task_is_created_with_its_frequency(
     headers = bot_headers(
         client, owner, project_ids=[project_id], permissions=CREATE_ONLY
     )
+    caller = caller_for(db, headers)
 
-    result = call_tool(
-        client,
-        headers,
-        "create_task",
-        {
-            "title": "Water the plants",
-            "project": project_id,
-            "due_date": "today",
-            "recurrence": {"frequency": "every_n_days", "interval_days": 3},
-        },
+    result = create_task_body(
+        db,
+        caller,
+        title="Water the plants",
+        project=project_id,
+        due_date="today",
+        recurrence={"frequency": "every_n_days", "interval_days": 3},
     )
-    assert result["recurrence"] == {
-        "frequency": "every_n_days",
-        "interval_days": 3,
-    }
+    assert result["recurrence"] == {"frequency": "every_n_days", "interval_days": 3}
 
 
 def test_a_recurring_task_without_a_due_date_is_refused(
@@ -262,21 +237,17 @@ def test_a_recurring_task_without_a_due_date_is_refused(
     headers = bot_headers(
         client, owner, project_ids=[project_id], permissions=CREATE_ONLY
     )
+    caller = caller_for(db, headers)
 
-    try:
-        call_tool(
-            client,
-            headers,
-            "create_task",
-            {
-                "title": "T",
-                "project": project_id,
-                "recurrence": {"frequency": "weekly"},
-            },
+    with pytest.raises(ToolError) as exc_info:
+        create_task_body(
+            db,
+            caller,
+            title="T",
+            project=project_id,
+            recurrence={"frequency": "weekly"},
         )
-        raise AssertionError("expected a refusal")
-    except ToolError as exc:
-        assert "A recurring task needs a due date" in exc.message
+    assert "A recurring task needs a due date" in str(exc_info.value)
 
 
 def test_a_recurring_subtask_is_refused(client: TestClient, db: Session) -> None:
@@ -286,22 +257,18 @@ def test_a_recurring_subtask_is_refused(client: TestClient, db: Session) -> None
     headers = bot_headers(
         client, owner, project_ids=[project_id], permissions=CREATE_ONLY
     )
+    caller = caller_for(db, headers)
 
-    try:
-        call_tool(
-            client,
-            headers,
-            "create_task",
-            {
-                "title": "Sub",
-                "parent_task_id": root["id"],
-                "due_date": "today",
-                "recurrence": {"frequency": "daily"},
-            },
+    with pytest.raises(ToolError) as exc_info:
+        create_task_body(
+            db,
+            caller,
+            title="Sub",
+            parent_task_id=root["id"],
+            due_date="today",
+            recurrence={"frequency": "daily"},
         )
-        raise AssertionError("expected a refusal")
-    except ToolError as exc:
-        assert "Only a task at the top of its tree can recur" in exc.message
+    assert "Only a task at the top of its tree can recur" in str(exc_info.value)
 
 
 def test_a_recurring_task_created_done_is_refused(
@@ -312,23 +279,19 @@ def test_a_recurring_task_created_done_is_refused(
     headers = bot_headers(
         client, owner, project_ids=[project_id], permissions=CREATE_ONLY
     )
+    caller = caller_for(db, headers)
 
-    try:
-        call_tool(
-            client,
-            headers,
-            "create_task",
-            {
-                "title": "T",
-                "project": project_id,
-                "due_date": "today",
-                "status": "done",
-                "recurrence": {"frequency": "daily"},
-            },
+    with pytest.raises(ToolError) as exc_info:
+        create_task_body(
+            db,
+            caller,
+            title="T",
+            project=project_id,
+            due_date="today",
+            status="done",
+            recurrence={"frequency": "daily"},
         )
-        raise AssertionError("expected a refusal")
-    except ToolError as exc:
-        assert "Only an open task can recur" in exc.message
+    assert "Only an open task can recur" in str(exc_info.value)
 
 
 # --- Assignee -------------------------------------------------------------
@@ -340,18 +303,12 @@ def test_assignee_self_names_the_connecting_bot(
     owner = create_user_headers(client, db)
     project_id = create_project(client, owner)
     headers = bot_headers(
-        client,
-        owner,
-        project_ids=[project_id],
-        permissions=CREATE_ONLY,
-        name="Agent",
+        client, owner, project_ids=[project_id], permissions=CREATE_ONLY, name="Agent"
     )
+    caller = caller_for(db, headers)
 
-    result = call_tool(
-        client,
-        headers,
-        "create_task",
-        {"title": "T", "project": project_id, "assignee": "self"},
+    result = create_task_body(
+        db, caller, title="T", project=project_id, assignee="self"
     )
     assert result["assignee_bot_user"]["name"] == "Agent"
 
@@ -363,12 +320,10 @@ def test_assignee_owner_names_the_human_owner(client: TestClient, db: Session) -
     headers = bot_headers(
         client, owner, project_ids=[project_id], permissions=CREATE_ONLY
     )
+    caller = caller_for(db, headers)
 
-    result = call_tool(
-        client,
-        headers,
-        "create_task",
-        {"title": "T", "project": project_id, "assignee": "owner"},
+    result = create_task_body(
+        db, caller, title="T", project=project_id, assignee="owner"
     )
     assert result["assignee_id"] == owner_id
     assert result["assignee_bot_user"] is None
@@ -378,21 +333,15 @@ def test_assignee_by_another_bot_users_id(client: TestClient, db: Session) -> No
     owner = create_user_headers(client, db)
     project_id = create_project(client, owner)
     target = create_bot_user(
-        client,
-        owner,
-        project_ids=[],
-        permissions=READ_ONLY,
-        name="Triage bot",
+        client, owner, project_ids=[], permissions=READ_ONLY, name="Triage bot"
     )
     headers = bot_headers(
         client, owner, project_ids=[project_id], permissions=CREATE_ONLY
     )
+    caller = caller_for(db, headers)
 
-    result = call_tool(
-        client,
-        headers,
-        "create_task",
-        {"title": "T", "project": project_id, "assignee": target["id"]},
+    result = create_task_body(
+        db, caller, title="T", project=project_id, assignee=target["id"]
     )
     assert result["assignee_bot_user"]["name"] == "Triage bot"
 
@@ -409,17 +358,13 @@ def test_assignee_outside_the_owners_bots_is_refused(
     headers = bot_headers(
         client, owner, project_ids=[project_id], permissions=CREATE_ONLY
     )
+    caller = caller_for(db, headers)
 
-    try:
-        call_tool(
-            client,
-            headers,
-            "create_task",
-            {"title": "T", "project": project_id, "assignee": stranger["id"]},
+    with pytest.raises(ToolError) as exc_info:
+        create_task_body(
+            db, caller, title="T", project=project_id, assignee=stranger["id"]
         )
-        raise AssertionError("expected a refusal")
-    except ToolError as exc:
-        assert "only be assigned to you or to one of your bot users" in exc.message
+    assert "only be assigned to you or to one of your bot users" in str(exc_info.value)
 
 
 def test_an_invalid_assignee_string_is_refused(client: TestClient, db: Session) -> None:
@@ -428,17 +373,13 @@ def test_an_invalid_assignee_string_is_refused(client: TestClient, db: Session) 
     headers = bot_headers(
         client, owner, project_ids=[project_id], permissions=CREATE_ONLY
     )
+    caller = caller_for(db, headers)
 
-    try:
-        call_tool(
-            client,
-            headers,
-            "create_task",
-            {"title": "T", "project": project_id, "assignee": "whoever"},
+    with pytest.raises(ToolError) as exc_info:
+        create_task_body(
+            db, caller, title="T", project=project_id, assignee="whoever"
         )
-        raise AssertionError("expected a refusal")
-    except ToolError as exc:
-        assert "invalid_argument" in exc.message
+    assert "invalid_argument" in str(exc_info.value)
 
 
 def test_a_deleted_bot_user_takes_no_new_task(client: TestClient, db: Session) -> None:
@@ -452,17 +393,13 @@ def test_a_deleted_bot_user_takes_no_new_task(client: TestClient, db: Session) -
     headers = bot_headers(
         client, owner, project_ids=[project_id], permissions=CREATE_ONLY
     )
+    caller = caller_for(db, headers)
 
-    try:
-        call_tool(
-            client,
-            headers,
-            "create_task",
-            {"title": "T", "project": project_id, "assignee": target["id"]},
+    with pytest.raises(ToolError) as exc_info:
+        create_task_body(
+            db, caller, title="T", project=project_id, assignee=target["id"]
         )
-        raise AssertionError("expected a refusal")
-    except ToolError as exc:
-        assert "is deleted and takes no new tasks" in exc.message
+    assert "is deleted and takes no new tasks" in str(exc_info.value)
 
 
 # --- Tags -------------------------------------------------------------------
@@ -477,12 +414,10 @@ def test_tags_are_applied_by_name(client: TestClient, db: Session) -> None:
         project_ids=[project_id],
         permissions={**CREATE_ONLY, "create_tags": True},
     )
+    caller = caller_for(db, headers)
 
-    result = call_tool(
-        client,
-        headers,
-        "create_task",
-        {"title": "T", "project": project_id, "tags": ["urgent", "ci"]},
+    result = create_task_body(
+        db, caller, title="T", project=project_id, tags=["urgent", "ci"]
     )
     assert sorted(result["tags"]) == ["ci", "urgent"]
 
@@ -496,24 +431,17 @@ def test_a_new_tag_name_needs_the_grant_and_names_the_new_ones(
     headers = bot_headers(
         client, owner, project_ids=[project_id], permissions=CREATE_ONLY
     )
+    caller = caller_for(db, headers)
 
-    try:
-        call_tool(
-            client,
-            headers,
-            "create_task",
-            {
-                "title": "T",
-                "project": project_id,
-                "tags": ["urgent", "brand-new"],
-            },
+    with pytest.raises(ToolError) as exc_info:
+        create_task_body(
+            db, caller, title="T", project=project_id, tags=["urgent", "brand-new"]
         )
-        raise AssertionError("expected a refusal")
-    except ToolError as exc:
-        assert "permission_not_granted" in exc.message
-        # Only the name that was new, never the one already a tag.
-        assert "brand-new" in exc.message
-        assert "urgent" not in exc.message
+    message = str(exc_info.value)
+    assert "permission_not_granted" in message
+    # Only the name that was new, never the one already a tag.
+    assert "brand-new" in message
+    assert "urgent" not in message
 
 
 # --- Reporter ---------------------------------------------------------------
@@ -529,10 +457,9 @@ def test_the_reporter_is_always_the_bot_user(client: TestClient, db: Session) ->
         permissions=CREATE_ONLY,
         name="Filing bot",
     )
+    caller = caller_for(db, headers)
 
-    task = call_tool(
-        client, headers, "create_task", {"title": "T", "project": project_id}
-    )
+    task = create_task_body(db, caller, title="T", project=project_id)
 
     entries = client.get(f"{API}/activity-log/", headers=owner).json()["data"]
     [entry] = [e for e in entries if e["entity_id"] == task["id"]]
@@ -549,13 +476,13 @@ def test_without_create_tasks_permission_is_refused_by_name(
     owner = create_user_headers(client, db)
     project_id = create_project(client, owner)
     headers = bot_headers(client, owner, project_ids=[project_id], permissions={})
+    caller = caller_for(db, headers)
 
-    try:
-        call_tool(client, headers, "create_task", {"title": "T", "project": project_id})
-        raise AssertionError("expected a refusal")
-    except ToolError as exc:
-        assert "permission_not_granted" in exc.message
-        assert "create tasks" in exc.message
+    with pytest.raises(ToolError) as exc_info:
+        create_task_body(db, caller, title="T", project=project_id)
+    message = str(exc_info.value)
+    assert "permission_not_granted" in message
+    assert "create tasks" in message
 
 
 def test_a_project_outside_scope_is_refused_by_name(
@@ -567,13 +494,13 @@ def test_a_project_outside_scope_is_refused_by_name(
     headers = bot_headers(
         client, owner, project_ids=[in_scope], permissions=CREATE_ONLY
     )
+    caller = caller_for(db, headers)
 
-    try:
-        call_tool(client, headers, "create_task", {"title": "T", "project": outside})
-        raise AssertionError("expected a refusal")
-    except ToolError as exc:
-        assert "outside_scope" in exc.message
-        assert "Outside" in exc.message
+    with pytest.raises(ToolError) as exc_info:
+        create_task_body(db, caller, title="T", project=outside)
+    message = str(exc_info.value)
+    assert "outside_scope" in message
+    assert "Outside" in message
 
 
 def test_the_archive_refuses_creation(client: TestClient, db: Session) -> None:
@@ -582,17 +509,21 @@ def test_the_archive_refuses_creation(client: TestClient, db: Session) -> None:
     headers = bot_headers(
         client, owner, project_ids=[project_id], permissions=CREATE_ONLY
     )
+    caller = caller_for(db, headers)
     r = archive_project(client, owner, project_id)
     assert r.status_code == 200, r.text
 
-    try:
-        call_tool(client, headers, "create_task", {"title": "T", "project": project_id})
-        raise AssertionError("expected a refusal")
-    except ToolError as exc:
-        assert "project_archived" in exc.message
+    with pytest.raises(ToolError) as exc_info:
+        create_task_body(db, caller, title="T", project=project_id)
+    assert "project_archived" in str(exc_info.value)
 
 
 # --- Argument limits, declared in the schema ---------------------------------
+#
+# `title` and `description`'s length caps are declared on `create_task`'s
+# own argument schema (`Field(max_length=...)`), enforced by the MCP SDK
+# before a call ever reaches `create_task_body` — the one pair of checks
+# here that genuinely needs the protocol rather than a direct body call.
 
 
 def test_an_overlong_title_is_refused_by_its_schema(
@@ -612,7 +543,7 @@ def test_an_overlong_title_is_refused_by_its_schema(
             {"title": "x" * 256, "project": project_id},
         )
         raise AssertionError("expected a refusal")
-    except ToolError as exc:
+    except ProtocolToolError as exc:
         assert "255" in exc.message
 
 
@@ -630,12 +561,8 @@ def test_an_overlong_description_is_refused_by_its_schema(
             client,
             headers,
             "create_task",
-            {
-                "title": "T",
-                "project": project_id,
-                "description": "x" * 2001,
-            },
+            {"title": "T", "project": project_id, "description": "x" * 2001},
         )
         raise AssertionError("expected a refusal")
-    except ToolError as exc:
+    except ProtocolToolError as exc:
         assert "2000" in exc.message
