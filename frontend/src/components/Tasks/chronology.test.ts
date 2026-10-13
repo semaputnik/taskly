@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test"
 
 import type { ActivityEntryPublic, CommentPublic } from "@/client"
+import { describeTaskEvent } from "@/components/Activity/entryWords"
 import { dateInWords } from "@/lib/dates"
 import { chronology } from "./chronology"
-import { describeTaskEvent } from "./taskEvents"
 
 function entry(
   action: ActivityEntryPublic["action"],

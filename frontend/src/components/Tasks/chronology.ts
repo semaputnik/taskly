@@ -1,6 +1,6 @@
 import type { ActivityEntryPublic, CommentPublic } from "@/client"
+import { describeTaskEvent } from "@/components/Activity/entryWords"
 import { dayHeading } from "@/lib/dates"
-import { describeTaskEvent } from "./taskEvents"
 
 /** One line of a task's history: something that happened, or something said. */
 export type Moment =
