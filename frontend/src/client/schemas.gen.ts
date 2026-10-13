@@ -119,18 +119,6 @@ export const ActivityEntryPublicSchema = {
             ],
             title: 'Actor Bot User Name'
         },
-        deletion_id: {
-            anyOf: [
-                {
-                    type: 'string',
-                    format: 'uuid'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Deletion Id'
-        },
         details: {
             additionalProperties: true,
             type: 'object',
@@ -163,6 +151,18 @@ export const ActivityEntryPublicSchema = {
                 }
             ],
             title: 'Entity Project Id'
+        },
+        deletion_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Deletion Id'
         },
         restorable: {
             type: 'boolean',
@@ -347,6 +347,128 @@ export const Body_attachments_upload_attachmentSchema = {
         'file'
     ],
     title: 'Body_attachments-upload_attachment'
+} as const;
+
+export const BotActivityEntriesPublicSchema = {
+    properties: {
+        data: {
+            items: {
+                $ref: '#/components/schemas/BotActivityEntryPublic'
+            },
+            type: 'array',
+            title: 'Data'
+        },
+        count: {
+            type: 'integer',
+            title: 'Count'
+        }
+    },
+    type: 'object',
+    required: [
+        'data',
+        'count'
+    ],
+    title: 'BotActivityEntriesPublic'
+} as const;
+
+export const BotActivityEntryPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        action: {
+            $ref: '#/components/schemas/ActivityAction'
+        },
+        entity_type: {
+            $ref: '#/components/schemas/ActivityEntityType'
+        },
+        entity_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Entity Id'
+        },
+        actor_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Actor Id'
+        },
+        actor_bot_user_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Actor Bot User Id'
+        },
+        actor_bot_user_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Actor Bot User Name'
+        },
+        details: {
+            additionalProperties: true,
+            type: 'object',
+            title: 'Details'
+        },
+        created_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Created At'
+        },
+        entity_exists: {
+            type: 'boolean',
+            title: 'Entity Exists'
+        },
+        entity_project_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Entity Project Id'
+        }
+    },
+    type: 'object',
+    required: [
+        'id',
+        'action',
+        'entity_type',
+        'entity_id',
+        'details',
+        'entity_exists'
+    ],
+    title: 'BotActivityEntryPublic',
+    description: 'What a bot user\'s own read of the activity log carries (#298, ADR-0011):\neverything a human\'s read does except `restorable` and the deletion id.\nRestoring stays a human-only action, and a handle a bot user cannot act\non is a field worth withholding from its response, not a dead one worth\nkeeping at `False`/`None` — so this is the base shape, and\n`ActivityEntryPublic` is the one that adds the two restore-related\nfields back for a human, rather than the other way around.'
 } as const;
 
 export const BotPermissionsSchema = {

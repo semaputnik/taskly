@@ -98,7 +98,9 @@ def _bot(db: Session, world: World, project_ids: list[uuid.UUID]) -> Caller:
 
 
 def _complete(db: Session, task: Task) -> None:
-    crud.update_task(session=db, db_task=task, task_in=TaskUpdate(status=TaskStatus.DONE))
+    crud.update_task(
+        session=db, db_task=task, task_in=TaskUpdate(status=TaskStatus.DONE)
+    )
 
 
 # --- the grant, checked first --------------------------------------------
@@ -155,9 +157,7 @@ def test_kind_narrows_to_one_group_of_changes(db: Session, world: World) -> None
 
 
 def test_task_id_narrows_to_one_tasks_history(db: Session, world: World) -> None:
-    page = read_activity(
-        db, _human(world), ActivityNarrowing(task_id=world.task.id)
-    )
+    page = read_activity(db, _human(world), ActivityNarrowing(task_id=world.task.id))
 
     entity_ids = {e.entity_id for e in page.entries}
     assert world.task.id in entity_ids
@@ -172,9 +172,7 @@ def test_task_id_not_the_callers_own_is_a_404(db: Session, world: World) -> None
     stranger_task = _task(db, stranger.id, stranger_project, "Not yours")
 
     with pytest.raises(HTTPException) as exc_info:
-        read_activity(
-            db, _human(world), ActivityNarrowing(task_id=stranger_task.id)
-        )
+        read_activity(db, _human(world), ActivityNarrowing(task_id=stranger_task.id))
     assert exc_info.value.status_code == 404
 
 
@@ -182,9 +180,7 @@ def test_project_id_outside_a_bots_scope_is_a_404(db: Session, world: World) -> 
     bot = _bot(db, world, [world.project.id])
 
     with pytest.raises(HTTPException) as exc_info:
-        read_activity(
-            db, bot, ActivityNarrowing(project_id=world.other_project.id)
-        )
+        read_activity(db, bot, ActivityNarrowing(project_id=world.other_project.id))
     assert exc_info.value.status_code == 404
 
 
@@ -239,9 +235,7 @@ def test_by_user_and_by_bots_are_the_two_sides_of_who_acted(
 # --- period --------------------------------------------------------------
 
 
-def test_since_and_until_are_exclusive_and_inclusive(
-    db: Session, world: World
-) -> None:
+def test_since_and_until_are_exclusive_and_inclusive(db: Session, world: World) -> None:
     newest = read_activity(db, _human(world), ActivityNarrowing()).entries[0]
     moment = newest.created_at
     assert moment is not None
@@ -286,8 +280,6 @@ def test_limit_none_asks_for_every_match(db: Session, world: World) -> None:
 def test_locations_places_a_task_entry_in_its_project(
     db: Session, world: World
 ) -> None:
-    page = read_activity(
-        db, _human(world), ActivityNarrowing(task_id=world.task.id)
-    )
+    page = read_activity(db, _human(world), ActivityNarrowing(task_id=world.task.id))
 
     assert page.locations[world.task.id] == world.project.id

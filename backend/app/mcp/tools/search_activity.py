@@ -207,9 +207,7 @@ def search_activity(
 
 
 def _rows(session: Session, entries: Sequence[ActivityEntry]) -> list[dict[str, Any]]:
-    bot_ids = {
-        entry.actor_bot_user_id for entry in entries if entry.actor_bot_user_id
-    }
+    bot_ids = {entry.actor_bot_user_id for entry in entries if entry.actor_bot_user_id}
     bots = crud.get_bot_user_refs(session=session, bot_user_ids=bot_ids)
     return [
         {
