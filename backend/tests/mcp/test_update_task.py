@@ -174,9 +174,7 @@ def test_a_new_tag_name_needs_the_grant_and_names_the_new_ones(
     caller = caller_for(db, headers)
 
     with pytest.raises(ToolError) as exc_info:
-        update_task_body(
-            db, caller, task_id=task["id"], tags=["urgent", "brand-new"]
-        )
+        update_task_body(db, caller, task_id=task["id"], tags=["urgent", "brand-new"])
     message = str(exc_info.value)
     assert "permission_not_granted" in message
     assert "brand-new" in message

@@ -351,9 +351,7 @@ def test_narrowing_by_project(client: TestClient, db: Session) -> None:
     _backdate_completion(db, in_work["id"], _at(1))
     _backdate_completion(db, in_home["id"], _at(1))
 
-    result = list_completions_body(
-        db, caller, since=SINCE, until=UNTIL, project="Work"
-    )
+    result = list_completions_body(db, caller, since=SINCE, until=UNTIL, project="Work")
     rows = _rows(result)
     assert [row["title"] for row in rows] == ["In Work"]
     assert result["summary"]["completions"] == 1

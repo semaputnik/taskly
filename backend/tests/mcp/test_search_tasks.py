@@ -342,15 +342,15 @@ def test_assignee_owner_any_bot_and_nobody(client: TestClient, db: Session) -> N
     )
     create_task_record(client, owner, "On nobody", project_id=project_id)
 
-    assert _titles(
-        search_tasks_body(db, caller, assignee=SearchAssignee.OWNER)
-    ) == ["On owner"]
-    assert _titles(
-        search_tasks_body(db, caller, assignee=SearchAssignee.ANY_BOT)
-    ) == ["On bot"]
-    assert _titles(
-        search_tasks_body(db, caller, assignee=SearchAssignee.NOBODY)
-    ) == ["On nobody"]
+    assert _titles(search_tasks_body(db, caller, assignee=SearchAssignee.OWNER)) == [
+        "On owner"
+    ]
+    assert _titles(search_tasks_body(db, caller, assignee=SearchAssignee.ANY_BOT)) == [
+        "On bot"
+    ]
+    assert _titles(search_tasks_body(db, caller, assignee=SearchAssignee.NOBODY)) == [
+        "On nobody"
+    ]
     assert sorted(
         _titles(search_tasks_body(db, caller, assignee=SearchAssignee.ANY))
     ) == ["On bot", "On nobody", "On owner"]
@@ -389,9 +389,7 @@ def test_status_done_with_open_only_false_reaches_done_work(
     headers = bot_headers(client, owner, project_ids=[project_id])
     caller = caller_for(db, headers)
 
-    result = search_tasks_body(
-        db, caller, status=[TaskStatus.DONE], open_only=False
-    )
+    result = search_tasks_body(db, caller, status=[TaskStatus.DONE], open_only=False)
     assert _titles(result) == ["Finished"]
 
 

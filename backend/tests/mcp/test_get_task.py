@@ -287,7 +287,5 @@ def test_a_task_not_there_at_all_is_refused(client: TestClient, db: Session) -> 
     caller = caller_for(db, headers)
 
     with pytest.raises(ToolError) as exc_info:
-        get_task_body(
-            db, caller, task_id="00000000-0000-0000-0000-000000000000"
-        )
+        get_task_body(db, caller, task_id="00000000-0000-0000-0000-000000000000")
     assert "not_found" in str(exc_info.value)

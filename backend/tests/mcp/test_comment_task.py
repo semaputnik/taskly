@@ -95,7 +95,9 @@ def test_a_blank_or_overlong_comment_is_refused_by_its_schema(
     )
 
     try:
-        call_tool(client, headers, "comment_task", {"task_id": task["id"], "body": "  "})
+        call_tool(
+            client, headers, "comment_task", {"task_id": task["id"], "body": "  "}
+        )
         raise AssertionError("expected a refusal")
     except ProtocolToolError:
         pass

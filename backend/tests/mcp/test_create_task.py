@@ -225,7 +225,9 @@ def test_a_recurring_task_is_created_with_its_frequency(
         title="Water the plants",
         project=project_id,
         due_date="today",
-        recurrence=Recurrence(frequency=RecurrenceFrequency.EVERY_N_DAYS, interval_days=3),
+        recurrence=Recurrence(
+            frequency=RecurrenceFrequency.EVERY_N_DAYS, interval_days=3
+        ),
     )
     assert result["recurrence"] == {"frequency": "every_n_days", "interval_days": 3}
 
@@ -377,9 +379,7 @@ def test_an_invalid_assignee_string_is_refused(client: TestClient, db: Session) 
     caller = caller_for(db, headers)
 
     with pytest.raises(ToolError) as exc_info:
-        create_task_body(
-            db, caller, title="T", project=project_id, assignee="whoever"
-        )
+        create_task_body(db, caller, title="T", project=project_id, assignee="whoever")
     assert "invalid_argument" in str(exc_info.value)
 
 

@@ -320,19 +320,19 @@ def test_actor_self_owner_any_bot_and_named_bot(
     create_task_record(client, sibling, "By the sibling", project_id=project_id)
     create_task_record(client, reader, "By the reader itself", project_id=project_id)
 
-    assert _task_titles(
-        search_activity_body(db, reader_caller, actor="self")
-    ) == ["By the reader itself"]
-    assert _task_titles(
-        search_activity_body(db, reader_caller, actor="owner")
-    ) == ["By the owner"]
+    assert _task_titles(search_activity_body(db, reader_caller, actor="self")) == [
+        "By the reader itself"
+    ]
+    assert _task_titles(search_activity_body(db, reader_caller, actor="owner")) == [
+        "By the owner"
+    ]
     any_bot_titles = _task_titles(
         search_activity_body(db, reader_caller, actor="any_bot")
     )
     assert set(any_bot_titles) == {"By the sibling", "By the reader itself"}
-    assert _task_titles(
-        search_activity_body(db, reader_caller, actor="Sibling")
-    ) == ["By the sibling"]
+    assert _task_titles(search_activity_body(db, reader_caller, actor="Sibling")) == [
+        "By the sibling"
+    ]
     assert _task_titles(
         search_activity_body(db, reader_caller, actor=sibling_user["id"])
     ) == ["By the sibling"]
