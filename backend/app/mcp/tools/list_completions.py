@@ -67,7 +67,9 @@ from app.activity_log import ActivityNarrowing, read_activity
 from app.api import access
 from app.api.deps import Caller
 from app.mcp.conventions import (
+    actor_label,
     list_result,
+    narrow_hint,
     open_caller,
     refusal,
     resolve_actor,
@@ -226,7 +228,11 @@ def list_completions(
     enriched.sort(key=lambda e: e.completion.closed_at, reverse=True)
     rows = [_row(e, bots) for e in enriched[:limit]]
 
-    narrow_with = _narrow_hint(project=project, actor=actor, tag=tag)
+    narrow_with = narrow_hint(
+        ("project", project is not None),
+        ("actor", actor is not None),
+        ("tag", tag is not None),
+    )
     result = list_result(
         rows, key="completions", count=len(enriched), narrow_with=narrow_with
     )
@@ -457,13 +463,13 @@ def _row(enriched: _Enriched, bots: dict[uuid.UUID, BotUserRef]) -> dict[str, An
 
 
 def _actor_label(actor: _Actor, bots: dict[uuid.UUID, BotUserRef]) -> str:
-    """Who closed it: "owner", or a bot user by name, `get_task`'s own comment-row convention."""
+    """Who closed it: `actor_label`'s own convention, once this completion's actor is read down to a bot or the owner."""
     if actor.actor_id is not None:
-        return "owner"
+        return actor_label(None)
     assert actor.actor_bot_user_id is not None
     bot = bots.get(actor.actor_bot_user_id)
     assert bot is not None, "a bot user is kept, not removed, once it acted (FR-08.19)"
-    return f"{bot.name} (deleted)" if bot.deleted else bot.name
+    return actor_label(bot)
 
 
 def _summary(
@@ -493,23 +499,3 @@ def _summary(
         "by_actor": by_actor,
         "median_days_to_close": round(median(days), 2) if days else None,
     }
-
-
-# The narrow hint
-
-
-def _narrow_hint(
-    *, project: str | None, actor: str | None, tag: str | None
-) -> str | None:
-    """
-    The one filter, among those not already set, most likely to turn a
-    truncated answer into a complete one — `since`/`until` are never
-    offered here, since both are already required.
-    """
-    if project is None:
-        return "project"
-    if actor is None:
-        return "actor"
-    if tag is None:
-        return "tag"
-    return None

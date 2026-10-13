@@ -43,6 +43,7 @@ from app.api.access import TaskAction
 from app.api.deps import Caller
 from app.mcp.conventions import (
     list_result,
+    narrow_hint,
     open_caller,
     refusal,
     refuse,
@@ -222,14 +223,13 @@ def search_tasks(
         )
         rows = render_task_rows(session, tasks, caller.owner_id)
 
-    narrow_with = _narrow_hint(
-        project=project,
-        status=status,
-        assignee=assignee,
-        tag=tag,
-        priority=priority,
-        due_before=due_before,
-        due_after=due_after,
+    narrow_with = narrow_hint(
+        ("project", project is not None),
+        ("status", bool(status)),
+        ("assignee", assignee is not None),
+        ("tag", tag is not None),
+        ("priority", priority is not None),
+        ("due_before or due_after", due_before is not None or due_after is not None),
     )
     return list_result(rows, count=count, offset=offset, narrow_with=narrow_with)
 
@@ -337,33 +337,3 @@ def _apply_preset(
         TaskSort.CREATED_AT,
         SortOrder.DESC,
     )  # RECENTLY_FILED
-
-
-def _narrow_hint(
-    *,
-    project: str | None,
-    status: list[TaskStatus] | None,
-    assignee: SearchAssignee | None,
-    tag: str | None,
-    priority: TaskPriority | None,
-    due_before: str | None,
-    due_after: str | None,
-) -> str | None:
-    """
-    The one filter, among those not already set, most likely to turn a
-    truncated answer into a complete one — named, not applied, so the
-    caller stays the one deciding what it actually meant.
-    """
-    if project is None:
-        return "project"
-    if not status:
-        return "status"
-    if assignee is None:
-        return "assignee"
-    if tag is None:
-        return "tag"
-    if priority is None:
-        return "priority"
-    if due_before is None and due_after is None:
-        return "due_before or due_after"
-    return None

@@ -18,9 +18,15 @@ from sqlmodel import Session
 from app import crud
 from app.api import access
 from app.api.access import TaskAction
-from app.mcp.conventions import open_caller, refusal, render_task_rows, resolve_task_id
+from app.mcp.conventions import (
+    actor_label,
+    open_caller,
+    refusal,
+    render_task_rows,
+    resolve_task_id,
+)
 from app.mcp.server import mcp_server
-from app.models import BotUserRef, Comment, TaskQuery
+from app.models import Comment, TaskQuery
 from app.read_models import task_publics
 
 
@@ -107,16 +113,10 @@ def _comment_rows(
         rows.append(
             {
                 "body": comment.body,
-                "author": _author(bot),
+                "author": actor_label(bot),
                 "created_at": comment.created_at.isoformat()
                 if comment.created_at is not None
                 else None,
             }
         )
     return rows
-
-
-def _author(bot: BotUserRef | None) -> str:
-    if bot is None:
-        return "owner"
-    return f"{bot.name} (deleted)" if bot.deleted else bot.name
