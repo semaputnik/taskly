@@ -51,16 +51,19 @@ def tree_walk(start_condition: Any, *, including_deleted: bool = False) -> Any:
     be a caller-supplied `name` that had to stay unique among the walks a
     single statement combines — `app/mcp/conventions.py`'s `resolve_task_id`
     already combines two — so getting it wrong produced a runtime SQL error
-    far from the mistake. It is generated fresh here instead, 32 hex digits
-    no two calls ever share, which removes the chance of ever getting it
-    wrong at the cost of a name with no meaning to a human reading the
-    compiled SQL.
+    far from the mistake. `.cte()` is given no name at all here instead:
+    SQLAlchemy numbers an unnamed CTE per statement at compile time (`anon_1`,
+    `anon_2`, ...), which is just as collision-free as a caller picking one
+    would need to be, with no caller input at all. A per-call generated name
+    (`uuid4().hex`) was tried and reverted — it made every walk's compiled
+    form unique, which defeated SQLAlchemy's statement cache and evicted
+    unrelated statements out of it.
     """
     live: list[Any] = [] if including_deleted else [not_deleted(Task)]
     tree = (
         select(Task.id, Task.status, col(Task.project_id), col(Task.due_date))
         .where(start_condition, *live)
-        .cte(f"tree_walk_{uuid.uuid4().hex}", recursive=True)
+        .cte(recursive=True)
     )
     child = aliased(Task)
     live_child: list[Any] = [] if including_deleted else [not_deleted(child)]
