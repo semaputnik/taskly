@@ -13,8 +13,9 @@ injection along the way. Only the shape of what a request resolves to, and
 attributing a transaction to it once resolved, live here instead.
 
 (`app.api.access`, at 570 lines and imported by every route as well as by
-the operations, is the same inversion at a larger scale; it stays where it
-is — this ticket moves `Caller` and `set_caller_actor` alone.)
+the operations, was the same inversion at a larger scale; this ticket moved
+`Caller` and `set_caller_actor` alone, and left it where it was. `app.access`
+is #303's move of it, the same shape repeated.)
 """
 
 import uuid
@@ -35,7 +36,7 @@ class Caller:
     `owner_id` is whose data the request reaches: the user's own, or the
     owning user's for a bot, which never reaches anyone else's. For a bot,
     `bot` and the projects of its scope come along, so Task access
-    (`app.api.access`) can narrow what it reaches. `user` is the human caller
+    (`app.access`) can narrow what it reaches. `user` is the human caller
     themselves, already resolved by `app.api.deps.get_current_user`; it is
     `None` for a bot, which is never a `User` row (FR-08.2's "not a kind of
     user account").
