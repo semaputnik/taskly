@@ -21,8 +21,10 @@ from fastapi import HTTPException
 from mcp.server.mcpserver import Context
 from mcp.types import ToolAnnotations
 from pydantic import Field
+from sqlmodel import Session
 
 from app import tasks
+from app.api.deps import Caller
 from app.mcp.conventions import (
     open_caller,
     refusal,
@@ -121,6 +123,41 @@ def update_task(
 
     Returns the updated task in full.
     """
+    with open_caller(ctx) as (session, caller):
+        return update_task_body(
+            session,
+            caller,
+            task_id=task_id,
+            title=title,
+            description=description,
+            project=project,
+            priority=priority,
+            due_date=due_date,
+            due_date_scope=due_date_scope,
+            assignee=assignee,
+            status=status,
+            tags=tags,
+            clear=clear,
+        )
+
+
+def update_task_body(
+    session: Session,
+    caller: Caller,
+    *,
+    task_id: str,
+    title: str | None = None,
+    description: str | None = None,
+    project: str | None = None,
+    priority: TaskPriority | None = None,
+    due_date: str | None = None,
+    due_date_scope: DueDateScope | None = None,
+    assignee: str | None = None,
+    status: TaskStatus | None = None,
+    tags: list[TagName] | None = None,
+    clear: list[ClearableField] | None = None,
+) -> dict[str, Any]:
+    """`update_task`'s own body (#302): callable directly, with any session and any `Caller`, with no protocol in between."""
     cleared = set(clear or [])
     _refuse_conflicting_clears(
         cleared,
@@ -137,53 +174,52 @@ def update_task(
             "belongs.",
         )
 
-    with open_caller(ctx) as (session, caller):
-        try:
-            resolved_id = resolve_task_id(session, caller, task_id)
-            fields: dict[str, Any] = {}
-            if title is not None:
-                fields["title"] = title
-            if description is not None:
-                fields["description"] = description
-            elif "description" in cleared:
-                fields["description"] = None
-            if due_date is not None:
-                fields["due_date"] = resolve_date(due_date)
-            elif "due_date" in cleared:
-                fields["due_date"] = None
-            if priority is not None:
-                fields["priority"] = priority
-            elif "priority" in cleared:
-                fields["priority"] = None
-            if project is not None:
-                fields["project_id"] = resolve_project_id(session, caller, project)
-            if assignee is not None:
-                fields["assignee_id"] = resolve_assignee(caller, assignee)
-            elif "assignee" in cleared:
-                fields["assignee_id"] = None
-            if status is not None:
-                fields["status"] = status
-            if tags is not None:
-                fields["tags"] = tags
-            if due_date_scope is not None:
-                fields["due_date_scope"] = due_date_scope
+    try:
+        resolved_id = resolve_task_id(session, caller, task_id)
+        fields: dict[str, Any] = {}
+        if title is not None:
+            fields["title"] = title
+        if description is not None:
+            fields["description"] = description
+        elif "description" in cleared:
+            fields["description"] = None
+        if due_date is not None:
+            fields["due_date"] = resolve_date(due_date)
+        elif "due_date" in cleared:
+            fields["due_date"] = None
+        if priority is not None:
+            fields["priority"] = priority
+        elif "priority" in cleared:
+            fields["priority"] = None
+        if project is not None:
+            fields["project_id"] = resolve_project_id(session, caller, project)
+        if assignee is not None:
+            fields["assignee_id"] = resolve_assignee(caller, assignee)
+        elif "assignee" in cleared:
+            fields["assignee_id"] = None
+        if status is not None:
+            fields["status"] = status
+        if tags is not None:
+            fields["tags"] = tags
+        if due_date_scope is not None:
+            fields["due_date_scope"] = due_date_scope
 
-            task_in = TaskUpdate(**fields)
-            result = tasks.update(
-                session=session, caller=caller, task_id=resolved_id, task_in=task_in
-            )
-        except (HTTPException, Refusal) as exc:
-            raise refusal(exc) from exc
-
-        # `status: done` is refused above, before the operation is ever
-        # called, so `update` never delegates to `complete` on this path.
-        assert isinstance(result, tasks.UpdateResult)
-        [public] = task_publics(
-            session,
-            [result.task],
-            projects={result.task.id: result.project.id},
-            recurrences={result.task.id: result.recurrence},
+        task_in = TaskUpdate(**fields)
+        result = tasks.update(
+            session=session, caller=caller, task_id=resolved_id, task_in=task_in
         )
+    except (HTTPException, Refusal) as exc:
+        raise refusal(exc) from exc
+
+    # `status: done` is refused above, before the operation is ever called,
+    # so `update` never delegates to `complete` on this path.
+    assert isinstance(result, tasks.UpdateResult)
+    [public] = task_publics(
+        session,
+        [result.task],
+        projects={result.task.id: result.project.id},
+        recurrences={result.task.id: result.recurrence},
+    )
 
     return public.model_dump(mode="json")
 

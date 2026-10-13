@@ -18,6 +18,7 @@ from sqlmodel import Session
 from app import crud
 from app.api import access
 from app.api.access import TaskAction
+from app.api.deps import Caller
 from app.mcp.conventions import (
     actor_label,
     open_caller,
@@ -58,36 +59,56 @@ def get_task(
     attachments by name and size, never their bytes.
     """
     with open_caller(ctx) as (session, caller):
-        try:
-            resolved_id = resolve_task_id(session, caller, task_id)
-            resolved = access.get_task(session, caller, resolved_id, TaskAction.READ)
-        except HTTPException as exc:
-            raise refusal(exc) from exc
-
-        [public] = task_publics(
-            session, [resolved.task], projects={resolved.task.id: resolved.project.id}
+        return get_task_body(
+            session,
+            caller,
+            task_id=task_id,
+            include_subtasks=include_subtasks,
+            include_comments=include_comments,
+            include_attachments=include_attachments,
         )
-        result = public.model_dump(mode="json")
 
-        if include_subtasks:
-            subtasks, _ = crud.get_tasks(
-                session=session,
-                owner_id=caller.owner_id,
-                query=TaskQuery(parent_id=resolved_id),
-                project_ids=caller.project_ids if caller.bot else None,
-            )
-            result["subtasks"] = render_task_rows(session, subtasks, caller.owner_id)
 
-        if include_comments:
-            comments, _ = crud.get_comments(session=session, task_id=resolved_id)
-            result["comments"] = _comment_rows(session, comments)
+def get_task_body(
+    session: Session,
+    caller: Caller,
+    *,
+    task_id: str,
+    include_subtasks: bool = False,
+    include_comments: bool = False,
+    include_attachments: bool = False,
+) -> dict[str, Any]:
+    """`get_task`'s own body (#302): callable directly, with any session and any `Caller`, with no protocol in between."""
+    try:
+        resolved_id = resolve_task_id(session, caller, task_id)
+        resolved = access.get_task(session, caller, resolved_id, TaskAction.READ)
+    except HTTPException as exc:
+        raise refusal(exc) from exc
 
-        if include_attachments:
-            attachments, _ = crud.get_attachments(session=session, task_id=resolved_id)
-            result["attachments"] = [
-                {"filename": attachment.filename, "size": attachment.size}
-                for attachment in attachments
-            ]
+    [public] = task_publics(
+        session, [resolved.task], projects={resolved.task.id: resolved.project.id}
+    )
+    result = public.model_dump(mode="json")
+
+    if include_subtasks:
+        subtasks, _ = crud.get_tasks(
+            session=session,
+            owner_id=caller.owner_id,
+            query=TaskQuery(parent_id=resolved_id),
+            project_ids=caller.project_ids if caller.bot else None,
+        )
+        result["subtasks"] = render_task_rows(session, subtasks, caller.owner_id)
+
+    if include_comments:
+        comments, _ = crud.get_comments(session=session, task_id=resolved_id)
+        result["comments"] = _comment_rows(session, comments)
+
+    if include_attachments:
+        attachments, _ = crud.get_attachments(session=session, task_id=resolved_id)
+        result["attachments"] = [
+            {"filename": attachment.filename, "size": attachment.size}
+            for attachment in attachments
+        ]
 
     return result
 

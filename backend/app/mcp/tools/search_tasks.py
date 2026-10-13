@@ -36,6 +36,7 @@ from fastapi import HTTPException
 from mcp.server.mcpserver import Context
 from mcp.types import ToolAnnotations
 from pydantic import Field, ValidationError
+from sqlmodel import Session
 
 from app import crud
 from app.api import access
@@ -136,6 +137,51 @@ def search_tasks(
     page; a `truncated` answer names the one filter (`narrow_with`) still
     free to ask again with.
     """
+    with open_caller(ctx) as (session, caller):
+        return search_tasks_body(
+            session,
+            caller,
+            query=query,
+            project=project,
+            status=status,
+            open_only=open_only,
+            assignee=assignee,
+            tag=tag,
+            priority=priority,
+            due_before=due_before,
+            due_after=due_after,
+            overdue=overdue,
+            parent_task_id=parent_task_id,
+            preset=preset,
+            sort=sort,
+            order=order,
+            limit=limit,
+            offset=offset,
+        )
+
+
+def search_tasks_body(
+    session: Session,
+    caller: Caller,
+    *,
+    query: str | None = None,
+    project: str | None = None,
+    status: list[TaskStatus] | None = None,
+    open_only: bool = True,
+    assignee: SearchAssignee | None = None,
+    tag: str | None = None,
+    priority: TaskPriority | None = None,
+    due_before: str | None = None,
+    due_after: str | None = None,
+    overdue: bool = False,
+    parent_task_id: str | None = None,
+    preset: SearchPreset | None = None,
+    sort: TaskSort | None = None,
+    order: SortOrder | None = None,
+    limit: int = 20,
+    offset: int = 0,
+) -> dict[str, Any]:
+    """`search_tasks`'s own body (#302): callable directly, with any session and any `Caller`, with no protocol in between."""
     if preset is not None:
         _refuse_preset_conflicts(
             preset,
@@ -159,69 +205,60 @@ def search_tasks(
     except _NoPossibleMatch:
         return list_result([], count=0, offset=offset, narrow_with=None)
 
-    with open_caller(ctx) as (session, caller):
-        try:
-            project_id = None
-            if project is not None:
-                project_id = resolve_project(
-                    session, caller, project, TaskAction.READ
-                ).id
-            else:
-                access.authorize_tasks(caller, TaskAction.READ)
+    try:
+        project_id = None
+        if project is not None:
+            project_id = resolve_project(session, caller, project, TaskAction.READ).id
+        else:
+            access.authorize_tasks(caller, TaskAction.READ)
 
-            parent_id = None
-            if parent_task_id is not None:
-                parent_id = resolve_task_id(session, caller, parent_task_id)
-                # `resolve_task_id` only decided which task was meant;
-                # `access` still makes the real decision (outside the
-                # scope, archived, lacking the permission).
-                access.get_task(session, caller, parent_id, TaskAction.READ)
+        parent_id = None
+        if parent_task_id is not None:
+            parent_id = resolve_task_id(session, caller, parent_task_id)
+            # `resolve_task_id` only decided which task was meant; `access`
+            # still makes the real decision (outside the scope, archived,
+            # lacking the permission).
+            access.get_task(session, caller, parent_id, TaskAction.READ)
 
-            tag_name = (
-                resolve_tag_name(session, caller.owner_id, tag)
-                if tag is not None
-                else None
-            )
-            due_before_date = (
-                resolve_date(due_before) if due_before is not None else None
-            )
-            due_after_date = resolve_date(due_after) if due_after is not None else None
-            assignee_id, unassigned, assigned_to_bots = _assignee_filters(
-                assignee, caller
-            )
-
-            built_query = TaskQuery(
-                title=query,
-                project_id=project_id,
-                parent_id=parent_id,
-                assignee_id=assignee_id,
-                unassigned=unassigned,
-                assigned_to_bots=assigned_to_bots,
-                tag=tag_name,
-                priority=priority,
-                status=effective_status,
-                due_from=due_after_date,
-                due_to=due_before_date,
-                overdue=overdue,
-                sort=sort,
-                order=order,
-                skip=offset,
-                limit=limit,
-            )
-        except HTTPException as exc:
-            raise refusal(exc) from exc
-        except ValidationError as exc:
-            first = exc.errors()[0]
-            field = ".".join(str(part) for part in first["loc"])
-            refuse("invalid_argument", f"{field}: {first['msg']}")
-
-        tasks, count = crud.get_tasks(
-            session=session,
-            owner_id=caller.owner_id,
-            query=built_query,
-            project_ids=caller.project_ids if caller.bot else None,
+        tag_name = (
+            resolve_tag_name(session, caller.owner_id, tag) if tag is not None else None
         )
-        rows = render_task_rows(session, tasks, caller.owner_id)
+        due_before_date = resolve_date(due_before) if due_before is not None else None
+        due_after_date = resolve_date(due_after) if due_after is not None else None
+        assignee_id, unassigned, assigned_to_bots = _assignee_filters(assignee, caller)
+
+        built_query = TaskQuery(
+            title=query,
+            project_id=project_id,
+            parent_id=parent_id,
+            assignee_id=assignee_id,
+            unassigned=unassigned,
+            assigned_to_bots=assigned_to_bots,
+            tag=tag_name,
+            priority=priority,
+            status=effective_status,
+            due_from=due_after_date,
+            due_to=due_before_date,
+            overdue=overdue,
+            sort=sort,
+            order=order,
+            skip=offset,
+            limit=limit,
+        )
+    except HTTPException as exc:
+        raise refusal(exc) from exc
+    except ValidationError as exc:
+        first = exc.errors()[0]
+        field = ".".join(str(part) for part in first["loc"])
+        refuse("invalid_argument", f"{field}: {first['msg']}")
+
+    tasks, count = crud.get_tasks(
+        session=session,
+        owner_id=caller.owner_id,
+        query=built_query,
+        project_ids=caller.project_ids if caller.bot else None,
+    )
+    rows = render_task_rows(session, tasks, caller.owner_id)
 
     narrow_with = narrow_hint(
         ("project", project is not None),

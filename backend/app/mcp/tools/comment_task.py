@@ -17,8 +17,10 @@ from typing import Any
 
 from fastapi import HTTPException
 from mcp.server.mcpserver import Context
+from sqlmodel import Session
 
 from app import comments
+from app.api.deps import Caller
 from app.mcp.conventions import open_caller, refusal, resolve_task_id
 from app.mcp.server import mcp_server
 from app.models import BotUserRef, CommentBody, CommentCreate, CommentPublic
@@ -47,26 +49,31 @@ def comment_task(ctx: Context, task_id: str, body: CommentBody) -> dict[str, Any
     prints. Returns the comment as recorded, with its author.
     """
     with open_caller(ctx) as (session, caller):
-        try:
-            resolved_id = resolve_task_id(session, caller, task_id)
-            comment_row = comments.comment(
-                session, caller, resolved_id, CommentCreate(body=body)
-            )
-        except HTTPException as exc:
-            raise refusal(exc) from exc
+        return comment_task_body(session, caller, task_id=task_id, body=body)
 
-        # The author is always this call's own bot user — an MCP caller is
-        # always a bot (ADR-0012) — already loaded on `caller`, so there is
-        # no need to query it back the way `app.api.routes.comments._public`
-        # does for a reader that does not already know who wrote it.
-        assert caller.bot is not None, "an MCP caller is always a bot"
-        author = BotUserRef(
-            id=caller.bot.id,
-            name=caller.bot.name,
-            deleted=caller.bot.deleted_at is not None,
+
+def comment_task_body(
+    session: Session, caller: Caller, *, task_id: str, body: CommentBody
+) -> dict[str, Any]:
+    """`comment_task`'s own body (#302): callable directly, with any session and any `Caller`, with no protocol in between."""
+    try:
+        resolved_id = resolve_task_id(session, caller, task_id)
+        comment_row = comments.comment(
+            session, caller, resolved_id, CommentCreate(body=body)
         )
-        public = CommentPublic.model_validate(
-            comment_row, update={"author_bot_user": author}
-        )
+    except HTTPException as exc:
+        raise refusal(exc) from exc
+
+    # The author is always this call's own bot user — an MCP caller is
+    # always a bot (ADR-0012) — already loaded on `caller`, so there is no
+    # need to query it back the way `app.api.routes.comments._public` does
+    # for a reader that does not already know who wrote it.
+    assert caller.bot is not None, "an MCP caller is always a bot"
+    author = BotUserRef(
+        id=caller.bot.id, name=caller.bot.name, deleted=caller.bot.deleted_at is not None
+    )
+    public = CommentPublic.model_validate(
+        comment_row, update={"author_bot_user": author}
+    )
 
     return public.model_dump(mode="json")
