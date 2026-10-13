@@ -33,20 +33,6 @@ def not_deleted(model: type[Task] | type[Project]) -> Any:
     return col(model.deletion_id).is_(None)
 
 
-def _fresh_cte_name(label: str) -> str:
-    """
-    A CTE name that cannot collide with another `tree_walk`'s: `label` for a
-    reader, plus 32 hex digits no two calls ever share. A caller used to have
-    to pick a name unique among the walks its own statement combines —
-    `app/mcp/conventions.py` already combines two in `resolve_task_id` — and
-    getting that wrong was a runtime SQL error two modules away from the
-    mistake. Generating it here instead removes the chance of ever getting
-    it wrong, at the cost of a name with no meaning beyond `label` to a human
-    reading the compiled SQL.
-    """
-    return f"{label}_{uuid.uuid4().hex}"
-
-
 def tree_walk(start_condition: Any, *, including_deleted: bool = False) -> Any:
     """
     The one walk down the task tree: the tasks matching `start_condition` and
@@ -61,15 +47,20 @@ def tree_walk(start_condition: Any, *, including_deleted: bool = False) -> Any:
     belong to — has to resolve a deleted task exactly as it would a live one.
 
     Subtasks hold no project of their own, so the tasks of a project are only
-    reachable by walking down from its root tasks. The CTE's own name is
-    generated fresh by `_fresh_cte_name`, so nothing a caller does can make
-    it collide with another walk the same statement combines.
+    reachable by walking down from its root tasks. The CTE's own name used to
+    be a caller-supplied `name` that had to stay unique among the walks a
+    single statement combines — `app/mcp/conventions.py`'s `resolve_task_id`
+    already combines two — so getting it wrong produced a runtime SQL error
+    far from the mistake. It is generated fresh here instead, 32 hex digits
+    no two calls ever share, which removes the chance of ever getting it
+    wrong at the cost of a name with no meaning to a human reading the
+    compiled SQL.
     """
     live: list[Any] = [] if including_deleted else [not_deleted(Task)]
     tree = (
         select(Task.id, Task.status, col(Task.project_id), col(Task.due_date))
         .where(start_condition, *live)
-        .cte(_fresh_cte_name("tree_walk"), recursive=True)
+        .cte(f"tree_walk_{uuid.uuid4().hex}", recursive=True)
     )
     child = aliased(Task)
     live_child: list[Any] = [] if including_deleted else [not_deleted(child)]
