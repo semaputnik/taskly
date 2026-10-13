@@ -13,9 +13,8 @@ import uuid
 
 from sqlmodel import Session
 
-from app import crud
-from app.api import access
-from app.api.access import TaskAction
+from app import access, crud
+from app.access import TaskAction
 from app.caller import Caller, set_caller_actor
 from app.models import Comment, CommentCreate
 from app.unit_of_work import UnitOfWork
@@ -30,7 +29,7 @@ def comment(
     """
     Leave a comment on a task, including a subtask (FR-03.1).
 
-    Decides access itself (`app.api.access.get_task`, `TaskAction.COMMENT`):
+    Decides access itself (`app.access.get_task`, `TaskAction.COMMENT`):
     a bot user needs the `add_comments` grant, not `update_tasks` — it can
     report on a task without being able to change it (FR-08.10).
 

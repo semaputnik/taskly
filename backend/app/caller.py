@@ -13,8 +13,9 @@ injection along the way. Only the shape of what a request resolves to, and
 attributing a transaction to it once resolved, live here instead.
 
 (`app.api.access`, at 570 lines and imported by every route as well as by
-the operations, is the same inversion at a larger scale; it stays where it
-is — this ticket moves `Caller` and `set_caller_actor` alone.)
+the operations, was the same inversion at a larger scale; this ticket moved
+`Caller` and `set_caller_actor` alone, and left it where it was. `app.access`
+is #303's move of it, the same shape repeated.)
 """
 
 import uuid

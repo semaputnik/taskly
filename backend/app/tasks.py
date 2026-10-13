@@ -32,9 +32,8 @@ from datetime import date
 from sqlalchemy import not_
 from sqlmodel import Session, col, select
 
-from app import crud, deletions, refusals
-from app.api import access
-from app.api.access import TaskAction
+from app import access, crud, deletions, refusals
+from app.access import TaskAction
 from app.caller import Caller, set_caller_actor
 from app.models import (
     BotUser,
@@ -226,7 +225,7 @@ def complete(
     the status move), now performed in one place for both callers that
     perform it (#275).
 
-    Decides access itself (`app.api.access.get_task`), rather than taking it
+    Decides access itself (`app.access.get_task`), rather than taking it
     as already settled: an operation is the one place this product's write
     rules live, not whichever caller happened to check first.
 
@@ -567,7 +566,7 @@ def delete(
     Delete a task, and its subtasks with it (FR-01.8, FR-01.11, FR-01.12,
     #275, #282).
 
-    Decides access itself (`app.api.access.get_task`), the same as every
+    Decides access itself (`app.access.get_task`), the same as every
     other operation. A task with subtasks is refused until `delete_subtasks`
     confirms the cascade; the refusal carries the whole live subtree — done
     descendants included, since the cascade takes them along with the open

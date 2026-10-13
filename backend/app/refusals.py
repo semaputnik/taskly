@@ -3,7 +3,7 @@ A refusal: a decision not to perform an act, which names itself rather than
 being assembled where it happens (#275).
 
 Raised, never returned. A sum-typed result would mean teaching
-`app.api.access` and `app.crud` to thread a refusal upward through every call
+`app.access` and `app.crud` to thread a refusal upward through every call
 they are already part of — a rewrite of the access path this slice does not
 need. Not a subclass of `HTTPException` either: an operation (`app.tasks`)
 knows nothing about HTTP, and a refusal that was itself an `HTTPException`
@@ -24,7 +24,7 @@ string a code — that is a deliberate, client-visible change the bodies #276
 pinned are the proof nobody made here.
 
 Only the codes the paths this slice (#279, #282) touches need are introduced
-here. The other forty code-less refusals `app.api.access` and inline route
+here. The other forty code-less refusals `app.access` and inline route
 checks still raise as a plain-string `HTTPException` detail are left exactly
 as they are (#275) — this module gains a code only when a ticket actually
 moves the path it sits on, never ahead of it.
