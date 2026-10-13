@@ -192,7 +192,17 @@ class ActivityEntry(SQLModel, table=True):
     )
 
 
-class ActivityEntryPublic(SQLModel):
+class BotActivityEntryPublic(SQLModel):
+    """
+    What a bot user's own read of the activity log carries (#298, ADR-0011):
+    everything a human's read does except `restorable` and the deletion id.
+    Restoring stays a human-only action, and a handle a bot user cannot act
+    on is a field worth withholding from its response, not a dead one worth
+    keeping at `False`/`None` — so this is the base shape, and
+    `ActivityEntryPublic` is the one that adds the two restore-related
+    fields back for a human, rather than the other way around.
+    """
+
     id: uuid.UUID
     action: ActivityAction
     entity_type: ActivityEntityType
@@ -202,18 +212,27 @@ class ActivityEntryPublic(SQLModel):
     actor_id: uuid.UUID | None = None
     actor_bot_user_id: uuid.UUID | None = None
     actor_bot_user_name: str | None = None
-    deletion_id: uuid.UUID | None = None
     details: dict[str, Any]
     created_at: datetime | None = None
     # Whether the entity can still be opened, and the project to open it in:
     # a deleted task has nowhere to link to.
     entity_exists: bool
     entity_project_id: uuid.UUID | None = None
+
+
+class ActivityEntryPublic(BotActivityEntryPublic):
     # Set on a deletion entry whose rows are still deleted: the entry a
-    # restore can be started from.
+    # restore can be started from. A bot user's response carries neither
+    # this nor `deletion_id` (ADR-0011) — see `BotActivityEntryPublic`.
+    deletion_id: uuid.UUID | None = None
     restorable: bool = False
 
 
 class ActivityEntriesPublic(SQLModel):
     data: list[ActivityEntryPublic]
+    count: int
+
+
+class BotActivityEntriesPublic(SQLModel):
+    data: list[BotActivityEntryPublic]
     count: int
