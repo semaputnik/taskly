@@ -130,7 +130,9 @@ def create_task_body(
 
     try:
         project_id = (
-            resolve_project_id(session, caller, project) if project is not None else None
+            resolve_project_id(session, caller, project)
+            if project is not None
+            else None
         )
         parent_id = (
             resolve_task_id(session, caller, parent_task_id)

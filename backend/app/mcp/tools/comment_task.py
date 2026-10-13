@@ -70,7 +70,9 @@ def comment_task_body(
     # for a reader that does not already know who wrote it.
     assert caller.bot is not None, "an MCP caller is always a bot"
     author = BotUserRef(
-        id=caller.bot.id, name=caller.bot.name, deleted=caller.bot.deleted_at is not None
+        id=caller.bot.id,
+        name=caller.bot.name,
+        deleted=caller.bot.deleted_at is not None,
     )
     public = CommentPublic.model_validate(
         comment_row, update={"author_bot_user": author}
