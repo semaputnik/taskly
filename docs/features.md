@@ -631,12 +631,13 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
   `until` (FR-10.12) — a date each, widened to the whole day it names so a
   closed period ("last month") is asked for by its two calendar dates. It
   invents no narrowing the endpoint does not have: it is built on
-  `app.api.routes.activity.read_activity_log` itself, called through to
-  directly the way the write tools call theirs, so the scope narrowing, the
-  all-or-nothing batch rule, the tag exemption, and the withholding of
-  `restorable` and the deletion id from a bot's own response all stay that
-  route's code. `order` (FR-10.10) and paging (`limit`, `offset`) work as
-  they do there. Each result is one compact line — `at`, `actor` ("owner",
+  `app.activity_log.read_activity`, the reader `GET /activity-log/` itself
+  calls through to, so the scope narrowing, the all-or-nothing batch rule,
+  and the tag exemption stay that one module's code; the withholding of
+  `restorable` and the deletion id from a bot's own response is the route's
+  own job of declaring two response shapes (ADR-0011). `order` (FR-10.10)
+  and paging (`limit`, `offset`) work as they do there. Each result is one
+  compact line — `at`, `actor` ("owner",
   or a bot user by name, the convention `get_task`'s own comment rows use),
   `what` (one short phrase, ported from the web UI's own
   `ActivityDescription.tsx`, there being no backend description of an entry

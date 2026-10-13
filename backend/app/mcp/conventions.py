@@ -371,8 +371,9 @@ def resolve_actor(
     session: Session, caller: Caller, raw: str
 ) -> tuple[uuid.UUID | None, bool, bool]:
     """
-    `actor` as the three arguments `read_activity_log` takes for it
-    (spec #248, #259): `actor_bot_user_id`, `by_bots`, `by_user`. `self` is
+    `actor` as the three fields `app.activity_log.ActivityNarrowing` takes
+    for it (spec #248, #259, #298): `actor_bot_user_id`, `by_bots`,
+    `by_user`. `self` is
     the connecting bot's own id; `owner` and `any_bot` read as the log's own
     flags for "the human" and "any bot user"; anything else names a sibling
     bot user, by id or by name case-insensitively, the same ambiguous-name
