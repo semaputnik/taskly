@@ -1,16 +1,25 @@
 """
-`update_task` (spec #247, #256): change a task, move it, hand it over —
-driven over the protocol with a bot user's token, the same way an agent
-would.
+`update_task` (spec #247, #256): change a task, move it, hand it over.
+
+Exercised against `update_task_body` directly (#302) — see
+`test_whoami.py`'s own module docstring for why, and where the protocol
+itself is still tested. `test_a_null_argument_is_refused_rather_than_read_as_clear`
+is the exception: it is `app.mcp.server._RefuseNullArguments`, a `tools/call`
+interceptor that inspects the raw JSON arguments before the SDK ever binds
+them to `update_task`'s own parameters, so it genuinely needs the protocol.
 """
 
 from datetime import date
 
 import httpx
+import pytest
 from fastapi.testclient import TestClient
+from mcp.server.mcpserver.exceptions import ToolError
 from sqlmodel import Session
 
 from app.core.config import settings
+from app.mcp.tools.update_task import update_task_body
+from app.models import DueDateScope, TaskPriority, TaskStatus
 from tests.utils.accounts import (
     ALL_PERMISSIONS,
     READ_ONLY,
@@ -22,7 +31,9 @@ from tests.utils.accounts import (
     create_user_headers,
     my_id,
 )
-from tests.utils.mcp import ToolError, bot_headers, call_tool, list_tools
+from tests.utils.mcp import ToolError as ProtocolToolError
+from tests.utils.mcp import bot_headers, call_tool
+from tests.utils.mcp_body import caller_for
 
 API = settings.API_V1_STR
 TODAY = date.today().isoformat()
@@ -45,20 +56,6 @@ def _patch(
     return client.patch(f"{API}/tasks/{task_id}", headers=headers, json=fields)
 
 
-def test_tools_list_advertises_update_task_as_idempotent_not_read_only(
-    client: TestClient, db: Session
-) -> None:
-    owner = create_user_headers(client, db)
-    headers = bot_headers(client, owner)
-
-    tools = list_tools(client, headers)
-    update_task = next(t for t in tools if t["name"] == "update_task")
-    assert update_task["description"]
-    annotations = update_task.get("annotations") or {}
-    assert annotations.get("idempotentHint")
-    assert not annotations.get("readOnlyHint")
-
-
 # --- Fields: changed together, left alone when omitted ----------------------
 
 
@@ -74,20 +71,18 @@ def test_updates_several_fields_leaving_the_rest_alone(
     headers = bot_headers(
         client, owner, project_ids=[work, personal], permissions=ALL_PERMISSIONS
     )
+    caller = caller_for(db, headers)
 
-    result = call_tool(
-        client,
-        headers,
-        "update_task",
-        {
-            "task_id": task["id"],
-            "title": "Shipped",
-            "project": "Personal",
-            "priority": "P1",
-            "due_date": "today",
-            "status": "todo",
-            "tags": ["release"],
-        },
+    result = update_task_body(
+        db,
+        caller,
+        task_id=task["id"],
+        title="Shipped",
+        project="Personal",
+        priority=TaskPriority.P1,
+        due_date="today",
+        status=TaskStatus.TODO,
+        tags=["release"],
     )
 
     assert result["title"] == "Shipped"
@@ -107,12 +102,10 @@ def test_description_can_be_set_on_its_own(client: TestClient, db: Session) -> N
     headers = bot_headers(
         client, owner, project_ids=[project_id], permissions=UPDATE_ONLY
     )
+    caller = caller_for(db, headers)
 
-    result = call_tool(
-        client,
-        headers,
-        "update_task",
-        {"task_id": task["id"], "description": "What it's for"},
+    result = update_task_body(
+        db, caller, task_id=task["id"], description="What it's for"
     )
     assert result["description"] == "What it's for"
     assert result["title"] == "T"
@@ -125,13 +118,9 @@ def test_a_short_id_prefix_resolves(client: TestClient, db: Session) -> None:
     headers = bot_headers(
         client, owner, project_ids=[project_id], permissions=UPDATE_ONLY
     )
+    caller = caller_for(db, headers)
 
-    result = call_tool(
-        client,
-        headers,
-        "update_task",
-        {"task_id": task["id"][:8], "title": "Renamed"},
-    )
+    result = update_task_body(db, caller, task_id=task["id"][:8], title="Renamed")
     assert result["id"] == task["id"]
     assert result["title"] == "Renamed"
 
@@ -151,13 +140,9 @@ def test_tags_replace_wholesale(client: TestClient, db: Session) -> None:
         project_ids=[project_id],
         permissions={**UPDATE_ONLY, "create_tags": True},
     )
+    caller = caller_for(db, headers)
 
-    result = call_tool(
-        client,
-        headers,
-        "update_task",
-        {"task_id": task["id"], "tags": ["new"]},
-    )
+    result = update_task_body(db, caller, task_id=task["id"], tags=["new"])
     assert result["tags"] == ["new"]
 
 
@@ -170,10 +155,9 @@ def test_sending_an_empty_tags_list_clears_every_tag(
     headers = bot_headers(
         client, owner, project_ids=[project_id], permissions=UPDATE_ONLY
     )
+    caller = caller_for(db, headers)
 
-    result = call_tool(
-        client, headers, "update_task", {"task_id": task["id"], "tags": []}
-    )
+    result = update_task_body(db, caller, task_id=task["id"], tags=[])
     assert result["tags"] == []
 
 
@@ -187,19 +171,16 @@ def test_a_new_tag_name_needs_the_grant_and_names_the_new_ones(
     headers = bot_headers(
         client, owner, project_ids=[project_id], permissions=UPDATE_ONLY
     )
+    caller = caller_for(db, headers)
 
-    try:
-        call_tool(
-            client,
-            headers,
-            "update_task",
-            {"task_id": task["id"], "tags": ["urgent", "brand-new"]},
+    with pytest.raises(ToolError) as exc_info:
+        update_task_body(
+            db, caller, task_id=task["id"], tags=["urgent", "brand-new"]
         )
-        raise AssertionError("expected a refusal")
-    except ToolError as exc:
-        assert "permission_not_granted" in exc.message
-        assert "brand-new" in exc.message
-        assert "urgent" not in exc.message
+    message = str(exc_info.value)
+    assert "permission_not_granted" in message
+    assert "brand-new" in message
+    assert "urgent" not in message
 
 
 # --- Clear: the explicit way to empty a field --------------------------------
@@ -224,15 +205,13 @@ def test_clear_empties_description_due_date_priority_and_assignee(
     headers = bot_headers(
         client, owner, project_ids=[project_id], permissions=UPDATE_ONLY
     )
+    caller = caller_for(db, headers)
 
-    result = call_tool(
-        client,
-        headers,
-        "update_task",
-        {
-            "task_id": task["id"],
-            "clear": ["description", "due_date", "priority", "assignee"],
-        },
+    result = update_task_body(
+        db,
+        caller,
+        task_id=task["id"],
+        clear=["description", "due_date", "priority", "assignee"],
     )
     assert result["description"] is None
     assert result["due_date"] is None
@@ -249,23 +228,25 @@ def test_sending_a_value_and_clearing_the_same_field_is_refused(
     headers = bot_headers(
         client, owner, project_ids=[project_id], permissions=UPDATE_ONLY
     )
+    caller = caller_for(db, headers)
 
-    try:
-        call_tool(
-            client,
-            headers,
-            "update_task",
-            {"task_id": task["id"], "priority": "P1", "clear": ["priority"]},
+    with pytest.raises(ToolError) as exc_info:
+        update_task_body(
+            db, caller, task_id=task["id"], priority=TaskPriority.P1, clear=["priority"]
         )
-        raise AssertionError("expected a refusal")
-    except ToolError as exc:
-        assert "invalid_argument" in exc.message
-        assert "priority" in exc.message
+    message = str(exc_info.value)
+    assert "invalid_argument" in message
+    assert "priority" in message
 
 
 def test_a_null_argument_is_refused_rather_than_read_as_clear(
     client: TestClient, db: Session
 ) -> None:
+    """
+    `app.mcp.server._RefuseNullArguments` inspects the raw JSON arguments of
+    a `tools/call`, before the SDK binds anything to `update_task`'s own
+    parameters — the one check here that genuinely needs the protocol.
+    """
     owner = create_user_headers(client, db)
     project_id = create_project(client, owner)
     task = create_task_record(client, owner, "T", project_id=project_id)
@@ -275,13 +256,10 @@ def test_a_null_argument_is_refused_rather_than_read_as_clear(
 
     try:
         call_tool(
-            client,
-            headers,
-            "update_task",
-            {"task_id": task["id"], "due_date": None},
+            client, headers, "update_task", {"task_id": task["id"], "due_date": None}
         )
         raise AssertionError("expected a refusal")
-    except ToolError as exc:
+    except ProtocolToolError as exc:
         assert "invalid_argument" in exc.message
         assert "null" in exc.message
 
@@ -298,14 +276,11 @@ def test_moving_to_done_is_refused_pointing_to_complete_task(
     headers = bot_headers(
         client, owner, project_ids=[project_id], permissions=UPDATE_ONLY
     )
+    caller = caller_for(db, headers)
 
-    try:
-        call_tool(
-            client, headers, "update_task", {"task_id": task["id"], "status": "done"}
-        )
-        raise AssertionError("expected a refusal")
-    except ToolError as exc:
-        assert "complete_task" in exc.message
+    with pytest.raises(ToolError) as exc_info:
+        update_task_body(db, caller, task_id=task["id"], status=TaskStatus.DONE)
+    assert "complete_task" in str(exc_info.value)
 
 
 def test_moving_between_open_statuses_leaves_subtasks_alone(
@@ -318,13 +293,9 @@ def test_moving_between_open_statuses_leaves_subtasks_alone(
     headers = bot_headers(
         client, owner, project_ids=[project_id], permissions=UPDATE_ONLY
     )
+    caller = caller_for(db, headers)
 
-    result = call_tool(
-        client,
-        headers,
-        "update_task",
-        {"task_id": root["id"], "status": "waiting"},
-    )
+    result = update_task_body(db, caller, task_id=root["id"], status=TaskStatus.WAITING)
     assert result["status"] == "waiting"
     assert _get(client, owner, sub["id"])["status"] == "backlog"
 
@@ -341,17 +312,11 @@ def test_moving_an_open_occurrences_due_date_needs_a_scope(
     headers = bot_headers(
         client, owner, project_ids=[project_id], permissions=UPDATE_ONLY
     )
+    caller = caller_for(db, headers)
 
-    try:
-        call_tool(
-            client,
-            headers,
-            "update_task",
-            {"task_id": task["id"], "due_date": "2026-03-04"},
-        )
-        raise AssertionError("expected a refusal")
-    except ToolError as exc:
-        assert "due_date_scope_required" in exc.message
+    with pytest.raises(ToolError) as exc_info:
+        update_task_body(db, caller, task_id=task["id"], due_date="2026-03-04")
+    assert "due_date_scope_required" in str(exc_info.value)
 
 
 def test_a_due_date_scope_moves_a_recurring_occurrence(
@@ -363,16 +328,14 @@ def test_a_due_date_scope_moves_a_recurring_occurrence(
     headers = bot_headers(
         client, owner, project_ids=[project_id], permissions=UPDATE_ONLY
     )
+    caller = caller_for(db, headers)
 
-    result = call_tool(
-        client,
-        headers,
-        "update_task",
-        {
-            "task_id": task["id"],
-            "due_date": "2026-03-04",
-            "due_date_scope": "this_occurrence",
-        },
+    result = update_task_body(
+        db,
+        caller,
+        task_id=task["id"],
+        due_date="2026-03-04",
+        due_date_scope=DueDateScope.THIS_OCCURRENCE,
     )
     assert result["due_date"] == "2026-03-04"
 
@@ -388,22 +351,19 @@ def test_a_due_date_scope_on_a_task_that_does_not_recur_is_refused(
     headers = bot_headers(
         client, owner, project_ids=[project_id], permissions=UPDATE_ONLY
     )
+    caller = caller_for(db, headers)
 
-    try:
-        call_tool(
-            client,
-            headers,
-            "update_task",
-            {
-                "task_id": task["id"],
-                "due_date": "2026-03-04",
-                "due_date_scope": "this_occurrence",
-            },
+    with pytest.raises(ToolError) as exc_info:
+        update_task_body(
+            db,
+            caller,
+            task_id=task["id"],
+            due_date="2026-03-04",
+            due_date_scope=DueDateScope.THIS_OCCURRENCE,
         )
-        raise AssertionError("expected a refusal")
-    except ToolError as exc:
-        assert "invalid_argument" in exc.message
-        assert "recurring task that is open" in exc.message
+    message = str(exc_info.value)
+    assert "invalid_argument" in message
+    assert "recurring task that is open" in message
 
 
 def test_reopening_an_earlier_occurrence_is_refused_naming_the_latest(
@@ -417,15 +377,13 @@ def test_reopening_an_earlier_occurrence_is_refused_naming_the_latest(
     headers = bot_headers(
         client, owner, project_ids=[project_id], permissions=UPDATE_ONLY
     )
+    caller = caller_for(db, headers)
 
-    try:
-        call_tool(
-            client, headers, "update_task", {"task_id": task["id"], "status": "todo"}
-        )
-        raise AssertionError("expected a refusal")
-    except ToolError as exc:
-        assert "occurrence_superseded" in exc.message
-        assert "latest occurrence" in exc.message
+    with pytest.raises(ToolError) as exc_info:
+        update_task_body(db, caller, task_id=task["id"], status=TaskStatus.TODO)
+    message = str(exc_info.value)
+    assert "occurrence_superseded" in message
+    assert "latest occurrence" in message
 
 
 # --- Project: moved, a subtask refused, scope both ways ----------------------
@@ -441,13 +399,9 @@ def test_a_task_is_moved_to_another_project_by_name(
     headers = bot_headers(
         client, owner, project_ids=[work, personal], permissions=UPDATE_ONLY
     )
+    caller = caller_for(db, headers)
 
-    result = call_tool(
-        client,
-        headers,
-        "update_task",
-        {"task_id": task["id"], "project": "Personal"},
-    )
+    result = update_task_body(db, caller, task_id=task["id"], project="Personal")
     assert result["project_id"] == personal
 
 
@@ -462,17 +416,11 @@ def test_a_subtask_cannot_be_moved_between_projects(
     headers = bot_headers(
         client, owner, project_ids=[work, personal], permissions=UPDATE_ONLY
     )
+    caller = caller_for(db, headers)
 
-    try:
-        call_tool(
-            client,
-            headers,
-            "update_task",
-            {"task_id": sub["id"], "project": "Personal"},
-        )
-        raise AssertionError("expected a refusal")
-    except ToolError as exc:
-        assert "top of the tree" in exc.message
+    with pytest.raises(ToolError) as exc_info:
+        update_task_body(db, caller, task_id=sub["id"], project="Personal")
+    assert "top of the tree" in str(exc_info.value)
 
 
 def test_moving_into_a_project_outside_scope_is_refused_by_name(
@@ -483,15 +431,13 @@ def test_moving_into_a_project_outside_scope_is_refused_by_name(
     outside = create_project(client, owner, "Outside")
     task = create_task_record(client, owner, "T", project_id=work)
     headers = bot_headers(client, owner, project_ids=[work], permissions=UPDATE_ONLY)
+    caller = caller_for(db, headers)
 
-    try:
-        call_tool(
-            client, headers, "update_task", {"task_id": task["id"], "project": outside}
-        )
-        raise AssertionError("expected a refusal")
-    except ToolError as exc:
-        assert "outside_scope" in exc.message
-        assert "Outside" in exc.message
+    with pytest.raises(ToolError) as exc_info:
+        update_task_body(db, caller, task_id=task["id"], project=outside)
+    message = str(exc_info.value)
+    assert "outside_scope" in message
+    assert "Outside" in message
 
 
 def test_a_task_whose_own_project_is_outside_scope_cannot_be_moved_out_of_it(
@@ -502,17 +448,15 @@ def test_a_task_whose_own_project_is_outside_scope_cannot_be_moved_out_of_it(
     inside = create_project(client, owner, "Inside")
     task = create_task_record(client, owner, "T", project_id=outside)
     headers = bot_headers(client, owner, project_ids=[inside], permissions=UPDATE_ONLY)
+    caller = caller_for(db, headers)
 
-    try:
-        call_tool(
-            client, headers, "update_task", {"task_id": task["id"], "project": inside}
-        )
-        raise AssertionError("expected a refusal")
-    except ToolError as exc:
-        # The task's own project (where it already is) is the one checked
-        # first (FR-08.8), before the destination is even looked at.
-        assert "outside_scope" in exc.message
-        assert "Outside" in exc.message
+    with pytest.raises(ToolError) as exc_info:
+        update_task_body(db, caller, task_id=task["id"], project=inside)
+    message = str(exc_info.value)
+    # The task's own project (where it already is) is the one checked first
+    # (FR-08.8), before the destination is even looked at.
+    assert "outside_scope" in message
+    assert "Outside" in message
 
 
 # --- Assignee: owner or a bot user, never the reporter -----------------------
@@ -525,16 +469,11 @@ def test_assignee_self_names_the_connecting_bot(
     project_id = create_project(client, owner)
     task = create_task_record(client, owner, "T", project_id=project_id)
     headers = bot_headers(
-        client,
-        owner,
-        project_ids=[project_id],
-        permissions=UPDATE_ONLY,
-        name="Agent",
+        client, owner, project_ids=[project_id], permissions=UPDATE_ONLY, name="Agent"
     )
+    caller = caller_for(db, headers)
 
-    result = call_tool(
-        client, headers, "update_task", {"task_id": task["id"], "assignee": "self"}
-    )
+    result = update_task_body(db, caller, task_id=task["id"], assignee="self")
     assert result["assignee_bot_user"]["name"] == "Agent"
 
 
@@ -546,10 +485,9 @@ def test_assignee_owner_names_the_human_owner(client: TestClient, db: Session) -
     headers = bot_headers(
         client, owner, project_ids=[project_id], permissions=UPDATE_ONLY
     )
+    caller = caller_for(db, headers)
 
-    result = call_tool(
-        client, headers, "update_task", {"task_id": task["id"], "assignee": "owner"}
-    )
+    result = update_task_body(db, caller, task_id=task["id"], assignee="owner")
     assert result["assignee_id"] == owner_id
 
 
@@ -570,24 +508,15 @@ def test_a_deleted_bot_user_keeps_what_it_has_but_takes_no_new_task(
     headers = bot_headers(
         client, owner, project_ids=[project_id], permissions=UPDATE_ONLY
     )
+    caller = caller_for(db, headers)
 
-    try:
-        call_tool(
-            client,
-            headers,
-            "update_task",
-            {"task_id": task["id"], "assignee": retired["id"]},
-        )
-        raise AssertionError("expected a refusal")
-    except ToolError as exc:
-        assert "is deleted and takes no new tasks" in exc.message
+    with pytest.raises(ToolError) as exc_info:
+        update_task_body(db, caller, task_id=task["id"], assignee=retired["id"])
+    assert "is deleted and takes no new tasks" in str(exc_info.value)
 
     # Resending it on the task it already holds is not a new assignment.
-    result = call_tool(
-        client,
-        headers,
-        "update_task",
-        {"task_id": other_task["id"], "assignee": retired["id"], "title": "Still mine"},
+    result = update_task_body(
+        db, caller, task_id=other_task["id"], assignee=retired["id"], title="Still mine"
     )
     assert result["title"] == "Still mine"
 
@@ -603,18 +532,12 @@ def test_the_reporter_is_never_changed_by_update_task(
     task = create_task_record(client, owner, "T", project_id=project_id)
     reporter_id_before = task["reporter_id"]
     headers = bot_headers(
-        client,
-        owner,
-        project_ids=[project_id],
-        permissions=UPDATE_ONLY,
-        name="Agent",
+        client, owner, project_ids=[project_id], permissions=UPDATE_ONLY, name="Agent"
     )
+    caller = caller_for(db, headers)
 
-    result = call_tool(
-        client,
-        headers,
-        "update_task",
-        {"task_id": task["id"], "assignee": "owner", "status": "review"},
+    result = update_task_body(
+        db, caller, task_id=task["id"], assignee="owner", status=TaskStatus.REVIEW
     )
     assert result["reporter_id"] == reporter_id_before
 
@@ -638,12 +561,10 @@ def test_a_hand_over_leaves_the_task_in_review_on_the_owner_and_shows_it(
         permissions={**UPDATE_ONLY, "add_comments": True},
         name="Agent",
     )
+    caller = caller_for(db, headers)
 
-    result = call_tool(
-        client,
-        headers,
-        "update_task",
-        {"task_id": task["id"], "status": "review", "assignee": "owner"},
+    result = update_task_body(
+        db, caller, task_id=task["id"], status=TaskStatus.REVIEW, assignee="owner"
     )
     assert result["status"] == "review"
     assert result["assignee_id"] == owner_id
@@ -680,10 +601,9 @@ def test_entering_review_alone_does_not_move_the_task_onto_the_owner(
         permissions=UPDATE_ONLY,
         name="Reviewer bot",
     )
+    caller = caller_for(db, headers)
 
-    result = call_tool(
-        client, headers, "update_task", {"task_id": task["id"], "status": "review"}
-    )
+    result = update_task_body(db, caller, task_id=task["id"], status=TaskStatus.REVIEW)
     assert result["status"] == "review"
     assert result["assignee_bot_user"]["id"] == target["id"]
 
@@ -698,15 +618,13 @@ def test_without_update_tasks_permission_is_refused_by_name(
     project_id = create_project(client, owner)
     task = create_task_record(client, owner, "T", project_id=project_id)
     headers = bot_headers(client, owner, project_ids=[project_id], permissions={})
+    caller = caller_for(db, headers)
 
-    try:
-        call_tool(
-            client, headers, "update_task", {"task_id": task["id"], "title": "New"}
-        )
-        raise AssertionError("expected a refusal")
-    except ToolError as exc:
-        assert "permission_not_granted" in exc.message
-        assert "update tasks" in exc.message
+    with pytest.raises(ToolError) as exc_info:
+        update_task_body(db, caller, task_id=task["id"], title="New")
+    message = str(exc_info.value)
+    assert "permission_not_granted" in message
+    assert "update tasks" in message
 
 
 def test_the_archive_refuses_an_update(client: TestClient, db: Session) -> None:
@@ -716,13 +634,10 @@ def test_the_archive_refuses_an_update(client: TestClient, db: Session) -> None:
     headers = bot_headers(
         client, owner, project_ids=[project_id], permissions=UPDATE_ONLY
     )
+    caller = caller_for(db, headers)
     r = archive_project(client, owner, project_id)
     assert r.status_code == 200, r.text
 
-    try:
-        call_tool(
-            client, headers, "update_task", {"task_id": task["id"], "title": "New"}
-        )
-        raise AssertionError("expected a refusal")
-    except ToolError as exc:
-        assert "project_archived" in exc.message
+    with pytest.raises(ToolError) as exc_info:
+        update_task_body(db, caller, task_id=task["id"], title="New")
+    assert "project_archived" in str(exc_info.value)

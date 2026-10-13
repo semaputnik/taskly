@@ -18,6 +18,7 @@ from sqlmodel import Session
 
 from app.core.config import settings
 from app.mcp.tools.create_task import create_task_body
+from app.models import Recurrence, RecurrenceFrequency, TaskPriority, TaskStatus
 from tests.utils.accounts import (
     ALL_PERMISSIONS,
     READ_ONLY,
@@ -57,8 +58,8 @@ def test_creates_a_task_with_every_field_in_one_call(
         title="Ship it",
         description="The whole thing",
         project="Work",
-        status="todo",
-        priority="P2",
+        status=TaskStatus.TODO,
+        priority=TaskPriority.P2,
         due_date="today",
         tags=["release"],
         assignee="self",
@@ -200,7 +201,7 @@ def test_a_named_status_is_honored(client: TestClient, db: Session) -> None:
     caller = caller_for(db, headers)
 
     result = create_task_body(
-        db, caller, title="T", project=project_id, status="waiting"
+        db, caller, title="T", project=project_id, status=TaskStatus.WAITING
     )
     assert result["status"] == "waiting"
 
@@ -224,7 +225,7 @@ def test_a_recurring_task_is_created_with_its_frequency(
         title="Water the plants",
         project=project_id,
         due_date="today",
-        recurrence={"frequency": "every_n_days", "interval_days": 3},
+        recurrence=Recurrence(frequency=RecurrenceFrequency.EVERY_N_DAYS, interval_days=3),
     )
     assert result["recurrence"] == {"frequency": "every_n_days", "interval_days": 3}
 
@@ -245,7 +246,7 @@ def test_a_recurring_task_without_a_due_date_is_refused(
             caller,
             title="T",
             project=project_id,
-            recurrence={"frequency": "weekly"},
+            recurrence=Recurrence(frequency=RecurrenceFrequency.WEEKLY),
         )
     assert "A recurring task needs a due date" in str(exc_info.value)
 
@@ -266,7 +267,7 @@ def test_a_recurring_subtask_is_refused(client: TestClient, db: Session) -> None
             title="Sub",
             parent_task_id=root["id"],
             due_date="today",
-            recurrence={"frequency": "daily"},
+            recurrence=Recurrence(frequency=RecurrenceFrequency.DAILY),
         )
     assert "Only a task at the top of its tree can recur" in str(exc_info.value)
 
@@ -288,8 +289,8 @@ def test_a_recurring_task_created_done_is_refused(
             title="T",
             project=project_id,
             due_date="today",
-            status="done",
-            recurrence={"frequency": "daily"},
+            status=TaskStatus.DONE,
+            recurrence=Recurrence(frequency=RecurrenceFrequency.DAILY),
         )
     assert "Only an open task can recur" in str(exc_info.value)
 

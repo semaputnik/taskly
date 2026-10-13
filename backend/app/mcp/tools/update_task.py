@@ -166,7 +166,7 @@ def update_task_body(
         priority=priority,
         assignee=assignee,
     )
-    if status is TaskStatus.DONE:
+    if status == TaskStatus.DONE:
         refuse(
             "invalid_argument",
             "update_task does not move a task to done. Use complete_task to "
