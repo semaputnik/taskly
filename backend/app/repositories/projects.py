@@ -4,7 +4,7 @@ where its tasks stand, and how it is reported.
 """
 
 import uuid
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from datetime import date
 from typing import Any, NamedTuple
 
@@ -67,6 +67,43 @@ def set_project_archived(
     session.commit()
     session.refresh(project)
     return project
+
+
+def project_list_statement(
+    *,
+    owner_id: uuid.UUID,
+    archived: bool,
+    project_ids: Collection[uuid.UUID] | None = None,
+) -> Any:
+    """
+    The owner's projects matching `archived`, Inbox first then by name
+    ignoring case, with the id to settle a shared name — the one order every
+    project list uses (FR-05.14). `project_ids` narrows further, for the one
+    caller that is itself narrowed to a scope (FR-08.6, FR-05.13); `None`
+    reads every one of the owner's that matches `archived`.
+
+    Shared by the project list and a bot's scope list in `GET /caller`, so
+    the two cannot drift apart the way they once did (issue #264) — a caller
+    that only wants the whole result applies no `.offset()`/`.limit()`, and
+    may run `select(func.count()).select_from(statement.subquery())` for a
+    count over the same conditions.
+    """
+    conditions: list[Any] = [
+        Project.owner_id == owner_id,
+        not_deleted(Project),
+        Project.is_archived == archived,
+    ]
+    if project_ids is not None:
+        conditions.append(col(Project.id).in_(project_ids))
+    return (
+        select(Project)
+        .where(*conditions)
+        .order_by(
+            col(Project.is_inbox).desc(),
+            func.lower(Project.name),
+            col(Project.id),
+        )
+    )
 
 
 def get_inbox_project(*, session: Session, owner_id: uuid.UUID) -> Project:

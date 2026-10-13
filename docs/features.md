@@ -727,6 +727,10 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
   | Project | never | only projects in scope | never | never |
   | Activity log | never | configurable (`read_activity`, off by default) | never | never |
 
+  A human user holds every one of these grants by construction, not as a
+  list kept in step with them by hand: there is no scope to narrow a human,
+  so each grant above is simply true for one (see FR-07.4).
+
   Tags (see ADR-0003):
   - Creating tags is a permission of its own. It covers both creating a tag
     directly and typing a name that is not a tag yet onto a task.
