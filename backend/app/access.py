@@ -530,12 +530,11 @@ def activity_log_scope(caller: Caller) -> Any | None:
     if caller.bot is None:
         return None
 
-    is_archived = False
     live_scope_projects = (
         select(Project.id)
         .where(
             col(Project.id).in_(caller.project_ids),
-            Project.is_archived == is_archived,
+            Project.is_archived == False,  # noqa: E712
         )
         .subquery()
     )

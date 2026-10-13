@@ -205,6 +205,16 @@ class ActivityPage:
     locations: dict[uuid.UUID, uuid.UUID | None]
 
 
+def _aware(bound: datetime) -> datetime:
+    """
+    A period bound as an aware datetime. A naive one is read as UTC, which is
+    what the log stores: a caller that names a bound without an offset means
+    the wall clock the entries were written against, not the server's local
+    one.
+    """
+    return bound if bound.tzinfo is not None else bound.replace(tzinfo=UTC)
+
+
 def read_activity(
     session: Session, caller: Caller, narrowing: ActivityNarrowing
 ) -> ActivityPage:
@@ -256,16 +266,10 @@ def read_activity(
         where.append(col(ActivityEntry.actor_bot_user_id).is_not(None))
     if narrowing.by_user:
         where.append(col(ActivityEntry.actor_bot_user_id).is_(None))
-    since = narrowing.since
-    if since is not None:
-        if since.tzinfo is None:
-            since = since.replace(tzinfo=UTC)
-        where.append(col(ActivityEntry.created_at) > since)
-    until = narrowing.until
-    if until is not None:
-        if until.tzinfo is None:
-            until = until.replace(tzinfo=UTC)
-        where.append(col(ActivityEntry.created_at) <= until)
+    if narrowing.since is not None:
+        where.append(col(ActivityEntry.created_at) > _aware(narrowing.since))
+    if narrowing.until is not None:
+        where.append(col(ActivityEntry.created_at) <= _aware(narrowing.until))
 
     total = session.exec(
         select(func.count()).select_from(ActivityEntry).where(*where)
