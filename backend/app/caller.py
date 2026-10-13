@@ -36,7 +36,7 @@ class Caller:
     `owner_id` is whose data the request reaches: the user's own, or the
     owning user's for a bot, which never reaches anyone else's. For a bot,
     `bot` and the projects of its scope come along, so Task access
-    (`app.api.access`) can narrow what it reaches. `user` is the human caller
+    (`app.access`) can narrow what it reaches. `user` is the human caller
     themselves, already resolved by `app.api.deps.get_current_user`; it is
     `None` for a bot, which is never a `User` row (FR-08.2's "not a kind of
     user account").

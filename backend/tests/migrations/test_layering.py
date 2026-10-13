@@ -7,11 +7,16 @@ way `app.tasks` and `app.comments` importing `app.api.access` did (named in
 `app.api` (REST routes and `app.api.deps`) and `app.mcp` (the MCP tools and
 gateway, ADR-0012) are this app's two front doors: both call down into the
 operations (`app.tasks`, `app.comments`), access (`app.access`), repository
-and model layers, and `app.mcp` legitimately reaches into `app.api` itself
-for some of what it shares with the REST surface (`app.api.deps.Caller`,
-a route function reused as-is). `app.main` wires both into one FastAPI app.
-Everything else in `app` sits below that line and may not import back up
-into `app.api`.
+and model layers. `app.mcp` also legitimately reaches across into `app.api`
+itself for pieces it shares with the REST surface rather than duplicating —
+`app.api.deps.Caller` and `get_mcp_caller`, the re-exported `app.api.access`
+shim some tools still import by that name, and a couple of route functions
+reused as-is (`app.api.routes.activity.read_activity_log`, `.caller.
+read_caller`). None of that is the inversion this test exists to catch: a
+front door reaching sideways into the other front door is not a lower layer
+reaching up into one. `app.main` wires both into one FastAPI app. Everything
+else in `app` sits below that line and may not import back up into
+`app.api`.
 
 Parses the source directly, the same way `test_models_class_names.py` checks
 for class-name collisions: a static walk over the `ast` finds every import
