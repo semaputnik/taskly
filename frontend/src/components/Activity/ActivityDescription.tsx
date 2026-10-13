@@ -1,89 +1,13 @@
 import { Link } from "@tanstack/react-router"
 import type { ReactNode } from "react"
 
-import type { ActivityEntryPublic, TaskStatus } from "@/client"
+import type { ActivityEntryPublic } from "@/client"
 import { type RecordKind, recordLink } from "@/components/Records/panels"
-import { STATUS_LABELS } from "@/components/Tasks/statuses"
-import { formatDayPlain } from "@/lib/dates"
 import { cn } from "@/lib/utils"
-
-interface ProjectRef {
-  id: string
-  name: string | null
-}
-
-// What each field is called when an entry lists what changed.
-const FIELD_LABELS: Record<string, string> = {
-  title: "title",
-  description: "description",
-  due_date: "due date",
-  priority: "priority",
-  tags: "tags",
-  recurrence: "repeat",
-}
-
-/** What a batch did, in the words the reader will recognise. */
-function describeBatch(changes: Record<string, unknown>): string {
-  const said: string[] = []
-  // Batches from before statuses recorded `completed`.
-  if ("completed" in changes) {
-    said.push(changes.completed ? "completed" : "reopened")
-  }
-  if ("status" in changes) {
-    const status = changes.status as TaskStatus
-    said.push(
-      status === "done" ? "completed" : `moved to ${STATUS_LABELS[status]}`,
-    )
-  }
-  if ("priority" in changes) {
-    said.push(
-      changes.priority ? `priority ${changes.priority}` : "priority cleared",
-    )
-  }
-  if ("due_date" in changes) {
-    said.push(
-      changes.due_date
-        ? `due ${formatDayPlain(changes.due_date as string)}`
-        : "due date cleared",
-    )
-  }
-  const project = changes.project as { name?: string } | undefined
-  if (project?.name) said.push(`moved to ${project.name}`)
-  const added = changes.added_tags as string[] | undefined
-  if (added?.length) said.push(`tagged ${added.join(", ")}`)
-  const removed = changes.removed_tags as string[] | undefined
-  if (removed?.length) said.push(`untagged ${removed.join(", ")}`)
-  return said.join(", ")
-}
+import { entryWords } from "./entryWords"
 
 function detail<T>(entry: ActivityEntryPublic, key: string): T | undefined {
   return entry.details[key] as T | undefined
-}
-
-function projectName(project: ProjectRef | null | undefined): string {
-  return project?.name ?? "a project that no longer exists"
-}
-
-// Entries from before bot users could be assigned carry only the id.
-interface AssigneeRef {
-  type: "user" | "bot_user"
-  id: string
-  name?: string
-}
-
-/**
- * Who a task was assigned to. A bot user is named as it was called at the
- * time, which still reads after it is renamed or deleted.
- */
-function assigneeName(
-  assignee: AssigneeRef | null | undefined,
-  assigneeId: string | undefined,
-  currentUserId: string | undefined,
-): string {
-  if (assignee?.type === "bot_user") {
-    return `the bot user ${assignee.name}`
-  }
-  return (assignee?.id ?? assigneeId) === currentUserId ? "you" : "someone"
 }
 
 interface ActivityDescriptionProps {
@@ -128,21 +52,32 @@ function recordOf(
 }
 
 /**
- * One entry as a sentence. It is built from what the entry recorded at the
- * time, so it reads the same after the task is renamed, moved or deleted;
- * only the link depends on the thing still being there.
+ * One entry as a sentence. The vocabulary — the verb, the pluralisations,
+ * the field labels, all 24 actions — lives in `entryWords`, in the voice
+ * that names its subject; this component supplies only the one thing that
+ * voice cannot: the subject itself, as a link to the record (The Real
+ * Address Rule — its panel opens on the screen the reader is already on,
+ * over any other it replaces, so following a link from a long log does not
+ * cost them their place in it), struck through when the record is gone.
+ *
+ * It is built from what the entry recorded at the time, so it reads the
+ * same after the task is renamed, moved or deleted; only the link depends
+ * on the thing still being there.
  */
 export function ActivityDescription({
   entry,
   currentUserId,
 }: ActivityDescriptionProps) {
+  const words = entryWords(entry, "names-its-subject", currentUserId)
+  // Every one of the 24 actions has a case in this voice, so this is never
+  // actually null; the compiler does not know that, since `entryWords`'
+  // return type is shared with the voice that does say nothing for some
+  // actions. Render nothing rather than throw if a future action arrives
+  // here with no case yet.
+  if (!words) return null
   const name = subjectName(entry)
   const linkClass = "font-medium underline-offset-4 hover:underline"
 
-  // Every reference to a record links to that record (The Real Address
-  // Rule): its panel opens on the screen the reader is already on, over any
-  // other it replaces, so following a link from a long log does not cost them
-  // their place in it.
   const record = entry.entity_exists ? recordOf(entry) : null
   const subject: ReactNode = record ? (
     <Link {...recordLink(record.kind, record.id)} className={linkClass}>
@@ -165,180 +100,11 @@ export function ActivityDescription({
     </span>
   )
 
-  switch (entry.action) {
-    case "task_created": {
-      const snapshot = detail<{ project: ProjectRef | null }>(entry, "task")
-      return (
-        <>
-          Created {subject}
-          {snapshot?.project && <> in {projectName(snapshot.project)}</>}
-        </>
-      )
-    }
-    case "task_changed": {
-      const changes = detail<Record<string, unknown>>(entry, "changes") ?? {}
-      const fields = Object.keys(changes).map((key) => FIELD_LABELS[key] ?? key)
-      return (
-        <>
-          Changed the {fields.join(", ")} of {subject}
-        </>
-      )
-    }
-    case "task_completed":
-      return <>Completed {subject}</>
-    case "task_reopened":
-      return <>Reopened {subject}</>
-    case "task_status_changed": {
-      const to = detail<TaskStatus>(entry, "to")
-      return (
-        <>
-          Moved {subject} to {to ? STATUS_LABELS[to] : "another status"}
-        </>
-      )
-    }
-    case "task_deleted": {
-      // A batch names no single task: what it deleted is the selection, and
-      // the count is what the entry has to say.
-      const batch = detail<number>(entry, "task_count")
-      if (batch !== undefined) {
-        return <>Deleted {batch === 1 ? "1 task" : `${batch} tasks`}</>
-      }
-      const subtasks = detail<number>(entry, "subtask_count") ?? 0
-      return (
-        <>
-          Deleted {subject}
-          {subtasks > 0 &&
-            ` and ${subtasks} ${subtasks === 1 ? "subtask" : "subtasks"}`}
-        </>
-      )
-    }
-    case "tasks_bulk_changed": {
-      const count = detail<number>(entry, "task_count") ?? 0
-      const changes = detail<Record<string, unknown>>(entry, "changes") ?? {}
-      return (
-        <>
-          Changed {count === 1 ? "1 task" : `${count} tasks`}
-          {describeBatch(changes) && `: ${describeBatch(changes)}`}
-        </>
-      )
-    }
-    case "task_restored": {
-      const subtasks = detail<number>(entry, "subtask_count") ?? 0
-      return (
-        <>
-          Restored {subject}
-          {subtasks > 0 &&
-            ` and ${subtasks} ${subtasks === 1 ? "subtask" : "subtasks"}`}
-        </>
-      )
-    }
-    case "task_moved":
-      return (
-        <>
-          Moved {subject} from{" "}
-          {projectName(detail<ProjectRef>(entry, "from_project"))} to{" "}
-          {projectName(detail<ProjectRef>(entry, "to_project"))}
-        </>
-      )
-    case "task_assigned":
-      return (
-        <>
-          Assigned {subject} to{" "}
-          {assigneeName(
-            detail<AssigneeRef>(entry, "assignee"),
-            detail<string>(entry, "assignee_id"),
-            currentUserId,
-          )}
-        </>
-      )
-    case "task_unassigned": {
-      const previous = detail<AssigneeRef>(entry, "previous_assignee")
-      if (previous?.type === "bot_user") {
-        return (
-          <>
-            Removed {assigneeName(previous, previous.id, currentUserId)} from{" "}
-            {subject}
-          </>
-        )
-      }
-      return <>Removed the assignee from {subject}</>
-    }
-    case "project_created":
-      return <>Created the project {subject}</>
-    case "project_changed": {
-      const changes = detail<Record<string, unknown>>(entry, "changes") ?? {}
-      return (
-        <>
-          Changed the {Object.keys(changes).join(", ")} of the project {subject}
-        </>
-      )
-    }
-    case "project_deleted": {
-      const tasks = detail<number>(entry, "task_count") ?? 0
-      return (
-        <>
-          Deleted the project {subject}
-          {tasks > 0 && ` and ${tasks} ${tasks === 1 ? "task" : "tasks"}`}
-        </>
-      )
-    }
-    case "project_restored": {
-      const tasks = detail<number>(entry, "task_count") ?? 0
-      return (
-        <>
-          Restored the project {subject}
-          {tasks > 0 && ` and ${tasks} ${tasks === 1 ? "task" : "tasks"}`}
-        </>
-      )
-    }
-    case "comment_added":
-      return <>Commented on {subject}</>
-    case "comment_edited":
-      return <>Edited a comment on {subject}</>
-    case "comment_deleted":
-      return <>Deleted a comment on {subject}</>
-    case "attachment_added":
-      return (
-        <>
-          Attached “{detail<string>(entry, "filename")}” to {subject}
-        </>
-      )
-    case "attachment_deleted":
-      return (
-        <>
-          Removed “{detail<string>(entry, "filename")}” from {subject}
-        </>
-      )
-    case "tag_created":
-      return <>Created the tag {subject}</>
-    case "tag_renamed": {
-      const change = detail<{ name?: { from: string } }>(entry, "changes")
-      return (
-        <>
-          Renamed the tag “{change?.name?.from}” to {subject}
-        </>
-      )
-    }
-    case "tag_merged": {
-      const sources = detail<string[]>(entry, "sources") ?? []
-      const tasks = detail<number>(entry, "task_count") ?? 0
-      return (
-        <>
-          Merged {sources.map((name) => `“${name}”`).join(", ")} into {subject}
-          {tasks > 0 &&
-            `, moving ${tasks} ${tasks === 1 ? "task" : "tasks"} onto it`}
-        </>
-      )
-    }
-    case "tag_deleted": {
-      const tasks = detail<number>(entry, "task_count") ?? 0
-      return (
-        <>
-          Deleted the tag {subject}
-          {tasks > 0 &&
-            `, taking it off ${tasks} ${tasks === 1 ? "task" : "tasks"}`}
-        </>
-      )
-    }
-  }
+  return (
+    <>
+      {words.verb}
+      {words.subject && <> {subject}</>}
+      {words.after}
+    </>
+  )
 }
