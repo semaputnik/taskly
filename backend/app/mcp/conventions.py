@@ -181,7 +181,10 @@ class _Table[T]:
     is real to whoever resolves it next); `candidates` runs the actual
     name-or-prefix match and returns each hit paired with how the refusal
     below lists it; `noun`, `ambiguous_code` and `instruction` are the code
-    and the words that refusal's own message uses.
+    and the words that refusal's own message uses. `separator` joins the
+    candidates' own labels — `resolve_task_id`'s own labels carry a title,
+    which can itself contain a comma, so it joins with `"; "` rather than
+    the default `", "` a bare id never needs escaping from.
     """
 
     by_id: Callable[[uuid.UUID], T | None]
@@ -189,6 +192,7 @@ class _Table[T]:
     noun: str
     ambiguous_code: str
     instruction: str = "Use one of their ids."
+    separator: str = ", "
 
 
 def _resolve_by_name[T](raw: str, table: _Table[T], not_found: Callable[[], T]) -> T:
@@ -202,8 +206,10 @@ def _resolve_by_name[T](raw: str, table: _Table[T], not_found: Callable[[], T]) 
     ambiguous project name and an ambiguous bot name all now share — what
     a candidate's own label says still differs by table, since a project
     or a bot user sharing the same name is only told apart by its id,
-    while two tasks sharing a prefix are told apart by their (different)
-    titles, quoted next to the short id a compact line already showed.
+    while two tasks sharing a prefix need their full id either way (an
+    ambiguous prefix as long as `short_id` itself would otherwise list the
+    same eight characters twice) plus the title beside it, since the id
+    alone does not say which task is which.
 
     `not_found` is the one step that legitimately differs per caller —
     everywhere but `resolve_tag_name`, no match at all is refused the same
@@ -224,7 +230,7 @@ def _resolve_by_name[T](raw: str, table: _Table[T], not_found: Callable[[], T]) 
     if not matches:
         return not_found()
     if len(matches) > 1:
-        listed = ", ".join(label for _, label in matches)
+        listed = table.separator.join(label for _, label in matches)
         refuse(
             table.ambiguous_code,
             f"“{raw}” names {len(matches)} {table.noun}: {listed}. {table.instruction}",
@@ -281,7 +287,7 @@ def resolve_task_id(session: Session, caller: Caller, raw: str) -> uuid.UUID:
             .where(*conditions)
             .order_by(col(Task.created_at))
         ).all()
-        return [(task_id, f"{short_id(task_id)} “{title}”") for task_id, title in rows]
+        return [(task_id, f"{task_id} “{title}”") for task_id, title in rows]
 
     return _resolve_by_name(
         raw,
@@ -290,6 +296,7 @@ def resolve_task_id(session: Session, caller: Caller, raw: str) -> uuid.UUID:
             candidates=candidates,
             noun="tasks",
             ambiguous_code="ambiguous_id",
+            separator="; ",
         ),
         not_found=lambda: refuse("not_found", f"No task's id starts with “{raw}”."),
     )

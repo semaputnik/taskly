@@ -260,13 +260,11 @@ def test_ambiguous_short_prefix_is_refused_with_candidates(
         raise AssertionError("expected a refusal")
     except ToolError as exc:
         assert "ambiguous_id" in exc.message
-        # Listed by the short id a compact line already shows, plus its
-        # title — not the full id, which would tell the caller nothing
-        # about which task is which.
-        assert first["id"].replace("-", "")[:8] in exc.message
-        assert second["id"].replace("-", "")[:8] in exc.message
-        assert first["title"] in exc.message
-        assert second["title"] in exc.message
+        # Each full id is paired with its own title in the message, not
+        # just present somewhere in it — proof the two candidates are
+        # distinguishable from each other, not only from "no match at all".
+        assert f"{first['id']} “{first['title']}”" in exc.message
+        assert f"{second['id']} “{second['title']}”" in exc.message
 
 
 # Dates: ISO, today, tomorrow, +<count>d

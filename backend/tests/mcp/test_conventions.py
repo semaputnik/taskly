@@ -14,6 +14,7 @@ arguments happens to be ambiguous or empty that day.
 """
 
 import re
+import secrets
 import uuid
 
 import pytest
@@ -100,10 +101,11 @@ def test_resolve_task_id_ambiguous_prefix_is_refused_with_candidates(
     db: Session,
 ) -> None:
     """
-    The candidates are listed by the short id a compact line already
-    shows, not the full id — a caller that only ever sees `short_id`
-    (`render_task_rows`) can quote one straight back, and a full id would
-    tell it nothing about which task is which anyway.
+    Each candidate is listed by its full id, with its title beside it —
+    the full id, because the short id a compact line shows is exactly the
+    eight characters an ambiguous prefix might already be the whole of
+    (see the "same eight characters" test below), and the title because
+    an id alone does not say which task is which.
     """
     owner = _owner(db)
     inbox = crud.get_inbox_project(session=db, owner_id=owner.owner_id)
@@ -117,10 +119,11 @@ def test_resolve_task_id_ambiguous_prefix_is_refused_with_candidates(
         resolve_task_id(db, owner, "")
     message = str(exc_info.value)
     assert "ambiguous_id" in message
-    assert first.hex[:8] in message
-    assert second.hex[:8] in message
-    assert str(first) not in message
-    assert str(second) not in message
+    # Each full id is paired with its own title in the message, not just
+    # present somewhere in it — proof the two candidates are
+    # distinguishable from each other, not only from "no match at all".
+    assert f"{first} “First”" in message
+    assert f"{second} “Second”" in message
 
 
 def test_resolve_task_id_ambiguous_prefix_lists_each_candidates_title(
@@ -141,6 +144,42 @@ def test_resolve_task_id_ambiguous_prefix_lists_each_candidates_title(
     message = str(exc_info.value)
     assert "Write the quarterly report" in message
     assert "Fix the flaky spec" in message
+
+
+def test_resolve_task_id_ambiguous_prefix_the_same_eight_characters(
+    db: Session,
+) -> None:
+    """
+    The degenerate case `short_id` cannot tell apart: two tasks whose ids
+    happen to share their first eight hex characters, forced here rather
+    than waited for, since relying on it by chance would make this test as
+    rare as the bug it guards against. An eight-character prefix matching
+    both is exactly as ambiguous as the empty-string trick above — and
+    here, unlike there, a short id would print the same eight characters
+    twice, which is why the refusal lists the full id instead.
+    """
+    owner = _owner(db)
+    inbox = crud.get_inbox_project(session=db, owner_id=owner.owner_id)
+    first = _task(db, owner, inbox.id, title="First")
+    second_task = crud.create_task(
+        session=db,
+        task_create=TaskCreate(title="Second"),
+        project_id=inbox.id,
+        owner_id=owner.owner_id,
+        reporter=crud.Reporter(user_id=owner.owner_id),
+    )
+    collided = uuid.UUID(hex=first.hex[:8] + secrets.token_hex(12))
+    second_task.id = collided
+    db.add(second_task)
+    db.commit()
+
+    prefix = first.hex[:8]
+    with pytest.raises(ToolError) as exc_info:
+        resolve_task_id(db, owner, prefix)
+    message = str(exc_info.value)
+    assert "ambiguous_id" in message
+    assert f"{first} “First”" in message
+    assert f"{collided} “Second”" in message
 
 
 def test_resolve_task_id_prefix_matches_only_a_bots_own_scope(db: Session) -> None:
