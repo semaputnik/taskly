@@ -99,6 +99,12 @@ def test_resolve_task_id_no_match_is_refused_not_found(db: Session) -> None:
 def test_resolve_task_id_ambiguous_prefix_is_refused_with_candidates(
     db: Session,
 ) -> None:
+    """
+    The candidates are listed by the short id a compact line already
+    shows, not the full id — a caller that only ever sees `short_id`
+    (`render_task_rows`) can quote one straight back, and a full id would
+    tell it nothing about which task is which anyway.
+    """
     owner = _owner(db)
     inbox = crud.get_inbox_project(session=db, owner_id=owner.owner_id)
     first = _task(db, owner, inbox.id, title="First")
@@ -111,8 +117,30 @@ def test_resolve_task_id_ambiguous_prefix_is_refused_with_candidates(
         resolve_task_id(db, owner, "")
     message = str(exc_info.value)
     assert "ambiguous_id" in message
-    assert str(first) in message
-    assert str(second) in message
+    assert first.hex[:8] in message
+    assert second.hex[:8] in message
+    assert str(first) not in message
+    assert str(second) not in message
+
+
+def test_resolve_task_id_ambiguous_prefix_lists_each_candidates_title(
+    db: Session,
+) -> None:
+    """
+    An ambiguous prefix's refusal exists so the caller can pick the task it
+    meant — a list of bare ids tells it nothing about which is which, so
+    each candidate is named by its title too.
+    """
+    owner = _owner(db)
+    inbox = crud.get_inbox_project(session=db, owner_id=owner.owner_id)
+    _task(db, owner, inbox.id, title="Write the quarterly report")
+    _task(db, owner, inbox.id, title="Fix the flaky spec")
+
+    with pytest.raises(ToolError) as exc_info:
+        resolve_task_id(db, owner, "")
+    message = str(exc_info.value)
+    assert "Write the quarterly report" in message
+    assert "Fix the flaky spec" in message
 
 
 def test_resolve_task_id_prefix_matches_only_a_bots_own_scope(db: Session) -> None:
