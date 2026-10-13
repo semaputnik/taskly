@@ -16,18 +16,20 @@ this tool wanted to show one — it never asks the reader to compute them,
 rather than asking a route to compute and then hide them.
 
 This tool's own job, once the reader has answered: naming who acted
-("owner", or a bot user by name, the same convention `get_task`'s comment
-rows use), saying what happened in one short phrase, and naming the task,
-project or tag (or, for a batch, the selection) the entry is about — ported
-from the web UI's own `ActivityDescription.tsx`, since there is no backend
-description of an entry yet and this tool is the first thing besides a human
-reading the page that needs one.
+(`app.mcp.conventions.actor_label`'s own convention, also `get_task`'s
+comment rows and `list_completions`'s own `closed_by`), saying what
+happened in one short phrase, and naming the task, project or tag (or, for
+a batch, the selection) the entry is about — ported from the web UI's own
+`ActivityDescription.tsx`, since there is no backend description of an
+entry yet and this tool is the first thing besides a human reading the
+page that needs one.
 
 `actor` and the `since`/`until` widening are read through
 `app.mcp.conventions.resolve_actor`/`since_datetime`/`until_datetime`:
 settled here first, then moved there once `list_completions` (#260) needed
 the exact same reading of a period and of who acted, rather than its own
-copy of either.
+copy of either. `narrow_with` is `app.mcp.conventions.narrow_hint`'s own
+(#301), with this tool's own priority order.
 """
 
 import uuid
@@ -43,7 +45,9 @@ from sqlmodel import Session
 from app import crud
 from app.activity_log import ActivityNarrowing, read_activity
 from app.mcp.conventions import (
+    actor_label,
     list_result,
+    narrow_hint,
     open_caller,
     refusal,
     resolve_actor,
@@ -190,13 +194,11 @@ def search_activity(
 
         rows = _rows(session, page.entries)
 
-    narrow_with = _narrow_hint(
-        kind=kind,
-        task_id=task_id,
-        project=project,
-        actor=actor,
-        since=since,
-        until=until,
+    narrow_with = narrow_hint(
+        ("kind", kind is not None),
+        ("task_id or project", task_id is not None or project is not None),
+        ("actor", actor is not None),
+        ("since or until", since is not None or until is not None),
     )
     return list_result(
         rows, key="entries", count=page.total, offset=offset, narrow_with=narrow_with
@@ -221,18 +223,13 @@ def _rows(session: Session, entries: Sequence[ActivityEntry]) -> list[dict[str, 
 
 
 def _actor_label(entry: ActivityEntry, bots: dict[uuid.UUID, BotUserRef]) -> str:
-    """
-    Who acted, the same convention `get_task`'s own comment rows use: "owner"
-    for the human, or a bot user by the name the entry itself carries
-    (present whatever its scope, FR-08.19), "(deleted)" appended if it no
-    longer exists.
-    """
+    """Who acted: `actor_label`'s own convention, once this entry's actor is read down to a bot or the owner."""
     if entry.actor_id is not None:
-        return "owner"
+        return actor_label(None)
     assert entry.actor_bot_user_id is not None
     bot = bots.get(entry.actor_bot_user_id)
     assert bot is not None, "a bot user is kept, not removed, once it acted (FR-08.19)"
-    return f"{bot.name} (deleted)" if bot.deleted else bot.name
+    return actor_label(bot)
 
 
 # Subjects: the task, project, tag, or batch an entry is about
@@ -414,31 +411,3 @@ def _describe_batch_changes(changes: dict[str, Any]) -> str:
     if removed:
         said.append(f"untagged {', '.join(removed)}")
     return ", ".join(said)
-
-
-# The narrow hint
-
-
-def _narrow_hint(
-    *,
-    kind: ActivityKind | None,
-    task_id: str | None,
-    project: str | None,
-    actor: str | None,
-    since: str | None,
-    until: str | None,
-) -> str | None:
-    """
-    The one filter, among those not already set, most likely to turn a
-    truncated answer into a complete one — named, not applied, the same
-    convention `search_tasks`'s own `_narrow_hint` follows.
-    """
-    if kind is None:
-        return "kind"
-    if task_id is None and project is None:
-        return "task_id or project"
-    if actor is None:
-        return "actor"
-    if since is None and until is None:
-        return "since or until"
-    return None
