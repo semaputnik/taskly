@@ -6,6 +6,7 @@ import type {
   TaskStatus,
 } from "@/client"
 import { nameList, plural } from "@/components/Common/words"
+import type { RecordKind } from "@/components/Records/panels"
 import { STATUS_LABELS } from "@/components/Tasks/statuses"
 import { formatDayPlain } from "@/lib/dates"
 
@@ -34,6 +35,15 @@ export interface EntryWords {
   verb: string
   subject: boolean
   after: string
+}
+
+/** The record one entry links to: its own entity, or the task a comment or
+ * file is on. `null` when the entry names no single record at all — a
+ * batch, or a row whose real entity the backend could not place (`kind:
+ * "unrecognized"`) and whose own type carries no such entity. */
+export interface RecordRef {
+  kind: RecordKind
+  id: string
 }
 
 function projectName(project: ProjectRef | null | undefined): string {
@@ -152,8 +162,8 @@ function changedTags({ from, to }: FieldChange): string {
   const said = [
     added.length ? `tagged it ${added.join(", ")}` : null,
     removed.length ? `untagged ${removed.join(", ")}` : null,
-  ].filter(Boolean)
-  return said.length ? said.join(" and ") : "changed the tags"
+  ].filter(Boolean) as string[]
+  return said.length ? nameList(said) : "changed the tags"
 }
 
 /** A sentence with nothing after the verb and no subject of its own. */
@@ -166,12 +176,52 @@ function withSubject(verb: string, after = ""): EntryWords {
   return { verb, subject: true, after }
 }
 
+// The implicit-voice sentence for a deletion or a restore reads the same
+// whether the entry is a single task's own or a batch's: the task panel is
+// always open on one task, so it never has a count or a selection to speak
+// of either way (#321). One value for each, shared by both of a kind's two
+// switch cases below, rather than written out twice.
+const DELETED_IMPLICIT = whole("deleted it")
+const RESTORED_IMPLICIT = whole("restored it")
+
+/** The record a task-kind entry links to: itself, by the id every entry of
+ * any kind already carries. */
+function taskRecord(entry: ActivityEntryPublic): RecordRef {
+  return { kind: "task", id: entry.entity_id }
+}
+
+function projectRecord(entry: ActivityEntryPublic): RecordRef {
+  return { kind: "project", id: entry.entity_id }
+}
+
+function tagRecord(entry: ActivityEntryPublic): RecordRef {
+  return { kind: "tag", id: entry.entity_id }
+}
+
 /**
- * The 24 kinds of activity entry, each as a sentence's parts, in a voice.
+ * Everything one action's entry has to say: both voices' sentences, the name
+ * of the subject the log page links to, and the record that link opens.
+ */
+interface ActionVoices {
+  /** What the log page says: it names every one of the 24 actions. */
+  names: EntryWords
+  /** What the task panel says, or `null` for an action it does not speak. */
+  implicit: EntryWords | null
+  /** The subject's display name, independent of voice — the task panel
+   * never shows it, but computing it costs nothing extra here. */
+  subjectName: string
+  /** The record the subject links to, or `null` when the entry names none. */
+  record: RecordRef | null
+}
+
+/**
+ * The 24 kinds of activity entry, each as both of its voices, its subject's
+ * name and the record that subject links to — one switch, declared here
+ * because this is the one place that reads `entry.details.kind` at all.
  *
  * It is built from what the entry recorded at the time, so it reads the
  * same after the task, project or tag is renamed, moved or deleted — only
- * the caller's subject slot depends on the record still being there.
+ * the record's link depends on the thing still being there.
  *
  * Switches on `entry.details.kind` rather than `entry.action`: the two
  * agree everywhere but one, `task_deleted`/`task_restored`, which each write
@@ -186,230 +236,406 @@ function withSubject(verb: string, after = ""): EntryWords {
  * the fields each case actually has — this way, a field this switch reads
  * is one the compiler has already checked is there.
  *
+ * The switch has no `default`: every one of the 27 cases (24 actions, two of
+ * them split into a `_batch` sibling, plus `unrecognized`) must return an
+ * `ActionVoices`, or the function falls off the end without one, and the
+ * compiler rejects it — a 25th kind with no case here yet is a type error
+ * wherever this file's exports are called, not a silent fallback.
+ *
  * The two voices are not the same sentence twice over: `subject-implicit`
  * is addressed to a reader who already has the record open (the task
  * panel), so it says less, and sometimes says nothing at all — a comment,
- * a project or a tag is not among the actions it speaks, so this returns
- * `null` for those. `names-its-subject` speaks every action, because the
- * log page is the one place every kind of entry is read — a caller in that
- * voice should never actually see `null`, but the return type stays
- * nullable for both, so a 25th action with no case yet fails safely rather
- * than throwing.
+ * a project or a tag is not among the actions it speaks, so `implicit` is
+ * `null` for those, declared so rather than reached by falling through a
+ * conditional. `names-its-subject` speaks every action, because the log
+ * page is the one place every kind of entry is read.
+ */
+function actionVoices(
+  entry: ActivityEntryPublic,
+  currentUserId: string | undefined,
+): ActionVoices {
+  const { details } = entry
+
+  switch (details.kind) {
+    case "task_created": {
+      const { task } = details
+      return {
+        subjectName: details.title ?? "Untitled task",
+        record: taskRecord(entry),
+        names: withSubject(
+          "Created",
+          task.project ? ` in ${projectName(task.project)}` : "",
+        ),
+        // Unlike the other voice, this only mentions the project when it
+        // has a name — a project reference with none reads as if there
+        // were no project at all, rather than naming it "no longer exists".
+        implicit: whole(
+          task.project?.name
+            ? `created this in ${task.project.name}`
+            : "created this",
+        ),
+      }
+    }
+    case "task_changed": {
+      const said = changedFields(details.changes)
+      const fields = Object.keys(details.changes).map(
+        (key) => FIELD_LABELS[key] ?? key,
+      )
+      return {
+        subjectName: details.title ?? "Untitled task",
+        record: taskRecord(entry),
+        names: withSubject(`Changed the ${fields.join(", ")} of`),
+        implicit: said ? whole(said) : null,
+      }
+    }
+    case "task_completed":
+      return {
+        subjectName: details.title ?? "Untitled task",
+        record: taskRecord(entry),
+        names: withSubject("Completed"),
+        implicit: whole("completed it"),
+      }
+    case "task_reopened":
+      return {
+        subjectName: details.title ?? "Untitled task",
+        record: taskRecord(entry),
+        names: withSubject("Reopened"),
+        implicit: whole("reopened it"),
+      }
+    case "task_status_changed": {
+      const { to } = details
+      return {
+        subjectName: details.title ?? "Untitled task",
+        record: taskRecord(entry),
+        names: withSubject(
+          "Moved",
+          ` to ${to ? STATUS_LABELS[to] : "another status"}`,
+        ),
+        implicit: whole(to ? `moved it to ${STATUS_LABELS[to]}` : "moved it"),
+      }
+    }
+    case "task_deleted": {
+      const subtasks = details.subtask_count ?? 0
+      return {
+        subjectName: details.title ?? "Untitled task",
+        record: taskRecord(entry),
+        names: withSubject(
+          "Deleted",
+          subtasks > 0 ? ` and ${plural(subtasks, "subtask")}` : "",
+        ),
+        implicit: DELETED_IMPLICIT,
+      }
+    }
+    case "task_deleted_batch":
+      // A batch names no single task: what it deleted is the selection, and
+      // the count is what the entry has to say.
+      return {
+        subjectName: "Untitled task",
+        record: taskRecord(entry),
+        names: whole(`Deleted ${plural(details.task_count, "task")}`),
+        implicit: DELETED_IMPLICIT,
+      }
+    case "task_restored": {
+      const subtasks = details.subtask_count ?? 0
+      return {
+        subjectName: details.title ?? "Untitled task",
+        record: taskRecord(entry),
+        names: withSubject(
+          "Restored",
+          subtasks > 0 ? ` and ${plural(subtasks, "subtask")}` : "",
+        ),
+        implicit: RESTORED_IMPLICIT,
+      }
+    }
+    case "task_restored_batch":
+      return {
+        subjectName: "Untitled task",
+        record: taskRecord(entry),
+        names: whole(`Restored ${plural(details.task_count, "task")}`),
+        implicit: RESTORED_IMPLICIT,
+      }
+    case "task_moved": {
+      const to = details.to_project
+      return {
+        subjectName: details.title ?? "Untitled task",
+        record: taskRecord(entry),
+        names: withSubject(
+          "Moved",
+          ` from ${projectName(details.from_project)} to ${projectName(
+            details.to_project,
+          )}`,
+        ),
+        // Only the destination, not the origin: the task panel already
+        // knows where the task was, because it is reading its history in
+        // order.
+        implicit: whole(
+          to?.name ? `moved it to ${to.name}` : "moved it to another project",
+        ),
+      }
+    }
+    case "task_assigned": {
+      const { assignee } = details
+      // The only human a task can be assigned to is its owner: when they
+      // did it themselves it is "yourself", when a bot user did it, "you".
+      const who =
+        assignee?.type === "bot_user"
+          ? (assignee.name ?? "a bot user")
+          : entry.actor_bot_user_id
+            ? "you"
+            : "yourself"
+      return {
+        subjectName: details.title ?? "Untitled task",
+        record: taskRecord(entry),
+        names: withSubject(
+          "Assigned",
+          ` to ${namesAssignee(assignee, details.assignee_id ?? undefined, currentUserId)}`,
+        ),
+        implicit: whole(`assigned it to ${who}`),
+      }
+    }
+    case "task_unassigned": {
+      const previous = details.previous_assignee
+      return {
+        subjectName: details.title ?? "Untitled task",
+        record: taskRecord(entry),
+        names:
+          previous?.type === "bot_user"
+            ? withSubject(
+                `Removed ${namesAssignee(previous, previous.id, currentUserId)} from`,
+              )
+            : withSubject("Removed the assignee from"),
+        // Unlike the other voice, this never names who was removed, bot
+        // user or not — "removed the assignee" covers every case.
+        implicit: whole("removed the assignee"),
+      }
+    }
+    case "tasks_bulk_changed": {
+      const { task_count: count } = details
+      const batch = describeBatch(details.changes)
+      // The current task is one of the count; what matters to the implicit
+      // voice is how many others went with it.
+      const others = count - 1
+      return {
+        subjectName: "Untitled task",
+        record: taskRecord(entry),
+        names: whole(
+          `Changed ${plural(count, "task")}${batch ? `: ${batch}` : ""}`,
+        ),
+        implicit: whole(
+          others > 0
+            ? `changed it along with ${others} other ${others === 1 ? "task" : "tasks"}`
+            : "changed it",
+        ),
+      }
+    }
+    // `subjectName` and `record` below are getters, not plain fields, in
+    // these five cases only: both read through `details.task`, which
+    // `names`/`implicit` never touch, and a caller that only wants the
+    // sentence (`entryWords`, and the fixtures `entryWords.test.ts` builds
+    // for exactly that) should not have to supply one.
+    case "attachment_added": {
+      const { filename } = details
+      return {
+        get subjectName() {
+          return details.task.title ?? "a task"
+        },
+        get record() {
+          return { kind: "task" as const, id: details.task.id }
+        },
+        names: withSubject(`Attached “${filename}” to`),
+        implicit: whole(`attached “${filename}”`),
+      }
+    }
+    case "attachment_deleted": {
+      const { filename } = details
+      return {
+        get subjectName() {
+          return details.task.title ?? "a task"
+        },
+        get record() {
+          return { kind: "task" as const, id: details.task.id }
+        },
+        names: withSubject(`Removed “${filename}” from`),
+        implicit: whole(`removed “${filename}”`),
+      }
+    }
+    // A comment is shown as the comment itself, with its author and body,
+    // not as a line saying someone wrote one — so the task panel's voice
+    // has nothing to say about these.
+    case "comment_added":
+      return {
+        get subjectName() {
+          return details.task.title ?? "a task"
+        },
+        get record() {
+          return { kind: "task" as const, id: details.task.id }
+        },
+        names: withSubject("Commented on"),
+        implicit: null,
+      }
+    case "comment_edited":
+      return {
+        get subjectName() {
+          return details.task.title ?? "a task"
+        },
+        get record() {
+          return { kind: "task" as const, id: details.task.id }
+        },
+        names: withSubject("Edited a comment on"),
+        implicit: null,
+      }
+    case "comment_deleted":
+      return {
+        get subjectName() {
+          return details.task.title ?? "a task"
+        },
+        get record() {
+          return { kind: "task" as const, id: details.task.id }
+        },
+        names: withSubject("Deleted a comment on"),
+        implicit: null,
+      }
+    // Projects and tags never appear in a task's own history, so the task
+    // panel's voice has nothing to say about these either.
+    case "project_created":
+      return {
+        subjectName: details.name ?? "Untitled project",
+        record: projectRecord(entry),
+        names: withSubject("Created the project"),
+        implicit: null,
+      }
+    case "project_changed":
+      return {
+        subjectName: details.name ?? "Untitled project",
+        record: projectRecord(entry),
+        names: withSubject(
+          `Changed the ${Object.keys(details.changes).join(", ")} of the project`,
+        ),
+        implicit: null,
+      }
+    case "project_deleted": {
+      const tasks = details.task_count
+      return {
+        subjectName: details.name ?? "Untitled project",
+        record: projectRecord(entry),
+        names: withSubject(
+          "Deleted the project",
+          tasks > 0 ? ` and ${plural(tasks, "task")}` : "",
+        ),
+        implicit: null,
+      }
+    }
+    case "project_restored": {
+      const tasks = details.task_count
+      return {
+        subjectName: details.name ?? "Untitled project",
+        record: projectRecord(entry),
+        names: withSubject(
+          "Restored the project",
+          tasks > 0 ? ` and ${plural(tasks, "task")}` : "",
+        ),
+        implicit: null,
+      }
+    }
+    case "tag_created":
+      return {
+        // "Untitled project" covers a nameless tag too — an existing
+        // wording quirk, preserved rather than fixed, since nothing
+        // user-visible changes in this ticket.
+        subjectName: details.name ?? "Untitled project",
+        record: tagRecord(entry),
+        names: withSubject("Created the tag"),
+        implicit: null,
+      }
+    case "tag_renamed":
+      return {
+        subjectName: details.name ?? "Untitled project",
+        record: tagRecord(entry),
+        names: withSubject(
+          `Renamed the tag “${details.changes.name?.from}” to`,
+        ),
+        implicit: null,
+      }
+    case "tag_merged": {
+      const { sources, task_count: tasks } = details
+      return {
+        subjectName: details.name ?? "Untitled project",
+        record: tagRecord(entry),
+        names: withSubject(
+          `Merged ${sources.map((name) => `“${name}”`).join(", ")} into`,
+          tasks > 0 ? `, moving ${plural(tasks, "task")} onto it` : "",
+        ),
+        implicit: null,
+      }
+    }
+    case "tag_deleted": {
+      const tasks = details.task_count
+      return {
+        subjectName: details.name ?? "Untitled project",
+        record: tagRecord(entry),
+        names: withSubject(
+          "Deleted the tag",
+          tasks > 0 ? `, taking it off ${plural(tasks, "task")}` : "",
+        ),
+        implicit: null,
+      }
+    }
+    // A row the backend itself could not make sense of (`app.activity_details
+    // .to_public`'s own fallback) — one bad entry says so plainly rather
+    // than breaking the page it would otherwise take down with it. Its real
+    // entity is still named by `entity_type`/`entity_id` even though
+    // `details` carries nothing else, so the record link survives for a
+    // task, project or tag; a comment or an attachment has no `details.task`
+    // left to point through, so the link is dropped rather than guessed at.
+    case "unrecognized":
+      return {
+        subjectName: "Untitled task",
+        record:
+          entry.entity_type === "task" ||
+          entry.entity_type === "project" ||
+          entry.entity_type === "tag"
+            ? { kind: entry.entity_type, id: entry.entity_id }
+            : null,
+        names: whole("Something changed"),
+        implicit: null,
+      }
+  }
+}
+
+/**
+ * One entry's sentence, in the given voice: an entry plus a voice in,
+ * sentence parts or `null` out. A caller in `names-its-subject` should never
+ * actually see `null` — every action has a sentence in that voice — but the
+ * return type stays nullable for both, so a 25th action with no case yet in
+ * `actionVoices` fails to compile here rather than throwing at runtime.
  */
 export function entryWords(
   entry: ActivityEntryPublic,
   voice: Voice,
   currentUserId?: string,
 ): EntryWords | null {
-  const implicit = voice === "subject-implicit"
-  const { details } = entry
+  const voices = actionVoices(entry, currentUserId)
+  return voice === "subject-implicit" ? voices.implicit : voices.names
+}
 
-  switch (details.kind) {
-    case "task_created": {
-      const { task } = details
-      if (implicit) {
-        // Unlike the other voice, this only mentions the project when it
-        // has a name — a project reference with none reads as if there
-        // were no project at all, rather than naming it "no longer exists".
-        return whole(
-          task.project?.name
-            ? `created this in ${task.project.name}`
-            : "created this",
-        )
-      }
-      return withSubject(
-        "Created",
-        task.project ? ` in ${projectName(task.project)}` : "",
-      )
-    }
-    case "task_changed": {
-      if (implicit) {
-        const said = changedFields(details.changes)
-        return said ? whole(said) : null
-      }
-      const fields = Object.keys(details.changes).map(
-        (key) => FIELD_LABELS[key] ?? key,
-      )
-      return withSubject(`Changed the ${fields.join(", ")} of`)
-    }
-    case "task_completed":
-      return implicit ? whole("completed it") : withSubject("Completed")
-    case "task_reopened":
-      return implicit ? whole("reopened it") : withSubject("Reopened")
-    case "task_status_changed": {
-      const { to } = details
-      if (implicit) {
-        return whole(to ? `moved it to ${STATUS_LABELS[to]}` : "moved it")
-      }
-      return withSubject(
-        "Moved",
-        ` to ${to ? STATUS_LABELS[to] : "another status"}`,
-      )
-    }
-    case "task_deleted": {
-      if (implicit) return whole("deleted it")
-      const subtasks = details.subtask_count ?? 0
-      return withSubject(
-        "Deleted",
-        subtasks > 0 ? ` and ${plural(subtasks, "subtask")}` : "",
-      )
-    }
-    case "task_deleted_batch":
-      // A batch names no single task: what it deleted is the selection, and
-      // the count is what the entry has to say.
-      return implicit
-        ? whole("deleted it")
-        : whole(`Deleted ${plural(details.task_count, "task")}`)
-    case "task_restored": {
-      if (implicit) return whole("restored it")
-      const subtasks = details.subtask_count ?? 0
-      return withSubject(
-        "Restored",
-        subtasks > 0 ? ` and ${plural(subtasks, "subtask")}` : "",
-      )
-    }
-    case "task_restored_batch":
-      return implicit
-        ? whole("restored it")
-        : whole(`Restored ${plural(details.task_count, "task")}`)
-    case "task_moved": {
-      if (implicit) {
-        // Only the destination, not the origin: the task panel already knows
-        // where the task was, because it is reading its history in order.
-        const to = details.to_project
-        return whole(
-          to?.name ? `moved it to ${to.name}` : "moved it to another project",
-        )
-      }
-      return withSubject(
-        "Moved",
-        ` from ${projectName(details.from_project)} to ${projectName(
-          details.to_project,
-        )}`,
-      )
-    }
-    case "task_assigned": {
-      const { assignee } = details
-      if (implicit) {
-        // The only human a task can be assigned to is its owner: when they
-        // did it themselves it is "yourself", when a bot user did it, "you".
-        const who =
-          assignee?.type === "bot_user"
-            ? (assignee.name ?? "a bot user")
-            : entry.actor_bot_user_id
-              ? "you"
-              : "yourself"
-        return whole(`assigned it to ${who}`)
-      }
-      return withSubject(
-        "Assigned",
-        ` to ${namesAssignee(assignee, details.assignee_id ?? undefined, currentUserId)}`,
-      )
-    }
-    case "task_unassigned": {
-      // Unlike the other voice, this never names who was removed, bot user
-      // or not — "removed the assignee" covers every case.
-      if (implicit) return whole("removed the assignee")
-      const previous = details.previous_assignee
-      if (previous?.type === "bot_user") {
-        return withSubject(
-          `Removed ${namesAssignee(previous, previous.id, currentUserId)} from`,
-        )
-      }
-      return withSubject("Removed the assignee from")
-    }
-    case "tasks_bulk_changed": {
-      const { task_count: count } = details
-      if (implicit) {
-        // The current task is one of the count; what matters here is how
-        // many others went with it.
-        const others = count - 1
-        return whole(
-          others > 0
-            ? `changed it along with ${others} other ${others === 1 ? "task" : "tasks"}`
-            : "changed it",
-        )
-      }
-      const batch = describeBatch(details.changes)
-      return whole(
-        `Changed ${plural(count, "task")}${batch ? `: ${batch}` : ""}`,
-      )
-    }
-    case "attachment_added": {
-      const { filename } = details
-      return implicit
-        ? whole(`attached “${filename}”`)
-        : withSubject(`Attached “${filename}” to`)
-    }
-    case "attachment_deleted": {
-      const { filename } = details
-      return implicit
-        ? whole(`removed “${filename}”`)
-        : withSubject(`Removed “${filename}” from`)
-    }
-    // A comment is shown as the comment itself, with its author and body,
-    // not as a line saying someone wrote one — so the task panel's voice
-    // has nothing to say about these.
-    case "comment_added":
-      return implicit ? null : withSubject("Commented on")
-    case "comment_edited":
-      return implicit ? null : withSubject("Edited a comment on")
-    case "comment_deleted":
-      return implicit ? null : withSubject("Deleted a comment on")
-    // Projects and tags never appear in a task's own history, so the task
-    // panel's voice has nothing to say about these either.
-    case "project_created":
-      return implicit ? null : withSubject("Created the project")
-    case "project_changed": {
-      if (implicit) return null
-      return withSubject(
-        `Changed the ${Object.keys(details.changes).join(", ")} of the project`,
-      )
-    }
-    case "project_deleted": {
-      if (implicit) return null
-      const tasks = details.task_count
-      return withSubject(
-        "Deleted the project",
-        tasks > 0 ? ` and ${plural(tasks, "task")}` : "",
-      )
-    }
-    case "project_restored": {
-      if (implicit) return null
-      const tasks = details.task_count
-      return withSubject(
-        "Restored the project",
-        tasks > 0 ? ` and ${plural(tasks, "task")}` : "",
-      )
-    }
-    case "tag_created":
-      return implicit ? null : withSubject("Created the tag")
-    case "tag_renamed": {
-      if (implicit) return null
-      return withSubject(`Renamed the tag “${details.changes.name?.from}” to`)
-    }
-    case "tag_merged": {
-      if (implicit) return null
-      const { sources, task_count: tasks } = details
-      return withSubject(
-        `Merged ${sources.map((name) => `“${name}”`).join(", ")} into`,
-        tasks > 0 ? `, moving ${plural(tasks, "task")} onto it` : "",
-      )
-    }
-    case "tag_deleted": {
-      if (implicit) return null
-      const tasks = details.task_count
-      return withSubject(
-        "Deleted the tag",
-        tasks > 0 ? `, taking it off ${plural(tasks, "task")}` : "",
-      )
-    }
-    // A row the backend itself could not make sense of (`app.activity_details
-    // .to_public`'s own fallback) — one bad entry says so plainly rather
-    // than breaking the page it would otherwise take down with it.
-    case "unrecognized":
-      return implicit ? null : whole("Something changed")
-  }
+/**
+ * What an entry names: the task, project, tag, or task a comment or file is
+ * on. Reads the same per-action declaration `entryWords` does, so a 25th
+ * action with no case there is a compile error here too, rather than a
+ * silent fallback to "Untitled task".
+ */
+export function subjectName(entry: ActivityEntryPublic): string {
+  return actionVoices(entry, undefined).subjectName
+}
+
+/**
+ * The record an entry links to: its own entity, or for a comment or a file,
+ * the task it is on. `null` when the entry names no single record (a batch,
+ * or an unrecognized row whose real entity was itself a comment or
+ * attachment).
+ */
+export function recordOf(entry: ActivityEntryPublic): RecordRef | null {
+  return actionVoices(entry, undefined).record
 }
 
 /**
