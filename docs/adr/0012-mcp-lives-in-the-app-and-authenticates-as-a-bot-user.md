@@ -97,7 +97,7 @@ request, `initialize` included, authenticates on its own bearer token, which
 is what "nothing about the caller is cached" (above) already committed to;
 removing the session binding does not loosen that property, since the
 binding itself only ever worked within one worker's own memory — there was
-no cross-process guarantee to lose. FR-07.8 is rewritten to match: there are no protocol sessions,
-so there is no session for one agent's work to be continued as another's —
-strictly stronger than a binding that only worked by accident of which
-worker a request landed on.
+no cross-process guarantee to lose. FR-07.8 is rewritten to match: there
+are no protocol sessions, so there is no session for one agent's work to be
+continued as another's — strictly stronger than a binding that only worked
+by accident of which worker a request landed on.
