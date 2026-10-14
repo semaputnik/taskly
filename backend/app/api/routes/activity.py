@@ -8,8 +8,6 @@ from app import deletions
 from app.activity_details import (
     ActivityEntriesPublic,
     ActivityEntryPublic,
-    BotActivityEntriesPublic,
-    BotActivityEntryPublic,
     to_public,
 )
 from app.activity_log import _KIND_ACTIONS as _KIND_ACTIONS  # re-export, see below
@@ -56,7 +54,7 @@ def _refuse(code: str, message: str) -> HTTPException:
     )
 
 
-@router.get("/", response_model=ActivityEntriesPublic | BotActivityEntriesPublic)
+@router.get("/", response_model=ActivityEntriesPublic)
 def read_activity_log(
     session: SessionDep,
     caller: CallerDep,
@@ -71,7 +69,7 @@ def read_activity_log(
     task_id: uuid.UUID | None = Query(default=None),
     project_id: uuid.UUID | None = Query(default=None),
     order: ActivityOrder = Query(default=ActivityOrder.NEWEST),
-) -> ActivityEntriesPublic | BotActivityEntriesPublic:
+) -> ActivityEntriesPublic:
     """
     Retrieve the caller's activity log, newest first unless `order` says
     `oldest` (FR-10.10).
@@ -83,9 +81,9 @@ def read_activity_log(
     comments, attachments and tags of its scope — never an archived project,
     whatever the scope lists, and never a batch that touched a task outside
     it (`app.activity_log.read_activity`, `app.access.activity_log_scope`).
-    Its response is declared as `BotActivityEntriesPublic`, which has no
-    `restorable` or deletion id at all (#298, ADR-0011); restoring stays a
-    human-only action.
+    Its response is the same shape a human's is, `ActivityEntriesPublic`, but
+    with `restorable` and the deletion id both `null` (#298, #314,
+    ADR-0011); restoring stays a human-only action.
 
     `actor_bot_user_id` narrows it to one bot user's own changes — what an
     operator asks when they want to read an integration rather than their
@@ -170,11 +168,16 @@ def read_activity_log(
     )
 
     if caller.bot is not None:
-        # A bot user's own projection: everything but `restorable` and the
-        # deletion id (ADR-0011) — never computed for a bot at all, rather
-        # than computed and then excluded from a hand-built response.
+        # A bot user's own projection: `restorable` and the deletion id are
+        # both set to `None` explicitly (ADR-0011, #314) — never computed
+        # for a bot at all, rather than computed and then excluded from a
+        # hand-built response. `deletion_id` has to be named here rather
+        # than left off this dict: it is a real column on `entry` itself,
+        # set on the very deletion entry a restore would start from, so
+        # `model_validate`'s own attribute copy would otherwise carry it
+        # straight through instead of withholding it.
         bot_entries = [
-            BotActivityEntryPublic.model_validate(
+            ActivityEntryPublic.model_validate(
                 entry,
                 update={
                     "details": to_public(entry.action, entry.details),
@@ -183,11 +186,13 @@ def read_activity_log(
                     "actor_bot_user_name": bot_names.get(entry.actor_bot_user_id)
                     if entry.actor_bot_user_id
                     else None,
+                    "restorable": None,
+                    "deletion_id": None,
                 },
             )
             for entry in entries
         ]
-        return BotActivityEntriesPublic(data=bot_entries, count=page.total)
+        return ActivityEntriesPublic(data=bot_entries, count=page.total)
 
     # The deletion events on this page, and whether each still has something
     # to bring back: the same answer a restore of it would act on. A human's

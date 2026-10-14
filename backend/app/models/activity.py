@@ -192,11 +192,12 @@ class ActivityEntry(SQLModel, table=True):
     )
 
 
-# `BotActivityEntryPublic`/`ActivityEntryPublic`/`ActivityEntriesPublic`/
-# `BotActivityEntriesPublic` live in `app.activity_details` instead of here
-# (re-exported by `app.models`, below): that module's `ActivityDetailsPublic`
-# is what `details` is typed as on the first two, and it already depends on
-# this module one way, for `ActivityAction`/`ActivityEntityType` — moving the
-# four response models to the same side keeps that one-directional rather
-# than adding a second, opposite edge back into this one (#299's spike; see
-# `app.activity_details`'s own module docstring for what the union answers).
+# `ActivityEntryPublic`/`ActivityEntriesPublic` live in `app.activity_details`
+# instead of here (re-exported by `app.models`, below): that module's
+# `ActivityDetailsPublic` is what `details` is typed as on the first one, and
+# it already depends on this module one way, for
+# `ActivityAction`/`ActivityEntityType` — moving the two response models to
+# the same side keeps that one-directional rather than adding a second,
+# opposite edge back into this one (#299's spike, settled by #314 into one
+# model rather than a union; see `app.activity_details`'s own module
+# docstring for the detail).
