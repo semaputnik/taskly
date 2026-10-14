@@ -16,8 +16,10 @@ this tool wanted to show one — it never asks the reader to compute them,
 rather than asking a route to compute and then hide them.
 
 This tool's own job, once the reader has answered: naming who acted
-(`app.mcp.conventions.actor_label`'s own convention, also `get_task`'s
-comment rows and `list_completions`'s own `closed_by`), saying what
+(`app.mcp.conventions.actor_label_of`, which reads an `ActivityEntry` or
+`list_completions`'s own `_Actor` down to `actor_label`'s convention — the
+one reading-down step shared by this tool, `list_completions`'s own
+`closed_by`, and `get_task`'s comment rows, #321), saying what
 happened in one short phrase, and naming the task, project or tag (or, for
 a batch, the selection) the entry is about — ported from the web UI's own
 `ActivityDescription.tsx`, since there is no backend description of an
@@ -77,7 +79,7 @@ from app.activity_details import (
 from app.activity_log import ActivityNarrowing, read_activity
 from app.api.deps import Caller
 from app.mcp.conventions import (
-    actor_label,
+    actor_label_of,
     list_result,
     narrow_hint,
     open_caller,
@@ -94,7 +96,6 @@ from app.models import (
     ActivityEntry,
     ActivityKind,
     ActivityOrder,
-    BotUserRef,
     TaskStatus,
 )
 from app.refusals import Refusal
@@ -281,22 +282,12 @@ def _rows(session: Session, entries: Sequence[ActivityEntry]) -> list[dict[str, 
         rows.append(
             {
                 "at": entry.created_at.isoformat() if entry.created_at else None,
-                "actor": _actor_label(entry, bots),
+                "actor": actor_label_of(entry, bots),
                 "what": _describe(decoded),
                 "subject": _subject(decoded, entry),
             }
         )
     return rows
-
-
-def _actor_label(entry: ActivityEntry, bots: dict[uuid.UUID, BotUserRef]) -> str:
-    """Who acted: `actor_label`'s own convention, once this entry's actor is read down to a bot or the owner."""
-    if entry.actor_id is not None:
-        return actor_label(None)
-    assert entry.actor_bot_user_id is not None
-    bot = bots.get(entry.actor_bot_user_id)
-    assert bot is not None, "a bot user is kept, not removed, once it acted (FR-08.19)"
-    return actor_label(bot)
 
 
 # Subjects: the task, project, tag, or batch an entry is about
@@ -486,7 +477,20 @@ def _assignee_label(assignee: AssigneeRef | None) -> str:
 
 
 def _describe_batch_changes(changes: dict[str, Any]) -> str:
-    """What a batch did, in the words `ActivityDescription.tsx`'s own `describeBatch` uses."""
+    """
+    What a batch did, in the words `frontend/src/components/Activity/
+    entryWords.ts`'s own `describeBatch` uses (that file absorbed
+    `ActivityDescription.tsx`'s copy in #300).
+
+    The `status == TaskStatus.DONE` test below is one of three places that
+    decide whether a batch counts as a completion (#321): `app.activity_log.
+    _BULK_COMPLETION` is what the log's own `kind=completed` filter narrows
+    by, and `describeBatch` decides the same thing a third time for the web
+    UI. See `_BULK_COMPLETION`'s own comment for why a shared constant
+    cannot cross the Python/TypeScript line, and
+    `tests/app/test_batch_completion_rule.py` for the test that keeps this
+    site and that one from disagreeing.
+    """
     said = []
     if "status" in changes:
         status = changes["status"]

@@ -77,7 +77,7 @@ from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta
-from typing import Any, NoReturn
+from typing import Any, NoReturn, Protocol
 
 from fastapi import HTTPException
 from mcp.server.mcpserver import Context
@@ -571,6 +571,48 @@ def actor_label(bot: BotUserRef | None) -> str:
     if bot is None:
         return "owner"
     return f"{bot.name} (deleted)" if bot.deleted else bot.name
+
+
+class HasActor(Protocol):
+    """
+    Anything that names who acted the way an activity entry does: a real
+    column on `ActivityEntry` itself, or `list_completions`'s own `_Actor`
+    dataclass, built from the same two fields off an entry it has already
+    expanded away from. Exactly one of the two is ever set — never both,
+    never neither — the same invariant `actor_label_of` below asserts.
+
+    Declared as read-only properties rather than plain attributes: a plain
+    attribute in a `Protocol` asks a structural match to be read-*and*-write
+    compatible, which `ActivityEntry`'s own SQLModel column and `_Actor`'s
+    frozen dataclass field both fail for reasons that have nothing to do
+    with this convention — neither is ever written back through here.
+    """
+
+    @property
+    def actor_id(self) -> uuid.UUID | None: ...
+    @property
+    def actor_bot_user_id(self) -> uuid.UUID | None: ...
+
+
+def actor_label_of(actor: HasActor, bots: Mapping[uuid.UUID, BotUserRef]) -> str:
+    """
+    Who acted, read down to `actor_label`'s own convention from anything
+    carrying `actor_id`/`actor_bot_user_id`: an `ActivityEntry` row
+    (`search_activity`) or `list_completions`'s own `_Actor`. The two tools
+    used to carry byte-identical four-line wrappers here, differing only in
+    the annotated type of this argument (#321) — a review once read them as
+    pure pass-throughs to `actor_label`, which they are not: reading an
+    actor down to a bot or the owner, and asserting a bot a completion names
+    is still there to be named (FR-08.19), is real work, done once rather
+    than twice now that `HasActor` says in the type what both bodies already
+    agreed on in the data.
+    """
+    if actor.actor_id is not None:
+        return actor_label(None)
+    assert actor.actor_bot_user_id is not None
+    bot = bots.get(actor.actor_bot_user_id)
+    assert bot is not None, "a bot user is kept, not removed, once it acted (FR-08.19)"
+    return actor_label(bot)
 
 
 # Lists

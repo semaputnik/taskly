@@ -51,7 +51,22 @@ const FIELD_LABELS: Record<string, string> = {
   recurrence: "repeat",
 }
 
-/** What a batch did, in the words the reader will recognise. */
+/**
+ * What a batch did, in the words the reader will recognise.
+ *
+ * The `status === "done"` test below is one of three places that decide
+ * whether a batch counts as a completion rather than a plain status move
+ * (#321): `app.activity_log._BULK_COMPLETION` (Python) is what the log's
+ * own `kind=completed` filter narrows by, and `app.mcp.tools.
+ * search_activity._describe_batch_changes` decides the same thing a third
+ * time for the MCP tool's narration. A shared constant cannot cross the
+ * Python/TypeScript line here — the generated client carries a shape
+ * (`TasksBulkChangedDetailsPublic`, the `TaskStatus` union), never a
+ * predicate — so nothing ties the three together but this comment and
+ * `backend/tests/app/test_batch_completion_rule.py`, which guards the two
+ * Python sites directly; this file's own `entryWords.test.ts` guards this
+ * one against drifting on its own.
+ */
 function describeBatch(changes: Record<string, unknown>): string {
   const said: string[] = []
   // Batches from before statuses recorded `completed`.
