@@ -442,7 +442,7 @@ describe("entryWords", () => {
     }
   })
 
-  test.each(STATUSES)(
+  test.each([...STATUSES])(
     // Whether a batch counts as a completion is decided three times (#321):
     // here (`describeBatch`, inside `entryWords`), in
     // `app.activity_log._BULK_COMPLETION` (the log's own `kind=completed`
