@@ -42,7 +42,36 @@ from mcp.types import ToolAnnotations
 from pydantic import Field
 from sqlmodel import Session
 
-from app import crud
+from app import activity_details, crud
+from app.activity_details import (
+    AssigneeRef,
+    AttachmentAddedDetails,
+    AttachmentDeletedDetails,
+    CommentAddedDetails,
+    CommentDeletedDetails,
+    CommentEditedDetails,
+    ProjectChangedDetails,
+    ProjectCreatedDetails,
+    ProjectDeletedDetails,
+    ProjectRestoredDetails,
+    TagCreatedDetails,
+    TagDeletedDetails,
+    TagMergedDetails,
+    TagRenamedDetails,
+    TaskAssignedDetails,
+    TaskChangedDetails,
+    TaskCompletedDetails,
+    TaskCreatedDetails,
+    TaskDeletedBatch,
+    TaskDeletedSingle,
+    TaskMovedDetails,
+    TaskReopenedDetails,
+    TaskRestoredBatch,
+    TaskRestoredSingle,
+    TasksBulkChangedDetails,
+    TaskStatusChangedDetails,
+    TaskUnassignedDetails,
+)
 from app.activity_log import ActivityNarrowing, read_activity
 from app.api.deps import Caller
 from app.mcp.conventions import (
@@ -60,7 +89,6 @@ from app.mcp.conventions import (
 )
 from app.mcp.server import mcp_server
 from app.models import (
-    ActivityAction,
     ActivityEntry,
     ActivityKind,
     ActivityOrder,
@@ -68,6 +96,37 @@ from app.models import (
     TaskStatus,
 )
 from app.refusals import Refusal
+
+# Every task-shaped detail model that carries a top-level `title` — every
+# action but a batch's (`TaskDeletedBatch`/`TaskRestoredBatch`/
+# `TasksBulkChangedDetails`, which name no single task at all) and a
+# comment's or attachment's (which name their task by `TaskRef` instead).
+_TASK_TITLED = (
+    TaskCreatedDetails,
+    TaskChangedDetails,
+    TaskMovedDetails,
+    TaskAssignedDetails,
+    TaskUnassignedDetails,
+    TaskCompletedDetails,
+    TaskReopenedDetails,
+    TaskStatusChangedDetails,
+    TaskDeletedSingle,
+    TaskRestoredSingle,
+)
+_PROJECT_NAMED = (
+    ProjectCreatedDetails,
+    ProjectChangedDetails,
+    ProjectDeletedDetails,
+    ProjectRestoredDetails,
+)
+_TAG_NAMED = (TagCreatedDetails, TagRenamedDetails, TagDeletedDetails, TagMergedDetails)
+_ON_A_TASK = (
+    CommentAddedDetails,
+    CommentEditedDetails,
+    CommentDeletedDetails,
+    AttachmentAddedDetails,
+    AttachmentDeletedDetails,
+)
 
 # How a status reads in a sentence, the backend's own copy of the web UI's
 # `STATUS_LABELS` (`frontend/src/components/Tasks/statuses.tsx`) — this tool
@@ -266,46 +325,50 @@ def _actor_label(entry: ActivityEntry, bots: dict[uuid.UUID, BotUserRef]) -> str
 
 
 def _subject(entry: ActivityEntry) -> dict[str, Any]:
-    details = entry.details
+    decoded = activity_details.decode(entry.action, entry.details)
     entity_type = entry.entity_type
 
-    if entry.action == ActivityAction.TASKS_BULK_CHANGED or (
-        "task_count" in details and "title" not in details
+    if isinstance(
+        decoded, (TaskDeletedBatch, TaskRestoredBatch, TasksBulkChangedDetails)
     ):
-        # A batch deletion or restore (`app.activity._deletion_entry`,
-        # `_restore_entry`) names no task ids, only a count; a bulk status
-        # change (`app.activity._write`) names them in `task_ids`. Either
-        # way the subject is the selection, not any one task it happened to
-        # be filed under (`app.activity_log._on_task`'s own reason).
-        subject: dict[str, Any] = {"type": "tasks", "count": details["task_count"]}
-        if "task_ids" in details:
-            subject["ids"] = [short_id(uuid.UUID(i)) for i in details["task_ids"]]
+        # A batch deletion or restore (`TaskDeletedBatch`/`TaskRestoredBatch`)
+        # names no task ids, only a count; a bulk status change
+        # (`TasksBulkChangedDetails`) names them in `task_ids`. Either way
+        # the subject is the selection, not any one task it happened to be
+        # filed under (`app.activity_log._on_task`'s own reason) — the three
+        # shapes a batch can take, declared rather than read off which
+        # fields happen to be there (ADR-0011's all-or-nothing batch).
+        subject: dict[str, Any] = {"type": "tasks", "count": decoded.task_count}
+        if isinstance(decoded, TasksBulkChangedDetails):
+            subject["ids"] = [short_id(uuid.UUID(i)) for i in decoded.task_ids]
         return subject
 
     if entity_type in ("comment", "attachment"):
-        task = details.get("task") or {}
-        task_id = uuid.UUID(task["id"]) if "id" in task else entry.entity_id
+        assert isinstance(decoded, _ON_A_TASK)
         return {
             "type": "task",
-            "id": short_id(task_id),
-            "title": task.get("title") or "Untitled task",
+            "id": short_id(decoded.task.id),
+            "title": decoded.task.title or "Untitled task",
         }
     if entity_type == "project":
+        assert isinstance(decoded, _PROJECT_NAMED)
         return {
             "type": "project",
             "id": str(entry.entity_id),
-            "name": details.get("name") or "Untitled project",
+            "name": decoded.name or "Untitled project",
         }
     if entity_type == "tag":
+        assert isinstance(decoded, _TAG_NAMED)
         return {
             "type": "tag",
             "id": str(entry.entity_id),
-            "name": details.get("name") or "Untitled tag",
+            "name": decoded.name or "Untitled tag",
         }
+    assert isinstance(decoded, _TASK_TITLED)
     return {
         "type": "task",
         "id": short_id(entry.entity_id),
-        "title": details.get("title") or "Untitled task",
+        "title": decoded.title or "Untitled task",
     }
 
 
@@ -314,91 +377,88 @@ def _subject(entry: ActivityEntry) -> dict[str, Any]:
 # yet, and this tool is the first thing besides that page that needs one.
 
 
-def _describe(entry: ActivityEntry) -> str:
-    action = entry.action
-    details: Any = entry.details
+def _describe(entry: ActivityEntry) -> str:  # noqa: PLR0911
+    decoded = activity_details.decode(entry.action, entry.details)
 
-    if action == ActivityAction.TASK_CREATED:
-        task = details.get("task") or {}
-        project = task.get("project")
-        return "Created" + (f" in {project['name']}" if project else "")
-    if action == ActivityAction.TASK_CHANGED:
-        fields = ", ".join(
-            _FIELD_LABELS.get(name, name) for name in details.get("changes", {})
-        )
+    if isinstance(decoded, TaskCreatedDetails):
+        project = decoded.task.project
+        return "Created" + (f" in {project.name}" if project is not None else "")
+    if isinstance(decoded, TaskChangedDetails):
+        fields = ", ".join(_FIELD_LABELS.get(name, name) for name in decoded.changes)
         return f"Changed {fields}" if fields else "Changed"
-    if action == ActivityAction.TASK_COMPLETED:
+    if isinstance(decoded, TaskCompletedDetails):
         return "Completed"
-    if action == ActivityAction.TASK_REOPENED:
+    if isinstance(decoded, TaskReopenedDetails):
         return "Reopened"
-    if action == ActivityAction.TASK_STATUS_CHANGED:
-        to = details.get("to")
+    if isinstance(decoded, TaskStatusChangedDetails):
+        to = decoded.to
         return f"Moved to {_STATUS_LABELS.get(to, to)}"
-    if action == ActivityAction.TASK_DELETED:
-        if "task_count" in details:
-            return "Deleted"  # the count is in the subject, not here
-        return _with_count("Deleted", details.get("subtask_count"), "subtask")
-    if action == ActivityAction.TASK_RESTORED:
-        if "task_count" in details and "title" not in details:
-            return "Restored"
-        return _with_count("Restored", details.get("subtask_count"), "subtask")
-    if action == ActivityAction.TASK_MOVED:
-        from_name = (details.get("from_project") or {}).get("name", "no project")
-        to_name = (details.get("to_project") or {}).get("name", "no project")
+    if isinstance(decoded, TaskDeletedSingle):
+        return _with_count("Deleted", decoded.subtask_count, "subtask")
+    if isinstance(decoded, TaskDeletedBatch):
+        return "Deleted"  # the count is in the subject, not here
+    if isinstance(decoded, TaskRestoredSingle):
+        return _with_count("Restored", decoded.subtask_count, "subtask")
+    if isinstance(decoded, TaskRestoredBatch):
+        return "Restored"
+    if isinstance(decoded, TaskMovedDetails):
+        from_name = decoded.from_project.name if decoded.from_project else "no project"
+        to_name = decoded.to_project.name if decoded.to_project else "no project"
         return f"Moved from {from_name} to {to_name}"
-    if action == ActivityAction.TASK_ASSIGNED:
-        return f"Assigned to {_assignee_label(details.get('assignee'))}"
-    if action == ActivityAction.TASK_UNASSIGNED:
+    if isinstance(decoded, TaskAssignedDetails):
+        return f"Assigned to {_assignee_label(decoded.assignee)}"
+    if isinstance(decoded, TaskUnassignedDetails):
         # Named only for a bot user, the same asymmetry
         # `ActivityDescription.tsx`'s own `task_unassigned` case has: the
         # owner is always "you" to themselves, so naming a previous human
         # assignee says nothing a reader does not already know.
-        previous = details.get("previous_assignee")
-        if previous and previous.get("type") == "bot_user":
+        previous = decoded.previous_assignee
+        if previous is not None and previous.type == "bot_user":
             return f"Unassigned (was {_assignee_label(previous)})"
         return "Unassigned"
-    if action == ActivityAction.TASKS_BULK_CHANGED:
-        count = details.get("task_count") or 0
-        said = _describe_batch_changes(details.get("changes") or {})
+    if isinstance(decoded, TasksBulkChangedDetails):
+        count = decoded.task_count
+        said = _describe_batch_changes(decoded.changes)
         base = f"Changed {count} task{'' if count == 1 else 's'}"
         return f"{base}: {said}" if said else base
-    if action == ActivityAction.PROJECT_CREATED:
+    if isinstance(decoded, ProjectCreatedDetails):
         return "Created"
-    if action == ActivityAction.PROJECT_CHANGED:
-        fields = ", ".join(details.get("changes", {}))
+    if isinstance(decoded, ProjectChangedDetails):
+        fields = ", ".join(decoded.changes)
         return f"Changed {fields}" if fields else "Changed"
-    if action == ActivityAction.PROJECT_DELETED:
-        return _with_count("Deleted", details.get("task_count"), "task")
-    if action == ActivityAction.PROJECT_RESTORED:
-        return _with_count("Restored", details.get("task_count"), "task")
-    if action == ActivityAction.COMMENT_ADDED:
+    if isinstance(decoded, ProjectDeletedDetails):
+        return _with_count("Deleted", decoded.task_count, "task")
+    if isinstance(decoded, ProjectRestoredDetails):
+        return _with_count("Restored", decoded.task_count, "task")
+    if isinstance(decoded, CommentAddedDetails):
         return "Commented"
-    if action == ActivityAction.COMMENT_EDITED:
+    if isinstance(decoded, CommentEditedDetails):
         return "Edited a comment"
-    if action == ActivityAction.COMMENT_DELETED:
+    if isinstance(decoded, CommentDeletedDetails):
         return "Deleted a comment"
-    if action == ActivityAction.ATTACHMENT_ADDED:
-        return f"Attached “{details.get('filename', 'a file')}”"
-    if action == ActivityAction.ATTACHMENT_DELETED:
-        return f"Removed “{details.get('filename', 'a file')}”"
-    if action == ActivityAction.TAG_CREATED:
+    if isinstance(decoded, AttachmentAddedDetails):
+        return f"Attached “{decoded.filename}”"
+    if isinstance(decoded, AttachmentDeletedDetails):
+        return f"Removed “{decoded.filename}”"
+    if isinstance(decoded, TagCreatedDetails):
         return "Created"
-    if action == ActivityAction.TAG_RENAMED:
-        old = (details.get("changes", {}).get("name") or {}).get("from")
+    if isinstance(decoded, TagRenamedDetails):
+        old = decoded.changes["name"].from_
         return f"Renamed from “{old}”" if old else "Renamed"
-    if action == ActivityAction.TAG_MERGED:
-        sources = details.get("sources") or []
-        said = "Merged " + ", ".join(f"“{name}”" for name in sources) + " into it"
-        tasks = details.get("task_count") or 0
+    if isinstance(decoded, TagMergedDetails):
+        said = (
+            "Merged " + ", ".join(f"“{name}”" for name in decoded.sources) + " into it"
+        )
+        tasks = decoded.task_count
         if tasks:
             said += f", moving {tasks} task{'' if tasks == 1 else 's'} onto it"
         return said
-    if action == ActivityAction.TAG_DELETED:
-        tasks = details.get("task_count") or 0
+    if isinstance(decoded, TagDeletedDetails):
+        tasks = decoded.task_count
         if tasks:
             return f"Deleted, removed from {tasks} task{'' if tasks == 1 else 's'}"
         return "Deleted"
-    return str(action)
+    return str(entry.action)
 
 
 def _with_count(verb: str, count: int | None, noun: str) -> str:
@@ -407,11 +467,11 @@ def _with_count(verb: str, count: int | None, noun: str) -> str:
     return f"{verb} with {count} {noun}{'' if count == 1 else 's'}"
 
 
-def _assignee_label(assignee: dict[str, Any] | None) -> str:
+def _assignee_label(assignee: AssigneeRef | None) -> str:
     if assignee is None:
         return "nobody"
-    if assignee.get("type") == "bot_user":
-        return f"the bot user {assignee.get('name')}"
+    if assignee.type == "bot_user":
+        return f"the bot user {assignee.name}"
     return "owner"
 
 

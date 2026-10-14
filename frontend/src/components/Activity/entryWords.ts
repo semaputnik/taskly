@@ -1,4 +1,10 @@
-import type { ActivityEntryPublic, TaskStatus } from "@/client"
+import type {
+  ActivityEntryPublic,
+  AssigneeRef,
+  FieldChange,
+  ProjectRef,
+  TaskStatus,
+} from "@/client"
 import { nameList, plural } from "@/components/Common/words"
 import { STATUS_LABELS } from "@/components/Tasks/statuses"
 import { formatDayPlain } from "@/lib/dates"
@@ -28,15 +34,6 @@ export interface EntryWords {
   verb: string
   subject: boolean
   after: string
-}
-
-function detail<T>(entry: ActivityEntryPublic, key: string): T | undefined {
-  return entry.details[key] as T | undefined
-}
-
-interface ProjectRef {
-  id: string
-  name: string | null
 }
 
 function projectName(project: ProjectRef | null | undefined): string {
@@ -88,13 +85,6 @@ function describeBatch(changes: Record<string, unknown>): string {
   return said.join(", ")
 }
 
-// Entries from before bot users could be assigned carry only the id.
-interface AssigneeRef {
-  type: "user" | "bot_user"
-  id: string
-  name?: string
-}
-
 /**
  * Who a task was assigned to, in the voice that names its subject. A bot
  * user is named as it was called at the time, which still reads after it is
@@ -111,10 +101,8 @@ function namesAssignee(
   return (assignee?.id ?? assigneeId) === currentUserId ? "you" : "someone"
 }
 
-type Change = { from: unknown; to: unknown }
-
 /** What a batch of field changes says, in the voice that drops its subject. */
-function changedFields(changes: Record<string, Change>): string | null {
+function changedFields(changes: Record<string, FieldChange>): string | null {
   const said: string[] = []
   if (changes.title) said.push(`renamed it to “${changes.title.to}”`)
   if (changes.description) said.push("edited the description")
@@ -141,7 +129,7 @@ function changedFields(changes: Record<string, Change>): string | null {
   return said.length ? nameList(said) : null
 }
 
-function changedTags({ from, to }: Change): string {
+function changedTags({ from, to }: FieldChange): string {
   const before = (from as string[] | null) ?? []
   const after = (to as string[] | null) ?? []
   const added = after.filter((tag) => !before.includes(tag))
@@ -170,6 +158,19 @@ function withSubject(verb: string, after = ""): EntryWords {
  * same after the task, project or tag is renamed, moved or deleted — only
  * the caller's subject slot depends on the record still being there.
  *
+ * Switches on `entry.details.kind` rather than `entry.action`: the two
+ * agree everywhere but one, `task_deleted`/`task_restored`, which each write
+ * one of two shapes under the same action — a single task's own deletion
+ * carrying its title, or a batch's, carrying only a count (ADR-0011's
+ * all-or-nothing batch, declared rather than read off which fields happen
+ * to be there) — so `kind` splits them into their own cases
+ * (`task_deleted`/`task_deleted_batch`, `task_restored`/
+ * `task_restored_batch`) the same way the generated client's own
+ * discriminated union does (#299's spike). Switching on `action` instead
+ * would read the same at runtime, but would not narrow `entry.details` to
+ * the fields each case actually has — this way, a field this switch reads
+ * is one the compiler has already checked is there.
+ *
  * The two voices are not the same sentence twice over: `subject-implicit`
  * is addressed to a reader who already has the record open (the task
  * panel), so it says less, and sometimes says nothing at all — a comment,
@@ -186,33 +187,34 @@ export function entryWords(
   currentUserId?: string,
 ): EntryWords | null {
   const implicit = voice === "subject-implicit"
+  const { details } = entry
 
-  switch (entry.action) {
+  switch (details.kind) {
     case "task_created": {
-      const snapshot = detail<{ project: ProjectRef | null }>(entry, "task")
+      const { task } = details
       if (implicit) {
         // Unlike the other voice, this only mentions the project when it
         // has a name — a project reference with none reads as if there
         // were no project at all, rather than naming it "no longer exists".
         return whole(
-          snapshot?.project?.name
-            ? `created this in ${snapshot.project.name}`
+          task.project?.name
+            ? `created this in ${task.project.name}`
             : "created this",
         )
       }
       return withSubject(
         "Created",
-        snapshot?.project ? ` in ${projectName(snapshot.project)}` : "",
+        task.project ? ` in ${projectName(task.project)}` : "",
       )
     }
     case "task_changed": {
       if (implicit) {
-        const changes = detail<Record<string, Change>>(entry, "changes") ?? {}
-        const said = changedFields(changes)
+        const said = changedFields(details.changes)
         return said ? whole(said) : null
       }
-      const changes = detail<Record<string, unknown>>(entry, "changes") ?? {}
-      const fields = Object.keys(changes).map((key) => FIELD_LABELS[key] ?? key)
+      const fields = Object.keys(details.changes).map(
+        (key) => FIELD_LABELS[key] ?? key,
+      )
       return withSubject(`Changed the ${fields.join(", ")} of`)
     }
     case "task_completed":
@@ -220,7 +222,7 @@ export function entryWords(
     case "task_reopened":
       return implicit ? whole("reopened it") : withSubject("Reopened")
     case "task_status_changed": {
-      const to = detail<TaskStatus>(entry, "to")
+      const { to } = details
       if (implicit) {
         return whole(to ? `moved it to ${STATUS_LABELS[to]}` : "moved it")
       }
@@ -231,42 +233,48 @@ export function entryWords(
     }
     case "task_deleted": {
       if (implicit) return whole("deleted it")
-      // A batch names no single task: what it deleted is the selection, and
-      // the count is what the entry has to say.
-      const batch = detail<number>(entry, "task_count")
-      if (batch !== undefined) return whole(`Deleted ${plural(batch, "task")}`)
-      const subtasks = detail<number>(entry, "subtask_count") ?? 0
+      const subtasks = details.subtask_count ?? 0
       return withSubject(
         "Deleted",
         subtasks > 0 ? ` and ${plural(subtasks, "subtask")}` : "",
       )
     }
+    case "task_deleted_batch":
+      // A batch names no single task: what it deleted is the selection, and
+      // the count is what the entry has to say.
+      return implicit
+        ? whole("deleted it")
+        : whole(`Deleted ${plural(details.task_count, "task")}`)
     case "task_restored": {
       if (implicit) return whole("restored it")
-      const subtasks = detail<number>(entry, "subtask_count") ?? 0
+      const subtasks = details.subtask_count ?? 0
       return withSubject(
         "Restored",
         subtasks > 0 ? ` and ${plural(subtasks, "subtask")}` : "",
       )
     }
+    case "task_restored_batch":
+      return implicit
+        ? whole("restored it")
+        : whole(`Restored ${plural(details.task_count, "task")}`)
     case "task_moved": {
       if (implicit) {
         // Only the destination, not the origin: the task panel already knows
         // where the task was, because it is reading its history in order.
-        const to = detail<{ name?: string }>(entry, "to_project")
+        const to = details.to_project
         return whole(
           to?.name ? `moved it to ${to.name}` : "moved it to another project",
         )
       }
       return withSubject(
         "Moved",
-        ` from ${projectName(detail<ProjectRef>(entry, "from_project"))} to ${projectName(
-          detail<ProjectRef>(entry, "to_project"),
+        ` from ${projectName(details.from_project)} to ${projectName(
+          details.to_project,
         )}`,
       )
     }
     case "task_assigned": {
-      const assignee = detail<AssigneeRef>(entry, "assignee")
+      const { assignee } = details
       if (implicit) {
         // The only human a task can be assigned to is its owner: when they
         // did it themselves it is "yourself", when a bot user did it, "you".
@@ -280,14 +288,14 @@ export function entryWords(
       }
       return withSubject(
         "Assigned",
-        ` to ${namesAssignee(assignee, detail<string>(entry, "assignee_id"), currentUserId)}`,
+        ` to ${namesAssignee(assignee, details.assignee_id ?? undefined, currentUserId)}`,
       )
     }
     case "task_unassigned": {
       // Unlike the other voice, this never names who was removed, bot user
       // or not — "removed the assignee" covers every case.
       if (implicit) return whole("removed the assignee")
-      const previous = detail<AssigneeRef>(entry, "previous_assignee")
+      const previous = details.previous_assignee
       if (previous?.type === "bot_user") {
         return withSubject(
           `Removed ${namesAssignee(previous, previous.id, currentUserId)} from`,
@@ -296,7 +304,7 @@ export function entryWords(
       return withSubject("Removed the assignee from")
     }
     case "tasks_bulk_changed": {
-      const count = detail<number>(entry, "task_count") ?? 0
+      const { task_count: count } = details
       if (implicit) {
         // The current task is one of the count; what matters here is how
         // many others went with it.
@@ -307,20 +315,19 @@ export function entryWords(
             : "changed it",
         )
       }
-      const changes = detail<Record<string, unknown>>(entry, "changes") ?? {}
-      const batch = describeBatch(changes)
+      const batch = describeBatch(details.changes)
       return whole(
         `Changed ${plural(count, "task")}${batch ? `: ${batch}` : ""}`,
       )
     }
     case "attachment_added": {
-      const filename = detail<string>(entry, "filename")
+      const { filename } = details
       return implicit
         ? whole(`attached “${filename}”`)
         : withSubject(`Attached “${filename}” to`)
     }
     case "attachment_deleted": {
-      const filename = detail<string>(entry, "filename")
+      const { filename } = details
       return implicit
         ? whole(`removed “${filename}”`)
         : withSubject(`Removed “${filename}” from`)
@@ -340,14 +347,13 @@ export function entryWords(
       return implicit ? null : withSubject("Created the project")
     case "project_changed": {
       if (implicit) return null
-      const changes = detail<Record<string, unknown>>(entry, "changes") ?? {}
       return withSubject(
-        `Changed the ${Object.keys(changes).join(", ")} of the project`,
+        `Changed the ${Object.keys(details.changes).join(", ")} of the project`,
       )
     }
     case "project_deleted": {
       if (implicit) return null
-      const tasks = detail<number>(entry, "task_count") ?? 0
+      const tasks = details.task_count
       return withSubject(
         "Deleted the project",
         tasks > 0 ? ` and ${plural(tasks, "task")}` : "",
@@ -355,7 +361,7 @@ export function entryWords(
     }
     case "project_restored": {
       if (implicit) return null
-      const tasks = detail<number>(entry, "task_count") ?? 0
+      const tasks = details.task_count
       return withSubject(
         "Restored the project",
         tasks > 0 ? ` and ${plural(tasks, "task")}` : "",
@@ -365,13 +371,11 @@ export function entryWords(
       return implicit ? null : withSubject("Created the tag")
     case "tag_renamed": {
       if (implicit) return null
-      const change = detail<{ name?: { from: string } }>(entry, "changes")
-      return withSubject(`Renamed the tag “${change?.name?.from}” to`)
+      return withSubject(`Renamed the tag “${details.changes.name?.from}” to`)
     }
     case "tag_merged": {
       if (implicit) return null
-      const sources = detail<string[]>(entry, "sources") ?? []
-      const tasks = detail<number>(entry, "task_count") ?? 0
+      const { sources, task_count: tasks } = details
       return withSubject(
         `Merged ${sources.map((name) => `“${name}”`).join(", ")} into`,
         tasks > 0 ? `, moving ${plural(tasks, "task")} onto it` : "",
@@ -379,7 +383,7 @@ export function entryWords(
     }
     case "tag_deleted": {
       if (implicit) return null
-      const tasks = detail<number>(entry, "task_count") ?? 0
+      const tasks = details.task_count
       return withSubject(
         "Deleted the tag",
         tasks > 0 ? `, taking it off ${plural(tasks, "task")}` : "",

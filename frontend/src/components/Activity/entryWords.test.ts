@@ -36,6 +36,27 @@ const COVERED: Record<ActivityAction, true> = {
   tag_merged: true,
 }
 
+/**
+ * `details.kind` as the real API would set it (`app.activity_details.
+ * public_kind`): an action's own spelling, except `task_deleted`/
+ * `task_restored`, split into `..._batch` by the one thing a batch's own
+ * shape never carries — here, by whether `task_count` is the field this
+ * fixture set, the same test the pre-union code used to run on `details`
+ * by hand.
+ */
+function kindOf(
+  action: ActivityEntryPublic["action"],
+  details: Record<string, unknown>,
+) {
+  if (
+    (action === "task_deleted" || action === "task_restored") &&
+    "task_count" in details
+  ) {
+    return `${action}_batch`
+  }
+  return action
+}
+
 function entry(
   action: ActivityEntryPublic["action"],
   details: Record<string, unknown> = {},
@@ -46,7 +67,10 @@ function entry(
     action,
     entity_type: "task",
     entity_id: "entity",
-    details,
+    details: {
+      ...details,
+      kind: kindOf(action, details),
+    } as ActivityEntryPublic["details"],
     created_at: null,
     entity_exists: true,
     ...extra,
