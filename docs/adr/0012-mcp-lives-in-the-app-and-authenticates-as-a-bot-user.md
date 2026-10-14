@@ -72,3 +72,32 @@ bot user, and two agents sharing one would simply be impossible to tell
 apart in the log or revoke apart, the same cost sharing a REST token already
 has (`CONTEXT.md`, "Bot user"). `docs/deployment-docker-compose.md`
 documents it as the way to connect an agent.
+
+## Amendment (2026-10-14): the session binding assumed one worker, which was wrong
+
+"MCP lives in the app and authenticates as a bot user" is unchanged — this
+amends one detail of how, not the decision. The "A protocol session is bound
+to the token that opened it" consequence above, and its closing sentence
+("there is no load balancer sharing sessions across processes to worry
+about here"), were both false of the deployment this ADR was written for.
+`backend/Dockerfile` runs the release image with four Uvicorn workers
+sharing one listening socket; the kernel spreads one session's requests
+across all four, so `_session_tokens` — kept in one worker's own process
+memory — only ever held within the worker that happened to answer
+`initialize`. A follow-up call landing on any of the other three found a
+session that worker had never minted: `404 Session not found`, roughly
+three calls in four in production (#325). The four-worker server *is* the
+load balancer the consequence said this app did not have.
+
+The fix is not sticky routing or a single worker — both trade away
+throughput or add infrastructure for state the server does not need — but
+going stateless (`stateless_http=True`, spec #325): `/mcp` mints no session
+id at all, so there is nothing for a worker hop to lose track of. Every
+request, `initialize` included, authenticates on its own bearer token, which
+is what "nothing about the caller is cached" (above) already committed to;
+removing the session binding does not loosen that property, since the
+binding itself only ever worked within one worker's own memory — there was
+no cross-process guarantee to lose. FR-07.8 is rewritten to match: there
+are no protocol sessions, so there is no session for one agent's work to be
+continued as another's — strictly stronger than a binding that only worked
+by accident of which worker a request landed on.

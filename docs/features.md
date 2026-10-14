@@ -447,12 +447,14 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
 - **FR-07.7** Nothing about the caller is cached between calls: a scope
   edited between two calls is read again before the second, the same
   promise `GET /caller` makes (FR-07.4).
-- **FR-07.8** A protocol session is bound to the token that opened it. The
-  same session id presented with a different token is refused rather than
-  served, so one agent's session cannot be continued as another's; one
-  mounted server still serves any number of agents at once, because the
-  caller comes from each call's own token rather than from anything the
-  server was configured with.
+- **FR-07.8** There are no protocol sessions: `/mcp` runs stateless, so no
+  call carries a session id and none is minted. Every single request,
+  `initialize` included, authenticates on its own bearer token (FR-07.6,
+  FR-07.7) — strictly stronger than a session bound to the token that opened
+  it, the property this replaces, since there is no session for one agent's
+  work to be continued as another's at all. One mounted server still serves
+  any number of agents at once, because the caller comes from each call's
+  own token rather than from anything the server was configured with.
 - **FR-07.9** `whoami` is the first tool: read-only, and answering exactly
   what `GET /caller` answers (FR-07.4) — the actor, the owner, the scope's
   projects (the Inbox marked) with their open-task counts, exactly its

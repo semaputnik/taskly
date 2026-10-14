@@ -1,8 +1,9 @@
 """
-`/mcp`: the transport and its authorisation (spec #252). A bot user's token
-identifies the caller through the same path the REST API uses (`app.api.
-deps.get_mcp_caller`), a human session is refused for what it is, and a
-protocol session is bound to the token that opened it.
+`/mcp`: the transport and its authorisation (spec #252, #325). A bot user's
+token identifies the caller through the same path the REST API uses
+(`app.api.deps.get_mcp_caller`), a human session is refused for what it is,
+and every request authenticates on its own token — there is no protocol
+session for one to be confused with another's (#325; FR-07.8).
 """
 
 from fastapi.testclient import TestClient
@@ -106,38 +107,76 @@ def test_tools_call_is_refused_the_same_way_as_initialize(
     assert r.json()["detail"]["code"] == "bot_only"
 
 
-def test_a_session_id_presented_with_a_different_token_is_refused(
+def test_tools_call_with_a_session_id_the_server_never_minted_succeeds(
     client: TestClient, db: Session
 ) -> None:
-    owner = create_user_headers(client, db)
-    project_id = create_project(client, owner)
-    opener = bot_headers(client, owner, project_ids=[project_id], name="Opener")
-    other = bot_headers(client, owner, project_ids=[project_id], name="Other")
-
-    session = start_session(client, opener)
-    r = rpc(
-        client,
-        other,
-        {"jsonrpc": "2.0", "id": 9, "method": "tools/list"},
-        session_id=session.session_id,
-    )
-    assert r.status_code == 401
-
-
-def test_the_same_token_may_continue_its_own_session(
-    client: TestClient, db: Session
-) -> None:
+    """
+    The reproduction of #325: the server runs stateless and mints no session
+    ids of its own, so a follow-up call carrying one from elsewhere — exactly
+    the shape a worker-hop produces behind the release image's four workers —
+    is not a session the server has to recognise at all. It answers the call
+    anyway, which is what "Session not found" stopped being possible.
+    """
     owner = create_user_headers(client, db)
     headers = bot_headers(client, owner)
-    session = start_session(client, headers)
 
     r = rpc(
         client,
         headers,
-        {"jsonrpc": "2.0", "id": 9, "method": "tools/list"},
-        session_id=session.session_id,
+        {
+            "jsonrpc": "2.0",
+            "id": 9,
+            "method": "tools/call",
+            "params": {"name": "whoami", "arguments": {}},
+        },
+        session_id="not-a-session-the-server-ever-minted",
     )
     assert r.status_code == 200, r.text
+    body = r.json()
+    assert "error" not in body, body.get("error")
+
+
+def test_tools_call_with_no_session_id_at_all_succeeds(
+    client: TestClient, db: Session
+) -> None:
+    """
+    The second shape #325 found: a client that never repeats `Mcp-Session-Id`
+    at all, which the stateful path answered `400 Bad Request: Missing
+    session ID`. Stateless mode needs no session id to answer a call.
+    """
+    owner = create_user_headers(client, db)
+    headers = bot_headers(client, owner)
+
+    r = rpc(
+        client,
+        headers,
+        {
+            "jsonrpc": "2.0",
+            "id": 9,
+            "method": "tools/call",
+            "params": {"name": "whoami", "arguments": {}},
+        },
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert "error" not in body, body.get("error")
+
+
+def test_twenty_sequential_tool_calls_all_succeed(
+    client: TestClient, db: Session
+) -> None:
+    """
+    One client, twenty calls in a row — the shape the issue's own probe
+    verified against a four-worker container; here against the in-process
+    test transport, where the equivalent risk is any leftover per-process
+    state between calls, not a worker hop.
+    """
+    owner = create_user_headers(client, db)
+    headers = bot_headers(client, owner)
+
+    for _ in range(20):
+        who = call_tool(client, headers, "whoami")
+        assert who["actor"]["name"] == "Agent"
 
 
 def test_two_bot_users_with_different_scopes_are_served_through_the_same_endpoint(
@@ -222,7 +261,6 @@ def test_the_refusal_envelope_is_a_code_and_one_sentence_iserror_true(
                 "arguments": {"task_id": "00000000-0000-0000-0000-000000000000"},
             },
         },
-        session_id=session.session_id,
     )
     assert response.status_code == 200, response.text
     body = response.json()
