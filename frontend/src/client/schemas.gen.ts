@@ -120,9 +120,118 @@ export const ActivityEntryPublicSchema = {
             title: 'Actor Bot User Name'
         },
         details: {
-            additionalProperties: true,
-            type: 'object',
-            title: 'Details'
+            oneOf: [
+                {
+                    $ref: '#/components/schemas/TaskCreatedDetailsPublic'
+                },
+                {
+                    $ref: '#/components/schemas/TaskChangedDetailsPublic'
+                },
+                {
+                    $ref: '#/components/schemas/TaskMovedDetailsPublic'
+                },
+                {
+                    $ref: '#/components/schemas/TaskAssignedDetailsPublic'
+                },
+                {
+                    $ref: '#/components/schemas/TaskUnassignedDetailsPublic'
+                },
+                {
+                    $ref: '#/components/schemas/TaskCompletedDetailsPublic'
+                },
+                {
+                    $ref: '#/components/schemas/TaskReopenedDetailsPublic'
+                },
+                {
+                    $ref: '#/components/schemas/TaskStatusChangedDetailsPublic'
+                },
+                {
+                    $ref: '#/components/schemas/TaskDeletedSinglePublic'
+                },
+                {
+                    $ref: '#/components/schemas/TaskDeletedBatchPublic'
+                },
+                {
+                    $ref: '#/components/schemas/TaskRestoredSinglePublic'
+                },
+                {
+                    $ref: '#/components/schemas/TaskRestoredBatchPublic'
+                },
+                {
+                    $ref: '#/components/schemas/TasksBulkChangedDetailsPublic'
+                },
+                {
+                    $ref: '#/components/schemas/ProjectCreatedDetailsPublic'
+                },
+                {
+                    $ref: '#/components/schemas/ProjectChangedDetailsPublic'
+                },
+                {
+                    $ref: '#/components/schemas/ProjectDeletedDetailsPublic'
+                },
+                {
+                    $ref: '#/components/schemas/ProjectRestoredDetailsPublic'
+                },
+                {
+                    $ref: '#/components/schemas/CommentAddedDetailsPublic'
+                },
+                {
+                    $ref: '#/components/schemas/CommentEditedDetailsPublic'
+                },
+                {
+                    $ref: '#/components/schemas/CommentDeletedDetailsPublic'
+                },
+                {
+                    $ref: '#/components/schemas/AttachmentAddedDetailsPublic'
+                },
+                {
+                    $ref: '#/components/schemas/AttachmentDeletedDetailsPublic'
+                },
+                {
+                    $ref: '#/components/schemas/TagCreatedDetailsPublic'
+                },
+                {
+                    $ref: '#/components/schemas/TagRenamedDetailsPublic'
+                },
+                {
+                    $ref: '#/components/schemas/TagDeletedDetailsPublic'
+                },
+                {
+                    $ref: '#/components/schemas/TagMergedDetailsPublic'
+                }
+            ],
+            title: 'Details',
+            discriminator: {
+                propertyName: 'kind',
+                mapping: {
+                    attachment_added: '#/components/schemas/AttachmentAddedDetailsPublic',
+                    attachment_deleted: '#/components/schemas/AttachmentDeletedDetailsPublic',
+                    comment_added: '#/components/schemas/CommentAddedDetailsPublic',
+                    comment_deleted: '#/components/schemas/CommentDeletedDetailsPublic',
+                    comment_edited: '#/components/schemas/CommentEditedDetailsPublic',
+                    project_changed: '#/components/schemas/ProjectChangedDetailsPublic',
+                    project_created: '#/components/schemas/ProjectCreatedDetailsPublic',
+                    project_deleted: '#/components/schemas/ProjectDeletedDetailsPublic',
+                    project_restored: '#/components/schemas/ProjectRestoredDetailsPublic',
+                    tag_created: '#/components/schemas/TagCreatedDetailsPublic',
+                    tag_deleted: '#/components/schemas/TagDeletedDetailsPublic',
+                    tag_merged: '#/components/schemas/TagMergedDetailsPublic',
+                    tag_renamed: '#/components/schemas/TagRenamedDetailsPublic',
+                    task_assigned: '#/components/schemas/TaskAssignedDetailsPublic',
+                    task_changed: '#/components/schemas/TaskChangedDetailsPublic',
+                    task_completed: '#/components/schemas/TaskCompletedDetailsPublic',
+                    task_created: '#/components/schemas/TaskCreatedDetailsPublic',
+                    task_deleted: '#/components/schemas/TaskDeletedSinglePublic',
+                    task_deleted_batch: '#/components/schemas/TaskDeletedBatchPublic',
+                    task_moved: '#/components/schemas/TaskMovedDetailsPublic',
+                    task_reopened: '#/components/schemas/TaskReopenedDetailsPublic',
+                    task_restored: '#/components/schemas/TaskRestoredSinglePublic',
+                    task_restored_batch: '#/components/schemas/TaskRestoredBatchPublic',
+                    task_status_changed: '#/components/schemas/TaskStatusChangedDetailsPublic',
+                    task_unassigned: '#/components/schemas/TaskUnassignedDetailsPublic',
+                    tasks_bulk_changed: '#/components/schemas/TasksBulkChangedDetailsPublic'
+                }
+            }
         },
         created_at: {
             anyOf: [
@@ -214,6 +323,113 @@ export const ActorKindSchema = {
     ],
     title: 'ActorKind',
     description: 'The two kinds of caller `GET /caller` ever describes (spec #245).'
+} as const;
+
+export const AssigneeRefSchema = {
+    properties: {
+        type: {
+            type: 'string',
+            enum: [
+                'user',
+                'bot_user'
+            ],
+            title: 'Type'
+        },
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Name'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'type',
+        'id'
+    ],
+    title: 'AssigneeRef',
+    description: 'Who a task is assigned to: the user, or a bot user with its name — a bot\nuser can be renamed or deleted later, the user is always "you". `name` is\n`None` for a user assignee, since there is only ever one user to be and\nnaming it says nothing a reader does not already know; every reader\nalready treats it as optional. (Before this module, a user assignee\'s\n`name` key was omitted outright rather than written as `null` — a wire\ndetail no reader distinguished from `None`, and keeping the distinction\nwould have cost `AssigneeRef` its declared shape in the generated client:\na per-instance key omission cannot be expressed in a schema, only `{}`\ncan, which is what every field that embeds `AssigneeRef` would have\ndegraded to.)'
+} as const;
+
+export const AttachmentAddedDetailsPublicSchema = {
+    properties: {
+        task: {
+            $ref: '#/components/schemas/TaskRef'
+        },
+        filename: {
+            type: 'string',
+            title: 'Filename'
+        },
+        content_type: {
+            type: 'string',
+            title: 'Content Type'
+        },
+        size: {
+            type: 'integer',
+            title: 'Size'
+        },
+        kind: {
+            type: 'string',
+            const: 'attachment_added',
+            title: 'Kind',
+            default: 'attachment_added'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'task',
+        'filename',
+        'content_type',
+        'size'
+    ],
+    title: 'AttachmentAddedDetailsPublic'
+} as const;
+
+export const AttachmentDeletedDetailsPublicSchema = {
+    properties: {
+        task: {
+            $ref: '#/components/schemas/TaskRef'
+        },
+        filename: {
+            type: 'string',
+            title: 'Filename'
+        },
+        content_type: {
+            type: 'string',
+            title: 'Content Type'
+        },
+        size: {
+            type: 'integer',
+            title: 'Size'
+        },
+        kind: {
+            type: 'string',
+            const: 'attachment_deleted',
+            title: 'Kind',
+            default: 'attachment_deleted'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'task',
+        'filename',
+        'content_type',
+        'size'
+    ],
+    title: 'AttachmentDeletedDetailsPublic'
 } as const;
 
 export const AttachmentLocationSchema = {
@@ -425,9 +641,118 @@ export const BotActivityEntryPublicSchema = {
             title: 'Actor Bot User Name'
         },
         details: {
-            additionalProperties: true,
-            type: 'object',
-            title: 'Details'
+            oneOf: [
+                {
+                    $ref: '#/components/schemas/TaskCreatedDetailsPublic'
+                },
+                {
+                    $ref: '#/components/schemas/TaskChangedDetailsPublic'
+                },
+                {
+                    $ref: '#/components/schemas/TaskMovedDetailsPublic'
+                },
+                {
+                    $ref: '#/components/schemas/TaskAssignedDetailsPublic'
+                },
+                {
+                    $ref: '#/components/schemas/TaskUnassignedDetailsPublic'
+                },
+                {
+                    $ref: '#/components/schemas/TaskCompletedDetailsPublic'
+                },
+                {
+                    $ref: '#/components/schemas/TaskReopenedDetailsPublic'
+                },
+                {
+                    $ref: '#/components/schemas/TaskStatusChangedDetailsPublic'
+                },
+                {
+                    $ref: '#/components/schemas/TaskDeletedSinglePublic'
+                },
+                {
+                    $ref: '#/components/schemas/TaskDeletedBatchPublic'
+                },
+                {
+                    $ref: '#/components/schemas/TaskRestoredSinglePublic'
+                },
+                {
+                    $ref: '#/components/schemas/TaskRestoredBatchPublic'
+                },
+                {
+                    $ref: '#/components/schemas/TasksBulkChangedDetailsPublic'
+                },
+                {
+                    $ref: '#/components/schemas/ProjectCreatedDetailsPublic'
+                },
+                {
+                    $ref: '#/components/schemas/ProjectChangedDetailsPublic'
+                },
+                {
+                    $ref: '#/components/schemas/ProjectDeletedDetailsPublic'
+                },
+                {
+                    $ref: '#/components/schemas/ProjectRestoredDetailsPublic'
+                },
+                {
+                    $ref: '#/components/schemas/CommentAddedDetailsPublic'
+                },
+                {
+                    $ref: '#/components/schemas/CommentEditedDetailsPublic'
+                },
+                {
+                    $ref: '#/components/schemas/CommentDeletedDetailsPublic'
+                },
+                {
+                    $ref: '#/components/schemas/AttachmentAddedDetailsPublic'
+                },
+                {
+                    $ref: '#/components/schemas/AttachmentDeletedDetailsPublic'
+                },
+                {
+                    $ref: '#/components/schemas/TagCreatedDetailsPublic'
+                },
+                {
+                    $ref: '#/components/schemas/TagRenamedDetailsPublic'
+                },
+                {
+                    $ref: '#/components/schemas/TagDeletedDetailsPublic'
+                },
+                {
+                    $ref: '#/components/schemas/TagMergedDetailsPublic'
+                }
+            ],
+            title: 'Details',
+            discriminator: {
+                propertyName: 'kind',
+                mapping: {
+                    attachment_added: '#/components/schemas/AttachmentAddedDetailsPublic',
+                    attachment_deleted: '#/components/schemas/AttachmentDeletedDetailsPublic',
+                    comment_added: '#/components/schemas/CommentAddedDetailsPublic',
+                    comment_deleted: '#/components/schemas/CommentDeletedDetailsPublic',
+                    comment_edited: '#/components/schemas/CommentEditedDetailsPublic',
+                    project_changed: '#/components/schemas/ProjectChangedDetailsPublic',
+                    project_created: '#/components/schemas/ProjectCreatedDetailsPublic',
+                    project_deleted: '#/components/schemas/ProjectDeletedDetailsPublic',
+                    project_restored: '#/components/schemas/ProjectRestoredDetailsPublic',
+                    tag_created: '#/components/schemas/TagCreatedDetailsPublic',
+                    tag_deleted: '#/components/schemas/TagDeletedDetailsPublic',
+                    tag_merged: '#/components/schemas/TagMergedDetailsPublic',
+                    tag_renamed: '#/components/schemas/TagRenamedDetailsPublic',
+                    task_assigned: '#/components/schemas/TaskAssignedDetailsPublic',
+                    task_changed: '#/components/schemas/TaskChangedDetailsPublic',
+                    task_completed: '#/components/schemas/TaskCompletedDetailsPublic',
+                    task_created: '#/components/schemas/TaskCreatedDetailsPublic',
+                    task_deleted: '#/components/schemas/TaskDeletedSinglePublic',
+                    task_deleted_batch: '#/components/schemas/TaskDeletedBatchPublic',
+                    task_moved: '#/components/schemas/TaskMovedDetailsPublic',
+                    task_reopened: '#/components/schemas/TaskReopenedDetailsPublic',
+                    task_restored: '#/components/schemas/TaskRestoredSinglePublic',
+                    task_restored_batch: '#/components/schemas/TaskRestoredBatchPublic',
+                    task_status_changed: '#/components/schemas/TaskStatusChangedDetailsPublic',
+                    task_unassigned: '#/components/schemas/TaskUnassignedDetailsPublic',
+                    tasks_bulk_changed: '#/components/schemas/TasksBulkChangedDetailsPublic'
+                }
+            }
         },
         created_at: {
             anyOf: [
@@ -944,6 +1269,31 @@ export const CallerPublicSchema = {
     description: 'What `GET /caller` answers for whoever calls it, human or bot user: who is\ncalling, whose data the call reaches, what it may do there, and today\'s\ndate on this installation (spec #245). Read-only, so nothing here is ever\nlogged (FR-10.1).'
 } as const;
 
+export const CommentAddedDetailsPublicSchema = {
+    properties: {
+        task: {
+            $ref: '#/components/schemas/TaskRef'
+        },
+        body: {
+            type: 'string',
+            title: 'Body'
+        },
+        kind: {
+            type: 'string',
+            const: 'comment_added',
+            title: 'Kind',
+            default: 'comment_added'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'task',
+        'body'
+    ],
+    title: 'CommentAddedDetailsPublic'
+} as const;
+
 export const CommentCreateSchema = {
     properties: {
         body: {
@@ -958,6 +1308,59 @@ export const CommentCreateSchema = {
         'body'
     ],
     title: 'CommentCreate'
+} as const;
+
+export const CommentDeletedDetailsPublicSchema = {
+    properties: {
+        task: {
+            $ref: '#/components/schemas/TaskRef'
+        },
+        body: {
+            type: 'string',
+            title: 'Body'
+        },
+        kind: {
+            type: 'string',
+            const: 'comment_deleted',
+            title: 'Kind',
+            default: 'comment_deleted'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'task',
+        'body'
+    ],
+    title: 'CommentDeletedDetailsPublic'
+} as const;
+
+export const CommentEditedDetailsPublicSchema = {
+    properties: {
+        task: {
+            $ref: '#/components/schemas/TaskRef'
+        },
+        changes: {
+            additionalProperties: {
+                $ref: '#/components/schemas/FieldChange'
+            },
+            type: 'object',
+            title: 'Changes'
+        },
+        kind: {
+            type: 'string',
+            const: 'comment_edited',
+            title: 'Kind',
+            default: 'comment_edited'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'task',
+        'changes'
+    ],
+    title: 'CommentEditedDetailsPublic'
 } as const;
 
 export const CommentPublicSchema = {
@@ -1081,6 +1484,21 @@ export const DueDateScopeSchema = {
     ],
     title: 'DueDateScope',
     description: 'What moving the due date of an open recurring occurrence means for the rest\nof its series.\n\nThere is no default: a client that changes the date without saying which\none is refused, so a series is never rescheduled by omission (FR-01.17).'
+} as const;
+
+export const FieldChangeSchema = {
+    properties: {
+        from: {
+            title: 'From'
+        },
+        to: {
+            title: 'To'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    title: 'FieldChange',
+    description: 'One field\'s value before and after, as a `task_changed`/`project_changed`/\n`tag_renamed`/`comment_edited` entry\'s own `changes` map holds it.'
 } as const;
 
 export const HTTPValidationErrorSchema = {
@@ -1444,6 +1862,35 @@ export const PrivateUserCreateSchema = {
     title: 'PrivateUserCreate'
 } as const;
 
+export const ProjectChangedDetailsPublicSchema = {
+    properties: {
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        changes: {
+            additionalProperties: {
+                $ref: '#/components/schemas/FieldChange'
+            },
+            type: 'object',
+            title: 'Changes'
+        },
+        kind: {
+            type: 'string',
+            const: 'project_changed',
+            title: 'Kind',
+            default: 'project_changed'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'name',
+        'changes'
+    ],
+    title: 'ProjectChangedDetailsPublic'
+} as const;
+
 export const ProjectCreateSchema = {
     properties: {
         name: {
@@ -1469,6 +1916,64 @@ export const ProjectCreateSchema = {
         'name'
     ],
     title: 'ProjectCreate'
+} as const;
+
+export const ProjectCreatedDetailsPublicSchema = {
+    properties: {
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        description: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Description'
+        },
+        kind: {
+            type: 'string',
+            const: 'project_created',
+            title: 'Kind',
+            default: 'project_created'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'name'
+    ],
+    title: 'ProjectCreatedDetailsPublic'
+} as const;
+
+export const ProjectDeletedDetailsPublicSchema = {
+    properties: {
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        task_count: {
+            type: 'integer',
+            title: 'Task Count'
+        },
+        kind: {
+            type: 'string',
+            const: 'project_deleted',
+            title: 'Kind',
+            default: 'project_deleted'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'name',
+        'task_count'
+    ],
+    title: 'ProjectDeletedDetailsPublic'
 } as const;
 
 export const ProjectPublicSchema = {
@@ -1554,6 +2059,60 @@ export const ProjectPublicSchema = {
         'is_archived'
     ],
     title: 'ProjectPublic'
+} as const;
+
+export const ProjectRefSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Name'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'id'
+    ],
+    title: 'ProjectRef',
+    description: 'A project as an entry names it: its id and name at the time of the change.'
+} as const;
+
+export const ProjectRestoredDetailsPublicSchema = {
+    properties: {
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        task_count: {
+            type: 'integer',
+            title: 'Task Count'
+        },
+        kind: {
+            type: 'string',
+            const: 'project_restored',
+            title: 'Kind',
+            default: 'project_restored'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'name',
+        'task_count'
+    ],
+    title: 'ProjectRestoredDetailsPublic'
 } as const;
 
 export const ProjectUpdateSchema = {
@@ -1688,6 +2247,31 @@ export const RecurrenceFrequencySchema = {
     title: 'RecurrenceFrequency'
 } as const;
 
+export const RecurrenceRefSchema = {
+    properties: {
+        frequency: {
+            $ref: '#/components/schemas/RecurrenceFrequency'
+        },
+        interval_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Interval Days'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'frequency'
+    ],
+    title: 'RecurrenceRef'
+} as const;
+
 export const RegistrationStartSchema = {
     properties: {
         email: {
@@ -1737,6 +2321,53 @@ export const TagCreateSchema = {
         'name'
     ],
     title: 'TagCreate'
+} as const;
+
+export const TagCreatedDetailsPublicSchema = {
+    properties: {
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        kind: {
+            type: 'string',
+            const: 'tag_created',
+            title: 'Kind',
+            default: 'tag_created'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'name'
+    ],
+    title: 'TagCreatedDetailsPublic'
+} as const;
+
+export const TagDeletedDetailsPublicSchema = {
+    properties: {
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        task_count: {
+            type: 'integer',
+            title: 'Task Count'
+        },
+        kind: {
+            type: 'string',
+            const: 'tag_deleted',
+            title: 'Kind',
+            default: 'tag_deleted'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'name',
+        'task_count'
+    ],
+    title: 'TagDeletedDetailsPublic'
 } as const;
 
 export const TagDuplicateDismissSchema = {
@@ -1834,6 +2465,40 @@ export const TagMergePreviewSchema = {
     description: 'What a merge would move: the tasks carrying any of the sources, each\ncounted once, live and archived apart (FR-01.27).'
 } as const;
 
+export const TagMergedDetailsPublicSchema = {
+    properties: {
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        sources: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Sources'
+        },
+        task_count: {
+            type: 'integer',
+            title: 'Task Count'
+        },
+        kind: {
+            type: 'string',
+            const: 'tag_merged',
+            title: 'Kind',
+            default: 'tag_merged'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'name',
+        'sources',
+        'task_count'
+    ],
+    title: 'TagMergedDetailsPublic'
+} as const;
+
 export const TagPublicSchema = {
     properties: {
         name: {
@@ -1887,6 +2552,35 @@ export const TagPublicSchema = {
     title: 'TagPublic'
 } as const;
 
+export const TagRenamedDetailsPublicSchema = {
+    properties: {
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        changes: {
+            additionalProperties: {
+                $ref: '#/components/schemas/FieldChange'
+            },
+            type: 'object',
+            title: 'Changes'
+        },
+        kind: {
+            type: 'string',
+            const: 'tag_renamed',
+            title: 'Kind',
+            default: 'tag_renamed'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'name',
+        'changes'
+    ],
+    title: 'TagRenamedDetailsPublic'
+} as const;
+
 export const TagUpdateSchema = {
     properties: {
         name: {
@@ -1923,6 +2617,71 @@ export const TagsPublicSchema = {
         'count'
     ],
     title: 'TagsPublic'
+} as const;
+
+export const TaskAssignedDetailsPublicSchema = {
+    properties: {
+        title: {
+            type: 'string',
+            title: 'Title'
+        },
+        assignee_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Assignee Id'
+        },
+        assignee: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/AssigneeRef'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        previous_assignee_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Previous Assignee Id'
+        },
+        previous_assignee: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/AssigneeRef'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        kind: {
+            type: 'string',
+            const: 'task_assigned',
+            title: 'Kind',
+            default: 'task_assigned'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'title'
+    ],
+    title: 'TaskAssignedDetailsPublic'
 } as const;
 
 export const TaskBulkDeleteSchema = {
@@ -2058,6 +2817,56 @@ export const TaskBulkUpdateSchema = {
     description: 'One set of changes for many tasks: the single-task update, plus the tasks\nit applies to.\n\n`add_tags` and `remove_tags` rather than `tags`: a batch adds a label to a\nselection or takes one off it, and replacing every task\'s tags wholesale\nwould destroy what each of them already carried.'
 } as const;
 
+export const TaskChangedDetailsPublicSchema = {
+    properties: {
+        title: {
+            type: 'string',
+            title: 'Title'
+        },
+        changes: {
+            additionalProperties: {
+                $ref: '#/components/schemas/FieldChange'
+            },
+            type: 'object',
+            title: 'Changes'
+        },
+        kind: {
+            type: 'string',
+            const: 'task_changed',
+            title: 'Kind',
+            default: 'task_changed'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'title',
+        'changes'
+    ],
+    title: 'TaskChangedDetailsPublic'
+} as const;
+
+export const TaskCompletedDetailsPublicSchema = {
+    properties: {
+        title: {
+            type: 'string',
+            title: 'Title'
+        },
+        kind: {
+            type: 'string',
+            const: 'task_completed',
+            title: 'Kind',
+            default: 'task_completed'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'title'
+    ],
+    title: 'TaskCompletedDetailsPublic'
+} as const;
+
 export const TaskCreateSchema = {
     properties: {
         title: {
@@ -2167,6 +2976,100 @@ export const TaskCreateSchema = {
     title: 'TaskCreate'
 } as const;
 
+export const TaskCreatedDetailsPublicSchema = {
+    properties: {
+        title: {
+            type: 'string',
+            title: 'Title'
+        },
+        task: {
+            $ref: '#/components/schemas/TaskSnapshot'
+        },
+        kind: {
+            type: 'string',
+            const: 'task_created',
+            title: 'Kind',
+            default: 'task_created'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'title',
+        'task'
+    ],
+    title: 'TaskCreatedDetailsPublic'
+} as const;
+
+export const TaskDeletedBatchPublicSchema = {
+    properties: {
+        task_count: {
+            type: 'integer',
+            title: 'Task Count'
+        },
+        kind: {
+            type: 'string',
+            const: 'task_deleted_batch',
+            title: 'Kind',
+            default: 'task_deleted_batch'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'task_count'
+    ],
+    title: 'TaskDeletedBatchPublic'
+} as const;
+
+export const TaskDeletedSinglePublicSchema = {
+    properties: {
+        title: {
+            type: 'string',
+            title: 'Title'
+        },
+        project: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/ProjectRef'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        parent_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Parent Id'
+        },
+        subtask_count: {
+            type: 'integer',
+            title: 'Subtask Count',
+            default: 0
+        },
+        kind: {
+            type: 'string',
+            const: 'task_deleted',
+            title: 'Kind',
+            default: 'task_deleted'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'title'
+    ],
+    title: 'TaskDeletedSinglePublic'
+} as const;
+
 export const TaskHandoverSchema = {
     properties: {
         bot_user: {
@@ -2185,6 +3088,47 @@ export const TaskHandoverSchema = {
     ],
     title: 'TaskHandover',
     description: 'How a task came to be in Review when a bot user put it there: which bot\nuser handed its work over, and when (ADR-0008). Read off the activity\nlog, so it names a deleted bot user as it was called.'
+} as const;
+
+export const TaskMovedDetailsPublicSchema = {
+    properties: {
+        title: {
+            type: 'string',
+            title: 'Title'
+        },
+        from_project: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/ProjectRef'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        to_project: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/ProjectRef'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        kind: {
+            type: 'string',
+            const: 'task_moved',
+            title: 'Kind',
+            default: 'task_moved'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'title'
+    ],
+    title: 'TaskMovedDetailsPublic'
 } as const;
 
 export const TaskPrioritySchema = {
@@ -2369,6 +3313,225 @@ export const TaskPublicSchema = {
     title: 'TaskPublic'
 } as const;
 
+export const TaskRefSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        title: {
+            type: 'string',
+            title: 'Title'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'id',
+        'title'
+    ],
+    title: 'TaskRef',
+    description: 'What a comment or attachment entry names its task by.'
+} as const;
+
+export const TaskReopenedDetailsPublicSchema = {
+    properties: {
+        title: {
+            type: 'string',
+            title: 'Title'
+        },
+        to: {
+            $ref: '#/components/schemas/TaskStatus'
+        },
+        kind: {
+            type: 'string',
+            const: 'task_reopened',
+            title: 'Kind',
+            default: 'task_reopened'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'title',
+        'to'
+    ],
+    title: 'TaskReopenedDetailsPublic'
+} as const;
+
+export const TaskRestoredBatchPublicSchema = {
+    properties: {
+        task_count: {
+            type: 'integer',
+            title: 'Task Count'
+        },
+        kind: {
+            type: 'string',
+            const: 'task_restored_batch',
+            title: 'Kind',
+            default: 'task_restored_batch'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'task_count'
+    ],
+    title: 'TaskRestoredBatchPublic'
+} as const;
+
+export const TaskRestoredSinglePublicSchema = {
+    properties: {
+        title: {
+            type: 'string',
+            title: 'Title'
+        },
+        project: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/ProjectRef'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        parent_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Parent Id'
+        },
+        subtask_count: {
+            type: 'integer',
+            title: 'Subtask Count',
+            default: 0
+        },
+        kind: {
+            type: 'string',
+            const: 'task_restored',
+            title: 'Kind',
+            default: 'task_restored'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'title'
+    ],
+    title: 'TaskRestoredSinglePublic'
+} as const;
+
+export const TaskSnapshotSchema = {
+    properties: {
+        title: {
+            type: 'string',
+            title: 'Title'
+        },
+        description: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Description'
+        },
+        due_date: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Due Date'
+        },
+        priority: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/TaskPriority'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        status: {
+            $ref: '#/components/schemas/TaskStatus'
+        },
+        project: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/ProjectRef'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        assignee_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Assignee Id'
+        },
+        assignee: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/AssigneeRef'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        tags: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Tags',
+            default: []
+        },
+        recurrence: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/RecurrenceRef'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'title',
+        'status'
+    ],
+    title: 'TaskSnapshot',
+    description: 'A task in full, as `task_created` records it (`app.activity._snapshot`).'
+} as const;
+
 export const TaskSortSchema = {
     type: 'string',
     enum: [
@@ -2392,6 +3555,78 @@ export const TaskStatusSchema = {
     ],
     title: 'TaskStatus',
     description: 'Where a task stands (FR-01.4). Six fixed values rather than user-defined\nones (ADR-0004, ADR-0008): every rule in the product only needs to know\nwhether a task is open or done, and the five open values tell apart\nwhether the work is decided on and who holds the next move. Declared in\nthe order the interface lists them.\n\nA new task starts in `backlog`. A bot user hands finished work over by\nmoving it to `review` and assigning it to the owner; entering review\ndoes not change the assignee on its own (FR-01.4a).'
+} as const;
+
+export const TaskStatusChangedDetailsPublicSchema = {
+    properties: {
+        title: {
+            type: 'string',
+            title: 'Title'
+        },
+        from: {
+            $ref: '#/components/schemas/TaskStatus'
+        },
+        to: {
+            $ref: '#/components/schemas/TaskStatus'
+        },
+        kind: {
+            type: 'string',
+            const: 'task_status_changed',
+            title: 'Kind',
+            default: 'task_status_changed'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'title',
+        'from',
+        'to'
+    ],
+    title: 'TaskStatusChangedDetailsPublic'
+} as const;
+
+export const TaskUnassignedDetailsPublicSchema = {
+    properties: {
+        title: {
+            type: 'string',
+            title: 'Title'
+        },
+        previous_assignee_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Previous Assignee Id'
+        },
+        previous_assignee: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/AssigneeRef'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        kind: {
+            type: 'string',
+            const: 'task_unassigned',
+            title: 'Kind',
+            default: 'task_unassigned'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'title'
+    ],
+    title: 'TaskUnassignedDetailsPublic'
 } as const;
 
 export const TaskUpdateSchema = {
@@ -2525,6 +3760,41 @@ export const TaskUpdateSchema = {
     },
     type: 'object',
     title: 'TaskUpdate'
+} as const;
+
+export const TasksBulkChangedDetailsPublicSchema = {
+    properties: {
+        task_count: {
+            type: 'integer',
+            title: 'Task Count'
+        },
+        task_ids: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Task Ids'
+        },
+        changes: {
+            additionalProperties: true,
+            type: 'object',
+            title: 'Changes'
+        },
+        kind: {
+            type: 'string',
+            const: 'tasks_bulk_changed',
+            title: 'Kind',
+            default: 'tasks_bulk_changed'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'task_count',
+        'task_ids',
+        'changes'
+    ],
+    title: 'TasksBulkChangedDetailsPublic'
 } as const;
 
 export const TasksPublicSchema = {

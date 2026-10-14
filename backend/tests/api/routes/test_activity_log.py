@@ -86,7 +86,7 @@ def test_changing_a_task_is_logged_with_what_changed(
     # is logged first, as its own entry (FR-10.3).
     created, entry = _log_after(client, headers, seen)
     assert created["action"] == "tag_created"
-    assert created["details"] == {"name": "plumbing"}
+    assert created["details"] == {"name": "plumbing", "kind": "tag_created"}
     assert entry["action"] == "task_changed"
     assert entry["details"]["title"] == "Fix the kitchen tap"
     assert entry["details"]["changes"] == {
@@ -219,7 +219,11 @@ def test_creating_a_project_is_logged(client: TestClient, db: Session) -> None:
     assert entry["entity_type"] == "project"
     assert entry["entity_id"] == project["id"]
     assert entry["actor_id"] == my_id(client, headers)
-    assert entry["details"] == {"name": "Home", "description": "Around the flat"}
+    assert entry["details"] == {
+        "name": "Home",
+        "description": "Around the flat",
+        "kind": "project_created",
+    }
     assert entry["entity_exists"] is True
     assert entry["entity_project_id"] == project["id"]
 
@@ -266,7 +270,11 @@ def test_deleting_a_project_is_one_entry_for_the_whole_deletion(
     assert entry["action"] == "project_deleted"
     assert entry["entity_id"] == project["id"]
     assert entry["deletion_id"] is not None
-    assert entry["details"] == {"name": "Someday", "task_count": 3}
+    assert entry["details"] == {
+        "name": "Someday",
+        "task_count": 3,
+        "kind": "project_deleted",
+    }
     assert entry["entity_exists"] is False
 
 
@@ -294,14 +302,23 @@ def test_adding_editing_and_deleting_a_comment_are_logged(
     assert added["action"] == "comment_added"
     assert added["entity_type"] == "comment"
     assert added["entity_id"] == comment["id"]
-    assert added["details"] == {"task": task_ref, "body": "Drips"}
+    assert added["details"] == {
+        "task": task_ref,
+        "body": "Drips",
+        "kind": "comment_added",
+    }
     assert edited["action"] == "comment_edited"
     assert edited["details"] == {
         "task": task_ref,
         "changes": {"body": {"from": "Drips", "to": "Pours"}},
+        "kind": "comment_edited",
     }
     assert deleted["action"] == "comment_deleted"
-    assert deleted["details"] == {"task": task_ref, "body": "Pours"}
+    assert deleted["details"] == {
+        "task": task_ref,
+        "body": "Pours",
+        "kind": "comment_deleted",
+    }
     # The comment is gone, so none of its entries link anywhere.
     assert all(e["entity_exists"] is False for e in (added, edited, deleted))
 
@@ -352,9 +369,9 @@ def test_adding_and_deleting_an_attachment_are_logged(
     assert added["action"] == "attachment_added"
     assert added["entity_type"] == "attachment"
     assert added["entity_id"] == attachment["id"]
-    assert added["details"] == details
+    assert added["details"] == {**details, "kind": "attachment_added"}
     assert deleted["action"] == "attachment_deleted"
-    assert deleted["details"] == details
+    assert deleted["details"] == {**details, "kind": "attachment_deleted"}
 
 
 def test_a_refused_upload_writes_nothing(

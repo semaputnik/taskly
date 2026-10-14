@@ -192,6 +192,14 @@ class ActivityEntry(SQLModel, table=True):
     )
 
 
+# Imported here rather than at the top of the file: `app.activity_details`
+# imports `ActivityAction`/`ActivityEntityType`/`ACTIVITY_TASK_REF` back from
+# this module, so this has to wait until all three already exist on it
+# (#299's own spike — see `app.activity_details`'s own module docstring for
+# what this union answers and how).
+from app.activity_details import ActivityDetailsPublic  # noqa: E402
+
+
 class BotActivityEntryPublic(SQLModel):
     """
     What a bot user's own read of the activity log carries (#298, ADR-0011):
@@ -212,7 +220,10 @@ class BotActivityEntryPublic(SQLModel):
     actor_id: uuid.UUID | None = None
     actor_bot_user_id: uuid.UUID | None = None
     actor_bot_user_name: str | None = None
-    details: dict[str, Any]
+    # A discriminated union keyed on `kind` (`app.activity_details.to_public`
+    # injects it; never stored), not the plain `dict[str, Any]` the database
+    # column (`ActivityEntry.details`, above) holds — #299's spike.
+    details: ActivityDetailsPublic
     created_at: datetime | None = None
     # Whether the entity can still be opened, and the project to open it in:
     # a deleted task has nowhere to link to.

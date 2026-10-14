@@ -278,6 +278,7 @@ def test_activity_entries_keep_the_name_a_tag_had_then(
     assert renamed["details"] == {
         "name": "housework",
         "changes": {"name": {"from": "chores", "to": "housework"}},
+        "kind": "tag_renamed",
     }
 
 
@@ -330,7 +331,7 @@ def test_a_tag_deletion_is_logged_but_cannot_be_restored(
     entry = _log(client, owner)[-1]
     assert entry["action"] == "tag_deleted"
     assert entry["entity_id"] == tag["id"]
-    assert entry["details"] == {"name": "home", "task_count": 2}
+    assert entry["details"] == {"name": "home", "task_count": 2, "kind": "tag_deleted"}
     assert entry["restorable"] is False
     r = client.post(f"{API}/activity-log/{entry['id']}/restore", headers=owner)
     assert r.status_code == 400

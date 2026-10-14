@@ -526,7 +526,11 @@ def test_a_project_restore_is_logged_once_for_the_project(
 
     restored = _latest_entry(client, headers, "project_restored", project["id"])
     assert restored["deletion_id"] == entry["deletion_id"]
-    assert restored["details"] == {"name": "Garden", "task_count": 2}
+    assert restored["details"] == {
+        "name": "Garden",
+        "task_count": 2,
+        "kind": "project_restored",
+    }
 
     deleted = _latest_entry(client, headers, "project_deleted", project["id"])
     assert deleted["details"] == entry["details"]
