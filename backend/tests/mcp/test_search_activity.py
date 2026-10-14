@@ -20,7 +20,6 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 from mcp.server.mcpserver.exceptions import ToolError
-from sqlalchemy import event
 from sqlmodel import Session
 
 from app.core.config import settings
@@ -35,6 +34,7 @@ from tests.utils.accounts import (
     delete_task,
     token_headers,
 )
+from tests.utils.counting import counting
 from tests.utils.mcp import bot_headers
 from tests.utils.mcp_body import caller_for
 
@@ -723,22 +723,6 @@ def test_task_restored_after_delete(client: TestClient, db: Session) -> None:
 # Statements issued: this tool never asks for the reader's own `locate` (#322)
 
 
-class _counting:
-    def __init__(self, db: Session) -> None:
-        self.engine = db.get_bind()
-        self.statements: list[str] = []
-
-    def _record(self, *args: Any) -> None:
-        self.statements.append(str(args[2]))
-
-    def __enter__(self) -> list[str]:
-        event.listen(self.engine, "before_cursor_execute", self._record)
-        return self.statements
-
-    def __exit__(self, *_: object) -> None:
-        event.remove(self.engine, "before_cursor_execute", self._record)
-
-
 def test_no_statement_is_issued_for_a_discarded_location(
     client: TestClient, db: Session
 ) -> None:
@@ -769,7 +753,7 @@ def test_no_statement_is_issued_for_a_discarded_location(
     )
     assert r.status_code == 200, r.text
 
-    with _counting(db) as statements:
+    with counting(db) as statements:
         search_activity_body(db, caller)
 
     assert len(statements) == 2

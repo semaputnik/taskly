@@ -68,6 +68,7 @@ from app.models import (
 from app.refusals import Refusal
 
 TASK_NOT_FOUND = "Task not found"
+PROJECT_NOT_FOUND = "Project not found"
 
 
 class TaskAction(StrEnum):
@@ -249,7 +250,7 @@ def get_project(
         # A deleted project is invisible until it is restored (FR-05.8).
         or project.deletion_id is not None
     ):
-        raise refusals.plain(404, "Project not found")
+        raise refusals.plain(404, PROJECT_NOT_FOUND)
     if action is not None:
         _authorize(caller, action, project)
     else:
@@ -473,7 +474,7 @@ def narrowing_project(session: Session, caller: Caller, project_id: uuid.UUID) -
         or project.owner_id != caller.owner_id
         or not bot_reaches_project(caller, project)
     ):
-        raise refusals.plain(404, "Project not found")
+        raise refusals.plain(404, PROJECT_NOT_FOUND)
 
 
 def activity_log_scope(caller: Caller) -> Any | None:
