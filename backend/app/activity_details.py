@@ -288,6 +288,18 @@ class TaskReopenedDetails(_Base):
 
 
 class TaskStatusChangedDetails(_Base):
+    """
+    `from_`/`to` are required, not optional like `TaskReopenedDetails.to` —
+    deliberately, not an oversight a looser field would quietly fix.
+    `task_status_changed` postdates the statuses migration (it did not exist
+    before it: there is no entry of this action without both fields), so
+    there is no historical shape to tolerate here the way `TaskReopenedDetails`
+    tolerates rows from before `task_reopened` recorded a destination at all.
+    The module's tolerance policy is "exactly where history requires it", not
+    "everywhere" — making these optional would let a genuinely malformed row
+    through silently instead.
+    """
+
     title: str
     from_: TaskStatus = Field(alias="from")
     to: TaskStatus

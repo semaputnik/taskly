@@ -74,6 +74,17 @@ from app.models import (
 # records no status at all, and comparing that missing key to a string yields
 # NULL rather than false. Under plain `=`, negating this to find the changes
 # would drop every such batch instead of keeping it.
+#
+# This is one of three places that decide the same question (#321): this is
+# what the `kind=completed` filter narrows by; `app.mcp.tools.
+# search_activity._describe_batch_changes` decides whether the MCP tool
+# calls the same entry "completed"; `frontend/src/components/Activity/
+# entryWords.ts`'s own `describeBatch` decides it a third time for the web
+# UI. A shared constant cannot cross the Python/TypeScript line here (a
+# predicate is a function, not a schema the generated client carries) — see
+# `tests/app/test_batch_completion_rule.py` for the test that stands guard
+# over the two Python sites instead, and `entryWords.test.ts`'s own
+# `tasks_bulk_changed` cases for the third.
 _BULK_COMPLETION = and_(
     col(ActivityEntry.action) == ActivityAction.TASKS_BULK_CHANGED,
     col(ActivityEntry.details)[DETAILS_CHANGES][

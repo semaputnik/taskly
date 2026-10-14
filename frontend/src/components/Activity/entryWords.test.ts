@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 
 import type { ActivityAction, ActivityEntryPublic } from "@/client"
+import { STATUSES } from "@/components/Tasks/statuses"
 import { type EntryWords, entryWords } from "./entryWords"
 
 /**
@@ -440,6 +441,28 @@ describe("entryWords", () => {
       expect(actions.has(action)).toBe(true)
     }
   })
+
+  test.each([...STATUSES])(
+    // Whether a batch counts as a completion is decided three times (#321):
+    // here (`describeBatch`, inside `entryWords`), in
+    // `app.activity_log._BULK_COMPLETION` (the log's own `kind=completed`
+    // filter) and in `app.mcp.tools.search_activity._describe_batch_changes`
+    // (the MCP tool's own narration) — both Python, both guarded together by
+    // `backend/tests/app/test_batch_completion_rule.py`. No Python test can
+    // reach this file, so this is what stands guard here: every status
+    // Taskly has, run through the real narration, must call it "completed"
+    // for exactly one of them.
+    "tasks_bulk_changed, status=%s: narrated as completed only when done",
+    (status) => {
+      const result = entryWords(
+        entry("tasks_bulk_changed", { task_count: 2, changes: { status } }),
+        "names-its-subject",
+      )
+      const saysCompleted = (result?.verb.includes("completed") ??
+        false) as boolean
+      expect(saysCompleted).toBe(status === "done")
+    },
+  )
 
   test("a row the backend could not decode says so plainly, in both voices", () => {
     // `app.activity_details.to_public`'s own fallback for a row whose shape

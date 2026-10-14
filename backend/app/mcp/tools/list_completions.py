@@ -66,7 +66,7 @@ from app.activity_log import ActivityNarrowing, read_activity
 from app.api import access
 from app.api.deps import Caller
 from app.mcp.conventions import (
-    actor_label,
+    actor_label_of,
     list_result,
     narrow_hint,
     open_caller,
@@ -93,6 +93,16 @@ from app.refusals import Refusal
 
 @dataclass(frozen=True)
 class _Actor:
+    """
+    Who recorded a completion, read down from an entry this tool has
+    already expanded away from (a batch's one entry becomes many
+    `_Completion`s, each needing its own copy). Structurally
+    `app.mcp.conventions.HasActor`: `actor_label_of` reads this the same
+    way it reads an `ActivityEntry` row directly (`search_activity`'s own
+    caller), which is the one thing the two tools' former `_actor_label`
+    copies actually shared (#321).
+    """
+
     actor_id: uuid.UUID | None
     actor_bot_user_id: uuid.UUID | None
 
@@ -470,21 +480,11 @@ def _row(enriched: _Enriched, bots: dict[uuid.UUID, BotUserRef]) -> dict[str, An
         else None,
         "closed": enriched.completion.closed_at.isoformat(),
         "days_to_close": enriched.days_to_close,
-        "closed_by": _actor_label(enriched.completion.actor, bots),
+        "closed_by": actor_label_of(enriched.completion.actor, bots),
     }
     if enriched.deleted:
         row["deleted"] = True
     return row
-
-
-def _actor_label(actor: _Actor, bots: dict[uuid.UUID, BotUserRef]) -> str:
-    """Who closed it: `actor_label`'s own convention, once this completion's actor is read down to a bot or the owner."""
-    if actor.actor_id is not None:
-        return actor_label(None)
-    assert actor.actor_bot_user_id is not None
-    bot = bots.get(actor.actor_bot_user_id)
-    assert bot is not None, "a bot user is kept, not removed, once it acted (FR-08.19)"
-    return actor_label(bot)
 
 
 def _summary(
@@ -503,7 +503,7 @@ def _summary(
     for e in enriched:
         project_key = e.project if e.project is not None else "(deleted)"
         by_project[project_key] = by_project.get(project_key, 0) + 1
-        actor_key = _actor_label(e.completion.actor, bots)
+        actor_key = actor_label_of(e.completion.actor, bots)
         by_actor[actor_key] = by_actor.get(actor_key, 0) + 1
         if e.days_to_close is not None:
             days.append(e.days_to_close)
