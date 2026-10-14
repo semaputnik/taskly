@@ -795,8 +795,9 @@ def decode_public(action: str, details: dict[str, Any]) -> ActivityDetailsPublic
 # this module already depends on `app.models.activity` one way, for
 # `ActivityAction`/`ActivityEntityType`, and keeping the response model here
 # too means that stays the only edge rather than growing a second, opposite
-# one back into it. `app.models` re-exports both, so every existing
-# `from app.models import ActivityEntryPublic`-style import is unaffected.
+# one back into it. `app.models` deliberately does **not** re-export them:
+# that import would be the second edge, and the cycle is exactly what moving
+# them here removed. Import them from this module.
 #
 # One model for both callers (#314, settling #298's spike): a bot user's
 # response and a human's are the same shape, and `restorable`/`deletion_id`
