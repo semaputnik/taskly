@@ -67,6 +67,7 @@ from app.models import (
     BotUserRef,
     TaskStatus,
 )
+from app.refusals import Refusal
 
 # How a status reads in a sentence, the backend's own copy of the web UI's
 # `STATUS_LABELS` (`frontend/src/components/Tasks/statuses.tsx`) — this tool
@@ -218,7 +219,7 @@ def search_activity_body(
                 limit=limit,
             ),
         )
-    except HTTPException as exc:
+    except (HTTPException, Refusal) as exc:
         raise refusal(exc) from exc
 
     rows = _rows(session, page.entries)

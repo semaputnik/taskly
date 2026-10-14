@@ -73,7 +73,7 @@ def delete_task_body(
         # subtasks has the task to name them from; the access decision
         # itself is still the operation's a moment later.
         task = access.get_task(session, caller, resolved_id, TaskAction.DELETE).task
-    except HTTPException as exc:
+    except (HTTPException, Refusal) as exc:
         raise refusal(exc) from exc
 
     try:

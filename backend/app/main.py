@@ -139,23 +139,28 @@ async def passkey_refused(_request: Request, error: Exception) -> Response:
 @app.exception_handler(refusals.Refusal)
 async def refusal_refused(_request: Request, error: Exception) -> Response:
     """
-    A deliberate refusal an operation (`app.tasks`, `app.comments`) raises,
-    mapped to the HTTP body routes on its path used to assemble inline, byte
-    for byte (#275, #279, #282) — the same shape `passkey_refused` above
-    already gives `app.passkeys.PasskeyError`. A refusal carries which of two
-    body shapes it is: `error.code` names which coded dict the route used to
-    raise, or is `None` for the bare string a route raised instead (#276
-    pinned both, so this handler renders both rather than choosing one). The
-    payload a refusal carries beyond its code and message (the open subtasks
-    `complete_task` names, say) is for a caller that reads the refusal
-    directly, such as `app.mcp.conventions`; the REST body never grows it,
-    so this handler stays indifferent to what a given code's payload holds.
+    A deliberate refusal an operation (`app.tasks`, `app.comments`) or the
+    access rules (`app.access`, #309) raises, mapped to the HTTP body routes
+    on its path used to assemble inline, byte for byte (#275, #279, #282,
+    #309) — the same shape `passkey_refused` above already gives
+    `app.passkeys.PasskeyError`. A refusal carries which of two body shapes
+    it is: `error.code` names which coded dict the route used to raise, or
+    is `None` for the bare string a route raised instead (#276 pinned both,
+    so this handler renders both rather than choosing one). `error.extra`
+    merges into the coded dict — `project_id`, `permission`, `tags`, the
+    handful of keys a handful of `app.access`'s own refusals already put in
+    their body before #309 moved their raise here — so those three bodies
+    stay byte for byte too. The payload a refusal carries beyond its code
+    and message (the open subtasks `complete_task` names, say) is for a
+    caller that reads the refusal directly, such as `app.mcp.conventions`;
+    the REST body never grows from it, so this handler stays indifferent to
+    what a given code's payload holds.
     """
     assert isinstance(error, refusals.Refusal)
     detail: object = (
         error.message
         if error.code is None
-        else {"code": error.code.value, "message": error.message}
+        else {"code": error.code.value, "message": error.message, **error.extra}
     )
     return JSONResponse(status_code=error.status, content={"detail": detail})
 

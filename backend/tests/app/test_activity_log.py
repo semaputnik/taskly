@@ -34,6 +34,7 @@ from app.models import (
     TaskUpdate,
     UserCreate,
 )
+from app.refusals import Refusal
 from tests.utils.utils import random_email
 
 
@@ -122,12 +123,12 @@ def test_a_bot_without_the_grant_is_refused_by_name(db: Session, world: World) -
         owner_id=world.owner_id, bot=bot, project_ids=frozenset([world.project.id])
     )
 
-    with pytest.raises(HTTPException) as exc_info:
+    with pytest.raises(Refusal) as exc_info:
         read_activity(db, caller, ActivityNarrowing())
 
-    detail = exc_info.value.detail
-    assert exc_info.value.status_code == 403
-    assert isinstance(detail, dict) and detail["code"] == "permission_not_granted"
+    refusal = exc_info.value
+    assert refusal.status == 403
+    assert refusal.code is not None and refusal.code.value == "permission_not_granted"
 
 
 def test_a_human_has_no_grant_to_check(db: Session, world: World) -> None:

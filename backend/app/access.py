@@ -29,10 +29,17 @@ used to import `access` and `TaskAction` from here while this module lived at
 `app.api.access` re-exports every name below unchanged, so none of the other
 importers — every route, every MCP tool, `tests/access/` — moves. The access
 rules are domain rules (scope, grants, the archive, ownership), none of them
-about HTTP: `HTTPException` is `fastapi`'s own, not `app.api`'s, so raising it
-here drags no layer above this one down with the move, and `app.crud` is
-already below `app.api` too (#283), so the dependency direction after the
-move is clean.
+about HTTP, and this module imports nothing from `fastapi` to prove it
+(#309): every refusal it gives is one of `app.refusals`'s own values, raised
+here and mapped to a body by the same handler (`app.main.refusal_refused`)
+that already renders one for `app.tasks` and `app.comments`. Before #309,
+eleven of these were `HTTPException`s assembled inline — the one place below
+`app.api` that still answered in HTTP, even though the layering test added
+by #303 already passed: `HTTPException` is `fastapi`'s own, not `app.api`'s,
+so raising it here never tripped an import-direction check, but it still
+left a non-HTTP caller (`app.mcp`) catching an HTTP-shaped exception to
+learn it was refused, and left these eleven refusals outside the one module
+meant to name every way the product says no.
 """
 
 import uuid
@@ -41,11 +48,10 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any
 
-from fastapi import HTTPException
 from sqlalchemy import Text, and_, cast, func, literal_column, not_, or_
 from sqlmodel import Session, col, select
 
-from app import crud
+from app import crud, refusals
 from app.caller import Caller
 from app.models import (
     ACTIVITY_TASK_REF,
@@ -58,21 +64,7 @@ from app.models import (
     Task,
     TaskRefusal,
 )
-
-BOT_REFUSED_STATUS = 403
-OUTSIDE_SCOPE_CODE = "outside_scope"
-PERMISSION_NOT_GRANTED_CODE = "permission_not_granted"
-
-# Writing into an archived project is refused with its own status and code
-# rather than a generic permission error, so a client can tell the user why
-# and what would undo it (FR-05.12).
-PROJECT_ARCHIVED_STATUS = 409
-PROJECT_ARCHIVED_CODE = "project_archived"
-
-# What a bot user said stays on the record: its comments are append-only for
-# everyone, its owner included (FR-03.2, FR-08.10).
-COMMENT_BY_BOT_STATUS = 403
-COMMENT_BY_BOT_CODE = "comment_by_bot"
+from app.refusals import Refusal
 
 TASK_NOT_FOUND = "Task not found"
 
@@ -111,13 +103,6 @@ class TaskAccess:
     project: Project
 
 
-def _refuse(code: str, message: str, **extra: Any) -> HTTPException:
-    return HTTPException(
-        status_code=BOT_REFUSED_STATUS,
-        detail={"code": code, "message": message, **extra},
-    )
-
-
 # Bots
 
 
@@ -127,36 +112,26 @@ def refuse_archived_for_bot(caller: Caller) -> None:
     bot, whatever its scope (FR-05.13).
     """
     if caller.bot is not None:
-        raise _refuse(
-            PROJECT_ARCHIVED_CODE, "Bot users have no access to archived projects."
-        )
+        raise refusals.archive_closed_to_bots()
 
 
-def _bot_project_refusal(caller: Caller, project: Project) -> tuple[str, str] | None:
+def _bot_project_refusal(caller: Caller, project: Project) -> Refusal | None:
     """
     Why the caller, if it is a bot, may not reach `project` at all — the
-    archive, then the scope — as a code and a message.
+    archive, then the scope.
     """
     if caller.bot is None:
         return None
     if project.is_archived:
-        return (
-            PROJECT_ARCHIVED_CODE,
-            f"The project “{project.name}” is archived. Bot users have no "
-            "access to archived projects.",
-        )
+        return refusals.bot_project_archived(project)
     if project.id not in caller.project_ids:
-        return (
-            OUTSIDE_SCOPE_CODE,
-            f"The project “{project.name}” is not in this bot user's scope.",
-        )
+        return refusals.bot_outside_scope(project)
     return None
 
 
 def _refuse_bot_project(caller: Caller, project: Project) -> None:
     if refusal := _bot_project_refusal(caller, project):
-        code, message = refusal
-        raise _refuse(code, message, project_id=str(project.id))
+        raise refusal
 
 
 def _refuse_permission(caller: Caller, action: TaskAction) -> None:
@@ -165,11 +140,7 @@ def _refuse_permission(caller: Caller, action: TaskAction) -> None:
         return
     permission, doing = _PERMISSIONS[action]
     if not getattr(bot, permission):
-        raise _refuse(
-            PERMISSION_NOT_GRANTED_CODE,
-            f"This bot user is not allowed to {doing}.",
-            permission=permission,
-        )
+        raise refusals.permission_not_granted(permission, doing)
 
 
 def authorize_tasks(caller: Caller, action: TaskAction) -> None:
@@ -188,11 +159,7 @@ def authorize_tag_creation(caller: Caller) -> None:
     """
     bot = caller.bot
     if bot is not None and not bot.create_tags:
-        raise _refuse(
-            PERMISSION_NOT_GRANTED_CODE,
-            "This bot user is not allowed to create tags.",
-            permission="create_tags",
-        )
+        raise refusals.permission_not_granted("create_tags", "create tags")
 
 
 def authorize_tag_names(
@@ -219,14 +186,7 @@ def authorize_tag_names(
     known = crud.get_tag_names(session=session, owner_id=caller.owner_id, names=names)
     new = [name for name in names if name not in known]
     if new:
-        raise _refuse(
-            PERMISSION_NOT_GRANTED_CODE,
-            "This bot user is not allowed to create tags, and "
-            + ", ".join(f"“{name}”" for name in new)
-            + (" is not a tag yet." if len(new) == 1 else " are not tags yet."),
-            permission="create_tags",
-            tags=new,
-        )
+        raise refusals.tag_names_not_granted(new)
 
 
 def authorize_activity_log(caller: Caller) -> None:
@@ -240,29 +200,15 @@ def authorize_activity_log(caller: Caller) -> None:
     """
     bot = caller.bot
     if bot is not None and not bot.read_activity:
-        raise _refuse(
-            PERMISSION_NOT_GRANTED_CODE,
-            "This bot user is not allowed to read the activity log.",
-            permission="read_activity",
-        )
+        raise refusals.permission_not_granted("read_activity", "read the activity log")
 
 
 # Projects
 
 
-def archived_refusal(project: Project) -> HTTPException:
+def archived_refusal(project: Project) -> Refusal:
     """How a change to an archived project, or to anything in it, is refused."""
-    return HTTPException(
-        status_code=PROJECT_ARCHIVED_STATUS,
-        detail={
-            "code": PROJECT_ARCHIVED_CODE,
-            "message": (
-                f"The project “{project.name}” is archived, so it and its "
-                "tasks are read-only. Unarchive it to make changes."
-            ),
-            "project_id": str(project.id),
-        },
-    )
+    return refusals.project_archived(project)
 
 
 def require_project_writable(project: Project) -> None:
@@ -302,7 +248,7 @@ def get_project(
         # A deleted project is invisible until it is restored (FR-05.8).
         or project.deletion_id is not None
     ):
-        raise HTTPException(status_code=404, detail="Project not found")
+        raise refusals.plain(404, "Project not found")
     if action is not None:
         _authorize(caller, action, project)
     else:
@@ -342,7 +288,7 @@ def _live_task(
     """
     resolved = _resolve(session, caller.owner_id, [task_id]).get(task_id)
     if resolved is None:
-        raise HTTPException(status_code=404, detail=not_found)
+        raise refusals.plain(404, not_found)
     return resolved
 
 
@@ -399,12 +345,14 @@ def _batch_refusal(
 ) -> TaskRefusal | None:
     task, project = access.task, access.project
     if refusal := _bot_project_refusal(caller, project):
-        code, message = refusal
-        return TaskRefusal(task_id=task.id, code=code, message=message)
+        assert refusal.code is not None
+        return TaskRefusal(
+            task_id=task.id, code=refusal.code.value, message=refusal.message
+        )
     if action.writes and project.is_archived:
         return TaskRefusal(
             task_id=task.id,
-            code=PROJECT_ARCHIVED_CODE,
+            code=refusals.RefusalCode.PROJECT_ARCHIVED.value,
             message=(
                 f"“{task.title}” is in the archived project “{project.name}”, "
                 "which is read-only."
@@ -427,19 +375,10 @@ def get_comment(
     not_found = "Comment not found"
     comment = session.get(Comment, comment_id)
     if not comment or comment.owner_id != caller.owner_id:
-        raise HTTPException(status_code=404, detail=not_found)
+        raise refusals.plain(404, not_found)
     resolved = _live_task(session, caller, comment.task_id, not_found)
     if action.writes and comment.author_bot_user_id is not None:
-        raise HTTPException(
-            status_code=COMMENT_BY_BOT_STATUS,
-            detail={
-                "code": COMMENT_BY_BOT_CODE,
-                "message": (
-                    "This comment was written by a bot user. Comments from bot "
-                    "users cannot be edited or deleted."
-                ),
-            },
-        )
+        raise refusals.comment_by_bot()
     _authorize(caller, action, resolved.project)
     return comment
 
@@ -455,7 +394,7 @@ def get_attachment(
     not_found = "Attachment not found"
     attachment = session.get(Attachment, attachment_id)
     if not attachment or attachment.owner_id != caller.owner_id:
-        raise HTTPException(status_code=404, detail=not_found)
+        raise refusals.plain(404, not_found)
     resolved = _live_task(session, caller, attachment.task_id, not_found)
     _authorize(caller, action, resolved.project)
     return attachment

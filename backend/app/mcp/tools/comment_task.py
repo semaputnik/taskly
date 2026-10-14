@@ -24,6 +24,7 @@ from app.api.deps import Caller
 from app.mcp.conventions import open_caller, refusal, resolve_task_id
 from app.mcp.server import mcp_server
 from app.models import BotUserRef, CommentBody, CommentCreate, CommentPublic
+from app.refusals import Refusal
 
 
 @mcp_server.tool()
@@ -61,7 +62,7 @@ def comment_task_body(
         comment_row = comments.comment(
             session, caller, resolved_id, CommentCreate(body=body)
         )
-    except HTTPException as exc:
+    except (HTTPException, Refusal) as exc:
         raise refusal(exc) from exc
 
     # The author is always this call's own bot user — an MCP caller is

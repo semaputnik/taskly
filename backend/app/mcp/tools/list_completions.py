@@ -89,6 +89,7 @@ from app.models import (
     Project,
     Task,
 )
+from app.refusals import Refusal
 
 
 @dataclass(frozen=True)
@@ -225,7 +226,7 @@ def list_completions_body(
         )
         since_at = since_datetime(since)
         until_at = until_datetime(until)
-    except HTTPException as exc:
+    except (HTTPException, Refusal) as exc:
         raise refusal(exc) from exc
 
     entries = _completion_entries(

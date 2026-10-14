@@ -55,12 +55,14 @@ rather than re-deriving its own version of any of these rules:
   function three tools each call with their own priority order, rather
   than three copies of the same loop (#301).
 - **Refusals.** `refuse` and `refusal` turn a deliberate refusal — an
-  `app.refusals.Refusal` an operation raised (#279), or an `HTTPException`
-  from `app.api.access`/`app.crud` on a path no operation has reached yet —
-  into the one thing a tool ever raises to report one: a `ToolError`
-  carrying the refusal's own code and one sentence saying what to do next —
-  never a bare status code, and never a guess at a `Refusal`'s code, which
-  it already carries.
+  `app.refusals.Refusal`, raised by an operation (#279) or, since #309, by
+  `app.access` itself, or an `HTTPException` from whatever still answers in
+  HTTP below `app.api` (`app.activity_log`'s own task/project narrowing, and
+  a handful of routes' own inline 400s a tool calls through to) — into the
+  one thing a tool ever raises to report one: a `ToolError` carrying the
+  refusal's own code and one sentence saying what to do next — never a bare
+  status code, and never a guess at a `Refusal`'s code, which it already
+  carries.
 """
 
 import re
@@ -94,24 +96,25 @@ def refuse(code: str, message: str) -> NoReturn:
     raise ToolError(f"{code}: {message}")
 
 
-# A plain-string `detail` (every 404 in `app.api.access`, and the stray 400s
-# routes raise inline) never carried a machine-readable code before a human
-# reading JSON was the only audience; a tool call needs one anyway.
+# A plain-string `detail` (every bare-string `app.refusals.plain`, and the
+# stray 400s a route raises inline) never carried a machine-readable code
+# before a human reading JSON was the only audience; a tool call needs one
+# anyway.
 _DEFAULT_CODE = {400: "invalid_argument", 404: "not_found", 422: "invalid_argument"}
 
 
 def refusal(exc: HTTPException | Refusal) -> ToolError:
     """
     A refusal, read the way a tool reports one: an `app.refusals.Refusal`
-    (raised by an operation, `app.tasks` and its siblings as they grow)
-    reads its own `code` and `message` straight off, the typed vocabulary
-    #279 introduced for exactly this — unless `code` is `None`, the shape
-    #282 taught this module too, for a refusal pinned as a bare string
-    (`app.refusals.plain`): read the same way a code-less `HTTPException`
-    already was, guessed from its status, since an MCP call needs one either
-    way. An `HTTPException` from `app.api.access` or `app.crud` — a refusal
-    that predates the vocabulary and is not on a path a ticket has moved onto
-    it yet — still has its code read out of a dict `detail` where it carries
+    (raised by an operation, `app.tasks` and its siblings, or by `app.access`
+    itself since #309) reads its own `code` and `message` straight off, the
+    typed vocabulary #279 introduced for exactly this — unless `code` is
+    `None`, the shape #282 taught this module too, for a refusal pinned as a
+    bare string (`app.refusals.plain`): read the same way a code-less
+    `HTTPException` already was, guessed from its status, since an MCP call
+    needs one either way. An `HTTPException` from whatever still answers in
+    HTTP below `app.api` (`app.activity_log`'s own task/project narrowing,
+    chiefly) still has its code read out of a dict `detail` where it carries
     one, or guessed from its status for a plain-string `detail` that never
     needed one before this had to read it back out. Either way, one
     sentence, never the bare status code.

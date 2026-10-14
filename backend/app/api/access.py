@@ -8,17 +8,15 @@ them without reaching up into the layer that calls them.
 
 Every name below is unchanged: this re-exports the whole of `app.access` so
 none of its other importers — every route, every MCP tool, `tests/access/` —
-has to move with it.
+has to move with it. The status and code constants this used to re-export
+(`PROJECT_ARCHIVED_CODE` and its five siblings) are gone (#309): every
+refusal `app.access` gives is now one of `app.refusals`'s own values, built
+by a function there rather than assembled from a status and a code a caller
+had to import separately — nothing outside `app.access` imported these
+constants, so none of them needed a replacement.
 """
 
 from app.access import (
-    BOT_REFUSED_STATUS,
-    COMMENT_BY_BOT_CODE,
-    COMMENT_BY_BOT_STATUS,
-    OUTSIDE_SCOPE_CODE,
-    PERMISSION_NOT_GRANTED_CODE,
-    PROJECT_ARCHIVED_CODE,
-    PROJECT_ARCHIVED_STATUS,
     TASK_NOT_FOUND,
     TaskAccess,
     TaskAction,
@@ -40,13 +38,6 @@ from app.access import (
 )
 
 __all__ = [
-    "BOT_REFUSED_STATUS",
-    "COMMENT_BY_BOT_CODE",
-    "COMMENT_BY_BOT_STATUS",
-    "OUTSIDE_SCOPE_CODE",
-    "PERMISSION_NOT_GRANTED_CODE",
-    "PROJECT_ARCHIVED_CODE",
-    "PROJECT_ARCHIVED_STATUS",
     "TASK_NOT_FOUND",
     "TaskAccess",
     "TaskAction",
