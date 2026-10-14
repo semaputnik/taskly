@@ -260,11 +260,19 @@ def update_task_body(
     # `status: done` is refused above, before the operation is ever called,
     # so `update` never delegates to `complete` on this path.
     assert isinstance(result, tasks.UpdateResult)
+    # `result.recurrence` is what `update` read *before* applying this
+    # request (`_check_recurrence_update`'s own `current`): still right for a
+    # call that left `recurrence` alone, but stale for one that just started,
+    # changed or stopped it — that one is read back from the database instead
+    # of trusted, the same way `app.api.routes.tasks.update_task` already
+    # does for a human's request.
     [public] = task_publics(
         session,
         [result.task],
         projects={result.task.id: result.project.id},
-        recurrences={result.task.id: result.recurrence},
+        recurrences={}
+        if "recurrence" in task_in.model_fields_set
+        else {result.task.id: result.recurrence},
     )
 
     return public.model_dump(mode="json")
