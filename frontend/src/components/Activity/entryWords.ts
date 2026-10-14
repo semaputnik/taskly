@@ -3,6 +3,7 @@ import type {
   AssigneeRef,
   FieldChange,
   ProjectRef,
+  TaskRef,
   TaskStatus,
 } from "@/client"
 import { nameList, plural } from "@/components/Common/words"
@@ -199,6 +200,33 @@ function tagRecord(entry: ActivityEntryPublic): RecordRef {
 }
 
 /**
+ * Attaches `subjectName` and `record` to a comment's or an attachment's own
+ * two voices — both point through to the task it is on, not the comment or
+ * attachment row itself. Attached as getters, via `Object.defineProperties`
+ * rather than spread, so that plain object spread (which would read them
+ * immediately) can't accidentally make them eager: neither is actually
+ * evaluated, and `task.title`/`task.id` actually touched, unless a caller
+ * asks for `subjectName` or `record`. `entryWords` never does, and the
+ * entries this file's own tests build for these five actions carry no
+ * `task` to read, because they exist only to check the sentence.
+ */
+function withTaskSubject<T extends Pick<ActionVoices, "names" | "implicit">>(
+  sentence: T,
+  task: TaskRef,
+): T & Pick<ActionVoices, "subjectName" | "record"> {
+  return Object.defineProperties(sentence, {
+    subjectName: {
+      enumerable: true,
+      get: (): string => task.title ?? "a task",
+    },
+    record: {
+      enumerable: true,
+      get: (): RecordRef => ({ kind: "task", id: task.id }),
+    },
+  }) as T & Pick<ActionVoices, "subjectName" | "record">
+}
+
+/**
  * Everything one action's entry has to say: both voices' sentences, the name
  * of the subject the log page links to, and the record that link opens.
  */
@@ -216,8 +244,11 @@ interface ActionVoices {
 
 /**
  * The 24 kinds of activity entry, each as both of its voices, its subject's
- * name and the record that subject links to — one switch, declared here
- * because this is the one place that reads `entry.details.kind` at all.
+ * name and the record that subject links to — one switch, declared here so
+ * it is the only place `entryWords`, `subjectName` and `recordOf` read
+ * `entry.details.kind` between them (`RestoreDeletion.tsx` switches on it
+ * too, for its own unrelated reason — restoring a deleted record — and
+ * stays out of this one).
  *
  * It is built from what the entry recorded at the time, so it reads the
  * same after the task, project or tag is renamed, moved or deleted — only
@@ -428,73 +459,44 @@ function actionVoices(
         ),
       }
     }
-    // `subjectName` and `record` below are getters, not plain fields, in
-    // these five cases only: both read through `details.task`, which
-    // `names`/`implicit` never touch, and a caller that only wants the
-    // sentence (`entryWords`, and the fixtures `entryWords.test.ts` builds
-    // for exactly that) should not have to supply one.
     case "attachment_added": {
       const { filename } = details
-      return {
-        get subjectName() {
-          return details.task.title ?? "a task"
+      return withTaskSubject(
+        {
+          names: withSubject(`Attached “${filename}” to`),
+          implicit: whole(`attached “${filename}”`),
         },
-        get record() {
-          return { kind: "task" as const, id: details.task.id }
-        },
-        names: withSubject(`Attached “${filename}” to`),
-        implicit: whole(`attached “${filename}”`),
-      }
+        details.task,
+      )
     }
     case "attachment_deleted": {
       const { filename } = details
-      return {
-        get subjectName() {
-          return details.task.title ?? "a task"
+      return withTaskSubject(
+        {
+          names: withSubject(`Removed “${filename}” from`),
+          implicit: whole(`removed “${filename}”`),
         },
-        get record() {
-          return { kind: "task" as const, id: details.task.id }
-        },
-        names: withSubject(`Removed “${filename}” from`),
-        implicit: whole(`removed “${filename}”`),
-      }
+        details.task,
+      )
     }
     // A comment is shown as the comment itself, with its author and body,
     // not as a line saying someone wrote one — so the task panel's voice
     // has nothing to say about these.
     case "comment_added":
-      return {
-        get subjectName() {
-          return details.task.title ?? "a task"
-        },
-        get record() {
-          return { kind: "task" as const, id: details.task.id }
-        },
-        names: withSubject("Commented on"),
-        implicit: null,
-      }
+      return withTaskSubject(
+        { names: withSubject("Commented on"), implicit: null },
+        details.task,
+      )
     case "comment_edited":
-      return {
-        get subjectName() {
-          return details.task.title ?? "a task"
-        },
-        get record() {
-          return { kind: "task" as const, id: details.task.id }
-        },
-        names: withSubject("Edited a comment on"),
-        implicit: null,
-      }
+      return withTaskSubject(
+        { names: withSubject("Edited a comment on"), implicit: null },
+        details.task,
+      )
     case "comment_deleted":
-      return {
-        get subjectName() {
-          return details.task.title ?? "a task"
-        },
-        get record() {
-          return { kind: "task" as const, id: details.task.id }
-        },
-        names: withSubject("Deleted a comment on"),
-        implicit: null,
-      }
+      return withTaskSubject(
+        { names: withSubject("Deleted a comment on"), implicit: null },
+        details.task,
+      )
     // Projects and tags never appear in a task's own history, so the task
     // panel's voice has nothing to say about these either.
     case "project_created":
