@@ -26,40 +26,56 @@ function plural(count: number, one: string, many: string): string {
   return count === 1 ? one : `${count} ${many}`
 }
 
-/** What the confirmation says comes back, for a task or a project. */
+/**
+ * What the confirmation says comes back, for a task or a project.
+ *
+ * `RestoreDeletion` only ever renders over a deletion entry (`task_deleted`
+ * or `project_deleted`), so this switches on `details.kind` rather than
+ * `entry.entity_type`: the discriminated union itself (#299's spike) is what
+ * tells a single task's own deletion from a batch's apart, by which of the
+ * two shapes `task_deleted` carries — never by reading for a `title` that
+ * may or may not be there.
+ */
 function describe(entry: ActivityEntryPublic) {
-  if (entry.entity_type === "project") {
-    const name = (entry.details.name as string | undefined) ?? "this project"
-    const tasks = (entry.details.task_count as number | undefined) ?? 0
-    return {
-      heading: "Restore project",
-      name,
-      comesBack:
-        tasks > 0
-          ? `, with ${plural(tasks, "the task", "tasks")} deleted along with it`
-          : "",
+  const { details } = entry
+  switch (details.kind) {
+    case "project_deleted": {
+      const tasks = details.task_count
+      return {
+        heading: "Restore project",
+        name: details.name ?? "this project",
+        comesBack:
+          tasks > 0
+            ? `, with ${plural(tasks, "the task", "tasks")} deleted along with it`
+            : "",
+      }
     }
-  }
-  const title = entry.details.title as string | undefined
-  if (title === undefined) {
-    // A batch deletion names no single task; what comes back is the selection
-    // it took down, and it comes back as the one act it was.
-    const tasks = (entry.details.task_count as number | undefined) ?? 0
-    return {
-      heading: "Restore tasks",
-      name: plural(tasks, "1 task", "tasks"),
-      comesBack: ", together, as they went",
+    case "task_deleted_batch": {
+      // A batch deletion names no single task; what comes back is the
+      // selection it took down, and it comes back as the one act it was.
+      const tasks = details.task_count
+      return {
+        heading: "Restore tasks",
+        name: plural(tasks, "1 task", "tasks"),
+        comesBack: ", together, as they went",
+      }
     }
-  }
-  const name = title
-  const subtasks = (entry.details.subtask_count as number | undefined) ?? 0
-  return {
-    heading: "Restore task",
-    name,
-    comesBack:
-      subtasks > 0
-        ? `, with ${plural(subtasks, "the subtask", "subtasks")} deleted along with it`
-        : "",
+    case "task_deleted": {
+      const subtasks = details.subtask_count ?? 0
+      return {
+        heading: "Restore task",
+        name: details.title,
+        comesBack:
+          subtasks > 0
+            ? `, with ${plural(subtasks, "the subtask", "subtasks")} deleted along with it`
+            : "",
+      }
+    }
+    default:
+      // Every other `kind` is unreachable here in practice — the log only
+      // ever offers a restore on a deletion entry — but this stays safe
+      // rather than assuming a caller never passes anything else.
+      return { heading: "Restore", name: "this", comesBack: "" }
   }
 }
 

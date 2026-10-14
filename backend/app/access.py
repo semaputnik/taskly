@@ -52,6 +52,7 @@ from sqlalchemy import Text, and_, cast, func, literal_column, not_, or_
 from sqlmodel import Session, col, select
 
 from app import crud, refusals
+from app.activity_details import DETAILS_PROJECT, DETAILS_TASK_IDS
 from app.caller import Caller
 from app.models import (
     ACTIVITY_TASK_REF,
@@ -494,7 +495,7 @@ def activity_log_scope(caller: Caller) -> Any | None:
         select(func.jsonb_agg(cast(scope_tasks.c.id, Text))).scalar_subquery(),
         literal_column("'[]'::jsonb"),
     )
-    batch_wholly_in_scope = col(ActivityEntry.details)["task_ids"].op("<@")(
+    batch_wholly_in_scope = col(ActivityEntry.details)[DETAILS_TASK_IDS].op("<@")(
         scope_task_ids_json
     )
 
@@ -512,7 +513,7 @@ def activity_log_scope(caller: Caller) -> Any | None:
                 literal_column(ACTIVITY_TASK_REF).in_(
                     select(cast(scope_tasks.c.id, Text))
                 ),
-                col(ActivityEntry.details)["project"]["id"].astext.in_(
+                col(ActivityEntry.details)[DETAILS_PROJECT]["id"].astext.in_(
                     select(cast(live_scope_projects.c.id, Text))
                 ),
             ),

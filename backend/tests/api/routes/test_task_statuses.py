@@ -412,6 +412,7 @@ def test_each_kind_of_move_is_logged_once(client: TestClient, owner: Headers) ->
         "title": "Call the bank",
         "from": "backlog",
         "to": "in_progress",
+        "kind": "task_status_changed",
     }
     assert entries[1]["details"]["from"] == "in_progress"
     assert entries[1]["details"]["to"] == "waiting"

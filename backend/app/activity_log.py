@@ -20,9 +20,10 @@ cheap enough that the route computes it itself over the rows this module
 hands back).
 
 Below `app.api` (`tests/migrations/test_layering.py`): imports only from
-`app.access`, `app.caller`, `app.crud` and `app.models`, none of them above
-this line, so both front doors — the REST route and the MCP tools — reach
-down into this module rather than into each other.
+`app.access`, `app.activity_details`, `app.caller`, `app.crud` and
+`app.models`, none of them above this line, so both front doors — the REST
+route and the MCP tools — reach down into this module rather than into
+each other.
 """
 
 import uuid
@@ -36,6 +37,12 @@ from sqlalchemy import Text, and_, cast, literal_column, not_, or_
 from sqlmodel import Session, col, func, select
 
 from app import access, crud
+from app.activity_details import (
+    DETAILS_CHANGES,
+    DETAILS_PROJECT,
+    DETAILS_STATUS,
+    DETAILS_TASK_IDS,
+)
 from app.caller import Caller
 from app.models import (
     ACTIVITY_TASK_REF,
@@ -62,9 +69,9 @@ from app.models import (
 # would drop every such batch instead of keeping it.
 _BULK_COMPLETION = and_(
     col(ActivityEntry.action) == ActivityAction.TASKS_BULK_CHANGED,
-    col(ActivityEntry.details)["changes"]["status"].astext.is_not_distinct_from(
-        TaskStatus.DONE.value
-    ),
+    col(ActivityEntry.details)[DETAILS_CHANGES][
+        DETAILS_STATUS
+    ].astext.is_not_distinct_from(TaskStatus.DONE.value),
 )
 
 # Which actions each kind gathers. Every action belongs to exactly one kind:
@@ -138,7 +145,7 @@ def _on_task(task_id: uuid.UUID) -> Any:
         literal_column(ACTIVITY_TASK_REF) == str(task_id),
         and_(
             col(ActivityEntry.action) == ActivityAction.TASKS_BULK_CHANGED,
-            col(ActivityEntry.details).contains({"task_ids": [str(task_id)]}),
+            col(ActivityEntry.details).contains({DETAILS_TASK_IDS: [str(task_id)]}),
         ),
     )
 
@@ -159,7 +166,7 @@ def _in_project(project_id: uuid.UUID) -> Any:
         ),
         col(ActivityEntry.entity_id).in_(select(tasks.c.id)),
         literal_column(ACTIVITY_TASK_REF).in_(select(cast(tasks.c.id, Text))),
-        col(ActivityEntry.details).contains({"project": {"id": str(project_id)}}),
+        col(ActivityEntry.details).contains({DETAILS_PROJECT: {"id": str(project_id)}}),
     )
 
 

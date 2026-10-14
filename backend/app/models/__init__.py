@@ -12,14 +12,21 @@ from .activity import (
     ACTIVITY_TASK_REF,
     ActivityAction,
     ActivityEntityType,
-    ActivityEntriesPublic,
     ActivityEntry,
-    ActivityEntryPublic,
     ActivityKind,
     ActivityOrder,
-    BotActivityEntriesPublic,
-    BotActivityEntryPublic,
 )
+
+# `ActivityEntryPublic`/`BotActivityEntryPublic`/`ActivityEntriesPublic`/
+# `BotActivityEntriesPublic` are *not* re-exported here, on purpose: they
+# live in `app.activity_details` (their `details` field is that module's own
+# `ActivityDetailsPublic`), which already depends on this package one way,
+# for `ActivityAction`/`ActivityEntityType`. Re-exporting them from here
+# would make this package depend back on `app.activity_details` too — a
+# second, opposite edge that is circular at the package level even though a
+# particular import order can paper over it (#299). Their one real
+# consumer, `app.api.routes.activity`, imports them from
+# `app.activity_details` directly.
 from .attachment import (
     Attachment,
     AttachmentBase,

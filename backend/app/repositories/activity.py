@@ -12,6 +12,12 @@ from typing import NamedTuple
 from sqlalchemy import ARRAY, Text, and_, literal, or_
 from sqlmodel import Session, col, select
 
+from app.activity_details import (
+    DETAILS_CHANGES,
+    DETAILS_STATUS,
+    DETAILS_TASK,
+    DETAILS_TASK_IDS,
+)
 from app.models import ActivityAction, ActivityEntityType, ActivityEntry, TaskStatus
 
 
@@ -44,10 +50,10 @@ def _status_move(entry: ActivityEntry) -> tuple[list[str], str | None]:
     details = entry.details
     match entry.action:
         case ActivityAction.TASKS_BULK_CHANGED:
-            changes = details.get("changes", {})
-            return details.get("task_ids", []), changes.get("status")
+            changes = details.get(DETAILS_CHANGES, {})
+            return details.get(DETAILS_TASK_IDS, []), changes.get(DETAILS_STATUS)
         case ActivityAction.TASK_CREATED:
-            status = details.get("task", {}).get("status")
+            status = details.get(DETAILS_TASK, {}).get(DETAILS_STATUS)
         case ActivityAction.TASK_COMPLETED:
             status = TaskStatus.DONE
         case _:
@@ -83,7 +89,7 @@ def get_review_moves(
                 ),
                 and_(
                     col(ActivityEntry.action) == ActivityAction.TASKS_BULK_CHANGED,
-                    col(ActivityEntry.details)["task_ids"].has_any(
+                    col(ActivityEntry.details)[DETAILS_TASK_IDS].has_any(
                         literal(sorted(wanted), ARRAY(Text))
                     ),
                 ),

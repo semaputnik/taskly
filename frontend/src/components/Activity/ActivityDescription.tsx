@@ -6,10 +6,6 @@ import { type RecordKind, recordLink } from "@/components/Records/panels"
 import { cn } from "@/lib/utils"
 import { entryWords } from "./entryWords"
 
-function detail<T>(entry: ActivityEntryPublic, key: string): T | undefined {
-  return entry.details[key] as T | undefined
-}
-
 interface ActivityDescriptionProps {
   entry: ActivityEntryPublic
   currentUserId?: string
@@ -17,16 +13,42 @@ interface ActivityDescriptionProps {
 
 /**
  * What an entry names: the task, project, tag, or task a comment or file is
- * on.
+ * on. Switches on `details.kind` — the discriminated union's own tag
+ * (#299's spike) — the same way `recordOf` below does, rather than reading
+ * `entry.entity_type` or which field happens to be on `details`.
  */
 function subjectName(entry: ActivityEntryPublic): string {
-  if (entry.entity_type === "project" || entry.entity_type === "tag") {
-    return detail<string>(entry, "name") ?? "Untitled project"
+  const { details } = entry
+  switch (details.kind) {
+    case "project_created":
+    case "project_changed":
+    case "project_deleted":
+    case "project_restored":
+      return details.name ?? "Untitled project"
+    case "tag_created":
+    case "tag_renamed":
+    case "tag_deleted":
+    case "tag_merged":
+      // "Untitled project" covers a nameless tag too — an existing
+      // wording quirk, preserved rather than fixed, since nothing
+      // user-visible changes in this ticket.
+      return details.name ?? "Untitled project"
+    case "comment_added":
+    case "comment_edited":
+    case "comment_deleted":
+    case "attachment_added":
+    case "attachment_deleted":
+      return details.task.title ?? "a task"
+    // A batch names no single task; a row the backend could not make
+    // sense of at all names nothing either (`to_public`'s own fallback).
+    case "task_deleted_batch":
+    case "task_restored_batch":
+    case "tasks_bulk_changed":
+    case "unrecognized":
+      return "Untitled task"
+    default:
+      return details.title ?? "Untitled task"
   }
-  if (entry.entity_type === "comment" || entry.entity_type === "attachment") {
-    return detail<{ title: string }>(entry, "task")?.title ?? "a task"
-  }
-  return detail<string>(entry, "title") ?? "Untitled task"
 }
 
 /**
@@ -43,8 +65,21 @@ function recordOf(
       return { kind: entry.entity_type, id: entry.entity_id }
     case "comment":
     case "attachment": {
-      const task = detail<{ id?: string }>(entry, "task")
-      return task?.id ? { kind: "task", id: task.id } : null
+      const { details } = entry
+      // Narrowed by `kind` rather than `"task" in details`: `task_created`'s
+      // own snapshot also has a `task` field, but it is a `TaskSnapshot`
+      // (named only by its fields, not its id) rather than the `TaskRef` a
+      // comment or an attachment names its task by.
+      switch (details.kind) {
+        case "comment_added":
+        case "comment_edited":
+        case "comment_deleted":
+        case "attachment_added":
+        case "attachment_deleted":
+          return { kind: "task", id: details.task.id }
+        default:
+          return null
+      }
     }
     default:
       return null

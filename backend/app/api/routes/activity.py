@@ -5,6 +5,13 @@ from fastapi import APIRouter, HTTPException, Query
 from sqlmodel import col, select
 
 from app import deletions
+from app.activity_details import (
+    ActivityEntriesPublic,
+    ActivityEntryPublic,
+    BotActivityEntriesPublic,
+    BotActivityEntryPublic,
+    to_public,
+)
 from app.activity_log import _KIND_ACTIONS as _KIND_ACTIONS  # re-export, see below
 from app.activity_log import ActivityNarrowing
 from app.activity_log import read_activity as _read_activity
@@ -13,13 +20,9 @@ from app.api.deps import CallerDep, CurrentUser, SessionDep
 from app.deletions import DeletionKind, Restorability, RestoreRefusal
 from app.models import (
     ActivityAction,
-    ActivityEntriesPublic,
     ActivityEntry,
-    ActivityEntryPublic,
     ActivityKind,
     ActivityOrder,
-    BotActivityEntriesPublic,
-    BotActivityEntryPublic,
     BotUser,
     Message,
 )
@@ -170,6 +173,7 @@ def read_activity_log(
             BotActivityEntryPublic.model_validate(
                 entry,
                 update={
+                    "details": to_public(entry.action, entry.details),
                     "entity_exists": entry.entity_id in locations,
                     "entity_project_id": locations.get(entry.entity_id),
                     "actor_bot_user_name": bot_names.get(entry.actor_bot_user_id)
@@ -197,6 +201,7 @@ def read_activity_log(
         ActivityEntryPublic.model_validate(
             entry,
             update={
+                "details": to_public(entry.action, entry.details),
                 "entity_exists": entry.entity_id in locations,
                 "entity_project_id": locations.get(entry.entity_id),
                 "restorable": _restorable(entry, verdicts),

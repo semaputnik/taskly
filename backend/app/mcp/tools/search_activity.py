@@ -43,6 +43,38 @@ from pydantic import Field
 from sqlmodel import Session
 
 from app import crud
+from app.activity_details import (
+    ActivityDetailsPublic,
+    AssigneeRef,
+    AttachmentAddedDetailsPublic,
+    AttachmentDeletedDetailsPublic,
+    CommentAddedDetailsPublic,
+    CommentDeletedDetailsPublic,
+    CommentEditedDetailsPublic,
+    ProjectChangedDetailsPublic,
+    ProjectCreatedDetailsPublic,
+    ProjectDeletedDetailsPublic,
+    ProjectRestoredDetailsPublic,
+    TagCreatedDetailsPublic,
+    TagDeletedDetailsPublic,
+    TagMergedDetailsPublic,
+    TagRenamedDetailsPublic,
+    TaskAssignedDetailsPublic,
+    TaskChangedDetailsPublic,
+    TaskCompletedDetailsPublic,
+    TaskCreatedDetailsPublic,
+    TaskDeletedBatchPublic,
+    TaskDeletedSinglePublic,
+    TaskMovedDetailsPublic,
+    TaskReopenedDetailsPublic,
+    TaskRestoredBatchPublic,
+    TaskRestoredSinglePublic,
+    TasksBulkChangedDetailsPublic,
+    TaskStatusChangedDetailsPublic,
+    TaskUnassignedDetailsPublic,
+    UnrecognizedDetailsPublic,
+    decode_public,
+)
 from app.activity_log import ActivityNarrowing, read_activity
 from app.api.deps import Caller
 from app.mcp.conventions import (
@@ -60,7 +92,6 @@ from app.mcp.conventions import (
 )
 from app.mcp.server import mcp_server
 from app.models import (
-    ActivityAction,
     ActivityEntry,
     ActivityKind,
     ActivityOrder,
@@ -241,15 +272,22 @@ def search_activity_body(
 def _rows(session: Session, entries: Sequence[ActivityEntry]) -> list[dict[str, Any]]:
     bot_ids = {entry.actor_bot_user_id for entry in entries if entry.actor_bot_user_id}
     bots = crud.get_bot_user_refs(session=session, bot_user_ids=bot_ids)
-    return [
-        {
-            "at": entry.created_at.isoformat() if entry.created_at else None,
-            "actor": _actor_label(entry, bots),
-            "what": _describe(entry),
-            "subject": _subject(entry),
-        }
-        for entry in entries
-    ]
+    rows = []
+    for entry in entries:
+        # Decoded once per entry, not once per thing it is asked (`_describe`
+        # and `_subject` both used to call `activity_details.decode`
+        # separately, validating the heavier shapes — nested `TaskSnapshot`,
+        # `AssigneeRef`, `FieldChange` — twice over for nothing).
+        decoded = decode_public(entry.action, entry.details)
+        rows.append(
+            {
+                "at": entry.created_at.isoformat() if entry.created_at else None,
+                "actor": _actor_label(entry, bots),
+                "what": _describe(decoded),
+                "subject": _subject(decoded, entry),
+            }
+        )
+    return rows
 
 
 def _actor_label(entry: ActivityEntry, bots: dict[uuid.UUID, BotUserRef]) -> str:
@@ -265,48 +303,74 @@ def _actor_label(entry: ActivityEntry, bots: dict[uuid.UUID, BotUserRef]) -> str
 # Subjects: the task, project, tag, or batch an entry is about
 
 
-def _subject(entry: ActivityEntry) -> dict[str, Any]:
-    details = entry.details
-    entity_type = entry.entity_type
-
-    if entry.action == ActivityAction.TASKS_BULK_CHANGED or (
-        "task_count" in details and "title" not in details
-    ):
-        # A batch deletion or restore (`app.activity._deletion_entry`,
-        # `_restore_entry`) names no task ids, only a count; a bulk status
-        # change (`app.activity._write`) names them in `task_ids`. Either
-        # way the subject is the selection, not any one task it happened to
-        # be filed under (`app.activity_log._on_task`'s own reason).
-        subject: dict[str, Any] = {"type": "tasks", "count": details["task_count"]}
-        if "task_ids" in details:
-            subject["ids"] = [short_id(uuid.UUID(i)) for i in details["task_ids"]]
-        return subject
-
-    if entity_type in ("comment", "attachment"):
-        task = details.get("task") or {}
-        task_id = uuid.UUID(task["id"]) if "id" in task else entry.entity_id
-        return {
-            "type": "task",
-            "id": short_id(task_id),
-            "title": task.get("title") or "Untitled task",
-        }
-    if entity_type == "project":
-        return {
-            "type": "project",
-            "id": str(entry.entity_id),
-            "name": details.get("name") or "Untitled project",
-        }
-    if entity_type == "tag":
-        return {
-            "type": "tag",
-            "id": str(entry.entity_id),
-            "name": details.get("name") or "Untitled tag",
-        }
-    return {
-        "type": "task",
-        "id": short_id(entry.entity_id),
-        "title": details.get("title") or "Untitled task",
-    }
+def _subject(decoded: ActivityDetailsPublic, entry: ActivityEntry) -> dict[str, Any]:
+    match decoded:
+        # A batch deletion or restore names no task ids, only a count; a
+        # bulk status change names them in `task_ids`. Either way the
+        # subject is the selection, not any one task it happened to be
+        # filed under (`app.activity_log._on_task`'s own reason) — the
+        # three shapes a batch can take, matched by name rather than read
+        # off which fields happen to be there (ADR-0011's all-or-nothing
+        # batch).
+        case TaskDeletedBatchPublic() | TaskRestoredBatchPublic():
+            return {"type": "tasks", "count": decoded.task_count}
+        case TasksBulkChangedDetailsPublic():
+            return {
+                "type": "tasks",
+                "count": decoded.task_count,
+                "ids": [short_id(uuid.UUID(i)) for i in decoded.task_ids],
+            }
+        case (
+            CommentAddedDetailsPublic()
+            | CommentEditedDetailsPublic()
+            | CommentDeletedDetailsPublic()
+            | AttachmentAddedDetailsPublic()
+            | AttachmentDeletedDetailsPublic()
+        ):
+            return {
+                "type": "task",
+                "id": short_id(decoded.task.id),
+                "title": decoded.task.title or "Untitled task",
+            }
+        case (
+            ProjectCreatedDetailsPublic()
+            | ProjectChangedDetailsPublic()
+            | ProjectDeletedDetailsPublic()
+            | ProjectRestoredDetailsPublic()
+        ):
+            return {
+                "type": "project",
+                "id": str(entry.entity_id),
+                "name": decoded.name or "Untitled project",
+            }
+        case (
+            TagCreatedDetailsPublic()
+            | TagRenamedDetailsPublic()
+            | TagDeletedDetailsPublic()
+            | TagMergedDetailsPublic()
+        ):
+            return {
+                "type": "tag",
+                "id": str(entry.entity_id),
+                "name": decoded.name or "Untitled tag",
+            }
+        case UnrecognizedDetailsPublic():
+            # A row this module could not make sense of at all: the one
+            # thing it can still say is the entry's own id (`to_public`'s
+            # own degrade-one-line-not-the-page reasoning).
+            return {
+                "type": "task",
+                "id": short_id(entry.entity_id),
+                "title": "Untitled task",
+            }
+        case _:
+            # Every task-shaped action but the three cases above: it names
+            # one task, with a `title`.
+            return {
+                "type": "task",
+                "id": short_id(entry.entity_id),
+                "title": decoded.title or "Untitled task",
+            }
 
 
 # What happened: one short phrase per action, ported from the web UI's own
@@ -314,91 +378,98 @@ def _subject(entry: ActivityEntry) -> dict[str, Any]:
 # yet, and this tool is the first thing besides that page that needs one.
 
 
-def _describe(entry: ActivityEntry) -> str:
-    action = entry.action
-    details: Any = entry.details
-
-    if action == ActivityAction.TASK_CREATED:
-        task = details.get("task") or {}
-        project = task.get("project")
-        return "Created" + (f" in {project['name']}" if project else "")
-    if action == ActivityAction.TASK_CHANGED:
-        fields = ", ".join(
-            _FIELD_LABELS.get(name, name) for name in details.get("changes", {})
-        )
-        return f"Changed {fields}" if fields else "Changed"
-    if action == ActivityAction.TASK_COMPLETED:
-        return "Completed"
-    if action == ActivityAction.TASK_REOPENED:
-        return "Reopened"
-    if action == ActivityAction.TASK_STATUS_CHANGED:
-        to = details.get("to")
-        return f"Moved to {_STATUS_LABELS.get(to, to)}"
-    if action == ActivityAction.TASK_DELETED:
-        if "task_count" in details:
+def _describe(decoded: ActivityDetailsPublic) -> str:  # noqa: PLR0911
+    match decoded:
+        case TaskCreatedDetailsPublic():
+            project = decoded.task.project
+            return "Created" + (f" in {project.name}" if project is not None else "")
+        case TaskChangedDetailsPublic():
+            fields = ", ".join(
+                _FIELD_LABELS.get(name, name) for name in decoded.changes
+            )
+            return f"Changed {fields}" if fields else "Changed"
+        case TaskCompletedDetailsPublic():
+            return "Completed"
+        case TaskReopenedDetailsPublic():
+            return "Reopened"
+        case TaskStatusChangedDetailsPublic():
+            to = decoded.to
+            return f"Moved to {_STATUS_LABELS.get(to, to)}"
+        case TaskDeletedSinglePublic():
+            return _with_count("Deleted", decoded.subtask_count, "subtask")
+        case TaskDeletedBatchPublic():
             return "Deleted"  # the count is in the subject, not here
-        return _with_count("Deleted", details.get("subtask_count"), "subtask")
-    if action == ActivityAction.TASK_RESTORED:
-        if "task_count" in details and "title" not in details:
+        case TaskRestoredSinglePublic():
+            return _with_count("Restored", decoded.subtask_count, "subtask")
+        case TaskRestoredBatchPublic():
             return "Restored"
-        return _with_count("Restored", details.get("subtask_count"), "subtask")
-    if action == ActivityAction.TASK_MOVED:
-        from_name = (details.get("from_project") or {}).get("name", "no project")
-        to_name = (details.get("to_project") or {}).get("name", "no project")
-        return f"Moved from {from_name} to {to_name}"
-    if action == ActivityAction.TASK_ASSIGNED:
-        return f"Assigned to {_assignee_label(details.get('assignee'))}"
-    if action == ActivityAction.TASK_UNASSIGNED:
-        # Named only for a bot user, the same asymmetry
-        # `ActivityDescription.tsx`'s own `task_unassigned` case has: the
-        # owner is always "you" to themselves, so naming a previous human
-        # assignee says nothing a reader does not already know.
-        previous = details.get("previous_assignee")
-        if previous and previous.get("type") == "bot_user":
-            return f"Unassigned (was {_assignee_label(previous)})"
-        return "Unassigned"
-    if action == ActivityAction.TASKS_BULK_CHANGED:
-        count = details.get("task_count") or 0
-        said = _describe_batch_changes(details.get("changes") or {})
-        base = f"Changed {count} task{'' if count == 1 else 's'}"
-        return f"{base}: {said}" if said else base
-    if action == ActivityAction.PROJECT_CREATED:
-        return "Created"
-    if action == ActivityAction.PROJECT_CHANGED:
-        fields = ", ".join(details.get("changes", {}))
-        return f"Changed {fields}" if fields else "Changed"
-    if action == ActivityAction.PROJECT_DELETED:
-        return _with_count("Deleted", details.get("task_count"), "task")
-    if action == ActivityAction.PROJECT_RESTORED:
-        return _with_count("Restored", details.get("task_count"), "task")
-    if action == ActivityAction.COMMENT_ADDED:
-        return "Commented"
-    if action == ActivityAction.COMMENT_EDITED:
-        return "Edited a comment"
-    if action == ActivityAction.COMMENT_DELETED:
-        return "Deleted a comment"
-    if action == ActivityAction.ATTACHMENT_ADDED:
-        return f"Attached “{details.get('filename', 'a file')}”"
-    if action == ActivityAction.ATTACHMENT_DELETED:
-        return f"Removed “{details.get('filename', 'a file')}”"
-    if action == ActivityAction.TAG_CREATED:
-        return "Created"
-    if action == ActivityAction.TAG_RENAMED:
-        old = (details.get("changes", {}).get("name") or {}).get("from")
-        return f"Renamed from “{old}”" if old else "Renamed"
-    if action == ActivityAction.TAG_MERGED:
-        sources = details.get("sources") or []
-        said = "Merged " + ", ".join(f"“{name}”" for name in sources) + " into it"
-        tasks = details.get("task_count") or 0
-        if tasks:
-            said += f", moving {tasks} task{'' if tasks == 1 else 's'} onto it"
-        return said
-    if action == ActivityAction.TAG_DELETED:
-        tasks = details.get("task_count") or 0
-        if tasks:
-            return f"Deleted, removed from {tasks} task{'' if tasks == 1 else 's'}"
-        return "Deleted"
-    return str(action)
+        case TaskMovedDetailsPublic():
+            from_name = (
+                decoded.from_project.name if decoded.from_project else "no project"
+            )
+            to_name = decoded.to_project.name if decoded.to_project else "no project"
+            return f"Moved from {from_name} to {to_name}"
+        case TaskAssignedDetailsPublic():
+            return f"Assigned to {_assignee_label(decoded.assignee)}"
+        case TaskUnassignedDetailsPublic():
+            # Named only for a bot user, the same asymmetry
+            # `ActivityDescription.tsx`'s own `task_unassigned` case has:
+            # the owner is always "you" to themselves, so naming a
+            # previous human assignee says nothing a reader does not
+            # already know.
+            previous = decoded.previous_assignee
+            if previous is not None and previous.type == "bot_user":
+                return f"Unassigned (was {_assignee_label(previous)})"
+            return "Unassigned"
+        case TasksBulkChangedDetailsPublic():
+            count = decoded.task_count
+            said = _describe_batch_changes(decoded.changes)
+            base = f"Changed {count} task{'' if count == 1 else 's'}"
+            return f"{base}: {said}" if said else base
+        case ProjectCreatedDetailsPublic():
+            return "Created"
+        case ProjectChangedDetailsPublic():
+            fields = ", ".join(decoded.changes)
+            return f"Changed {fields}" if fields else "Changed"
+        case ProjectDeletedDetailsPublic():
+            return _with_count("Deleted", decoded.task_count, "task")
+        case ProjectRestoredDetailsPublic():
+            return _with_count("Restored", decoded.task_count, "task")
+        case CommentAddedDetailsPublic():
+            return "Commented"
+        case CommentEditedDetailsPublic():
+            return "Edited a comment"
+        case CommentDeletedDetailsPublic():
+            return "Deleted a comment"
+        case AttachmentAddedDetailsPublic():
+            return f"Attached “{decoded.filename}”"
+        case AttachmentDeletedDetailsPublic():
+            return f"Removed “{decoded.filename}”"
+        case TagCreatedDetailsPublic():
+            return "Created"
+        case TagRenamedDetailsPublic():
+            old = decoded.changes["name"].from_
+            return f"Renamed from “{old}”" if old else "Renamed"
+        case TagMergedDetailsPublic():
+            said = (
+                "Merged "
+                + ", ".join(f"“{name}”" for name in decoded.sources)
+                + " into it"
+            )
+            tasks = decoded.task_count
+            if tasks:
+                said += f", moving {tasks} task{'' if tasks == 1 else 's'} onto it"
+            return said
+        case TagDeletedDetailsPublic():
+            tasks = decoded.task_count
+            if tasks:
+                return f"Deleted, removed from {tasks} task{'' if tasks == 1 else 's'}"
+            return "Deleted"
+        case UnrecognizedDetailsPublic():
+            # A row this module could not make sense of at all — see
+            # `to_public`'s own reasoning: one bad entry costs its own
+            # line, said plainly, rather than the whole page.
+            return "Something changed"
 
 
 def _with_count(verb: str, count: int | None, noun: str) -> str:
@@ -407,11 +478,11 @@ def _with_count(verb: str, count: int | None, noun: str) -> str:
     return f"{verb} with {count} {noun}{'' if count == 1 else 's'}"
 
 
-def _assignee_label(assignee: dict[str, Any] | None) -> str:
+def _assignee_label(assignee: AssigneeRef | None) -> str:
     if assignee is None:
         return "nobody"
-    if assignee.get("type") == "bot_user":
-        return f"the bot user {assignee.get('name')}"
+    if assignee.type == "bot_user":
+        return f"the bot user {assignee.name}"
     return "owner"
 
 
