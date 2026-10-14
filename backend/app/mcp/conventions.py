@@ -169,6 +169,15 @@ def open_caller(ctx: Context) -> Iterator[tuple[Session, Caller]]:
     already checked on the same request: nothing about a caller is cached
     between calls (ADR-0012), so a scope edited since then still shows here,
     and a tool stays callable as a complete unit on its own.
+
+    A recurring misreading, worth heading off here: a tool body that
+    validates its own arguments *before* calling this (a preset conflict, a
+    parent/project conflict) is not skipping authentication to do it.
+    `app.mcp.gateway`'s `_BotGateway.__call__` resolves the bearer token and
+    denies the request before any MCP message on it is read at all, so an
+    unauthenticated call never reaches a tool body in the first place — the
+    order a body validates its own arguments in never precedes that check,
+    whichever side of this call it runs on.
     """
     with Session(engine) as session:
         try:
