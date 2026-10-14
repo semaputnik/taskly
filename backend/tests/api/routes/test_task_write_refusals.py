@@ -894,9 +894,9 @@ def test_changing_a_recurrence_is_refused_once_the_task_is_done(
     client: TestClient, db: Session
 ) -> None:
     """
-    REST-only: `update_task` (the MCP tool) has no `recurrence` argument at
-    all, so this refusal — unlike every other recurrence rule in this file —
-    cannot be reached through any MCP tool today.
+    `update_task` (the MCP tool) gained a `recurrence` argument (#304), so
+    this refusal — unlike before — is reachable through MCP too, the same
+    way every other recurrence rule in this file already was.
     """
     owner = create_user_headers(client, db)
     project_id = create_project(client, owner)
@@ -909,6 +909,21 @@ def test_changing_a_recurrence_is_refused_once_the_task_is_done(
     r = _patch(client, bot, task["id"], recurrence={"frequency": "daily"})
     assert r.status_code == 400, r.text
     assert r.json()["detail"] == "Only an open task can change how it recurs"
+
+    mcp = bot_headers(client, owner, project_ids=[project_id], permissions=UPDATE_ONLY)
+    try:
+        call_tool(
+            client,
+            mcp,
+            "update_task",
+            {"task_id": task["id"], "recurrence": {"frequency": "daily"}},
+        )
+        raise AssertionError("expected a refusal")
+    except ToolError as exc:
+        assert exc.message == _mcp_refused(
+            "update_task",
+            "invalid_argument: Only an open task can change how it recurs",
+        )
 
 
 def test_updating_an_unknown_task_is_a_code_less_404(

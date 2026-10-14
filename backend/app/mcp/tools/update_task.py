@@ -1,18 +1,30 @@
 """
 `update_task` (spec #247, #256): change a task's fields, move it between open
-statuses or projects, hand it over, or clear a field.
+statuses or projects, hand it over, start, change or stop its recurrence, or
+clear a field.
 
 Calls `app.tasks.update` directly (#275, #282): the subtasks directive, the
 due-date scope, the superseded-occurrence refusal, the subtask-project rule,
-and the archive and scope checks are all that operation's own rules now, the
-same ones a human's `PATCH /tasks/{id}` goes through — neither a route
-function nor a route-private constant is imported here any more. This tool's
-own job is only to translate its MCP-style arguments (a project by name or
-id, an assignee as `self`, `owner` or an id, a due date read by
+the recurrence rules (only an open task can change how it recurs, a
+recurring task needs a due date, only a root task can recur), and the
+archive and scope checks are all that operation's own rules now, the same
+ones a human's `PATCH /tasks/{id}` goes through — neither a route function
+nor a route-private constant is imported here any more. This tool's own job
+is only to translate its MCP-style arguments (a project by name or id, an
+assignee as `self`, `owner` or an id, a due date read by
 `app.mcp.conventions.resolve_date`, an explicit `clear` naming the fields to
 empty) into the `TaskUpdate` that operation already takes, and to refuse
 `status: done` itself before the operation is ever called, pointing at
 `complete_task` — so `update` never delegates to `complete` from here.
+
+Starting, changing and stopping a task's recurrence through this tool is
+spec #304's own decision (2026-10-14): the REST API already allows a human
+to do all three, and the premise of this whole surface (ADR-0012) is that a
+human over REST and a bot user over MCP perform the same operation through
+the same code, so refusing it only here would invent a rule that exists
+nowhere else. Nothing about the operation's own rules is loosened for it —
+`recurrence` reaches `app.tasks.update` exactly like every other field here,
+and goes through `_check_recurrence_update` unchanged.
 """
 
 from typing import Annotated, Any, Literal
@@ -36,6 +48,7 @@ from app.mcp.conventions import (
 from app.mcp.server import mcp_server
 from app.models import (
     DueDateScope,
+    Recurrence,
     TagName,
     TaskPriority,
     TaskStatus,
@@ -44,12 +57,16 @@ from app.models import (
 from app.read_models import task_publics
 from app.refusals import Refusal
 
-# What `clear` may name: every field a task can be emptied of. `title` and
-# `status` cannot be (a task always has both; emptying either would reach the
-# database as a value it refuses), `project` cannot either (a task must
-# belong to one), and `tags` already has its own way to go empty — sending it
-# as `[]` — so none of the four joins this list.
-ClearableField = Literal["description", "due_date", "priority", "assignee"]
+# What `clear` may name: every field a task can be emptied of, plus
+# `recurrence`, whose "empty" is not a blank value but the series stopping —
+# the task stops recurring, and no occurrence after this one ever comes.
+# `title` and `status` cannot be named here (a task always has both; emptying
+# either would reach the database as a value it refuses), `project` cannot
+# either (a task must belong to one), and `tags` already has its own way to
+# go empty — sending it as `[]` — so neither joins this list.
+ClearableField = Literal[
+    "description", "due_date", "priority", "assignee", "recurrence"
+]
 
 
 @mcp_server.tool(
@@ -67,13 +84,15 @@ def update_task(
     assignee: str | None = None,
     status: TaskStatus | None = None,
     tags: list[TagName] | None = None,
+    recurrence: Recurrence | None = None,
     clear: list[ClearableField] | None = None,
 ) -> dict[str, Any]:
     """
     Change a task that already exists: retitle it, rewrite its description,
     move it between open statuses or into another project, put it on
-    someone, replace its tags, or move its due date — one call, any
-    combination of fields, each one left alone by leaving its argument out.
+    someone, replace its tags, move its due date, or start, change or stop
+    its recurrence — one call, any combination of fields, each one left
+    alone by leaving its argument out.
 
     Hand finished work over this way: move `status` to `review` and set
     `assignee` to `owner` in the same call, with a comment (`comment_task`)
@@ -114,11 +133,32 @@ def update_task(
     difference explained, and a `due_date_scope` sent where there is no
     series to reschedule is refused as well.
 
-    `description`, `due_date`, `priority` and `assignee` are the only fields
-    an explicit `clear` can empty, by naming them; sending one of them a
-    value and naming it in `clear` at once is refused. Nothing else here can
-    be emptied this way: a task always has a title, a status, and a project,
-    and `tags` already goes empty by being sent as `[]`.
+    `recurrence` changes the series itself — how often the task comes back —
+    which is a different act from moving `due_date` with a `due_date_scope`:
+    that moves where one occurrence falls without touching the schedule the
+    rest of the series still follows, while `recurrence` replaces the
+    schedule itself, so an agent asked to move only this week's occurrence
+    sends `due_date`, never `recurrence`. Send `recurrence` as
+    `{"frequency": "daily"|"weekly"|"monthly"|"every_n_days",
+    "interval_days": N}` (only `every_n_days` takes `interval_days`, at
+    least 2 — the same shape `create_task` takes) to start the task
+    recurring if it does not already, or to replace its schedule if it does;
+    name `recurrence` in `clear` instead to stop it recurring — the task
+    stops recurring and the occurrences after this one never come, while the
+    occurrence already made stays exactly as it is. Only an open task can
+    change how it recurs, a recurring task needs a due date (its own or one
+    sent in the same call), and only a task at the top of its tree — never a
+    subtask — can recur; each refused the same way `create_task`'s own
+    recurrence is.
+
+    `description`, `due_date`, `priority`, `assignee` and `recurrence` are
+    the only fields an explicit `clear` can empty, by naming them; sending
+    one of them a value and naming it in `clear` at once is refused.
+    Clearing `recurrence` is how a task stops recurring — the occurrences
+    after this one never come — whether or not it had a schedule to begin
+    with. Nothing else here can be emptied this way: a task always has a
+    title, a status, and a project, and `tags` already goes empty by being
+    sent as `[]`.
 
     Returns the updated task in full.
     """
@@ -136,6 +176,7 @@ def update_task(
             assignee=assignee,
             status=status,
             tags=tags,
+            recurrence=recurrence,
             clear=clear,
         )
 
@@ -154,6 +195,7 @@ def update_task_body(
     assignee: str | None = None,
     status: TaskStatus | None = None,
     tags: list[TagName] | None = None,
+    recurrence: Recurrence | None = None,
     clear: list[ClearableField] | None = None,
 ) -> dict[str, Any]:
     """`update_task`'s own body (#302): callable directly, with any session and any `Caller`, with no protocol in between."""
@@ -164,6 +206,7 @@ def update_task_body(
         due_date=due_date,
         priority=priority,
         assignee=assignee,
+        recurrence=recurrence,
     )
     if status == TaskStatus.DONE:
         refuse(
@@ -200,6 +243,10 @@ def update_task_body(
             fields["status"] = status
         if tags is not None:
             fields["tags"] = tags
+        if recurrence is not None:
+            fields["recurrence"] = recurrence
+        elif "recurrence" in cleared:
+            fields["recurrence"] = None
         if due_date_scope is not None:
             fields["due_date_scope"] = due_date_scope
 
@@ -213,11 +260,19 @@ def update_task_body(
     # `status: done` is refused above, before the operation is ever called,
     # so `update` never delegates to `complete` on this path.
     assert isinstance(result, tasks.UpdateResult)
+    # `result.recurrence` is what `update` read *before* applying this
+    # request (`_check_recurrence_update`'s own `current`): still right for a
+    # call that left `recurrence` alone, but stale for one that just started,
+    # changed or stopped it — that one is read back from the database instead
+    # of trusted, the same way `app.api.routes.tasks.update_task` already
+    # does for a human's request.
     [public] = task_publics(
         session,
         [result.task],
         projects={result.task.id: result.project.id},
-        recurrences={result.task.id: result.recurrence},
+        recurrences={}
+        if "recurrence" in task_in.model_fields_set
+        else {result.task.id: result.recurrence},
     )
 
     return public.model_dump(mode="json")
@@ -230,6 +285,7 @@ def _refuse_conflicting_clears(
     due_date: str | None,
     priority: TaskPriority | None,
     assignee: str | None,
+    recurrence: Recurrence | None,
 ) -> None:
     """
     A field sent a value and named in `clear` at once asks two things of the
@@ -240,6 +296,7 @@ def _refuse_conflicting_clears(
         "due_date": due_date is not None,
         "priority": priority is not None,
         "assignee": assignee is not None,
+        "recurrence": recurrence is not None,
     }
     conflicts = sorted(name for name in cleared if sent.get(name))
     if conflicts:

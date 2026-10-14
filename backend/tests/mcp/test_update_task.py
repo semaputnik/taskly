@@ -19,7 +19,13 @@ from sqlmodel import Session
 
 from app.core.config import settings
 from app.mcp.tools.update_task import update_task_body
-from app.models import DueDateScope, TaskPriority, TaskStatus
+from app.models import (
+    DueDateScope,
+    Recurrence,
+    RecurrenceFrequency,
+    TaskPriority,
+    TaskStatus,
+)
 from tests.utils.accounts import (
     ALL_PERMISSIONS,
     READ_ONLY,
@@ -382,6 +388,158 @@ def test_reopening_an_earlier_occurrence_is_refused_naming_the_latest(
     message = str(exc_info.value)
     assert "occurrence_superseded" in message
     assert "latest occurrence" in message
+
+
+# --- Recurrence: starting, changing and stopping a series (#304) ------------
+
+
+def test_recurrence_starts_a_series_on_an_existing_task(
+    client: TestClient, db: Session
+) -> None:
+    owner = create_user_headers(client, db)
+    project_id = create_project(client, owner)
+    task = create_task_record(
+        client, owner, "T", project_id=project_id, due_date="2026-03-02"
+    )
+    headers = bot_headers(
+        client, owner, project_ids=[project_id], permissions=UPDATE_ONLY
+    )
+    caller = caller_for(db, headers)
+
+    result = update_task_body(
+        db,
+        caller,
+        task_id=task["id"],
+        recurrence=Recurrence(frequency=RecurrenceFrequency.WEEKLY),
+    )
+    assert result["recurrence"] == {"frequency": "weekly", "interval_days": None}
+
+
+def test_recurrence_changes_an_existing_series(client: TestClient, db: Session) -> None:
+    owner = create_user_headers(client, db)
+    project_id = create_project(client, owner)
+    task = create_recurring_task(client, owner, date(2026, 3, 2), project_id=project_id)
+    headers = bot_headers(
+        client, owner, project_ids=[project_id], permissions=UPDATE_ONLY
+    )
+    caller = caller_for(db, headers)
+
+    result = update_task_body(
+        db,
+        caller,
+        task_id=task["id"],
+        recurrence=Recurrence(
+            frequency=RecurrenceFrequency.EVERY_N_DAYS, interval_days=5
+        ),
+    )
+    assert result["recurrence"] == {"frequency": "every_n_days", "interval_days": 5}
+
+
+def test_clear_recurrence_stops_the_series(client: TestClient, db: Session) -> None:
+    owner = create_user_headers(client, db)
+    project_id = create_project(client, owner)
+    task = create_recurring_task(client, owner, date(2026, 3, 2), project_id=project_id)
+    headers = bot_headers(
+        client, owner, project_ids=[project_id], permissions=UPDATE_ONLY
+    )
+    caller = caller_for(db, headers)
+
+    result = update_task_body(db, caller, task_id=task["id"], clear=["recurrence"])
+    assert result["recurrence"] is None
+    # The occurrence already made is untouched by stopping the series.
+    assert result["id"] == task["id"]
+    assert result["due_date"] == "2026-03-02"
+
+
+def test_sending_recurrence_and_clearing_it_at_once_is_refused(
+    client: TestClient, db: Session
+) -> None:
+    owner = create_user_headers(client, db)
+    project_id = create_project(client, owner)
+    task = create_recurring_task(client, owner, date(2026, 3, 2), project_id=project_id)
+    headers = bot_headers(
+        client, owner, project_ids=[project_id], permissions=UPDATE_ONLY
+    )
+    caller = caller_for(db, headers)
+
+    with pytest.raises(ToolError) as exc_info:
+        update_task_body(
+            db,
+            caller,
+            task_id=task["id"],
+            recurrence=Recurrence(frequency=RecurrenceFrequency.DAILY),
+            clear=["recurrence"],
+        )
+    message = str(exc_info.value)
+    assert "invalid_argument" in message
+    assert "recurrence" in message
+
+
+def test_starting_a_recurrence_without_a_due_date_is_refused(
+    client: TestClient, db: Session
+) -> None:
+    owner = create_user_headers(client, db)
+    project_id = create_project(client, owner)
+    task = create_task_record(client, owner, "T", project_id=project_id)
+    headers = bot_headers(
+        client, owner, project_ids=[project_id], permissions=UPDATE_ONLY
+    )
+    caller = caller_for(db, headers)
+
+    with pytest.raises(ToolError) as exc_info:
+        update_task_body(
+            db,
+            caller,
+            task_id=task["id"],
+            recurrence=Recurrence(frequency=RecurrenceFrequency.WEEKLY),
+        )
+    assert "A recurring task needs a due date" in str(exc_info.value)
+
+
+def test_a_subtask_cannot_be_given_a_recurrence_through_update(
+    client: TestClient, db: Session
+) -> None:
+    owner = create_user_headers(client, db)
+    project_id = create_project(client, owner)
+    root = create_task_record(client, owner, "Root", project_id=project_id)
+    sub = create_task_record(
+        client, owner, "Sub", parent_id=root["id"], due_date="2026-03-02"
+    )
+    headers = bot_headers(
+        client, owner, project_ids=[project_id], permissions=UPDATE_ONLY
+    )
+    caller = caller_for(db, headers)
+
+    with pytest.raises(ToolError) as exc_info:
+        update_task_body(
+            db,
+            caller,
+            task_id=sub["id"],
+            recurrence=Recurrence(frequency=RecurrenceFrequency.WEEKLY),
+        )
+    assert "Only a task at the top of its tree can recur" in str(exc_info.value)
+
+
+def test_changing_a_recurrence_is_refused_once_the_task_is_done(
+    client: TestClient, db: Session
+) -> None:
+    owner = create_user_headers(client, db)
+    project_id = create_project(client, owner)
+    task = create_recurring_task(client, owner, date(2026, 3, 2), project_id=project_id)
+    assert _patch(client, owner, task["id"], status="done").status_code == 200
+    headers = bot_headers(
+        client, owner, project_ids=[project_id], permissions=UPDATE_ONLY
+    )
+    caller = caller_for(db, headers)
+
+    with pytest.raises(ToolError) as exc_info:
+        update_task_body(
+            db,
+            caller,
+            task_id=task["id"],
+            recurrence=Recurrence(frequency=RecurrenceFrequency.DAILY),
+        )
+    assert "Only an open task can change how it recurs" in str(exc_info.value)
 
 
 # --- Project: moved, a subtask refused, scope both ways ----------------------
