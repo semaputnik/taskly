@@ -9,7 +9,6 @@ import {
 } from "@tanstack/react-query"
 
 import {
-  type ActivityEntriesPublic,
   ActivityService,
   AttachmentsService,
   BotsService,
@@ -311,12 +310,7 @@ export const activityQuery = (query: ReadActivityQuery = {}) =>
   queryOptions({
     queryKey: [ROOT.activity, query],
     queryFn: async () =>
-      // The web UI signs in as a human session, never a bot (ADR-0012), so
-      // the response is always the human projection — `restorable` and the
-      // deletion id included — never the bot one the backend's
-      // response_model also allows for (#298).
-      (await ActivityService.readActivityLog({ query }))
-        .data as ActivityEntriesPublic,
+      (await ActivityService.readActivityLog({ query })).data,
   })
 
 /** How many of a task's log entries one page of its history holds. */
@@ -333,7 +327,6 @@ export const taskActivityQuery = (taskId: string) =>
     queryKey: [ROOT.activity, "task", taskId],
     initialPageParam: 0,
     queryFn: async ({ pageParam }) =>
-      // See `activityQuery` above: always the human projection here too.
       (
         await ActivityService.readActivityLog({
           query: {
@@ -342,7 +335,7 @@ export const taskActivityQuery = (taskId: string) =>
             limit: TASK_HISTORY_PAGE,
           },
         })
-      ).data as ActivityEntriesPublic,
+      ).data,
     getNextPageParam: (last, pages) => {
       const loaded = pages.reduce((n, page) => n + page.data.length, 0)
       return loaded < last.count ? loaded : undefined

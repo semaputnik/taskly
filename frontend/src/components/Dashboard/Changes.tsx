@@ -170,7 +170,10 @@ function Line({
           "release-bot deleted …". The words themselves are the full log's. */}
       <span className="text-ink col-start-2 break-words first-letter:lowercase md:col-start-3">
         <ActivityDescription entry={entry} currentUserId={currentUserId} />
-        {entry.restorable && <Restore entry={entry} />}
+        {/* `restorable` is `null` for a bot user's own projection (ADR-0011,
+            #314), withheld rather than a dead `false` — narrowed with an
+            explicit default here too (see `ActivityLog.tsx`'s own line). */}
+        {(entry.restorable ?? false) && <Restore entry={entry} />}
       </span>
     </li>
   )

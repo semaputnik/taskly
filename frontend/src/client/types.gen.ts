@@ -32,6 +32,11 @@ export type ActivityEntriesPublic = {
 
 /**
  * ActivityEntryPublic
+ *
+ * What `GET /activity-log/` sends back: one shape for a human caller
+ * and a bot user alike (#314). See the module section above this class for
+ * why `restorable` and `deletion_id` are nullable rather than a second,
+ * narrower response model.
  */
 export type ActivityEntryPublic = {
     /**
@@ -133,7 +138,7 @@ export type ActivityEntryPublic = {
     /**
      * Restorable
      */
-    restorable?: boolean;
+    restorable?: boolean | null;
 };
 
 /**
@@ -294,126 +299,6 @@ export type Body_attachments_upload_attachment = {
      * File
      */
     file: Blob | File;
-};
-
-/**
- * BotActivityEntriesPublic
- */
-export type BotActivityEntriesPublic = {
-    /**
-     * Data
-     */
-    data: Array<BotActivityEntryPublic>;
-    /**
-     * Count
-     */
-    count: number;
-};
-
-/**
- * BotActivityEntryPublic
- *
- * What a bot user's own read of the activity log carries (#298, ADR-0011):
- * everything a human's read does except `restorable` and the deletion id.
- * Restoring stays a human-only action, and a handle a bot user cannot act
- * on is a field worth withholding from its response, not a dead one worth
- * keeping at `False`/`None` — so this is the base shape, and
- * `ActivityEntryPublic` is the one that adds the two restore-related
- * fields back for a human, rather than the other way around.
- */
-export type BotActivityEntryPublic = {
-    /**
-     * Id
-     */
-    id: string;
-    action: ActivityAction;
-    entity_type: ActivityEntityType;
-    /**
-     * Entity Id
-     */
-    entity_id: string;
-    /**
-     * Actor Id
-     */
-    actor_id?: string | null;
-    /**
-     * Actor Bot User Id
-     */
-    actor_bot_user_id?: string | null;
-    /**
-     * Actor Bot User Name
-     */
-    actor_bot_user_name?: string | null;
-    /**
-     * Details
-     */
-    details: ({
-        kind: 'task_created';
-    } & TaskCreatedDetailsPublic) | ({
-        kind: 'task_changed';
-    } & TaskChangedDetailsPublic) | ({
-        kind: 'task_moved';
-    } & TaskMovedDetailsPublic) | ({
-        kind: 'task_assigned';
-    } & TaskAssignedDetailsPublic) | ({
-        kind: 'task_unassigned';
-    } & TaskUnassignedDetailsPublic) | ({
-        kind: 'task_completed';
-    } & TaskCompletedDetailsPublic) | ({
-        kind: 'task_reopened';
-    } & TaskReopenedDetailsPublic) | ({
-        kind: 'task_status_changed';
-    } & TaskStatusChangedDetailsPublic) | ({
-        kind: 'task_deleted';
-    } & TaskDeletedSinglePublic) | ({
-        kind: 'task_deleted_batch';
-    } & TaskDeletedBatchPublic) | ({
-        kind: 'task_restored';
-    } & TaskRestoredSinglePublic) | ({
-        kind: 'task_restored_batch';
-    } & TaskRestoredBatchPublic) | ({
-        kind: 'tasks_bulk_changed';
-    } & TasksBulkChangedDetailsPublic) | ({
-        kind: 'project_created';
-    } & ProjectCreatedDetailsPublic) | ({
-        kind: 'project_changed';
-    } & ProjectChangedDetailsPublic) | ({
-        kind: 'project_deleted';
-    } & ProjectDeletedDetailsPublic) | ({
-        kind: 'project_restored';
-    } & ProjectRestoredDetailsPublic) | ({
-        kind: 'comment_added';
-    } & CommentAddedDetailsPublic) | ({
-        kind: 'comment_edited';
-    } & CommentEditedDetailsPublic) | ({
-        kind: 'comment_deleted';
-    } & CommentDeletedDetailsPublic) | ({
-        kind: 'attachment_added';
-    } & AttachmentAddedDetailsPublic) | ({
-        kind: 'attachment_deleted';
-    } & AttachmentDeletedDetailsPublic) | ({
-        kind: 'tag_created';
-    } & TagCreatedDetailsPublic) | ({
-        kind: 'tag_renamed';
-    } & TagRenamedDetailsPublic) | ({
-        kind: 'tag_deleted';
-    } & TagDeletedDetailsPublic) | ({
-        kind: 'tag_merged';
-    } & TagMergedDetailsPublic) | ({
-        kind: 'unrecognized';
-    } & UnrecognizedDetailsPublic);
-    /**
-     * Created At
-     */
-    created_at?: string | null;
-    /**
-     * Entity Exists
-     */
-    entity_exists: boolean;
-    /**
-     * Entity Project Id
-     */
-    entity_project_id?: string | null;
 };
 
 /**
@@ -3934,11 +3819,9 @@ export type activityReadActivityLogError = activityReadActivityLogErrors[keyof a
 
 export type activityReadActivityLogResponses = {
     /**
-     * Response Activity-Read Activity Log
-     *
      * Successful Response
      */
-    200: ActivityEntriesPublic | BotActivityEntriesPublic;
+    200: ActivityEntriesPublic;
 };
 
 export type activityReadActivityLogResponse = activityReadActivityLogResponses[keyof activityReadActivityLogResponses];

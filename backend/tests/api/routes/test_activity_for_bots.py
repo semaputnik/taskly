@@ -329,9 +329,17 @@ def test_the_bot_reads_entries_by_any_actor(client: TestClient, owner: Headers) 
 # --- restorable and the deletion id -----------------------------------------
 
 
-def test_restorable_and_the_deletion_id_are_absent_for_a_bot_present_for_a_human(
+def test_restorable_and_the_deletion_id_are_null_for_a_bot_set_for_a_human(
     client: TestClient, owner: Headers
 ) -> None:
+    """
+    One response model, not a union (#314): a bot user's entry still carries
+    both keys — there is nothing to discriminate between shapes any more —
+    but `null` for both, meaning withheld, never the `False`/absent a human's
+    own entry would never show either. Both sides are asserted here, in one
+    test, so the guard cannot drift into checking one shape without the
+    other.
+    """
     project_id = create_project(client, owner)
     bot = issue_bot_headers(
         client, owner, project_ids=[project_id], permissions=ALL_PERMISSIONS
@@ -342,8 +350,8 @@ def test_restorable_and_the_deletion_id_are_absent_for_a_bot_present_for_a_human
     bot_entry = next(
         e for e in _log(client, bot)["data"] if e["action"] == "task_deleted"
     )
-    assert "restorable" not in bot_entry
-    assert "deletion_id" not in bot_entry
+    assert bot_entry["restorable"] is None
+    assert bot_entry["deletion_id"] is None
 
     human_entry = next(
         e for e in _log(client, owner)["data"] if e["action"] == "task_deleted"

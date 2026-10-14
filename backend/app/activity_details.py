@@ -535,7 +535,7 @@ def named_task_ids(action: str, details: dict[str, Any]) -> list[uuid.UUID]:
 # Everything above is for `app.activity` (the writer) and Python readers.
 # Below answers the ticket's own spike question — can the generated frontend
 # client carry a discriminated union keyed on a string enum? — by being one:
-# wired into `BotActivityEntryPublic.details` (`app.models.activity`), the
+# wired into `ActivityEntryPublic.details` (`app.models.activity`), the
 # real response `GET /activity-log/` sends a bot user, and read back from
 # `scripts/generate-client.sh`'s own output (the PR body carries the
 # generated snippet and the answer).
@@ -790,26 +790,44 @@ def decode_public(action: str, details: dict[str, Any]) -> ActivityDetailsPublic
 
 # --- The public response shapes ---------------------------------------------
 #
-# `BotActivityEntryPublic`/`ActivityEntryPublic` live here rather than in
-# `app.models.activity` because their `details` field is `ActivityDetailsPublic`,
-# declared above: this module already depends on `app.models.activity` one
-# way, for `ActivityAction`/`ActivityEntityType`, and keeping the two response
-# models here too means that stays the only edge rather than growing a second,
-# opposite one back into it. `app.models` re-exports all four, so every
-# existing `from app.models import ActivityEntryPublic`-style import is
-# unaffected.
+# `ActivityEntryPublic` lives here rather than in `app.models.activity`
+# because its `details` field is `ActivityDetailsPublic`, declared above:
+# this module already depends on `app.models.activity` one way, for
+# `ActivityAction`/`ActivityEntityType`, and keeping the response model here
+# too means that stays the only edge rather than growing a second, opposite
+# one back into it. `app.models` re-exports both, so every existing
+# `from app.models import ActivityEntryPublic`-style import is unaffected.
+#
+# One model for both callers (#314, settling #298's spike): a bot user's
+# response and a human's are the same shape, and `restorable`/`deletion_id`
+# are nullable rather than the union of two response models this module used
+# to declare (`BotActivityEntryPublic`/`ActivityEntryPublic`). `None` here
+# means "withheld", not "false" or "absent" — #298 argued a handle a bot
+# user cannot act on is worth withholding rather than kept at a dead
+# `False`/`None`, which is right about `restorable: bool` (sending `False`
+# would state something false, that the entry is not restorable, when
+# restorability is simply none of a bot's business) but stops being right
+# once the field is `bool | None`: `null` is not `False`, it says "withheld"
+# and nothing else. That buys back what the union cost: no discriminator, no
+# `anyOf` in the OpenAPI document, and no `as ActivityEntriesPublic` casts in
+# `frontend/src/lib/serverState.ts`, since there is one shape to generate a
+# client type for rather than two to pick between.
+#
+# `app.api.routes.activity` is the one place that decides which caller gets
+# which values: a human's branch computes a real verdict for both fields, a
+# bot user's branch sets both explicitly to `None` in the same
+# `model_validate(entry, update={...})` call rather than leaving them to
+# whatever `model_validate` would otherwise copy off `entry` itself —
+# `deletion_id` is a real column on `ActivityEntry`, set on the very deletion
+# entry a restore would start from, so omitting it from a bot user's update
+# dict would leak it straight through instead of withholding it.
 
 
-class BotActivityEntryPublic(SQLModel):
-    """
-    What a bot user's own read of the activity log carries (#298, ADR-0011):
-    everything a human's read does except `restorable` and the deletion id.
-    Restoring stays a human-only action, and a handle a bot user cannot act
-    on is a field worth withholding from its response, not a dead one worth
-    keeping at `False`/`None` — so this is the base shape, and
-    `ActivityEntryPublic` is the one that adds the two restore-related
-    fields back for a human, rather than the other way around.
-    """
+class ActivityEntryPublic(SQLModel):
+    """What `GET /activity-log/` sends back: one shape for a human caller
+    and a bot user alike (#314). See the module section above this class for
+    why `restorable` and `deletion_id` are nullable rather than a second,
+    narrower response model."""
 
     id: uuid.UUID
     action: ActivityAction
@@ -829,21 +847,13 @@ class BotActivityEntryPublic(SQLModel):
     # a deleted task has nowhere to link to.
     entity_exists: bool
     entity_project_id: uuid.UUID | None = None
-
-
-class ActivityEntryPublic(BotActivityEntryPublic):
-    # Set on a deletion entry whose rows are still deleted: the entry a
-    # restore can be started from. A bot user's response carries neither
-    # this nor `deletion_id` (ADR-0011) — see `BotActivityEntryPublic`.
+    # Set for a human caller on a deletion entry whose rows are still
+    # deleted: the entry a restore can be started from. `None` for a bot
+    # user always (ADR-0011) — withheld, not a dead `False`/absent key.
     deletion_id: uuid.UUID | None = None
-    restorable: bool = False
+    restorable: bool | None = None
 
 
 class ActivityEntriesPublic(SQLModel):
     data: list[ActivityEntryPublic]
-    count: int
-
-
-class BotActivityEntriesPublic(SQLModel):
-    data: list[BotActivityEntryPublic]
     count: int

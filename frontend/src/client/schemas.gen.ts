@@ -278,9 +278,15 @@ export const ActivityEntryPublicSchema = {
             title: 'Deletion Id'
         },
         restorable: {
-            type: 'boolean',
-            title: 'Restorable',
-            default: false
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Restorable'
         }
     },
     type: 'object',
@@ -292,7 +298,8 @@ export const ActivityEntryPublicSchema = {
         'details',
         'entity_exists'
     ],
-    title: 'ActivityEntryPublic'
+    title: 'ActivityEntryPublic',
+    description: 'What `GET /activity-log/` sends back: one shape for a human caller\nand a bot user alike (#314). See the module section above this class for\nwhy `restorable` and `deletion_id` are nullable rather than a second,\nnarrower response model.'
 } as const;
 
 export const ActivityKindSchema = {
@@ -557,241 +564,6 @@ export const Body_attachments_upload_attachmentSchema = {
         'file'
     ],
     title: 'Body_attachments-upload_attachment'
-} as const;
-
-export const BotActivityEntriesPublicSchema = {
-    properties: {
-        data: {
-            items: {
-                $ref: '#/components/schemas/BotActivityEntryPublic'
-            },
-            type: 'array',
-            title: 'Data'
-        },
-        count: {
-            type: 'integer',
-            title: 'Count'
-        }
-    },
-    type: 'object',
-    required: [
-        'data',
-        'count'
-    ],
-    title: 'BotActivityEntriesPublic'
-} as const;
-
-export const BotActivityEntryPublicSchema = {
-    properties: {
-        id: {
-            type: 'string',
-            format: 'uuid',
-            title: 'Id'
-        },
-        action: {
-            $ref: '#/components/schemas/ActivityAction'
-        },
-        entity_type: {
-            $ref: '#/components/schemas/ActivityEntityType'
-        },
-        entity_id: {
-            type: 'string',
-            format: 'uuid',
-            title: 'Entity Id'
-        },
-        actor_id: {
-            anyOf: [
-                {
-                    type: 'string',
-                    format: 'uuid'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Actor Id'
-        },
-        actor_bot_user_id: {
-            anyOf: [
-                {
-                    type: 'string',
-                    format: 'uuid'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Actor Bot User Id'
-        },
-        actor_bot_user_name: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Actor Bot User Name'
-        },
-        details: {
-            oneOf: [
-                {
-                    $ref: '#/components/schemas/TaskCreatedDetailsPublic'
-                },
-                {
-                    $ref: '#/components/schemas/TaskChangedDetailsPublic'
-                },
-                {
-                    $ref: '#/components/schemas/TaskMovedDetailsPublic'
-                },
-                {
-                    $ref: '#/components/schemas/TaskAssignedDetailsPublic'
-                },
-                {
-                    $ref: '#/components/schemas/TaskUnassignedDetailsPublic'
-                },
-                {
-                    $ref: '#/components/schemas/TaskCompletedDetailsPublic'
-                },
-                {
-                    $ref: '#/components/schemas/TaskReopenedDetailsPublic'
-                },
-                {
-                    $ref: '#/components/schemas/TaskStatusChangedDetailsPublic'
-                },
-                {
-                    $ref: '#/components/schemas/TaskDeletedSinglePublic'
-                },
-                {
-                    $ref: '#/components/schemas/TaskDeletedBatchPublic'
-                },
-                {
-                    $ref: '#/components/schemas/TaskRestoredSinglePublic'
-                },
-                {
-                    $ref: '#/components/schemas/TaskRestoredBatchPublic'
-                },
-                {
-                    $ref: '#/components/schemas/TasksBulkChangedDetailsPublic'
-                },
-                {
-                    $ref: '#/components/schemas/ProjectCreatedDetailsPublic'
-                },
-                {
-                    $ref: '#/components/schemas/ProjectChangedDetailsPublic'
-                },
-                {
-                    $ref: '#/components/schemas/ProjectDeletedDetailsPublic'
-                },
-                {
-                    $ref: '#/components/schemas/ProjectRestoredDetailsPublic'
-                },
-                {
-                    $ref: '#/components/schemas/CommentAddedDetailsPublic'
-                },
-                {
-                    $ref: '#/components/schemas/CommentEditedDetailsPublic'
-                },
-                {
-                    $ref: '#/components/schemas/CommentDeletedDetailsPublic'
-                },
-                {
-                    $ref: '#/components/schemas/AttachmentAddedDetailsPublic'
-                },
-                {
-                    $ref: '#/components/schemas/AttachmentDeletedDetailsPublic'
-                },
-                {
-                    $ref: '#/components/schemas/TagCreatedDetailsPublic'
-                },
-                {
-                    $ref: '#/components/schemas/TagRenamedDetailsPublic'
-                },
-                {
-                    $ref: '#/components/schemas/TagDeletedDetailsPublic'
-                },
-                {
-                    $ref: '#/components/schemas/TagMergedDetailsPublic'
-                },
-                {
-                    $ref: '#/components/schemas/UnrecognizedDetailsPublic'
-                }
-            ],
-            title: 'Details',
-            discriminator: {
-                propertyName: 'kind',
-                mapping: {
-                    attachment_added: '#/components/schemas/AttachmentAddedDetailsPublic',
-                    attachment_deleted: '#/components/schemas/AttachmentDeletedDetailsPublic',
-                    comment_added: '#/components/schemas/CommentAddedDetailsPublic',
-                    comment_deleted: '#/components/schemas/CommentDeletedDetailsPublic',
-                    comment_edited: '#/components/schemas/CommentEditedDetailsPublic',
-                    project_changed: '#/components/schemas/ProjectChangedDetailsPublic',
-                    project_created: '#/components/schemas/ProjectCreatedDetailsPublic',
-                    project_deleted: '#/components/schemas/ProjectDeletedDetailsPublic',
-                    project_restored: '#/components/schemas/ProjectRestoredDetailsPublic',
-                    tag_created: '#/components/schemas/TagCreatedDetailsPublic',
-                    tag_deleted: '#/components/schemas/TagDeletedDetailsPublic',
-                    tag_merged: '#/components/schemas/TagMergedDetailsPublic',
-                    tag_renamed: '#/components/schemas/TagRenamedDetailsPublic',
-                    task_assigned: '#/components/schemas/TaskAssignedDetailsPublic',
-                    task_changed: '#/components/schemas/TaskChangedDetailsPublic',
-                    task_completed: '#/components/schemas/TaskCompletedDetailsPublic',
-                    task_created: '#/components/schemas/TaskCreatedDetailsPublic',
-                    task_deleted: '#/components/schemas/TaskDeletedSinglePublic',
-                    task_deleted_batch: '#/components/schemas/TaskDeletedBatchPublic',
-                    task_moved: '#/components/schemas/TaskMovedDetailsPublic',
-                    task_reopened: '#/components/schemas/TaskReopenedDetailsPublic',
-                    task_restored: '#/components/schemas/TaskRestoredSinglePublic',
-                    task_restored_batch: '#/components/schemas/TaskRestoredBatchPublic',
-                    task_status_changed: '#/components/schemas/TaskStatusChangedDetailsPublic',
-                    task_unassigned: '#/components/schemas/TaskUnassignedDetailsPublic',
-                    tasks_bulk_changed: '#/components/schemas/TasksBulkChangedDetailsPublic',
-                    unrecognized: '#/components/schemas/UnrecognizedDetailsPublic'
-                }
-            }
-        },
-        created_at: {
-            anyOf: [
-                {
-                    type: 'string',
-                    format: 'date-time'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Created At'
-        },
-        entity_exists: {
-            type: 'boolean',
-            title: 'Entity Exists'
-        },
-        entity_project_id: {
-            anyOf: [
-                {
-                    type: 'string',
-                    format: 'uuid'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Entity Project Id'
-        }
-    },
-    type: 'object',
-    required: [
-        'id',
-        'action',
-        'entity_type',
-        'entity_id',
-        'details',
-        'entity_exists'
-    ],
-    title: 'BotActivityEntryPublic',
-    description: 'What a bot user\'s own read of the activity log carries (#298, ADR-0011):\neverything a human\'s read does except `restorable` and the deletion id.\nRestoring stays a human-only action, and a handle a bot user cannot act\non is a field worth withholding from its response, not a dead one worth\nkeeping at `False`/`None` — so this is the base shape, and\n`ActivityEntryPublic` is the one that adds the two restore-related\nfields back for a human, rather than the other way around.'
 } as const;
 
 export const BotPermissionsSchema = {
