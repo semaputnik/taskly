@@ -1,8 +1,8 @@
 """
-The MCP test helper (spec #252): performs the protocol handshake over HTTP
-against `/mcp`, through the app's test client, with a bot user's token in the
-`Authorization` header exactly as a real agent sends it — never the MCP
-library's own in-process client, because the token is half of what every
+The MCP test helper (spec #252, #325): performs the protocol handshake over
+HTTP against `/mcp`, through the app's test client, with a bot user's token
+in the `Authorization` header exactly as a real agent sends it — never the
+MCP library's own in-process client, because the token is half of what every
 test here is about.
 
 A test reads as one call:
@@ -11,9 +11,14 @@ A test reads as one call:
 whoami = call_tool(client, bot_headers(client, owner), "whoami")
 ```
 
-`start_session` is the lower seam, for a test about the handshake itself (a
-refused token, a session reused with a different one) rather than about a
-tool.
+`/mcp` runs stateless (`app.mcp.gateway.run`, #325): the server never mints a
+session id, so there is no session id for this helper to carry either.
+`start_session` still performs `initialize` then `notifications/initialized`
+— the handshake a real client still sends — but only to get a tool call past
+those two messages; nothing here remembers a session id, because there is
+none to remember. `rpc` still takes an optional `session_id` for a test about
+the handshake itself: one that wants to send a bogus `Mcp-Session-Id` and
+confirm the server answers anyway (#325's whole point).
 """
 
 import json
@@ -69,8 +74,11 @@ def rpc(
 ) -> httpx.Response:
     """
     One JSON-RPC message to `/mcp`, with `headers`' bearer token and,
-    once a session exists, its id. The low-level seam everything else here
-    is built from — a test about a raw protocol message reaches for this.
+    when `session_id` is given, an `Mcp-Session-Id` header alongside it — the
+    server mints none of its own to carry (#325), so this is only ever a test
+    sending one on purpose, to confirm it changes nothing. The low-level seam
+    everything else here is built from — a test about a raw protocol message
+    reaches for this.
     """
     request_headers = {**_RPC_HEADERS, **headers}
     if session_id is not None:
@@ -103,9 +111,8 @@ def open_session(client: TestClient, headers: dict[str, str]) -> httpx.Response:
 
 @dataclass(frozen=True)
 class McpSession:
-    """An open MCP session: the id the server minted, and the headers (bearer token included) that opened it."""
+    """The headers (bearer token included) that opened a handshake — there is no session id to go with them (#325)."""
 
-    session_id: str
     headers: dict[str, str]
 
 
@@ -113,20 +120,19 @@ def start_session(client: TestClient, headers: dict[str, str]) -> McpSession:
     """
     The full handshake — `initialize`, then the `notifications/initialized`
     the protocol requires before anything else — asserting success at each
-    step, so a test that only wants a tool's result never has to.
+    step, so a test that only wants a tool's result never has to. Neither
+    message carries a session id: the server mints none (#325).
     """
     initialize = open_session(client, headers)
     assert initialize.status_code == 200, initialize.text
-    session_id = initialize.headers["mcp-session-id"]
 
     initialized = rpc(
         client,
         headers,
         {"jsonrpc": "2.0", "method": "notifications/initialized"},
-        session_id=session_id,
     )
     assert initialized.status_code == 202, initialized.text
-    return McpSession(session_id=session_id, headers=headers)
+    return McpSession(headers=headers)
 
 
 class ToolError(Exception):
@@ -151,10 +157,9 @@ def call_tool(
     session: McpSession | None = None,
 ) -> Any:
     """
-    Call tool `name` with `arguments`, over a fresh session unless `session`
-    is given (to test session binding across two calls), and return its
-    result — decoded from JSON, since every tool here returns a
-    JSON-serialisable value rather than free text.
+    Call tool `name` with `arguments`, over a fresh handshake unless `session`
+    is given, and return its result — decoded from JSON, since every tool
+    here returns a JSON-serialisable value rather than free text.
 
     Raises `ToolError` if the tool reported a refusal; an `AssertionError`
     if the HTTP call or the JSON-RPC envelope itself failed, which a
@@ -170,7 +175,6 @@ def call_tool(
             "method": "tools/call",
             "params": {"name": name, "arguments": arguments or {}},
         },
-        session_id=opened.session_id,
     )
     assert response.status_code == 200, response.text
     body = response.json()
@@ -189,7 +193,6 @@ def list_tools(client: TestClient, headers: dict[str, str]) -> list[dict[str, An
         client,
         session.headers,
         {"jsonrpc": "2.0", "id": 3, "method": "tools/list"},
-        session_id=session.session_id,
     )
     assert response.status_code == 200, response.text
     tools: list[dict[str, Any]] = response.json()["result"]["tools"]
