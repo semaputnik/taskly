@@ -19,7 +19,6 @@ error handling.
 
 from typing import Any
 
-from fastapi import HTTPException
 from mcp.server.mcpserver import Context
 from mcp.types import ToolAnnotations
 from sqlmodel import Session
@@ -92,7 +91,7 @@ def complete_task_body(
     try:
         resolved_id = resolve_task_id(session, caller, task_id)
         resolved = access.get_task(session, caller, resolved_id, TaskAction.UPDATE)
-    except (HTTPException, Refusal) as exc:
+    except Refusal as exc:
         raise refusal(exc) from exc
 
     task = resolved.task
@@ -125,8 +124,6 @@ def complete_task_body(
             f'{listed}. Send `subtasks: "complete"` to close them too, or '
             f'`subtasks: "leave_uncompleted"` to leave each where it is.',
         )
-    except HTTPException as exc:
-        raise refusal(exc) from exc
 
     [public] = task_publics(
         session, [result.task], projects={result.task.id: resolved.project.id}

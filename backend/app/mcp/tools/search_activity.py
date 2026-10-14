@@ -36,7 +36,6 @@ import uuid
 from collections.abc import Sequence
 from typing import Annotated, Any
 
-from fastapi import HTTPException
 from mcp.server.mcpserver import Context
 from mcp.types import ToolAnnotations
 from pydantic import Field
@@ -250,7 +249,7 @@ def search_activity_body(
                 limit=limit,
             ),
         )
-    except (HTTPException, Refusal) as exc:
+    except Refusal as exc:
         raise refusal(exc) from exc
 
     rows = _rows(session, page.entries)

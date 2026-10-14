@@ -17,7 +17,6 @@ empty) into the `TaskUpdate` that operation already takes, and to refuse
 
 from typing import Annotated, Any, Literal
 
-from fastapi import HTTPException
 from mcp.server.mcpserver import Context
 from mcp.types import ToolAnnotations
 from pydantic import Field
@@ -208,7 +207,7 @@ def update_task_body(
         result = tasks.update(
             session=session, caller=caller, task_id=resolved_id, task_in=task_in
         )
-    except (HTTPException, Refusal) as exc:
+    except Refusal as exc:
         raise refusal(exc) from exc
 
     # `status: done` is refused above, before the operation is ever called,

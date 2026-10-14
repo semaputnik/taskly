@@ -46,6 +46,7 @@ from tests.utils.accounts import (
     delete_task,
     token_headers,
 )
+from tests.utils.counting import counting
 from tests.utils.mcp import bot_headers
 from tests.utils.mcp_body import caller_for
 
@@ -505,3 +506,73 @@ def test_project_outside_scope_is_refused_the_way_the_api_refuses_it(
     with pytest.raises(ToolError) as exc_info:
         list_completions_body(db, caller, since=SINCE, until=UNTIL, project=outside)
     assert "not_found" in str(exc_info.value)
+
+
+def test_missing_and_out_of_scope_project_give_the_identical_refusal(
+    client: TestClient, db: Session
+) -> None:
+    """
+    ADR-0011's own point, proven for this tool too: narrowing by a project
+    outside the scope and by one that does not exist at all must not be told
+    apart (#322's own acceptance criterion) — both now reach
+    `app.access.narrowing_project` rather than `_resolve_narrowing_project_id`
+    mirroring the rule on its own.
+    """
+    owner = create_user_headers(client, db)
+    in_scope = create_project(client, owner, "In scope")
+    outside = create_project(client, owner, "Elsewhere")
+    headers = bot_headers(
+        client, owner, project_ids=[in_scope], permissions=ALL_PERMISSIONS
+    )
+    caller = caller_for(db, headers)
+
+    with pytest.raises(ToolError) as outside_exc:
+        list_completions_body(db, caller, since=SINCE, until=UNTIL, project=outside)
+    with pytest.raises(ToolError) as missing_exc:
+        list_completions_body(
+            db, caller, since=SINCE, until=UNTIL, project=str(uuid.uuid4())
+        )
+
+    assert str(outside_exc.value) == str(missing_exc.value)
+
+
+# Statements issued: no discarded location, one ancestry walk per call (#322)
+
+
+def test_statements_do_not_duplicate_the_ancestry_walk_or_the_count(
+    client: TestClient, db: Session
+) -> None:
+    """
+    Three wastes #322 found in this tool's own call: `read_activity` used to
+    run a `COUNT` even though `limit=None` already fetches every row
+    (`test_limit_none_asks_for_every_match`'s own point), it used to run
+    `_locate` for a comment and a tag this tool never reads, and `_enrich`
+    below ran its own `crud.get_task_project_ids` walk over the same task
+    ids `_locate` had just resolved and thrown away. One entries query, no
+    count, and one ancestry walk is what is left: five statements here,
+    measured the same way against `origin/iteration-2026-10-13` as seven.
+    """
+    owner = create_user_headers(client, db)
+    project_id = create_project(client, owner, "Work")
+    headers = bot_headers(
+        client, owner, project_ids=[project_id], permissions=ALL_PERMISSIONS
+    )
+    caller = caller_for(db, headers)
+    task = create_task_record(client, owner, "Write the report", project_id=project_id)
+    r = client.post(
+        f"{API}/tasks/{task['id']}/comments/", headers=owner, json={"body": "Note"}
+    )
+    assert r.status_code == 200, r.text
+    r = client.patch(
+        f"{API}/tasks/{task['id']}", headers=owner, json={"status": "done"}
+    )
+    assert r.status_code == 200, r.text
+    r = client.post(
+        f"{API}/tasks/", headers=owner, json={"title": "Tagged", "tags": ["x"]}
+    )
+    assert r.status_code == 200, r.text
+
+    with counting(db) as statements:
+        list_completions_body(db, caller, since="2020-01-01", until="2030-01-01")
+
+    assert len(statements) == 5

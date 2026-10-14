@@ -33,6 +33,8 @@ from app.access import (
     get_project,
     get_task,
     get_tasks,
+    narrowing_project,
+    narrowing_task,
     refuse_archived_for_bot,
     require_project_writable,
 )
@@ -54,6 +56,8 @@ __all__ = [
     "get_project",
     "get_task",
     "get_tasks",
+    "narrowing_project",
+    "narrowing_task",
     "refuse_archived_for_bot",
     "require_project_writable",
 ]

@@ -34,6 +34,7 @@ from tests.utils.accounts import (
     delete_task,
     token_headers,
 )
+from tests.utils.counting import counting
 from tests.utils.mcp import bot_headers
 from tests.utils.mcp_body import caller_for
 
@@ -717,3 +718,42 @@ def test_task_restored_after_delete(client: TestClient, db: Session) -> None:
     whats = _whats(result)
     assert "Deleted" in whats
     assert "Restored" in whats
+
+
+# Statements issued: this tool never asks for the reader's own `locate` (#322)
+
+
+def test_no_statement_is_issued_for_a_discarded_location(
+    client: TestClient, db: Session
+) -> None:
+    """
+    `read_activity` used to end every call with `_locate` (#298): a Comment
+    parent lookup, an Attachment parent lookup, `crud.get_task_project_ids`'s
+    own recursive walk, and a Project/Tag existence check — a whole
+    projection this tool never reads (#322's own first finding). A page
+    mixing a task, a comment, a tag and the project itself is built here on
+    purpose, so each of those four would have run if `read_activity` still
+    computed it: two statements (the count and the page itself) is what is
+    left once it does not — six before #322, measured the same way on
+    `origin/iteration-2026-10-13`.
+    """
+    owner = create_user_headers(client, db)
+    project_id = create_project(client, owner, "Work")
+    headers = bot_headers(
+        client, owner, project_ids=[project_id], permissions=ALL_PERMISSIONS
+    )
+    caller = caller_for(db, headers)
+    task = create_task_record(client, owner, "Write the report", project_id=project_id)
+    r = client.post(
+        f"{API}/tasks/{task['id']}/comments/", headers=owner, json={"body": "Note"}
+    )
+    assert r.status_code == 200, r.text
+    r = client.post(
+        f"{API}/tasks/", headers=owner, json={"title": "Tagged", "tags": ["x"]}
+    )
+    assert r.status_code == 200, r.text
+
+    with counting(db) as statements:
+        search_activity_body(db, caller)
+
+    assert len(statements) == 2

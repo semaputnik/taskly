@@ -13,11 +13,10 @@ import uuid
 from dataclasses import dataclass
 
 import pytest
-from fastapi import HTTPException
 from sqlmodel import Session
 
 from app import activity, crud
-from app.activity_log import ActivityNarrowing, read_activity
+from app.activity_log import ActivityNarrowing, locate, read_activity
 from app.api.deps import Caller
 from app.models import (
     ActivityAction,
@@ -172,17 +171,17 @@ def test_task_id_not_the_callers_own_is_a_404(db: Session, world: World) -> None
     stranger_project = _project(db, stranger.id, "Theirs")
     stranger_task = _task(db, stranger.id, stranger_project, "Not yours")
 
-    with pytest.raises(HTTPException) as exc_info:
+    with pytest.raises(Refusal) as exc_info:
         read_activity(db, _human(world), ActivityNarrowing(task_id=stranger_task.id))
-    assert exc_info.value.status_code == 404
+    assert exc_info.value.status == 404
 
 
 def test_project_id_outside_a_bots_scope_is_a_404(db: Session, world: World) -> None:
     bot = _bot(db, world, [world.project.id])
 
-    with pytest.raises(HTTPException) as exc_info:
+    with pytest.raises(Refusal) as exc_info:
         read_activity(db, bot, ActivityNarrowing(project_id=world.other_project.id))
-    assert exc_info.value.status_code == 404
+    assert exc_info.value.status == 404
 
 
 def test_project_id_narrows_to_one_projects_chronology(
@@ -276,6 +275,12 @@ def test_limit_none_asks_for_every_match(db: Session, world: World) -> None:
 
 
 # --- the located side data --------------------------------------------------
+#
+# `locate` is its own function (#322), not `ActivityPage`'s own field: a
+# caller that wants it — only the REST route does — calls it on the rows
+# `read_activity` already handed back, rather than every caller paying for a
+# projection it may throw away (`search_activity` and `list_completions`
+# both do).
 
 
 def test_locations_places_a_task_entry_in_its_project(
@@ -283,4 +288,5 @@ def test_locations_places_a_task_entry_in_its_project(
 ) -> None:
     page = read_activity(db, _human(world), ActivityNarrowing(task_id=world.task.id))
 
-    assert page.locations[world.task.id] == world.project.id
+    locations = locate(db, world.owner_id, page.entries)
+    assert locations[world.task.id] == world.project.id

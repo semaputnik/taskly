@@ -9,6 +9,7 @@ and `test_activity_by_kind` for how a log fixture is built and read,
 `test_bot_task_writes` for the scope-and-permission matrix shape.
 """
 
+import uuid
 from typing import Any
 
 import pytest
@@ -444,6 +445,47 @@ def test_narrowing_by_an_out_of_scope_project_is_not_found(
 
     r = _get(client, bot, project_id=out_of_scope)
     assert r.status_code == 404
+
+
+def test_missing_and_out_of_scope_project_give_the_identical_refusal(
+    client: TestClient, owner: Headers
+) -> None:
+    """
+    ADR-0011's own point: one answer whatever the reason a bot cannot reach
+    the id it named, so a scope refusal can never be told apart from a
+    missing one (#322's own acceptance criterion — the project-narrowing
+    refusal is decided once, in `app.access.narrowing_project`, so these two
+    calls cannot answer differently again).
+    """
+    in_scope = create_project(client, owner, "In scope")
+    out_of_scope = create_project(client, owner, "Elsewhere")
+    bot = issue_bot_headers(
+        client, owner, project_ids=[in_scope], permissions=ALL_PERMISSIONS
+    )
+
+    outside = _get(client, bot, project_id=out_of_scope)
+    missing = _get(client, bot, project_id=str(uuid.uuid4()))
+
+    assert outside.status_code == missing.status_code == 404
+    assert outside.json() == missing.json()
+
+
+def test_missing_and_out_of_scope_task_give_the_identical_refusal(
+    client: TestClient, owner: Headers
+) -> None:
+    """The task-narrowing twin of the project one above: also decided once (`app.access.narrowing_task`)."""
+    in_scope = create_project(client, owner, "In scope")
+    out_of_scope = create_project(client, owner, "Elsewhere")
+    bot = issue_bot_headers(
+        client, owner, project_ids=[in_scope], permissions=ALL_PERMISSIONS
+    )
+    outside_task = create_task(client, owner, project_id=out_of_scope)
+
+    outside = _get(client, bot, task_id=outside_task)
+    missing = _get(client, bot, task_id=str(uuid.uuid4()))
+
+    assert outside.status_code == missing.status_code == 404
+    assert outside.json() == missing.json()
 
 
 def test_narrowing_by_an_archived_project_in_scope_is_not_found(

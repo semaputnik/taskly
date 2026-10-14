@@ -15,7 +15,6 @@ is append-only, so there is no second call that fixes it (FR-03.2, FR-08.10).
 
 from typing import Any
 
-from fastapi import HTTPException
 from mcp.server.mcpserver import Context
 from sqlmodel import Session
 
@@ -62,7 +61,7 @@ def comment_task_body(
         comment_row = comments.comment(
             session, caller, resolved_id, CommentCreate(body=body)
         )
-    except (HTTPException, Refusal) as exc:
+    except Refusal as exc:
         raise refusal(exc) from exc
 
     # The author is always this call's own bot user — an MCP caller is

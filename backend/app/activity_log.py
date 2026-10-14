@@ -6,24 +6,33 @@ caller.
 
 `read_activity` takes the narrowing as one value object, `ActivityNarrowing`
 — kind, task, project, actor, period, order and page — and returns the
-matched entries, their total, and where each entry's entity can still be
-opened (`ActivityPage.locations`). The permission check (`read_activity`,
-FR-08.9), the task/project narrowing refusals, the scope condition
+matched entries and their total. The permission check (`read_activity`,
+FR-08.9), the task/project narrowing refusals (`app.access.narrowing_task`,
+`app.access.narrowing_project` — one place for a rule `list_completions`
+used to mirror rather than reach, #322), the scope condition
 (`app.access.activity_log_scope`), the all-or-nothing batch rule and the
 kind grouping all live here once; a caller learns one argument object and
 one return shape, not a dozen keyword arguments kept in step by hand.
 
 What the reader does not do: build the public response shape (that is a
 REST concern — a human's and a bot user's projections differ, ADR-0011 —
-and stays with the route) or compute restorability (also human-only, and
+and stays with the route), compute restorability (also human-only, and
 cheap enough that the route computes it itself over the rows this module
-hands back).
+hands back), or resolve where an entry's entity can still be opened
+(`locate`, below) — `search_activity` and `list_completions` throw that side
+data away, and only the REST route ever reads it, so #298's reader computing
+it for every caller was a projection step running in the wrong place (#322):
+`locate` is its own function now, and the route calls it on the rows the
+reader already handed back rather than the reader computing it unasked.
 
 Below `app.api` (`tests/migrations/test_layering.py`): imports only from
 `app.access`, `app.activity_details`, `app.caller`, `app.crud` and
 `app.models`, none of them above this line, so both front doors — the REST
 route and the MCP tools — reach down into this module rather than into
-each other.
+each other. Raises nothing from `fastapi`: every refusal here is one of
+`app.refusals`'s own values, reached through `app.access` (#322) — the two
+narrowing 404s were the last `HTTPException`s below `app.api` (#309's own
+report), and `tests/migrations/test_layering.py` now asserts none remain.
 """
 
 import uuid
@@ -32,7 +41,6 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
-from fastapi import HTTPException
 from sqlalchemy import Text, and_, cast, literal_column, not_, or_
 from sqlmodel import Session, col, func, select
 
@@ -55,7 +63,6 @@ from app.models import (
     Comment,
     Project,
     Tag,
-    Task,
     TaskStatus,
 )
 
@@ -201,15 +208,13 @@ class ActivityNarrowing:
 class ActivityPage:
     """
     The reader's answer: the matched entries (one page of them, newest or
-    oldest first per the narrowing's own `order`), their total count, and
-    where each entry's entity can still be opened (`locations`, keyed by
-    entity id — `None` for a tag, absent for an entity that is gone or hangs
-    off a task that is).
+    oldest first per the narrowing's own `order`) and their total count —
+    not where each entry's entity can still be opened, which is `locate`'s
+    own job (below), asked for by whichever caller actually wants it (#322).
     """
 
     entries: Sequence[ActivityEntry]
     total: int
-    locations: dict[uuid.UUID, uuid.UUID | None]
 
 
 def _aware(bound: datetime) -> datetime:
@@ -246,22 +251,10 @@ def read_activity(
 
     where: list[Any] = [ActivityEntry.owner_id == caller.owner_id]
     if narrowing.task_id is not None:
-        task = session.get(Task, narrowing.task_id)
-        if (
-            not task
-            or task.owner_id != caller.owner_id
-            or not access.bot_reaches_task(session, caller, narrowing.task_id)
-        ):
-            raise HTTPException(status_code=404, detail="Task not found")
+        access.narrowing_task(session, caller, narrowing.task_id)
         where.append(_on_task(narrowing.task_id))
     if narrowing.project_id is not None:
-        project = session.get(Project, narrowing.project_id)
-        if (
-            not project
-            or project.owner_id != caller.owner_id
-            or not access.bot_reaches_project(caller, project)
-        ):
-            raise HTTPException(status_code=404, detail="Project not found")
+        access.narrowing_project(session, caller, narrowing.project_id)
         where.append(_in_project(narrowing.project_id))
     if (scope := access.activity_log_scope(caller)) is not None:
         where.append(scope)
@@ -278,9 +271,6 @@ def read_activity(
     if narrowing.until is not None:
         where.append(col(ActivityEntry.created_at) <= _aware(narrowing.until))
 
-    total = session.exec(
-        select(func.count()).select_from(ActivityEntry).where(*where)
-    ).one()
     statement = (
         select(ActivityEntry)
         .where(*where)
@@ -295,18 +285,37 @@ def read_activity(
         statement = statement.limit(narrowing.limit)
     entries = session.exec(statement).all()
 
-    locations = _locate(session, caller.owner_id, entries)
-    return ActivityPage(entries=entries, total=total, locations=locations)
+    if narrowing.limit is None:
+        # Every match already fetched (`ActivityNarrowing.limit`'s own
+        # docstring): the rows in hand already say how many there are, so a
+        # second `COUNT` over the same `where` would only repeat a trip the
+        # query above already made (#322, `test_limit_none_asks_for_every_
+        # match`). `narrowing.skip` is folded back in so `total` still names
+        # every match, not only the ones this read kept past its offset.
+        total = len(entries) + narrowing.skip
+    else:
+        total = session.exec(
+            select(func.count()).select_from(ActivityEntry).where(*where)
+        ).one()
+
+    return ActivityPage(entries=entries, total=total)
 
 
-def _locate(
+def locate(
     session: Session, owner_id: uuid.UUID, entries: Sequence[ActivityEntry]
 ) -> dict[uuid.UUID, uuid.UUID | None]:
     """
-    Where each entry's entity can still be opened: the project to open it in,
-    keyed by entity id — None for a tag, which belongs to no project. An
-    entity that is gone, or hangs off a task that is, has no entry here, so
-    its log entry carries no link.
+    Where each of `entries`' entities can still be opened: the project to
+    open it in, keyed by entity id — None for a tag, which belongs to no
+    project. An entity that is gone, or hangs off a task that is, has no
+    entry here, so its log entry carries no link.
+
+    A projection over the reader's rows, not the reader's own job (#322):
+    only `app.api.routes.activity` reads this at all — `search_activity` and
+    `list_completions` throw it away, recursive task-ancestry walk
+    (`crud.get_task_project_ids`) and all, so `read_activity` stopped
+    computing it unasked and this is now its own function, called on the
+    rows a caller already has.
     """
     by_type: dict[str, set[uuid.UUID]] = {}
     for entry in entries:

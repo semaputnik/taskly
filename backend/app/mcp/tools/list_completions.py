@@ -56,7 +56,6 @@ from datetime import datetime
 from statistics import median
 from typing import Annotated, Any
 
-from fastapi import HTTPException
 from mcp.server.mcpserver import Context
 from mcp.types import ToolAnnotations
 from pydantic import Field
@@ -226,7 +225,7 @@ def list_completions_body(
         )
         since_at = since_datetime(since)
         until_at = until_datetime(until)
-    except (HTTPException, Refusal) as exc:
+    except Refusal as exc:
         raise refusal(exc) from exc
 
     entries = _completion_entries(
@@ -267,22 +266,15 @@ def _resolve_narrowing_project_id(
     session: Session, caller: Caller, raw: str
 ) -> uuid.UUID:
     """
-    Which project `project` narrows to, refused the way narrowing the
-    activity log itself is refused (`app.activity_log.read_activity`'s own
-    `project_id` handling, which this mirrors rather than
-    `app.api.access.get_project`'s): a 404 for either a project that is not
-    there or one outside this bot user's scope, the same answer for both,
-    since a scope refusal here would otherwise confirm an id the caller has
-    no business learning is real.
+    Which project `project` narrows to: resolved by name or id, then refused
+    exactly the way narrowing the activity log itself is refused —
+    `app.access.narrowing_project`, the one place that rule lives (#322,
+    replacing this function's own copy of it) — rather than
+    `app.api.access.get_project`'s, which would answer a 403 for the scope
+    and confirm an id the caller has no business learning is real.
     """
     project_id = resolve_project_id(session, caller, raw)
-    project = session.get(Project, project_id)
-    if (
-        project is None
-        or project.owner_id != caller.owner_id
-        or not access.bot_reaches_project(caller, project)
-    ):
-        raise HTTPException(status_code=404, detail="Project not found")
+    access.narrowing_project(session, caller, project_id)
     return project_id
 
 
