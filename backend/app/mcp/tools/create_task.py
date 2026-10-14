@@ -15,7 +15,6 @@ already takes.
 
 from typing import Annotated, Any
 
-from fastapi import HTTPException
 from mcp.server.mcpserver import Context
 from pydantic import Field
 from sqlmodel import Session
@@ -155,7 +154,7 @@ def create_task_body(
             status=status if status is not None else TaskStatus.BACKLOG,
         )
         result = tasks.create(session, caller, task_in)
-    except (HTTPException, Refusal) as exc:
+    except Refusal as exc:
         raise refusal(exc) from exc
 
     [public] = task_publics(

@@ -32,7 +32,6 @@ import uuid
 from enum import StrEnum
 from typing import Annotated, Any
 
-from fastapi import HTTPException
 from mcp.server.mcpserver import Context
 from mcp.types import ToolAnnotations
 from pydantic import Field, ValidationError
@@ -246,7 +245,7 @@ def search_tasks_body(
             skip=offset,
             limit=limit,
         )
-    except (HTTPException, Refusal) as exc:
+    except Refusal as exc:
         raise refusal(exc) from exc
     except ValidationError as exc:
         first = exc.errors()[0]

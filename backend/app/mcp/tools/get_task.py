@@ -10,7 +10,6 @@ task's shape, and on `app.mcp.conventions` for everything else.
 from collections.abc import Sequence
 from typing import Any
 
-from fastapi import HTTPException
 from mcp.server.mcpserver import Context
 from mcp.types import ToolAnnotations
 from sqlmodel import Session
@@ -83,7 +82,7 @@ def get_task_body(
     try:
         resolved_id = resolve_task_id(session, caller, task_id)
         resolved = access.get_task(session, caller, resolved_id, TaskAction.READ)
-    except (HTTPException, Refusal) as exc:
+    except Refusal as exc:
         raise refusal(exc) from exc
 
     [public] = task_publics(

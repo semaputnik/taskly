@@ -55,14 +55,20 @@ rather than re-deriving its own version of any of these rules:
   function three tools each call with their own priority order, rather
   than three copies of the same loop (#301).
 - **Refusals.** `refuse` and `refusal` turn a deliberate refusal — an
-  `app.refusals.Refusal`, raised by an operation (#279) or, since #309, by
-  `app.access` itself, or an `HTTPException` from whatever still answers in
-  HTTP below `app.api` (`app.activity_log`'s own task/project narrowing, and
-  a handful of routes' own inline 400s a tool calls through to) — into the
-  one thing a tool ever raises to report one: a `ToolError` carrying the
-  refusal's own code and one sentence saying what to do next — never a bare
-  status code, and never a guess at a `Refusal`'s code, which it already
-  carries.
+  `app.refusals.Refusal`, raised by an operation (#279), by `app.access`
+  itself (#309), or, since #322, by `app.activity_log`'s own task/project
+  narrowing too, now that it reaches `app.access` for that rule rather than
+  raising `HTTPException` inline — into the one thing a tool ever raises to
+  report one: a `ToolError` carrying the refusal's own code and one sentence
+  saying what to do next — never a bare status code, and never a guess at a
+  `Refusal`'s code, which it already carries. `refusal` still also reads a
+  plain `HTTPException`, the shape authentication answers in
+  (`app.api.deps`, raised before a tool body is even reached) — the one
+  place below `app.api` nothing moved off it (#322): signing in is answered
+  the same way whichever front door asks, and `app.api.deps` is itself one
+  of the two front doors' own wiring, not a layer below either (`tests/
+  migrations/test_layering.py`). Every tool body's own `except` now reads
+  `Refusal` alone; only `open_caller`'s still reads `HTTPException` too.
 """
 
 import re
@@ -106,18 +112,21 @@ _DEFAULT_CODE = {400: "invalid_argument", 404: "not_found", 422: "invalid_argume
 def refusal(exc: HTTPException | Refusal) -> ToolError:
     """
     A refusal, read the way a tool reports one: an `app.refusals.Refusal`
-    (raised by an operation, `app.tasks` and its siblings, or by `app.access`
-    itself since #309) reads its own `code` and `message` straight off, the
-    typed vocabulary #279 introduced for exactly this — unless `code` is
-    `None`, the shape #282 taught this module too, for a refusal pinned as a
-    bare string (`app.refusals.plain`): read the same way a code-less
-    `HTTPException` already was, guessed from its status, since an MCP call
-    needs one either way. An `HTTPException` from whatever still answers in
-    HTTP below `app.api` (`app.activity_log`'s own task/project narrowing,
-    chiefly) still has its code read out of a dict `detail` where it carries
-    one, or guessed from its status for a plain-string `detail` that never
-    needed one before this had to read it back out. Either way, one
-    sentence, never the bare status code.
+    (raised by an operation, `app.tasks` and its siblings, by `app.access`
+    itself since #309, or by `app.activity_log`'s own task/project narrowing
+    since #322, which now reaches `app.access` for that rule too) reads its
+    own `code` and `message` straight off, the typed vocabulary #279
+    introduced for exactly this — unless `code` is `None`, the shape #282
+    taught this module too, for a refusal pinned as a bare string
+    (`app.refusals.plain`): read the same way a code-less `HTTPException`
+    already was, guessed from its status, since an MCP call needs one either
+    way. An `HTTPException` is, since #322, only ever the one authentication
+    gives (`app.api.deps`, read by `open_caller` before a tool body even
+    starts) — nothing below `app.api` raises one any more
+    (`tests/migrations/test_layering.py` asserts it) — still read the same
+    way: its code out of a dict `detail` where it carries one, or guessed
+    from its status for a plain-string `detail`. Either way, one sentence,
+    never the bare status code.
     """
     if isinstance(exc, Refusal):
         code = (

@@ -14,6 +14,7 @@ from app.activity_details import (
 )
 from app.activity_log import _KIND_ACTIONS as _KIND_ACTIONS  # re-export, see below
 from app.activity_log import ActivityNarrowing
+from app.activity_log import locate as _locate
 from app.activity_log import read_activity as _read_activity
 from app.api.access import archived_refusal
 from app.api.deps import CallerDep, CurrentUser, SessionDep
@@ -153,7 +154,10 @@ def read_activity_log(
         ),
     )
     entries = page.entries
-    locations = page.locations
+    # This route is the one caller that opens an entry back up, so it is the
+    # one that asks the reader's own `locate` for where each entity still is
+    # — `search_activity` and `list_completions` never do (#322).
+    locations = _locate(session, caller.owner_id, entries)
 
     bot_names = dict(
         session.exec(

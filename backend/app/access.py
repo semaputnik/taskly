@@ -440,6 +440,42 @@ def bot_reaches_task(session: Session, caller: Caller, task_id: uuid.UUID) -> bo
     return project is not None and bot_reaches_project(caller, project)
 
 
+def narrowing_task(session: Session, caller: Caller, task_id: uuid.UUID) -> None:
+    """
+    Refuse narrowing a listing by a task the caller cannot reach — missing,
+    someone else's, or (for a bot) outside its scope — one answer for all
+    three (ADR-0011's Consequence). `app.activity_log.read_activity`'s own
+    `task_id` and `list_completions`'s task narrowing, were it to grow one,
+    both reach this rather than each deciding it again: a 404 that says
+    nothing about why, never the 403 `get_task` gives a caller asking after
+    a task directly, which would confirm the id is real.
+    """
+    task = session.get(Task, task_id)
+    if (
+        not task
+        or task.owner_id != caller.owner_id
+        or not bot_reaches_task(session, caller, task_id)
+    ):
+        raise refusals.plain(404, TASK_NOT_FOUND)
+
+
+def narrowing_project(session: Session, caller: Caller, project_id: uuid.UUID) -> None:
+    """
+    `narrowing_task`'s own project twin: `app.activity_log.read_activity`'s
+    `project_id` and `list_completions._resolve_narrowing_project_id` both
+    reach this rather than each re-deriving the rule — previously the same
+    four lines written out twice, with nothing holding the two in step
+    (semaputnik/taskly#322).
+    """
+    project = session.get(Project, project_id)
+    if (
+        not project
+        or project.owner_id != caller.owner_id
+        or not bot_reaches_project(caller, project)
+    ):
+        raise refusals.plain(404, "Project not found")
+
+
 def activity_log_scope(caller: Caller) -> Any | None:
     """
     What a bot user's activity-log read may see, as one condition built once

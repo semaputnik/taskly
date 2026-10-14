@@ -18,10 +18,19 @@ reaching up into one. `app.main` wires both into one FastAPI app. Everything
 else in `app` sits below that line and may not import back up into
 `app.api`.
 
+A second rule lives here too (#322): nothing below `app.api` may raise
+`fastapi.HTTPException` either — an operation, `app.access` and (since #309)
+`app.activity_log` all answer in `app.refusals.Refusal`, which knows nothing
+about HTTP, so an `HTTPException` surfacing from any of them is the same
+inversion as an import, caught the same way: statically, so the next one
+fails a test rather than leaving a non-HTTP caller (`app.mcp`) catching an
+HTTP-shaped exception to learn it was refused the way `app.activity_log`'s
+own task/project narrowing used to (#322, following #309's report).
+
 Parses the source directly, the same way `test_models_class_names.py` checks
 for class-name collisions: a static walk over the `ast` finds every import
-regardless of whether the module importing it is ever exercised by a test,
-which a runtime check of `sys.modules` would not.
+and every raise regardless of whether the module is ever exercised by a
+test, which a runtime check of `sys.modules` would not.
 """
 
 import ast
@@ -86,4 +95,55 @@ def test_nothing_below_app_api_imports_from_it() -> None:
     assert not violations, (
         "these modules sit below app.api but import from it, an upward "
         f"dependency the layering forbids: {violations}"
+    )
+
+
+def _raised_name(node: ast.expr | None) -> str | None:
+    """
+    The dotted-or-bare name a `raise` (or a `raise ... from ...`) actually
+    raises, whether it names a class directly (`raise HTTPException(...)`) or
+    calls one (`raise HTTPException(status_code=...)`) — the two shapes this
+    codebase's own raises take, either way read off `node.exc`.
+    """
+    target = node
+    if isinstance(target, ast.Call):
+        target = target.func
+    if isinstance(target, ast.Name):
+        return target.id
+    if isinstance(target, ast.Attribute):
+        return target.attr
+    return None
+
+
+def _http_exception_raises(tree: ast.AST) -> int:
+    return sum(
+        1
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Raise) and _raised_name(node.exc) == "HTTPException"
+    )
+
+
+def test_nothing_below_app_api_raises_http_exception() -> None:
+    """
+    `fastapi.HTTPException` is `app.api`'s own: every refusal below it answers
+    in `app.refusals.Refusal` instead (#309), `app.activity_log`'s own
+    task/project narrowing included, since #322 moved its last two raises
+    onto `app.access`. A module down here raising one again is the same
+    inversion importing from `app.api` is — caught the same way, so the next
+    one fails here rather than landing the way these two did.
+    """
+    violations: list[str] = []
+    for file in _source_files():
+        module_name = _module_name(file)
+        if _is_above_the_line(module_name):
+            continue
+        with open(file, encoding="utf-8") as source:
+            tree = ast.parse(source.read(), filename=file)
+        if _http_exception_raises(tree):
+            violations.append(module_name)
+
+    assert not violations, (
+        "these modules sit below app.api but raise fastapi.HTTPException, "
+        f"which belongs above that line (app.refusals.Refusal instead): "
+        f"{violations}"
     )

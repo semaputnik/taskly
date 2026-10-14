@@ -16,7 +16,6 @@ operation already queried, so this tool's own subtree query is gone.
 
 from typing import Any
 
-from fastapi import HTTPException
 from mcp.server.mcpserver import Context
 from mcp.types import ToolAnnotations
 from sqlmodel import Session
@@ -73,7 +72,7 @@ def delete_task_body(
         # subtasks has the task to name them from; the access decision
         # itself is still the operation's a moment later.
         task = access.get_task(session, caller, resolved_id, TaskAction.DELETE).task
-    except (HTTPException, Refusal) as exc:
+    except Refusal as exc:
         raise refusal(exc) from exc
 
     try:
@@ -96,8 +95,6 @@ def delete_task_body(
             f"which would be deleted with it: {listed}. Send "
             "`delete_subtasks: true` to confirm.",
         )
-    except HTTPException as exc:
-        raise refusal(exc) from exc
 
     # `task` was loaded before the delete and the delete never renames a
     # task, so its title is read here unchanged rather than queried back —
