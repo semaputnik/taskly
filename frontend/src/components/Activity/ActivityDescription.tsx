@@ -2,88 +2,13 @@ import { Link } from "@tanstack/react-router"
 import type { ReactNode } from "react"
 
 import type { ActivityEntryPublic } from "@/client"
-import { type RecordKind, recordLink } from "@/components/Records/panels"
+import { recordLink } from "@/components/Records/panels"
 import { cn } from "@/lib/utils"
-import { entryWords } from "./entryWords"
+import { entryWords, recordOf, subjectName } from "./entryWords"
 
 interface ActivityDescriptionProps {
   entry: ActivityEntryPublic
   currentUserId?: string
-}
-
-/**
- * What an entry names: the task, project, tag, or task a comment or file is
- * on. Switches on `details.kind` — the discriminated union's own tag
- * (#299's spike) — the same way `recordOf` below does, rather than reading
- * `entry.entity_type` or which field happens to be on `details`.
- */
-function subjectName(entry: ActivityEntryPublic): string {
-  const { details } = entry
-  switch (details.kind) {
-    case "project_created":
-    case "project_changed":
-    case "project_deleted":
-    case "project_restored":
-      return details.name ?? "Untitled project"
-    case "tag_created":
-    case "tag_renamed":
-    case "tag_deleted":
-    case "tag_merged":
-      // "Untitled project" covers a nameless tag too — an existing
-      // wording quirk, preserved rather than fixed, since nothing
-      // user-visible changes in this ticket.
-      return details.name ?? "Untitled project"
-    case "comment_added":
-    case "comment_edited":
-    case "comment_deleted":
-    case "attachment_added":
-    case "attachment_deleted":
-      return details.task.title ?? "a task"
-    // A batch names no single task; a row the backend could not make
-    // sense of at all names nothing either (`to_public`'s own fallback).
-    case "task_deleted_batch":
-    case "task_restored_batch":
-    case "tasks_bulk_changed":
-    case "unrecognized":
-      return "Untitled task"
-    default:
-      return details.title ?? "Untitled task"
-  }
-}
-
-/**
- * The record an entry links to: its own entity, or for a comment or a file,
- * the task it is on.
- */
-function recordOf(
-  entry: ActivityEntryPublic,
-): { kind: RecordKind; id: string } | null {
-  switch (entry.entity_type) {
-    case "task":
-    case "project":
-    case "tag":
-      return { kind: entry.entity_type, id: entry.entity_id }
-    case "comment":
-    case "attachment": {
-      const { details } = entry
-      // Narrowed by `kind` rather than `"task" in details`: `task_created`'s
-      // own snapshot also has a `task` field, but it is a `TaskSnapshot`
-      // (named only by its fields, not its id) rather than the `TaskRef` a
-      // comment or an attachment names its task by.
-      switch (details.kind) {
-        case "comment_added":
-        case "comment_edited":
-        case "comment_deleted":
-        case "attachment_added":
-        case "attachment_deleted":
-          return { kind: "task", id: details.task.id }
-        default:
-          return null
-      }
-    }
-    default:
-      return null
-  }
 }
 
 /**
