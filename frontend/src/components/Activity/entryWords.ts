@@ -389,6 +389,11 @@ export function entryWords(
         tasks > 0 ? `, taking it off ${plural(tasks, "task")}` : "",
       )
     }
+    // A row the backend itself could not make sense of (`app.activity_details
+    // .to_public`'s own fallback) — one bad entry says so plainly rather
+    // than breaking the page it would otherwise take down with it.
+    case "unrecognized":
+      return implicit ? null : whole("Something changed")
   }
 }
 

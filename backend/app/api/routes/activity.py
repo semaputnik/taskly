@@ -5,7 +5,13 @@ from fastapi import APIRouter, HTTPException, Query
 from sqlmodel import col, select
 
 from app import deletions
-from app.activity_details import to_public
+from app.activity_details import (
+    ActivityEntriesPublic,
+    ActivityEntryPublic,
+    BotActivityEntriesPublic,
+    BotActivityEntryPublic,
+    to_public,
+)
 from app.activity_log import _KIND_ACTIONS as _KIND_ACTIONS  # re-export, see below
 from app.activity_log import ActivityNarrowing
 from app.activity_log import read_activity as _read_activity
@@ -14,13 +20,9 @@ from app.api.deps import CallerDep, CurrentUser, SessionDep
 from app.deletions import DeletionKind, Restorability, RestoreRefusal
 from app.models import (
     ActivityAction,
-    ActivityEntriesPublic,
     ActivityEntry,
-    ActivityEntryPublic,
     ActivityKind,
     ActivityOrder,
-    BotActivityEntriesPublic,
-    BotActivityEntryPublic,
     BotUser,
     Message,
 )

@@ -440,4 +440,20 @@ describe("entryWords", () => {
       expect(actions.has(action)).toBe(true)
     }
   })
+
+  test("a row the backend could not decode says so plainly, in both voices", () => {
+    // `app.activity_details.to_public`'s own fallback for a row whose shape
+    // has drifted further than this module tolerates — never produced by
+    // `kindOf` above, but a real value `details.kind` can carry (#299).
+    const unrecognized = entry("task_created", {})
+    unrecognized.details = {
+      kind: "unrecognized",
+    } as typeof unrecognized.details
+    expect(entryWords(unrecognized, "names-its-subject")).toEqual({
+      verb: "Something changed",
+      subject: false,
+      after: "",
+    })
+    expect(entryWords(unrecognized, "subject-implicit")).toBeNull()
+  })
 })

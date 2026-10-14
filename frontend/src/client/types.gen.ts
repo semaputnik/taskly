@@ -111,7 +111,9 @@ export type ActivityEntryPublic = {
         kind: 'tag_deleted';
     } & TagDeletedDetailsPublic) | ({
         kind: 'tag_merged';
-    } & TagMergedDetailsPublic);
+    } & TagMergedDetailsPublic) | ({
+        kind: 'unrecognized';
+    } & UnrecognizedDetailsPublic);
     /**
      * Created At
      */
@@ -165,26 +167,8 @@ export type ActivityOrder = 'newest' | 'oldest';
  */
 export type ActorKind = 'user' | 'bot_user';
 
-/**
- * AssigneeRef
- *
- * Who a task is assigned to: the user, or a bot user with its name — a bot
- * user can be renamed or deleted later, the user is always "you". `name` is
- * `None` for a user assignee, since there is only ever one user to be and
- * naming it says nothing a reader does not already know; every reader
- * already treats it as optional. (Before this module, a user assignee's
- * `name` key was omitted outright rather than written as `null` — a wire
- * detail no reader distinguished from `None`, and keeping the distinction
- * would have cost `AssigneeRef` its declared shape in the generated client:
- * a per-instance key omission cannot be expressed in a schema, only `{}`
- * can, which is what every field that embeds `AssigneeRef` would have
- * degraded to.)
- */
 export type AssigneeRef = {
-    /**
-     * Type
-     */
-    type: 'user' | 'bot_user';
+    type: ActorKind;
     /**
      * Id
      */
@@ -415,7 +399,9 @@ export type BotActivityEntryPublic = {
         kind: 'tag_deleted';
     } & TagDeletedDetailsPublic) | ({
         kind: 'tag_merged';
-    } & TagMergedDetailsPublic);
+    } & TagMergedDetailsPublic) | ({
+        kind: 'unrecognized';
+    } & UnrecognizedDetailsPublic);
     /**
      * Created At
      */
@@ -1351,6 +1337,16 @@ export type RecurrenceFrequency = 'daily' | 'weekly' | 'monthly' | 'every_n_days
 
 /**
  * RecurrenceRef
+ *
+ * A task's recurrence, as a snapshot (`TaskSnapshot.recurrence`) records
+ * it — deliberately not `app.models.task.Recurrence`, which carries a
+ * validator (`check_interval_days`) enforcing *today's* rule for what a
+ * valid combination is. A snapshot records what was true when it was
+ * taken, and the log keeps it for ever (FR-10.5): validating a years-old
+ * row against the current rule would make a combination the product used
+ * to allow undecodable forever, the same mistake `extra="ignore"` exists
+ * to avoid at the module level. If `Recurrence` gains a field, an old
+ * snapshot simply never carried it — correct, not drift.
  */
 export type RecurrenceRef = {
     frequency: RecurrenceFrequency;
@@ -1908,7 +1904,7 @@ export type TaskReopenedDetailsPublic = {
      * Title
      */
     title: string;
-    to: TaskStatus;
+    to?: TaskStatus | null;
     /**
      * Kind
      */
@@ -1956,6 +1952,13 @@ export type TaskRestoredSinglePublic = {
  * TaskSnapshot
  *
  * A task in full, as `task_created` records it (`app.activity._snapshot`).
+ *
+ * `status` is optional: every `task_created` entry since statuses replaced
+ * a plain `completed: bool` (#99) carries it, but the log's older rows
+ * don't, and `extra="ignore"` drops their `completed` key rather than
+ * rejecting the entry over it — a reader that needs a task's status from
+ * one of those rows has nothing to invent one from, so this says nothing
+ * instead.
  */
 export type TaskSnapshot = {
     /**
@@ -1971,7 +1974,7 @@ export type TaskSnapshot = {
      */
     due_date?: string | null;
     priority?: TaskPriority | null;
-    status: TaskStatus;
+    status?: TaskStatus | null;
     project?: ProjectRef | null;
     /**
      * Assignee Id
@@ -2132,6 +2135,23 @@ export type Token = {
      * Token Type
      */
     token_type?: string;
+};
+
+/**
+ * UnrecognizedDetailsPublic
+ *
+ * The fallback `to_public` hands back for a row whose stored `details` does
+ * not match its action's declared shape even once `extra="ignore"` and the
+ * optional late fields have had their say — a shape this module has not
+ * been taught to read at all, rather than one of the two historical gaps it
+ * already tolerates. One bad row costs its own line this way, not the
+ * `GET /activity-log/` page it would otherwise take down with it.
+ */
+export type UnrecognizedDetailsPublic = {
+    /**
+     * Kind
+     */
+    kind?: 'unrecognized';
 };
 
 /**

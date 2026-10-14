@@ -303,4 +303,4 @@ def test_assignment_entries_name_the_owner_as_a_user(
     entries = client.get(f"{API}/activity-log/", headers=owner).json()["data"]
     assigned = next(e for e in entries if e["action"] == "task_assigned")
     assert assigned["details"]["assignee_id"] == me
-    assert assigned["details"]["assignee"] == {"type": "user", "id": me, "name": None}
+    assert assigned["details"]["assignee"] == {"type": "user", "id": me}

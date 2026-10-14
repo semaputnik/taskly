@@ -192,58 +192,11 @@ class ActivityEntry(SQLModel, table=True):
     )
 
 
-# Imported here rather than at the top of the file: `app.activity_details`
-# imports `ActivityAction`/`ActivityEntityType`/`ACTIVITY_TASK_REF` back from
-# this module, so this has to wait until all three already exist on it
-# (#299's own spike — see `app.activity_details`'s own module docstring for
-# what this union answers and how).
-from app.activity_details import ActivityDetailsPublic  # noqa: E402
-
-
-class BotActivityEntryPublic(SQLModel):
-    """
-    What a bot user's own read of the activity log carries (#298, ADR-0011):
-    everything a human's read does except `restorable` and the deletion id.
-    Restoring stays a human-only action, and a handle a bot user cannot act
-    on is a field worth withholding from its response, not a dead one worth
-    keeping at `False`/`None` — so this is the base shape, and
-    `ActivityEntryPublic` is the one that adds the two restore-related
-    fields back for a human, rather than the other way around.
-    """
-
-    id: uuid.UUID
-    action: ActivityAction
-    entity_type: ActivityEntityType
-    entity_id: uuid.UUID
-    # Exactly one of the two is set. A bot user's name comes along, since the
-    # log is where its owner finds out which integration did what.
-    actor_id: uuid.UUID | None = None
-    actor_bot_user_id: uuid.UUID | None = None
-    actor_bot_user_name: str | None = None
-    # A discriminated union keyed on `kind` (`app.activity_details.to_public`
-    # injects it; never stored), not the plain `dict[str, Any]` the database
-    # column (`ActivityEntry.details`, above) holds — #299's spike.
-    details: ActivityDetailsPublic
-    created_at: datetime | None = None
-    # Whether the entity can still be opened, and the project to open it in:
-    # a deleted task has nowhere to link to.
-    entity_exists: bool
-    entity_project_id: uuid.UUID | None = None
-
-
-class ActivityEntryPublic(BotActivityEntryPublic):
-    # Set on a deletion entry whose rows are still deleted: the entry a
-    # restore can be started from. A bot user's response carries neither
-    # this nor `deletion_id` (ADR-0011) — see `BotActivityEntryPublic`.
-    deletion_id: uuid.UUID | None = None
-    restorable: bool = False
-
-
-class ActivityEntriesPublic(SQLModel):
-    data: list[ActivityEntryPublic]
-    count: int
-
-
-class BotActivityEntriesPublic(SQLModel):
-    data: list[BotActivityEntryPublic]
-    count: int
+# `BotActivityEntryPublic`/`ActivityEntryPublic`/`ActivityEntriesPublic`/
+# `BotActivityEntriesPublic` live in `app.activity_details` instead of here
+# (re-exported by `app.models`, below): that module's `ActivityDetailsPublic`
+# is what `details` is typed as on the first two, and it already depends on
+# this module one way, for `ActivityAction`/`ActivityEntityType` — moving the
+# four response models to the same side keeps that one-directional rather
+# than adding a second, opposite edge back into this one (#299's spike; see
+# `app.activity_details`'s own module docstring for what the union answers).

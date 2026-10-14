@@ -198,6 +198,9 @@ export const ActivityEntryPublicSchema = {
                 },
                 {
                     $ref: '#/components/schemas/TagMergedDetailsPublic'
+                },
+                {
+                    $ref: '#/components/schemas/UnrecognizedDetailsPublic'
                 }
             ],
             title: 'Details',
@@ -229,7 +232,8 @@ export const ActivityEntryPublicSchema = {
                     task_restored_batch: '#/components/schemas/TaskRestoredBatchPublic',
                     task_status_changed: '#/components/schemas/TaskStatusChangedDetailsPublic',
                     task_unassigned: '#/components/schemas/TaskUnassignedDetailsPublic',
-                    tasks_bulk_changed: '#/components/schemas/TasksBulkChangedDetailsPublic'
+                    tasks_bulk_changed: '#/components/schemas/TasksBulkChangedDetailsPublic',
+                    unrecognized: '#/components/schemas/UnrecognizedDetailsPublic'
                 }
             }
         },
@@ -328,12 +332,7 @@ export const ActorKindSchema = {
 export const AssigneeRefSchema = {
     properties: {
         type: {
-            type: 'string',
-            enum: [
-                'user',
-                'bot_user'
-            ],
-            title: 'Type'
+            $ref: '#/components/schemas/ActorKind'
         },
         id: {
             type: 'string',
@@ -352,14 +351,11 @@ export const AssigneeRefSchema = {
             title: 'Name'
         }
     },
-    additionalProperties: false,
     type: 'object',
     required: [
         'type',
         'id'
-    ],
-    title: 'AssigneeRef',
-    description: 'Who a task is assigned to: the user, or a bot user with its name — a bot\nuser can be renamed or deleted later, the user is always "you". `name` is\n`None` for a user assignee, since there is only ever one user to be and\nnaming it says nothing a reader does not already know; every reader\nalready treats it as optional. (Before this module, a user assignee\'s\n`name` key was omitted outright rather than written as `null` — a wire\ndetail no reader distinguished from `None`, and keeping the distinction\nwould have cost `AssigneeRef` its declared shape in the generated client:\na per-instance key omission cannot be expressed in a schema, only `{}`\ncan, which is what every field that embeds `AssigneeRef` would have\ndegraded to.)'
+    ]
 } as const;
 
 export const AttachmentAddedDetailsPublicSchema = {
@@ -386,7 +382,6 @@ export const AttachmentAddedDetailsPublicSchema = {
             default: 'attachment_added'
         }
     },
-    additionalProperties: false,
     type: 'object',
     required: [
         'task',
@@ -421,7 +416,6 @@ export const AttachmentDeletedDetailsPublicSchema = {
             default: 'attachment_deleted'
         }
     },
-    additionalProperties: false,
     type: 'object',
     required: [
         'task',
@@ -719,6 +713,9 @@ export const BotActivityEntryPublicSchema = {
                 },
                 {
                     $ref: '#/components/schemas/TagMergedDetailsPublic'
+                },
+                {
+                    $ref: '#/components/schemas/UnrecognizedDetailsPublic'
                 }
             ],
             title: 'Details',
@@ -750,7 +747,8 @@ export const BotActivityEntryPublicSchema = {
                     task_restored_batch: '#/components/schemas/TaskRestoredBatchPublic',
                     task_status_changed: '#/components/schemas/TaskStatusChangedDetailsPublic',
                     task_unassigned: '#/components/schemas/TaskUnassignedDetailsPublic',
-                    tasks_bulk_changed: '#/components/schemas/TasksBulkChangedDetailsPublic'
+                    tasks_bulk_changed: '#/components/schemas/TasksBulkChangedDetailsPublic',
+                    unrecognized: '#/components/schemas/UnrecognizedDetailsPublic'
                 }
             }
         },
@@ -1285,7 +1283,6 @@ export const CommentAddedDetailsPublicSchema = {
             default: 'comment_added'
         }
     },
-    additionalProperties: false,
     type: 'object',
     required: [
         'task',
@@ -1326,7 +1323,6 @@ export const CommentDeletedDetailsPublicSchema = {
             default: 'comment_deleted'
         }
     },
-    additionalProperties: false,
     type: 'object',
     required: [
         'task',
@@ -1354,7 +1350,6 @@ export const CommentEditedDetailsPublicSchema = {
             default: 'comment_edited'
         }
     },
-    additionalProperties: false,
     type: 'object',
     required: [
         'task',
@@ -1495,7 +1490,6 @@ export const FieldChangeSchema = {
             title: 'To'
         }
     },
-    additionalProperties: false,
     type: 'object',
     title: 'FieldChange',
     description: 'One field\'s value before and after, as a `task_changed`/`project_changed`/\n`tag_renamed`/`comment_edited` entry\'s own `changes` map holds it.'
@@ -1882,7 +1876,6 @@ export const ProjectChangedDetailsPublicSchema = {
             default: 'project_changed'
         }
     },
-    additionalProperties: false,
     type: 'object',
     required: [
         'name',
@@ -1942,7 +1935,6 @@ export const ProjectCreatedDetailsPublicSchema = {
             default: 'project_created'
         }
     },
-    additionalProperties: false,
     type: 'object',
     required: [
         'name'
@@ -1967,7 +1959,6 @@ export const ProjectDeletedDetailsPublicSchema = {
             default: 'project_deleted'
         }
     },
-    additionalProperties: false,
     type: 'object',
     required: [
         'name',
@@ -2080,7 +2071,6 @@ export const ProjectRefSchema = {
             title: 'Name'
         }
     },
-    additionalProperties: false,
     type: 'object',
     required: [
         'id'
@@ -2106,7 +2096,6 @@ export const ProjectRestoredDetailsPublicSchema = {
             default: 'project_restored'
         }
     },
-    additionalProperties: false,
     type: 'object',
     required: [
         'name',
@@ -2264,12 +2253,12 @@ export const RecurrenceRefSchema = {
             title: 'Interval Days'
         }
     },
-    additionalProperties: false,
     type: 'object',
     required: [
         'frequency'
     ],
-    title: 'RecurrenceRef'
+    title: 'RecurrenceRef',
+    description: 'A task\'s recurrence, as a snapshot (`TaskSnapshot.recurrence`) records\nit — deliberately not `app.models.task.Recurrence`, which carries a\nvalidator (`check_interval_days`) enforcing *today\'s* rule for what a\nvalid combination is. A snapshot records what was true when it was\ntaken, and the log keeps it for ever (FR-10.5): validating a years-old\nrow against the current rule would make a combination the product used\nto allow undecodable forever, the same mistake `extra="ignore"` exists\nto avoid at the module level. If `Recurrence` gains a field, an old\nsnapshot simply never carried it — correct, not drift.'
 } as const;
 
 export const RegistrationStartSchema = {
@@ -2336,7 +2325,6 @@ export const TagCreatedDetailsPublicSchema = {
             default: 'tag_created'
         }
     },
-    additionalProperties: false,
     type: 'object',
     required: [
         'name'
@@ -2361,7 +2349,6 @@ export const TagDeletedDetailsPublicSchema = {
             default: 'tag_deleted'
         }
     },
-    additionalProperties: false,
     type: 'object',
     required: [
         'name',
@@ -2489,7 +2476,6 @@ export const TagMergedDetailsPublicSchema = {
             default: 'tag_merged'
         }
     },
-    additionalProperties: false,
     type: 'object',
     required: [
         'name',
@@ -2572,7 +2558,6 @@ export const TagRenamedDetailsPublicSchema = {
             default: 'tag_renamed'
         }
     },
-    additionalProperties: false,
     type: 'object',
     required: [
         'name',
@@ -2676,7 +2661,6 @@ export const TaskAssignedDetailsPublicSchema = {
             default: 'task_assigned'
         }
     },
-    additionalProperties: false,
     type: 'object',
     required: [
         'title'
@@ -2837,7 +2821,6 @@ export const TaskChangedDetailsPublicSchema = {
             default: 'task_changed'
         }
     },
-    additionalProperties: false,
     type: 'object',
     required: [
         'title',
@@ -2859,7 +2842,6 @@ export const TaskCompletedDetailsPublicSchema = {
             default: 'task_completed'
         }
     },
-    additionalProperties: false,
     type: 'object',
     required: [
         'title'
@@ -2992,7 +2974,6 @@ export const TaskCreatedDetailsPublicSchema = {
             default: 'task_created'
         }
     },
-    additionalProperties: false,
     type: 'object',
     required: [
         'title',
@@ -3014,7 +2995,6 @@ export const TaskDeletedBatchPublicSchema = {
             default: 'task_deleted_batch'
         }
     },
-    additionalProperties: false,
     type: 'object',
     required: [
         'task_count'
@@ -3062,7 +3042,6 @@ export const TaskDeletedSinglePublicSchema = {
             default: 'task_deleted'
         }
     },
-    additionalProperties: false,
     type: 'object',
     required: [
         'title'
@@ -3123,7 +3102,6 @@ export const TaskMovedDetailsPublicSchema = {
             default: 'task_moved'
         }
     },
-    additionalProperties: false,
     type: 'object',
     required: [
         'title'
@@ -3325,7 +3303,6 @@ export const TaskRefSchema = {
             title: 'Title'
         }
     },
-    additionalProperties: false,
     type: 'object',
     required: [
         'id',
@@ -3342,7 +3319,14 @@ export const TaskReopenedDetailsPublicSchema = {
             title: 'Title'
         },
         to: {
-            $ref: '#/components/schemas/TaskStatus'
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/TaskStatus'
+                },
+                {
+                    type: 'null'
+                }
+            ]
         },
         kind: {
             type: 'string',
@@ -3351,11 +3335,9 @@ export const TaskReopenedDetailsPublicSchema = {
             default: 'task_reopened'
         }
     },
-    additionalProperties: false,
     type: 'object',
     required: [
-        'title',
-        'to'
+        'title'
     ],
     title: 'TaskReopenedDetailsPublic'
 } as const;
@@ -3373,7 +3355,6 @@ export const TaskRestoredBatchPublicSchema = {
             default: 'task_restored_batch'
         }
     },
-    additionalProperties: false,
     type: 'object',
     required: [
         'task_count'
@@ -3421,7 +3402,6 @@ export const TaskRestoredSinglePublicSchema = {
             default: 'task_restored'
         }
     },
-    additionalProperties: false,
     type: 'object',
     required: [
         'title'
@@ -3469,7 +3449,14 @@ export const TaskSnapshotSchema = {
             ]
         },
         status: {
-            $ref: '#/components/schemas/TaskStatus'
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/TaskStatus'
+                },
+                {
+                    type: 'null'
+                }
+            ]
         },
         project: {
             anyOf: [
@@ -3522,14 +3509,12 @@ export const TaskSnapshotSchema = {
             ]
         }
     },
-    additionalProperties: false,
     type: 'object',
     required: [
-        'title',
-        'status'
+        'title'
     ],
     title: 'TaskSnapshot',
-    description: 'A task in full, as `task_created` records it (`app.activity._snapshot`).'
+    description: 'A task in full, as `task_created` records it (`app.activity._snapshot`).\n\n`status` is optional: every `task_created` entry since statuses replaced\na plain `completed: bool` (#99) carries it, but the log\'s older rows\ndon\'t, and `extra="ignore"` drops their `completed` key rather than\nrejecting the entry over it — a reader that needs a task\'s status from\none of those rows has nothing to invent one from, so this says nothing\ninstead.'
 } as const;
 
 export const TaskSortSchema = {
@@ -3576,7 +3561,6 @@ export const TaskStatusChangedDetailsPublicSchema = {
             default: 'task_status_changed'
         }
     },
-    additionalProperties: false,
     type: 'object',
     required: [
         'title',
@@ -3621,7 +3605,6 @@ export const TaskUnassignedDetailsPublicSchema = {
             default: 'task_unassigned'
         }
     },
-    additionalProperties: false,
     type: 'object',
     required: [
         'title'
@@ -3787,7 +3770,6 @@ export const TasksBulkChangedDetailsPublicSchema = {
             default: 'tasks_bulk_changed'
         }
     },
-    additionalProperties: false,
     type: 'object',
     required: [
         'task_count',
@@ -3836,6 +3818,20 @@ export const TokenSchema = {
         'access_token'
     ],
     title: 'Token'
+} as const;
+
+export const UnrecognizedDetailsPublicSchema = {
+    properties: {
+        kind: {
+            type: 'string',
+            const: 'unrecognized',
+            title: 'Kind',
+            default: 'unrecognized'
+        }
+    },
+    type: 'object',
+    title: 'UnrecognizedDetailsPublic',
+    description: 'The fallback `to_public` hands back for a row whose stored `details` does\nnot match its action\'s declared shape even once `extra="ignore"` and the\noptional late fields have had their say — a shape this module has not\nbeen taught to read at all, rather than one of the two historical gaps it\nalready tolerates. One bad row costs its own line this way, not the\n`GET /activity-log/` page it would otherwise take down with it.'
 } as const;
 
 export const UserListedSchema = {

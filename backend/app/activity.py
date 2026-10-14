@@ -67,6 +67,7 @@ from app.models import (
     ActivityAction,
     ActivityEntityType,
     ActivityEntry,
+    ActorKind,
     Attachment,
     BotUser,
     Comment,
@@ -487,7 +488,7 @@ class _Refs:
         bot user can be renamed or deleted later, the user is always "you".
         """
         if state.assignee_id is not None:
-            return AssigneeRef(type="user", id=state.assignee_id)
+            return AssigneeRef(type=ActorKind.USER, id=state.assignee_id)
         bot_user_id = state.assignee_bot_user_id
         if bot_user_id is None:
             return None
@@ -495,7 +496,7 @@ class _Refs:
             bot_user = self._session.get_one(BotUser, bot_user_id)
             self._bot_user_names[bot_user_id] = bot_user.name
         return AssigneeRef(
-            type="bot_user",
+            type=ActorKind.BOT_USER,
             id=bot_user_id,
             name=self._bot_user_names[bot_user_id],
         )

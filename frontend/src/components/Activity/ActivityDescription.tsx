@@ -13,25 +13,42 @@ interface ActivityDescriptionProps {
 
 /**
  * What an entry names: the task, project, tag, or task a comment or file is
- * on. Read off `entry.details` by which field is there rather than by
- * `entry.entity_type`, since that is what the discriminated union itself
- * narrows on (#299's spike) — `"name"` only ever appears on a project or a
- * tag entry, top-level `"title"` only on a task entry (never on
- * `task_deleted_batch`/`task_restored_batch`, which names no single task at
- * all, so this falls through to "Untitled task" for those, as it always
- * has), and nested `"task"` only on a comment or an attachment entry — checked
- * last, since `task_created`'s own snapshot also carries a `task` field,
- * whose `title` already matches the entry's own (top-level) one.
+ * on. Switches on `details.kind` — the discriminated union's own tag
+ * (#299's spike) — the same way `recordOf` below does, rather than reading
+ * `entry.entity_type` or which field happens to be on `details`.
  */
 function subjectName(entry: ActivityEntryPublic): string {
   const { details } = entry
-  // "Untitled project" covers a nameless tag too — an existing wording
-  // quirk, preserved rather than fixed, since nothing user-visible changes
-  // in this ticket.
-  if ("name" in details) return details.name ?? "Untitled project"
-  if ("title" in details) return details.title ?? "Untitled task"
-  if ("task" in details) return details.task.title ?? "a task"
-  return "Untitled task"
+  switch (details.kind) {
+    case "project_created":
+    case "project_changed":
+    case "project_deleted":
+    case "project_restored":
+      return details.name ?? "Untitled project"
+    case "tag_created":
+    case "tag_renamed":
+    case "tag_deleted":
+    case "tag_merged":
+      // "Untitled project" covers a nameless tag too — an existing
+      // wording quirk, preserved rather than fixed, since nothing
+      // user-visible changes in this ticket.
+      return details.name ?? "Untitled project"
+    case "comment_added":
+    case "comment_edited":
+    case "comment_deleted":
+    case "attachment_added":
+    case "attachment_deleted":
+      return details.task.title ?? "a task"
+    // A batch names no single task; a row the backend could not make
+    // sense of at all names nothing either (`to_public`'s own fallback).
+    case "task_deleted_batch":
+    case "task_restored_batch":
+    case "tasks_bulk_changed":
+    case "unrecognized":
+      return "Untitled task"
+    default:
+      return details.title ?? "Untitled task"
+  }
 }
 
 /**
