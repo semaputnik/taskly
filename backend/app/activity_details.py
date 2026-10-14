@@ -421,7 +421,9 @@ def decode(action: str, details: dict[str, Any]) -> ActivityDetails:
     if isinstance(model, tuple):
         single, batch = model
         model = single if DETAILS_TITLE in details else batch
-    return model.model_validate(details)  # type: ignore[return-value]
+    return model.model_validate(  # type: ignore[return-value] # ty: ignore[invalid-return-type]
+        details
+    )
 
 
 def named_task_ids(action: str, details: dict[str, Any]) -> list[uuid.UUID]:

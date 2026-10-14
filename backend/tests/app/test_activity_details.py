@@ -11,15 +11,15 @@ import pytest
 from pydantic import ValidationError
 
 from app.activity_details import (
-    AssigneeRef,
     DETAILS_TASK_IDS,
+    AssigneeRef,
     FieldChange,
     ProjectRef,
     TaskCreatedDetails,
     TaskDeletedBatch,
     TaskDeletedSingle,
-    TaskSnapshot,
     TasksBulkChangedDetails,
+    TaskSnapshot,
     decode,
     encode,
     named_task_ids,
