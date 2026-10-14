@@ -28,6 +28,18 @@ on the same session). `test_two_commits_touching_one_entity_are_two_entries_not_
 pins the second: an act that touches *one* entity twice across two commits,
 which nothing in the product does today, built directly against a `Session`
 to give the collapse risk above something concrete to fail against.
+
+#284 then gave `app.tasks` and `app.comments`'s five operations a
+`UnitOfWork` each, which is where #278's own two cases above went: both
+still pass, pinned unchanged (ADR-0013's "Verified: the activity log is
+unaffected"). #306's survey went looking for every other write path left
+committing more than once on one request's session, to settle what moving
+that boundary to `app.api.deps.get_db` would actually have cost each of
+them — a number, not a worry. It found exactly one still standing,
+`app.api.routes.attachments.upload_attachment` (ADR-0013's own attachment
+exception, kept on purpose): `test_uploading_a_pdf_with_paperless_connected_is_one_entry_not_two`
+pins what its two commits produce — the only other place in the product
+where this file's question applies at all.
 """
 
 import uuid
@@ -44,6 +56,7 @@ from app.models import (
     BotPermissions,
     BotScope,
     BotUserCreate,
+    PaperlessHandover,
     TaskCreate,
     TaskPriority,
     User,
@@ -51,15 +64,18 @@ from app.models import (
     WebhookEventType,
     WebhookKind,
 )
+from tests.paperless.support import connected_user, upload
 from tests.utils.accounts import (
     create_bot_user,
     create_project,
+    create_task_record,
     create_user_headers,
     my_id,
     set_webhook,
     token_headers,
 )
 from tests.utils.mcp import call_tool
+from tests.utils.paperless import pdf
 from tests.utils.utils import random_email
 from tests.utils.webhooks import outbox
 
@@ -239,6 +255,52 @@ def test_closing_a_recurring_task_with_a_note_is_three_entries_and_one_delivery(
     # for. Deleting the owner cascades through its project, tasks, bot users,
     # activity entries and this delivery, the same cleanup the suite performs
     # for every account at the end, done here instead of left for then.
+    owner_row = db.get(User, owner_id)
+    assert owner_row is not None
+    db.delete(owner_row)
+    db.commit()
+
+
+def test_uploading_a_pdf_with_paperless_connected_is_one_entry_not_two(
+    client: TestClient, db: Session
+) -> None:
+    """
+    The one other write path in this codebase that commits twice on purpose
+    outside #284's five operations (#306's own survey): `app.api.routes.
+    attachments.upload_attachment` commits `crud.create_attachment`'s row —
+    the attachment exception ADR-0013 names, durable before its bytes reach
+    storage — then commits `app.paperless.queue_handover`'s hand-over row in
+    a second, separate transaction on the one session the request opens.
+
+    Unlike the collapse risk the other tests in this file pin, the two
+    commits never touch the *same* entity: the attachment, once, in the
+    first; a `PaperlessHandover`, a kind `app.activity._collect` does not
+    watch at all, in the second. A caller sees one entry either way, so this
+    is the number a request-edge boundary would have cost here — nothing,
+    because there is nothing for the two commits to collapse. A deliberate
+    change to this pinned count means editing this test in the same commit.
+    """
+    owner = connected_user(client, db)
+    owner_id = uuid.UUID(my_id(client, owner))
+    project_id = create_project(client, owner, "Receipts")
+    task = create_task_record(client, owner, "File the invoice", project_id=project_id)
+
+    seen = _entries(db, owner_id)
+
+    attachment = upload(client, owner, task["id"], pdf())
+
+    # The second commit really happened: a hand-over row exists for it.
+    handover = db.exec(
+        select(PaperlessHandover).where(
+            PaperlessHandover.attachment_id == uuid.UUID(attachment["id"])
+        )
+    ).first()
+    assert handover is not None
+
+    entries = _entries(db, owner_id)[len(seen) :]
+    assert [entry.action for entry in entries] == ["attachment_added"]
+    assert entries[0].entity_id == uuid.UUID(attachment["id"])
+
     owner_row = db.get(User, owner_id)
     assert owner_row is not None
     db.delete(owner_row)

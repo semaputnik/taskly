@@ -124,7 +124,11 @@ function Line({
       >
         <ActivityDescription entry={entry} currentUserId={currentUserId} />
       </span>
-      {entry.restorable && (
+      {/* `restorable` is `null` for a bot user's own projection (ADR-0011,
+          #314) — withheld rather than a dead `false` — so this narrows with
+          an explicit default rather than trusting `null` to read as falsy
+          forever. */}
+      {(entry.restorable ?? false) && (
         <span className="col-start-2 text-[13px] md:col-start-4">
           <RestoreDeletion entry={entry} />
         </span>

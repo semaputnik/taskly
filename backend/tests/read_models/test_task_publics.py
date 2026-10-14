@@ -8,7 +8,6 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import event
 from sqlmodel import Session
 
 from app.models import Task
@@ -21,6 +20,7 @@ from tests.utils.accounts import (
     create_task,
     create_user_headers,
 )
+from tests.utils.counting import counting
 
 Headers = dict[str, str]
 
@@ -92,7 +92,7 @@ def test_known_projects_and_recurrences_are_not_looked_up_again(
     child = create_task(client, owner, parent_id=parent)
     task = db.get_one(Task, uuid.UUID(child))
 
-    with _counting(db) as statements:
+    with counting(db) as statements:
         [public] = task_publics(
             db,
             [task],
@@ -102,22 +102,6 @@ def test_known_projects_and_recurrences_are_not_looked_up_again(
 
     assert str(public.project_id) == project_id
     assert not [s for s in statements if "task_ancestry" in s or "series" in s]
-
-
-class _counting:
-    def __init__(self, db: Session) -> None:
-        self.engine = db.get_bind()
-        self.statements: list[str] = []
-
-    def _record(self, *args: Any) -> None:
-        self.statements.append(str(args[2]))
-
-    def __enter__(self) -> list[str]:
-        event.listen(self.engine, "before_cursor_execute", self._record)
-        return self.statements
-
-    def __exit__(self, *_: object) -> None:
-        event.remove(self.engine, "before_cursor_execute", self._record)
 
 
 def test_serialising_costs_the_same_for_one_task_and_fifty(
@@ -145,7 +129,7 @@ def test_serialising_costs_the_same_for_one_task_and_fifty(
     def cost(task_ids: list[str]) -> int:
         db.expire_all()
         tasks = [db.get_one(Task, uuid.UUID(task_id)) for task_id in task_ids]
-        with _counting(db) as recorded:
+        with counting(db) as recorded:
             task_publics(db, tasks)
         return len(recorded)
 

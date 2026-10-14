@@ -2,7 +2,7 @@ import uuid
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
-from sqlmodel import col, func, select
+from sqlmodel import func, select
 
 from app import crud, deletions
 from app.api import access
@@ -45,30 +45,17 @@ def read_projects(
     """
     if archived:
         access.refuse_archived_for_bot(caller)
-    conditions: list[Any] = [
-        Project.owner_id == caller.owner_id,
-        crud.not_deleted(Project),
-        Project.is_archived == archived,
-    ]
-    if caller.bot is not None:
-        conditions.append(col(Project.id).in_(caller.project_ids))
-    count_statement = select(func.count()).select_from(Project).where(*conditions)
+    # The same statement `GET /caller` runs for a bot's scope list (issue
+    # #264), so the two orderings cannot drift apart the way they once did.
+    statement = crud.project_list_statement(
+        owner_id=caller.owner_id,
+        archived=archived,
+        project_ids=caller.project_ids if caller.bot is not None else None,
+    )
+    count_statement = select(func.count()).select_from(statement.subquery())
     count = session.exec(count_statement).one()
 
-    # A fixed order, so paging is stable: Inbox first, then by name ignoring
-    # case, with the id to settle projects that share a name.
-    statement = (
-        select(Project)
-        .where(*conditions)
-        .order_by(
-            col(Project.is_inbox).desc(),
-            func.lower(Project.name),
-            col(Project.id),
-        )
-        .offset(skip)
-        .limit(limit)
-    )
-    projects = session.exec(statement).all()
+    projects = session.exec(statement.offset(skip).limit(limit)).all()
     task_stats = crud.get_project_task_stats(
         session=session,
         owner_id=caller.owner_id,

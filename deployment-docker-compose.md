@@ -259,7 +259,7 @@ A human session cannot use `/mcp` at all — it is refused for what it is, not o
 
 Eleven tools are available. `whoami` tells the agent who it is, whose data it reaches, what its scope allows and what today's date is here. `search_tasks`, `get_task` and `list_tags` read; `create_task`, `update_task`, `complete_task`, `comment_task` and `delete_task` write, each confined by the bot user's scope and grants and each recorded in the activity log as that bot user's own doing. `search_activity` and `list_completions` read the activity log, and need the `read_activity` grant, which is off until the owner gives it.
 
-Nothing about `/mcp` needs a routing change: it is a path on the application Traefik already routes by host, and its responses are plain JSON rather than a server-sent stream, so no proxy buffering setting applies.
+Nothing about `/mcp` needs a routing change: it is a path on the application Traefik already routes by host, and its responses are plain JSON rather than a server-sent stream, so no proxy buffering setting applies. Nor does it need sticky routing. The server keeps no session state, so any of the image's four worker processes can answer any call — each one carries the bot user's token and is authorised on its own. Before v2.1.1 it did keep session state, in one worker's memory, which broke roughly three agent calls in four (#325); if you are reading an older deployment of this doc, that is the symptom.
 
 ## URLs
 

@@ -15,11 +15,12 @@ already takes.
 
 from typing import Annotated, Any
 
-from fastapi import HTTPException
 from mcp.server.mcpserver import Context
 from pydantic import Field
+from sqlmodel import Session
 
 from app import tasks
+from app.api.deps import Caller
 from app.mcp.conventions import (
     open_caller,
     refusal,
@@ -87,45 +88,77 @@ def create_task(
     Returns the created task in full, with its id, so it can be acted on
     immediately.
     """
+    with open_caller(ctx) as (session, caller):
+        return create_task_body(
+            session,
+            caller,
+            title=title,
+            description=description,
+            project=project,
+            parent_task_id=parent_task_id,
+            status=status,
+            priority=priority,
+            due_date=due_date,
+            tags=tags,
+            assignee=assignee,
+            recurrence=recurrence,
+        )
+
+
+def create_task_body(
+    session: Session,
+    caller: Caller,
+    *,
+    title: str,
+    description: str | None = None,
+    project: str | None = None,
+    parent_task_id: str | None = None,
+    status: TaskStatus | None = None,
+    priority: TaskPriority | None = None,
+    due_date: str | None = None,
+    tags: list[TagName] | None = None,
+    assignee: str | None = None,
+    recurrence: Recurrence | None = None,
+) -> dict[str, Any]:
+    """`create_task`'s own body (#302): callable directly, with any session and any `Caller`, with no protocol in between."""
     if parent_task_id is not None and project is not None:
         refuse(
             "invalid_argument",
             "A subtask belongs to the project of its parent; name no project for it.",
         )
 
-    with open_caller(ctx) as (session, caller):
-        try:
-            project_id = (
-                resolve_project_id(session, caller, project)
-                if project is not None
-                else None
-            )
-            parent_id = (
-                resolve_task_id(session, caller, parent_task_id)
-                if parent_task_id is not None
-                else None
-            )
-            due = resolve_date(due_date) if due_date is not None else None
-            assignee_id = resolve_assignee(caller, assignee)
-
-            task_in = TaskCreate(
-                title=title,
-                description=description,
-                due_date=due,
-                priority=priority,
-                tags=tags or [],
-                project_id=project_id,
-                parent_id=parent_id,
-                assignee_id=assignee_id,
-                recurrence=recurrence,
-                status=status if status is not None else TaskStatus.BACKLOG,
-            )
-            result = tasks.create(session, caller, task_in)
-        except (HTTPException, Refusal) as exc:
-            raise refusal(exc) from exc
-
-        [public] = task_publics(
-            session, [result.task], projects={result.task.id: result.project.id}
+    try:
+        project_id = (
+            resolve_project_id(session, caller, project)
+            if project is not None
+            else None
         )
+        parent_id = (
+            resolve_task_id(session, caller, parent_task_id)
+            if parent_task_id is not None
+            else None
+        )
+        due = resolve_date(due_date) if due_date is not None else None
+        assignee_id = resolve_assignee(caller, assignee)
+
+        task_in = TaskCreate(
+            title=title,
+            description=description,
+            due_date=due,
+            priority=priority,
+            tags=tags or [],
+            project_id=project_id,
+            parent_id=parent_id,
+            assignee_id=assignee_id,
+            recurrence=recurrence,
+            status=status if status is not None else TaskStatus.BACKLOG,
+        )
+        result = tasks.create(session, caller, task_in)
+    except Refusal as exc:
+        raise refusal(exc) from exc
+
+    [public] = task_publics(
+        session, [result.task], projects={result.task.id: result.project.id}
+    )
 
     return public.model_dump(mode="json")

@@ -18,16 +18,23 @@ activity entry's `created_at` are both set by the server), so a fixture
 that needs a known lead time sets them directly through the `db` session —
 the same session `create_user_headers` itself writes a user through — after
 the act that would otherwise stamp "now".
+
+Exercised against `list_completions_body` directly (#302) — see
+`test_whoami.py`'s own module docstring for why, and where the protocol
+itself is still tested.
 """
 
 import uuid
 from datetime import UTC, date, datetime, time, timedelta
 from typing import Any
 
+import pytest
 from fastapi.testclient import TestClient
+from mcp.server.mcpserver.exceptions import ToolError
 from sqlmodel import Session, col, select
 
 from app.core.config import settings
+from app.mcp.tools.list_completions import list_completions_body
 from app.models import ActivityAction, ActivityEntry, Task
 from tests.utils.accounts import (
     ALL_PERMISSIONS,
@@ -39,7 +46,9 @@ from tests.utils.accounts import (
     delete_task,
     token_headers,
 )
-from tests.utils.mcp import ToolError, bot_headers, call_tool, list_tools
+from tests.utils.counting import counting
+from tests.utils.mcp import bot_headers
+from tests.utils.mcp_body import caller_for
 
 API = settings.API_V1_STR
 TODAY = date.today()
@@ -110,18 +119,6 @@ def _rows(result: dict[str, Any]) -> list[dict[str, Any]]:
     return rows
 
 
-def test_tools_list_advertises_list_completions_read_only(
-    client: TestClient, db: Session
-) -> None:
-    owner = create_user_headers(client, db)
-    headers = bot_headers(client, owner, permissions=ALL_PERMISSIONS)
-
-    tools = list_tools(client, headers)
-    tool = next(t for t in tools if t["name"] == "list_completions")
-    assert tool["description"]
-    assert tool["annotations"]["readOnlyHint"] is True
-
-
 def test_without_the_grant_is_refused_by_name(client: TestClient, db: Session) -> None:
     owner = create_user_headers(client, db)
     project_id = create_project(client, owner)
@@ -131,13 +128,13 @@ def test_without_the_grant_is_refused_by_name(client: TestClient, db: Session) -
         project_ids=[project_id],
         permissions={**ALL_PERMISSIONS, "read_activity": False},
     )
+    caller = caller_for(db, headers)
 
-    try:
-        call_tool(client, headers, "list_completions", {"since": SINCE, "until": UNTIL})
-        raise AssertionError("expected a refusal")
-    except ToolError as exc:
-        assert "permission_not_granted" in exc.message
-        assert "activity log" in exc.message
+    with pytest.raises(ToolError) as exc_info:
+        list_completions_body(db, caller, since=SINCE, until=UNTIL)
+    message = str(exc_info.value)
+    assert "permission_not_granted" in message
+    assert "activity log" in message
 
 
 def test_a_single_completion_row_with_known_lead_time(
@@ -148,6 +145,7 @@ def test_a_single_completion_row_with_known_lead_time(
     headers = bot_headers(
         client, owner, project_ids=[project_id], permissions=ALL_PERMISSIONS
     )
+    caller = caller_for(db, headers)
     task = create_task_record(
         client,
         owner,
@@ -160,9 +158,7 @@ def test_a_single_completion_row_with_known_lead_time(
     _backdate_task(db, task["id"], _at(5))
     _backdate_completion(db, task["id"], _at(2))
 
-    result = call_tool(
-        client, headers, "list_completions", {"since": SINCE, "until": UNTIL}
-    )
+    result = list_completions_body(db, caller, since=SINCE, until=UNTIL)
     [row] = _rows(result)
     assert row["id"] == task["id"].replace("-", "")[:8]
     assert row["title"] == "Write the report"
@@ -191,6 +187,7 @@ def test_a_batch_completion_produces_a_row_per_task(
     headers = bot_headers(
         client, owner, project_ids=[project_id], permissions=ALL_PERMISSIONS
     )
+    caller = caller_for(db, headers)
     first = create_task_record(client, owner, "First", project_id=project_id)
     second = create_task_record(client, owner, "Second", project_id=project_id)
     third = create_task_record(client, owner, "Third", project_id=project_id)
@@ -203,9 +200,7 @@ def test_a_batch_completion_produces_a_row_per_task(
     ids = [first["id"], second["id"], third["id"]]
     _backdate_batch(db, ids, _at(1))
 
-    result = call_tool(
-        client, headers, "list_completions", {"since": SINCE, "until": UNTIL}
-    )
+    result = list_completions_body(db, caller, since=SINCE, until=UNTIL)
     rows = _rows(result)
     assert len(rows) == 3
     assert {row["title"] for row in rows} == {"First", "Second", "Third"}
@@ -222,6 +217,7 @@ def test_a_reopened_and_reclosed_task_is_two_completions_of_one_task(
     headers = bot_headers(
         client, owner, project_ids=[project_id], permissions=ALL_PERMISSIONS
     )
+    caller = caller_for(db, headers)
     task = create_task_record(client, owner, "Flaky", project_id=project_id)
 
     _complete(client, owner, task["id"])
@@ -233,9 +229,7 @@ def test_a_reopened_and_reclosed_task_is_two_completions_of_one_task(
     _complete(client, owner, task["id"])
     _backdate_completion(db, task["id"], _at(1))
 
-    result = call_tool(
-        client, headers, "list_completions", {"since": SINCE, "until": UNTIL}
-    )
+    result = list_completions_body(db, caller, since=SINCE, until=UNTIL)
     rows = _rows(result)
     assert len(rows) == 2
     assert {row["closed"] for row in rows} == {_at(10).isoformat(), _at(1).isoformat()}
@@ -251,6 +245,7 @@ def test_a_deleted_task_keeps_its_row_marked_deleted_with_no_current_fields(
     headers = bot_headers(
         client, owner, project_ids=[project_id], permissions=ALL_PERMISSIONS
     )
+    caller = caller_for(db, headers)
     task = create_task_record(
         client,
         owner,
@@ -264,9 +259,7 @@ def test_a_deleted_task_keeps_its_row_marked_deleted_with_no_current_fields(
     _backdate_completion(db, task["id"], _at(4))
     assert delete_task(client, owner, task["id"]).status_code == 200
 
-    result = call_tool(
-        client, headers, "list_completions", {"since": SINCE, "until": UNTIL}
-    )
+    result = list_completions_body(db, caller, since=SINCE, until=UNTIL)
     [row] = _rows(result)
     assert row["deleted"] is True
     assert row["title"] == "Finish then forget"
@@ -293,6 +286,7 @@ def test_a_batch_closed_task_later_deleted_falls_back_to_untitled(
     headers = bot_headers(
         client, owner, project_ids=[project_id], permissions=ALL_PERMISSIONS
     )
+    caller = caller_for(db, headers)
     task = create_task_record(client, owner, "Batched then gone", project_id=project_id)
     r = client.post(
         f"{API}/tasks/bulk",
@@ -303,9 +297,7 @@ def test_a_batch_closed_task_later_deleted_falls_back_to_untitled(
     _backdate_batch(db, [task["id"]], _at(1))
     assert delete_task(client, owner, task["id"]).status_code == 200
 
-    result = call_tool(
-        client, headers, "list_completions", {"since": SINCE, "until": UNTIL}
-    )
+    result = list_completions_body(db, caller, since=SINCE, until=UNTIL)
     [row] = _rows(result)
     assert row["deleted"] is True
     assert row["title"] == "Untitled task"
@@ -319,6 +311,7 @@ def test_each_occurrence_of_a_series_is_its_own_completion(
     headers = bot_headers(
         client, owner, project_ids=[project_id], permissions=ALL_PERMISSIONS
     )
+    caller = caller_for(db, headers)
     first = create_recurring_task(client, owner, TODAY, project_id=project_id)
     _complete(client, owner, first["id"])
     _backdate_completion(db, first["id"], _at(5))
@@ -334,9 +327,7 @@ def test_each_occurrence_of_a_series_is_its_own_completion(
     _complete(client, owner, second_id)
     _backdate_completion(db, second_id, _at(1))
 
-    result = call_tool(
-        client, headers, "list_completions", {"since": SINCE, "until": UNTIL}
-    )
+    result = list_completions_body(db, caller, since=SINCE, until=UNTIL)
     rows = _rows(result)
     assert len(rows) == 2
     assert {row["id"] for row in rows} == {
@@ -353,6 +344,7 @@ def test_narrowing_by_project(client: TestClient, db: Session) -> None:
     headers = bot_headers(
         client, owner, project_ids=[work, home], permissions=ALL_PERMISSIONS
     )
+    caller = caller_for(db, headers)
     in_work = create_task_record(client, owner, "In Work", project_id=work)
     in_home = create_task_record(client, owner, "In Home", project_id=home)
     _complete(client, owner, in_work["id"])
@@ -360,12 +352,7 @@ def test_narrowing_by_project(client: TestClient, db: Session) -> None:
     _backdate_completion(db, in_work["id"], _at(1))
     _backdate_completion(db, in_home["id"], _at(1))
 
-    result = call_tool(
-        client,
-        headers,
-        "list_completions",
-        {"since": SINCE, "until": UNTIL, "project": "Work"},
-    )
+    result = list_completions_body(db, caller, since=SINCE, until=UNTIL, project="Work")
     rows = _rows(result)
     assert [row["title"] for row in rows] == ["In Work"]
     assert result["summary"]["completions"] == 1
@@ -389,6 +376,7 @@ def test_narrowing_by_actor(client: TestClient, db: Session) -> None:
         permissions=ALL_PERMISSIONS,
         name="Reader",
     )
+    caller = caller_for(db, headers)
     by_owner = create_task_record(client, owner, "By owner", project_id=project_id)
     by_sibling = create_task_record(
         client, sibling_headers, "By sibling", project_id=project_id
@@ -398,11 +386,8 @@ def test_narrowing_by_actor(client: TestClient, db: Session) -> None:
     _backdate_completion(db, by_owner["id"], _at(1))
     _backdate_completion(db, by_sibling["id"], _at(1))
 
-    result = call_tool(
-        client,
-        headers,
-        "list_completions",
-        {"since": SINCE, "until": UNTIL, "actor": "Sibling"},
+    result = list_completions_body(
+        db, caller, since=SINCE, until=UNTIL, actor="Sibling"
     )
     rows = _rows(result)
     assert [row["title"] for row in rows] == ["By sibling"]
@@ -415,6 +400,7 @@ def test_narrowing_by_tag(client: TestClient, db: Session) -> None:
     headers = bot_headers(
         client, owner, project_ids=[project_id], permissions=ALL_PERMISSIONS
     )
+    caller = caller_for(db, headers)
     tagged = create_task_record(
         client, owner, "Tagged", project_id=project_id, tags=["urgent"]
     )
@@ -424,12 +410,7 @@ def test_narrowing_by_tag(client: TestClient, db: Session) -> None:
     _backdate_completion(db, tagged["id"], _at(1))
     _backdate_completion(db, untagged["id"], _at(1))
 
-    result = call_tool(
-        client,
-        headers,
-        "list_completions",
-        {"since": SINCE, "until": UNTIL, "tag": "urgent"},
-    )
+    result = list_completions_body(db, caller, since=SINCE, until=UNTIL, tag="urgent")
     rows = _rows(result)
     assert [row["title"] for row in rows] == ["Tagged"]
 
@@ -443,6 +424,7 @@ def test_summary_splits_add_up_to_total_and_median_is_the_middle_value(
     headers = bot_headers(
         client, owner, project_ids=[work, home], permissions=ALL_PERMISSIONS
     )
+    caller = caller_for(db, headers)
     two_days = create_task_record(client, owner, "Two days", project_id=work)
     four_days = create_task_record(client, owner, "Four days", project_id=work)
     six_days = create_task_record(client, owner, "Six days", project_id=home)
@@ -455,9 +437,7 @@ def test_summary_splits_add_up_to_total_and_median_is_the_middle_value(
         _backdate_task(db, task["id"], _at(filed_days_ago))
         _backdate_completion(db, task["id"], _at(closed_days_ago))
 
-    result = call_tool(
-        client, headers, "list_completions", {"since": SINCE, "until": UNTIL}
-    )
+    result = list_completions_body(db, caller, since=SINCE, until=UNTIL)
     summary = result["summary"]
     assert summary["completions"] == 3
     assert sum(summary["by_project"].values()) == 3
@@ -474,17 +454,13 @@ def test_truncated_names_a_filter_to_narrow_with(
     headers = bot_headers(
         client, owner, project_ids=[project_id], permissions=ALL_PERMISSIONS
     )
+    caller = caller_for(db, headers)
     for i in range(3):
         task = create_task_record(client, owner, f"Task {i}", project_id=project_id)
         _complete(client, owner, task["id"])
         _backdate_completion(db, task["id"], _at(1))
 
-    result = call_tool(
-        client,
-        headers,
-        "list_completions",
-        {"since": SINCE, "until": UNTIL, "limit": 2},
-    )
+    result = list_completions_body(db, caller, since=SINCE, until=UNTIL, limit=2)
     assert result["count"] == 3
     assert len(result["completions"]) == 2
     assert result["truncated"] is True
@@ -502,6 +478,7 @@ def test_a_completion_outside_the_bot_users_scope_is_never_counted(
     headers = bot_headers(
         client, owner, project_ids=[in_scope], permissions=ALL_PERMISSIONS
     )
+    caller = caller_for(db, headers)
     reachable = create_task_record(client, owner, "Reachable", project_id=in_scope)
     unreachable = create_task_record(client, owner, "Unreachable", project_id=outside)
     _complete(client, owner, reachable["id"])
@@ -509,9 +486,7 @@ def test_a_completion_outside_the_bot_users_scope_is_never_counted(
     _backdate_completion(db, reachable["id"], _at(1))
     _backdate_completion(db, unreachable["id"], _at(1))
 
-    result = call_tool(
-        client, headers, "list_completions", {"since": SINCE, "until": UNTIL}
-    )
+    result = list_completions_body(db, caller, since=SINCE, until=UNTIL)
     rows = _rows(result)
     assert [row["title"] for row in rows] == ["Reachable"]
     assert result["summary"]["completions"] == 1
@@ -526,14 +501,78 @@ def test_project_outside_scope_is_refused_the_way_the_api_refuses_it(
     headers = bot_headers(
         client, owner, project_ids=[in_scope], permissions=ALL_PERMISSIONS
     )
+    caller = caller_for(db, headers)
 
-    try:
-        call_tool(
-            client,
-            headers,
-            "list_completions",
-            {"since": SINCE, "until": UNTIL, "project": outside},
+    with pytest.raises(ToolError) as exc_info:
+        list_completions_body(db, caller, since=SINCE, until=UNTIL, project=outside)
+    assert "not_found" in str(exc_info.value)
+
+
+def test_missing_and_out_of_scope_project_give_the_identical_refusal(
+    client: TestClient, db: Session
+) -> None:
+    """
+    ADR-0011's own point, proven for this tool too: narrowing by a project
+    outside the scope and by one that does not exist at all must not be told
+    apart (#322's own acceptance criterion) — both now reach
+    `app.access.narrowing_project` rather than `_resolve_narrowing_project_id`
+    mirroring the rule on its own.
+    """
+    owner = create_user_headers(client, db)
+    in_scope = create_project(client, owner, "In scope")
+    outside = create_project(client, owner, "Elsewhere")
+    headers = bot_headers(
+        client, owner, project_ids=[in_scope], permissions=ALL_PERMISSIONS
+    )
+    caller = caller_for(db, headers)
+
+    with pytest.raises(ToolError) as outside_exc:
+        list_completions_body(db, caller, since=SINCE, until=UNTIL, project=outside)
+    with pytest.raises(ToolError) as missing_exc:
+        list_completions_body(
+            db, caller, since=SINCE, until=UNTIL, project=str(uuid.uuid4())
         )
-        raise AssertionError("expected a refusal")
-    except ToolError as exc:
-        assert "not_found" in exc.message
+
+    assert str(outside_exc.value) == str(missing_exc.value)
+
+
+# Statements issued: no discarded location, one ancestry walk per call (#322)
+
+
+def test_statements_do_not_duplicate_the_ancestry_walk_or_the_count(
+    client: TestClient, db: Session
+) -> None:
+    """
+    Three wastes #322 found in this tool's own call: `read_activity` used to
+    run a `COUNT` even though `limit=None` already fetches every row
+    (`test_limit_none_asks_for_every_match`'s own point), it used to run
+    `_locate` for a comment and a tag this tool never reads, and `_enrich`
+    below ran its own `crud.get_task_project_ids` walk over the same task
+    ids `_locate` had just resolved and thrown away. One entries query, no
+    count, and one ancestry walk is what is left: five statements here,
+    measured the same way against `origin/iteration-2026-10-13` as seven.
+    """
+    owner = create_user_headers(client, db)
+    project_id = create_project(client, owner, "Work")
+    headers = bot_headers(
+        client, owner, project_ids=[project_id], permissions=ALL_PERMISSIONS
+    )
+    caller = caller_for(db, headers)
+    task = create_task_record(client, owner, "Write the report", project_id=project_id)
+    r = client.post(
+        f"{API}/tasks/{task['id']}/comments/", headers=owner, json={"body": "Note"}
+    )
+    assert r.status_code == 200, r.text
+    r = client.patch(
+        f"{API}/tasks/{task['id']}", headers=owner, json={"status": "done"}
+    )
+    assert r.status_code == 200, r.text
+    r = client.post(
+        f"{API}/tasks/", headers=owner, json={"title": "Tagged", "tags": ["x"]}
+    )
+    assert r.status_code == 200, r.text
+
+    with counting(db) as statements:
+        list_completions_body(db, caller, since="2020-01-01", until="2030-01-01")
+
+    assert len(statements) == 5

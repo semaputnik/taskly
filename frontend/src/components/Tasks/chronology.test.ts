@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test"
 
 import type { ActivityEntryPublic, CommentPublic } from "@/client"
+import { describeTaskEvent } from "@/components/Activity/entryWords"
 import { dateInWords } from "@/lib/dates"
 import { chronology } from "./chronology"
-import { describeTaskEvent } from "./taskEvents"
 
 function entry(
   action: ActivityEntryPublic["action"],
@@ -16,7 +16,12 @@ function entry(
     action,
     entity_type: "task",
     entity_id: "task",
-    details,
+    // `kind` the way the real API sets it (`app.activity_details.
+    // public_kind`): an action's own spelling for every action this fixture
+    // builder is ever asked for here (none of these cases are the
+    // `task_deleted`/`task_restored` split, see `entryWords.test.ts`'s own
+    // `kindOf` for that one).
+    details: { ...details, kind: action } as ActivityEntryPublic["details"],
     created_at: at,
     entity_exists: true,
     actor_id: "me",

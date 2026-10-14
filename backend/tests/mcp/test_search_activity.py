@@ -8,15 +8,23 @@ id withheld from a bot — are #251's and tested there
 tool's own mapping onto that route and its own rendering of a line, built
 over a history made through the API the way #248's own testing decision
 asks for.
+
+Exercised against `search_activity_body` directly (#302) — see
+`test_whoami.py`'s own module docstring for why, and where the protocol
+itself is still tested.
 """
 
 from datetime import date, timedelta
 from typing import Any
 
+import pytest
 from fastapi.testclient import TestClient
+from mcp.server.mcpserver.exceptions import ToolError
 from sqlmodel import Session
 
 from app.core.config import settings
+from app.mcp.tools.search_activity import search_activity_body
+from app.models import ActivityKind, ActivityOrder
 from tests.utils.accounts import (
     ALL_PERMISSIONS,
     create_bot_user,
@@ -26,7 +34,9 @@ from tests.utils.accounts import (
     delete_task,
     token_headers,
 )
-from tests.utils.mcp import ToolError, bot_headers, call_tool, list_tools
+from tests.utils.counting import counting
+from tests.utils.mcp import bot_headers
+from tests.utils.mcp_body import caller_for
 
 API = settings.API_V1_STR
 TODAY = date.today()
@@ -61,18 +71,6 @@ def _task_titles(result: dict[str, Any]) -> list[str | None]:
     ]
 
 
-def test_tools_list_advertises_search_activity_read_only(
-    client: TestClient, db: Session
-) -> None:
-    owner = create_user_headers(client, db)
-    headers = bot_headers(client, owner, permissions=ALL_PERMISSIONS)
-
-    tools = list_tools(client, headers)
-    search = next(t for t in tools if t["name"] == "search_activity")
-    assert search["description"]
-    assert search["annotations"]["readOnlyHint"] is True
-
-
 # The grant itself
 
 
@@ -85,13 +83,13 @@ def test_without_the_grant_is_refused_by_name(client: TestClient, db: Session) -
         project_ids=[project_id],
         permissions={**ALL_PERMISSIONS, "read_activity": False},
     )
+    caller = caller_for(db, headers)
 
-    try:
-        call_tool(client, headers, "search_activity")
-        raise AssertionError("expected a refusal")
-    except ToolError as exc:
-        assert "permission_not_granted" in exc.message
-        assert "activity log" in exc.message
+    with pytest.raises(ToolError) as exc_info:
+        search_activity_body(db, caller)
+    message = str(exc_info.value)
+    assert "permission_not_granted" in message
+    assert "activity log" in message
 
 
 # Compact lines: the moment, the actor, what happened, the subject
@@ -103,10 +101,11 @@ def test_compact_row_shape_for_a_created_task(client: TestClient, db: Session) -
     headers = bot_headers(
         client, owner, project_ids=[project_id], permissions=ALL_PERMISSIONS
     )
+    caller = caller_for(db, headers)
     task = create_task_record(client, owner, "Write the report", project_id=project_id)
 
-    result = call_tool(
-        client, headers, "search_activity", {"kind": "created", "task_id": task["id"]}
+    result = search_activity_body(
+        db, caller, kind=ActivityKind.CREATED, task_id=task["id"]
     )
     [row] = result["entries"]
     assert set(row) == {"at", "actor", "what", "subject"}
@@ -132,8 +131,9 @@ def test_total_is_reported_and_truncation_names_a_filter_to_narrow_with(
     headers = bot_headers(
         client, owner, project_ids=[project_id], permissions=ALL_PERMISSIONS
     )
+    caller = caller_for(db, headers)
 
-    result = call_tool(client, headers, "search_activity", {"limit": 2})
+    result = search_activity_body(db, caller, limit=2)
     assert result["count"] >= 3
     assert len(result["entries"]) == 2
     assert result["truncated"] is True
@@ -151,6 +151,7 @@ def test_kind_completed_and_changed_do_not_overlap(
     headers = bot_headers(
         client, owner, project_ids=[project_id], permissions=ALL_PERMISSIONS
     )
+    caller = caller_for(db, headers)
     completed = create_task_record(client, owner, "Finish me", project_id=project_id)
     changed = create_task_record(
         client, owner, "Reprioritise me", project_id=project_id
@@ -164,11 +165,11 @@ def test_kind_completed_and_changed_do_not_overlap(
     )
     assert r.status_code == 200, r.text
 
-    done = call_tool(client, headers, "search_activity", {"kind": "completed"})
+    done = search_activity_body(db, caller, kind=ActivityKind.COMPLETED)
     assert _titles(done) == ["Finish me"]
     assert _whats(done) == ["Completed"]
 
-    moved = call_tool(client, headers, "search_activity", {"kind": "changed"})
+    moved = search_activity_body(db, caller, kind=ActivityKind.CHANGED)
     assert "Finish me" not in _titles(moved)
     assert "Reprioritise me" in _titles(moved)
 
@@ -181,6 +182,7 @@ def test_a_batch_completion_is_counted_as_completed_not_changed(
     headers = bot_headers(
         client, owner, project_ids=[project_id], permissions=ALL_PERMISSIONS
     )
+    caller = caller_for(db, headers)
     first = create_task_record(client, owner, "First", project_id=project_id)
     second = create_task_record(client, owner, "Second", project_id=project_id)
     r = client.post(
@@ -190,7 +192,7 @@ def test_a_batch_completion_is_counted_as_completed_not_changed(
     )
     assert r.status_code == 200, r.text
 
-    done = call_tool(client, headers, "search_activity", {"kind": "completed"})
+    done = search_activity_body(db, caller, kind=ActivityKind.COMPLETED)
     [row] = done["entries"]
     assert row["what"] == "Changed 2 tasks: completed"
     assert row["subject"]["type"] == "tasks"
@@ -199,10 +201,7 @@ def test_a_batch_completion_is_counted_as_completed_not_changed(
         task_id.replace("-", "")[:8] for task_id in (first["id"], second["id"])
     )
 
-    assert (
-        call_tool(client, headers, "search_activity", {"kind": "changed"})["entries"]
-        == []
-    )
+    assert search_activity_body(db, caller, kind=ActivityKind.CHANGED)["entries"] == []
 
 
 # task_id: a task's own history, its comments, and the batches that touched it
@@ -216,6 +215,7 @@ def test_task_id_narrows_to_its_own_history_including_comments_and_batches(
     headers = bot_headers(
         client, owner, project_ids=[project_id], permissions=ALL_PERMISSIONS
     )
+    caller = caller_for(db, headers)
     mine = create_task_record(client, owner, "Mine", project_id=project_id)
     other = create_task_record(client, owner, "Other", project_id=project_id)
     r = client.post(
@@ -229,7 +229,7 @@ def test_task_id_narrows_to_its_own_history_including_comments_and_batches(
     )
     assert r.status_code == 200, r.text
 
-    result = call_tool(client, headers, "search_activity", {"task_id": mine["id"]})
+    result = search_activity_body(db, caller, task_id=mine["id"])
     whats = _whats(result)
     assert "Created in" in "".join(whats)
     assert "Commented" in whats
@@ -247,13 +247,12 @@ def test_task_id_outside_scope_is_refused_the_way_the_api_refuses_it(
     headers = bot_headers(
         client, owner, project_ids=[in_scope], permissions=ALL_PERMISSIONS
     )
+    caller = caller_for(db, headers)
     task = create_task_record(client, owner, "Outside", project_id=outside)
 
-    try:
-        call_tool(client, headers, "search_activity", {"task_id": task["id"]})
-        raise AssertionError("expected a refusal")
-    except ToolError as exc:
-        assert "not_found" in exc.message
+    with pytest.raises(ToolError) as exc_info:
+        search_activity_body(db, caller, task_id=task["id"])
+    assert "not_found" in str(exc_info.value)
 
 
 # project: one project's chronology
@@ -266,10 +265,11 @@ def test_project_narrows_to_its_own_chronology(client: TestClient, db: Session) 
     headers = bot_headers(
         client, owner, project_ids=[work, other], permissions=ALL_PERMISSIONS
     )
+    caller = caller_for(db, headers)
     create_task_record(client, owner, "In Work", project_id=work)
     create_task_record(client, owner, "In Other", project_id=other)
 
-    result = call_tool(client, headers, "search_activity", {"project": "Work"})
+    result = search_activity_body(db, caller, project="Work")
     titles = _titles(result)
     assert "In Work" in titles
     assert "In Other" not in titles
@@ -284,12 +284,11 @@ def test_project_outside_scope_is_refused_the_way_the_api_refuses_it(
     headers = bot_headers(
         client, owner, project_ids=[in_scope], permissions=ALL_PERMISSIONS
     )
+    caller = caller_for(db, headers)
 
-    try:
-        call_tool(client, headers, "search_activity", {"project": outside})
-        raise AssertionError("expected a refusal")
-    except ToolError as exc:
-        assert "not_found" in exc.message
+    with pytest.raises(ToolError) as exc_info:
+        search_activity_body(db, caller, project=outside)
+    assert "not_found" in str(exc_info.value)
 
 
 # actor: self, owner, any_bot, a named bot user
@@ -308,6 +307,7 @@ def test_actor_self_owner_any_bot_and_named_bot(
         name="Reader",
     )
     reader = token_headers(client, owner, reader_user["id"])
+    reader_caller = caller_for(db, reader)
     sibling_user = create_bot_user(
         client,
         owner,
@@ -321,21 +321,21 @@ def test_actor_self_owner_any_bot_and_named_bot(
     create_task_record(client, sibling, "By the sibling", project_id=project_id)
     create_task_record(client, reader, "By the reader itself", project_id=project_id)
 
-    assert _task_titles(
-        call_tool(client, reader, "search_activity", {"actor": "self"})
-    ) == ["By the reader itself"]
-    assert _task_titles(
-        call_tool(client, reader, "search_activity", {"actor": "owner"})
-    ) == ["By the owner"]
+    assert _task_titles(search_activity_body(db, reader_caller, actor="self")) == [
+        "By the reader itself"
+    ]
+    assert _task_titles(search_activity_body(db, reader_caller, actor="owner")) == [
+        "By the owner"
+    ]
     any_bot_titles = _task_titles(
-        call_tool(client, reader, "search_activity", {"actor": "any_bot"})
+        search_activity_body(db, reader_caller, actor="any_bot")
     )
     assert set(any_bot_titles) == {"By the sibling", "By the reader itself"}
+    assert _task_titles(search_activity_body(db, reader_caller, actor="Sibling")) == [
+        "By the sibling"
+    ]
     assert _task_titles(
-        call_tool(client, reader, "search_activity", {"actor": "Sibling"})
-    ) == ["By the sibling"]
-    assert _task_titles(
-        call_tool(client, reader, "search_activity", {"actor": sibling_user["id"]})
+        search_activity_body(db, reader_caller, actor=sibling_user["id"])
     ) == ["By the sibling"]
 
 
@@ -347,13 +347,13 @@ def test_actor_unknown_bot_name_is_refused_by_name(
     headers = bot_headers(
         client, owner, project_ids=[project_id], permissions=ALL_PERMISSIONS
     )
+    caller = caller_for(db, headers)
 
-    try:
-        call_tool(client, headers, "search_activity", {"actor": "No Such Bot"})
-        raise AssertionError("expected a refusal")
-    except ToolError as exc:
-        assert "not_found" in exc.message
-        assert "No Such Bot" in exc.message
+    with pytest.raises(ToolError) as exc_info:
+        search_activity_body(db, caller, actor="No Such Bot")
+    message = str(exc_info.value)
+    assert "not_found" in message
+    assert "No Such Bot" in message
 
 
 def test_actor_ambiguous_bot_name_is_refused_with_matching_ids(
@@ -382,14 +382,14 @@ def test_actor_ambiguous_bot_name_is_refused_with_matching_ids(
         permissions=ALL_PERMISSIONS,
         name="Reader",
     )
+    caller = caller_for(db, headers)
 
-    try:
-        call_tool(client, headers, "search_activity", {"actor": "Agent"})
-        raise AssertionError("expected a refusal")
-    except ToolError as exc:
-        assert "ambiguous_bot_name" in exc.message
-        assert first["id"] in exc.message
-        assert second["id"] in exc.message
+    with pytest.raises(ToolError) as exc_info:
+        search_activity_body(db, caller, actor="Agent")
+    message = str(exc_info.value)
+    assert "ambiguous_bot_name" in message
+    assert first["id"] in message
+    assert second["id"] in message
 
 
 # since/until: a period with both bounds, and order
@@ -403,23 +403,25 @@ def test_since_and_until_bound_the_period_both_ways(
     headers = bot_headers(
         client, owner, project_ids=[project_id], permissions=ALL_PERMISSIONS
     )
+    caller = caller_for(db, headers)
     create_task_record(client, owner, "Today's task", project_id=project_id)
 
-    within = call_tool(
-        client,
-        headers,
-        "search_activity",
-        {"since": str(YESTERDAY), "until": str(TODAY), "kind": "created"},
+    within = search_activity_body(
+        db,
+        caller,
+        since=str(YESTERDAY),
+        until=str(TODAY),
+        kind=ActivityKind.CREATED,
     )
     assert "Today's task" in _titles(within)
 
-    too_late_since = call_tool(
-        client, headers, "search_activity", {"since": str(TOMORROW), "kind": "created"}
+    too_late_since = search_activity_body(
+        db, caller, since=str(TOMORROW), kind=ActivityKind.CREATED
     )
     assert "Today's task" not in _titles(too_late_since)
 
-    too_early_until = call_tool(
-        client, headers, "search_activity", {"until": str(YESTERDAY), "kind": "created"}
+    too_early_until = search_activity_body(
+        db, caller, until=str(YESTERDAY), kind=ActivityKind.CREATED
     )
     assert "Today's task" not in _titles(too_early_until)
 
@@ -430,14 +432,15 @@ def test_order_newest_or_oldest_first(client: TestClient, db: Session) -> None:
     headers = bot_headers(
         client, owner, project_ids=[project_id], permissions=ALL_PERMISSIONS
     )
+    caller = caller_for(db, headers)
     create_task_record(client, owner, "First", project_id=project_id)
     create_task_record(client, owner, "Second", project_id=project_id)
 
-    newest = call_tool(client, headers, "search_activity", {"kind": "created"})
+    newest = search_activity_body(db, caller, kind=ActivityKind.CREATED)
     assert _task_titles(newest) == ["Second", "First"]
 
-    oldest = call_tool(
-        client, headers, "search_activity", {"kind": "created", "order": "oldest"}
+    oldest = search_activity_body(
+        db, caller, kind=ActivityKind.CREATED, order=ActivityOrder.OLDEST
     )
     assert _task_titles(oldest) == ["First", "Second"]
 
@@ -453,6 +456,7 @@ def test_a_completion_of_a_since_deleted_task_still_reads(
     headers = bot_headers(
         client, owner, project_ids=[project_id], permissions=ALL_PERMISSIONS
     )
+    caller = caller_for(db, headers)
     task = create_task_record(
         client, owner, "Finish then forget", project_id=project_id
     )
@@ -462,7 +466,7 @@ def test_a_completion_of_a_since_deleted_task_still_reads(
     assert r.status_code == 200, r.text
     assert delete_task(client, owner, task["id"]).status_code == 200
 
-    result = call_tool(client, headers, "search_activity", {"kind": "completed"})
+    result = search_activity_body(db, caller, kind=ActivityKind.COMPLETED)
     [row] = result["entries"]
     assert row["what"] == "Completed"
     assert row["subject"]["title"] == "Finish then forget"
@@ -485,14 +489,15 @@ def test_task_moved_names_both_projects(client: TestClient, db: Session) -> None
         project_ids=[from_project, to_project],
         permissions=ALL_PERMISSIONS,
     )
+    caller = caller_for(db, headers)
     task = create_task_record(client, owner, "Movable", project_id=from_project)
     r = client.patch(
         f"{API}/tasks/{task['id']}", headers=owner, json={"project_id": to_project}
     )
     assert r.status_code == 200, r.text
 
-    result = call_tool(
-        client, headers, "search_activity", {"kind": "changed", "task_id": task["id"]}
+    result = search_activity_body(
+        db, caller, kind=ActivityKind.CHANGED, task_id=task["id"]
     )
     [row] = result["entries"]
     assert row["what"] == "Moved from From to To"
@@ -511,6 +516,7 @@ def test_task_assigned_and_unassigned_name_the_assignee(
     headers = bot_headers(
         client, owner, project_ids=[project_id], permissions=ALL_PERMISSIONS
     )
+    caller = caller_for(db, headers)
     owner_id = client.get(f"{API}/caller", headers=owner).json()["actor"]["id"]
     task = create_task_record(client, owner, "Assign me", project_id=project_id)
 
@@ -523,8 +529,8 @@ def test_task_assigned_and_unassigned_name_the_assignee(
     )
     assert r.status_code == 200, r.text
 
-    result = call_tool(
-        client, headers, "search_activity", {"kind": "changed", "task_id": task["id"]}
+    result = search_activity_body(
+        db, caller, kind=ActivityKind.CHANGED, task_id=task["id"]
     )
     whats = _whats(result)
     assert "Assigned to owner" in whats
@@ -539,6 +545,7 @@ def test_task_status_changed_between_open_statuses_and_reopened(
     headers = bot_headers(
         client, owner, project_ids=[project_id], permissions=ALL_PERMISSIONS
     )
+    caller = caller_for(db, headers)
     task = create_task_record(client, owner, "Call the bank", project_id=project_id)
     for status in ["in_progress", "done", "in_progress"]:
         r = client.patch(
@@ -546,8 +553,8 @@ def test_task_status_changed_between_open_statuses_and_reopened(
         )
         assert r.status_code == 200, r.text
 
-    result = call_tool(
-        client, headers, "search_activity", {"task_id": task["id"], "order": "oldest"}
+    result = search_activity_body(
+        db, caller, task_id=task["id"], order=ActivityOrder.OLDEST
     )
     whats = _whats(result)
     assert "Moved to In progress" in whats
@@ -561,6 +568,7 @@ def test_project_changed_deleted_and_restored(client: TestClient, db: Session) -
     headers = bot_headers(
         client, owner, project_ids=[project_id], permissions=ALL_PERMISSIONS
     )
+    caller = caller_for(db, headers)
     r = client.patch(
         f"{API}/projects/{project_id}", headers=owner, json={"name": "New name"}
     )
@@ -575,7 +583,7 @@ def test_project_changed_deleted_and_restored(client: TestClient, db: Session) -
     # The bot's own scope is the project itself, which is gone and back again
     # by the time this reads — `project` can no longer name it to narrow by,
     # so this reads the bot's whole feed instead.
-    result = call_tool(client, headers, "search_activity", {"order": "oldest"})
+    result = search_activity_body(db, caller, order=ActivityOrder.OLDEST)
     whats = _whats(result)
     assert "Changed name" in whats
     assert "Deleted" in whats
@@ -591,6 +599,7 @@ def test_tag_renamed_merged_and_deleted(client: TestClient, db: Session) -> None
     headers = bot_headers(
         client, owner, project_ids=[project_id], permissions=ALL_PERMISSIONS
     )
+    caller = caller_for(db, headers)
     create_task_record(client, owner, "Tagged", project_id=project_id, tags=["wip"])
     tags = {
         t["name"]: t for t in client.get(f"{API}/tags/", headers=owner).json()["data"]
@@ -620,7 +629,7 @@ def test_tag_renamed_merged_and_deleted(client: TestClient, db: Session) -> None
     r = client.delete(f"{API}/tags/{tags['z']['id']}", headers=owner)
     assert r.status_code == 200, r.text
 
-    result = call_tool(client, headers, "search_activity", {"kind": "tags"})
+    result = search_activity_body(db, caller, kind=ActivityKind.TAGS)
     whats = _whats(result)
     assert any(w.startswith("Renamed from") for w in whats)
     assert any(w.startswith("Merged") for w in whats)
@@ -633,6 +642,7 @@ def test_comment_edited_and_deleted(client: TestClient, db: Session) -> None:
     headers = bot_headers(
         client, owner, project_ids=[project_id], permissions=ALL_PERMISSIONS
     )
+    caller = caller_for(db, headers)
     task = create_task_record(client, owner, "Commented on", project_id=project_id)
     r = client.post(
         f"{API}/tasks/{task['id']}/comments/", headers=owner, json={"body": "Draft"}
@@ -646,8 +656,8 @@ def test_comment_edited_and_deleted(client: TestClient, db: Session) -> None:
     r = client.delete(f"{API}/comments/{comment_id}", headers=owner)
     assert r.status_code == 200, r.text
 
-    result = call_tool(
-        client, headers, "search_activity", {"kind": "comments", "task_id": task["id"]}
+    result = search_activity_body(
+        db, caller, kind=ActivityKind.COMMENTS, task_id=task["id"]
     )
     whats = _whats(result)
     assert "Edited a comment" in whats
@@ -666,6 +676,7 @@ def test_attachment_added_and_deleted(client: TestClient, db: Session) -> None:
     headers = bot_headers(
         client, owner, project_ids=[project_id], permissions=ALL_PERMISSIONS
     )
+    caller = caller_for(db, headers)
     task = create_task_record(client, owner, "Has a file", project_id=project_id)
     r = client.post(
         f"{API}/tasks/{task['id']}/attachments/",
@@ -677,8 +688,8 @@ def test_attachment_added_and_deleted(client: TestClient, db: Session) -> None:
     r = client.delete(f"{API}/attachments/{attachment_id}", headers=owner)
     assert r.status_code == 200, r.text
 
-    result = call_tool(
-        client, headers, "search_activity", {"kind": "comments", "task_id": task["id"]}
+    result = search_activity_body(
+        db, caller, kind=ActivityKind.COMMENTS, task_id=task["id"]
     )
     whats = _whats(result)
     assert "Attached “notes.txt”" in whats
@@ -691,6 +702,7 @@ def test_task_restored_after_delete(client: TestClient, db: Session) -> None:
     headers = bot_headers(
         client, owner, project_ids=[project_id], permissions=ALL_PERMISSIONS
     )
+    caller = caller_for(db, headers)
     task = create_task_record(
         client, owner, "Back from the dead", project_id=project_id
     )
@@ -700,9 +712,48 @@ def test_task_restored_after_delete(client: TestClient, db: Session) -> None:
     r = client.post(f"{API}/activity-log/{deleted_entry['id']}/restore", headers=owner)
     assert r.status_code == 200, r.text
 
-    result = call_tool(
-        client, headers, "search_activity", {"kind": "deleted", "task_id": task["id"]}
+    result = search_activity_body(
+        db, caller, kind=ActivityKind.DELETED, task_id=task["id"]
     )
     whats = _whats(result)
     assert "Deleted" in whats
     assert "Restored" in whats
+
+
+# Statements issued: this tool never asks for the reader's own `locate` (#322)
+
+
+def test_no_statement_is_issued_for_a_discarded_location(
+    client: TestClient, db: Session
+) -> None:
+    """
+    `read_activity` used to end every call with `_locate` (#298): a Comment
+    parent lookup, an Attachment parent lookup, `crud.get_task_project_ids`'s
+    own recursive walk, and a Project/Tag existence check — a whole
+    projection this tool never reads (#322's own first finding). A page
+    mixing a task, a comment, a tag and the project itself is built here on
+    purpose, so each of those four would have run if `read_activity` still
+    computed it: two statements (the count and the page itself) is what is
+    left once it does not — six before #322, measured the same way on
+    `origin/iteration-2026-10-13`.
+    """
+    owner = create_user_headers(client, db)
+    project_id = create_project(client, owner, "Work")
+    headers = bot_headers(
+        client, owner, project_ids=[project_id], permissions=ALL_PERMISSIONS
+    )
+    caller = caller_for(db, headers)
+    task = create_task_record(client, owner, "Write the report", project_id=project_id)
+    r = client.post(
+        f"{API}/tasks/{task['id']}/comments/", headers=owner, json={"body": "Note"}
+    )
+    assert r.status_code == 200, r.text
+    r = client.post(
+        f"{API}/tasks/", headers=owner, json={"title": "Tagged", "tags": ["x"]}
+    )
+    assert r.status_code == 200, r.text
+
+    with counting(db) as statements:
+        search_activity_body(db, caller)
+
+    assert len(statements) == 2

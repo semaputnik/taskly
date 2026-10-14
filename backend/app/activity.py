@@ -23,17 +23,51 @@ from dataclasses import dataclass, field
 from datetime import date
 from typing import Any
 
-from pydantic_core import to_jsonable_python
 from sqlalchemy import event
 from sqlalchemy.orm import Session
 from sqlmodel import col, select
 
 from app import deletions, webhook_events
+from app.activity_details import (
+    AssigneeRef,
+    AttachmentAddedDetails,
+    CommentAddedDetails,
+    CommentDeletedDetails,
+    CommentEditedDetails,
+    FieldChange,
+    ProjectChangedDetails,
+    ProjectCreatedDetails,
+    ProjectDeletedDetails,
+    ProjectRef,
+    ProjectRestoredDetails,
+    RecurrenceRef,
+    TagCreatedDetails,
+    TagDeletedDetails,
+    TagMergedDetails,
+    TagRenamedDetails,
+    TaskAssignedDetails,
+    TaskChangedDetails,
+    TaskCompletedDetails,
+    TaskCreatedDetails,
+    TaskDeletedBatch,
+    TaskDeletedSingle,
+    TaskMovedDetails,
+    TaskRef,
+    TaskReopenedDetails,
+    TaskRestoredBatch,
+    TaskRestoredSingle,
+    TasksBulkChangedDetails,
+    TaskSnapshot,
+    TaskStatusChangedDetails,
+    TaskUnassignedDetails,
+    encode,
+)
 from app.deletions import DeletionKind
 from app.models import (
     ActivityAction,
     ActivityEntityType,
     ActivityEntry,
+    ActorKind,
     Attachment,
     BotUser,
     Comment,
@@ -108,9 +142,9 @@ def set_tag_merge(
             ActivityAction.TAG_MERGED,
             ActivityEntityType.TAG,
             target.id,
-            name=target.name,
-            sources=sources,
-            task_count=task_count,
+            TagMergedDetails(
+                name=target.name, sources=tuple(sources), task_count=task_count
+            ),
         ),
         source_ids=set(source_ids),
     )
@@ -328,9 +362,11 @@ def _write(session: Session) -> None:
                 action,
                 ActivityEntityType.TASK,
                 batched[0],
-                task_count=len(batched),
-                task_ids=[str(task_id) for task_id in batched],
-                **details,
+                TasksBulkChangedDetails(
+                    task_count=len(batched),
+                    task_ids=tuple(str(task_id) for task_id in batched),
+                    changes=details["changes"],
+                ),
             )
         )
 
@@ -437,33 +473,33 @@ class _Refs:
         self._project_names: dict[uuid.UUID, str] = {}
         self._bot_user_names: dict[uuid.UUID, str] = {}
 
-    def project(self, project_id: uuid.UUID | None) -> dict[str, Any] | None:
+    def project(self, project_id: uuid.UUID | None) -> ProjectRef | None:
         """A project: its id and name."""
         if project_id is None:
             return None
         if project_id not in self._project_names:
             project = self._session.get_one(Project, project_id)
             self._project_names[project_id] = project.name
-        return {"id": project_id, "name": self._project_names[project_id]}
+        return ProjectRef(id=project_id, name=self._project_names[project_id])
 
-    def assignee(self, state: _TaskState) -> dict[str, Any] | None:
+    def assignee(self, state: _TaskState) -> AssigneeRef | None:
         """
         Who a task is assigned to: the user, or a bot user with its name — a
         bot user can be renamed or deleted later, the user is always "you".
         """
         if state.assignee_id is not None:
-            return {"type": "user", "id": state.assignee_id}
+            return AssigneeRef(type=ActorKind.USER, id=state.assignee_id)
         bot_user_id = state.assignee_bot_user_id
         if bot_user_id is None:
             return None
         if bot_user_id not in self._bot_user_names:
             bot_user = self._session.get_one(BotUser, bot_user_id)
             self._bot_user_names[bot_user_id] = bot_user.name
-        return {
-            "type": "bot_user",
-            "id": bot_user_id,
-            "name": self._bot_user_names[bot_user_id],
-        }
+        return AssigneeRef(
+            type=ActorKind.BOT_USER,
+            id=bot_user_id,
+            name=self._bot_user_names[bot_user_id],
+        )
 
 
 def _task_entries(
@@ -472,35 +508,40 @@ def _task_entries(
     after: _TaskState,
     refs: _Refs,
 ) -> list[ActivityEntry]:
-    def entry(action: ActivityAction, **details: Any) -> ActivityEntry:
-        return ActivityEntry(
-            owner_id=after.owner_id,
-            action=action,
-            entity_type=ActivityEntityType.TASK,
-            entity_id=task_id,
-            # Every entry names its task as it was titled at the time, so it
-            # reads on its own whatever happens to the task afterwards.
-            details=to_jsonable_python({"title": after.title, **details}),
-        )
+    def entry(action: ActivityAction, details: Any) -> ActivityEntry:
+        return _entry(after.owner_id, action, ActivityEntityType.TASK, task_id, details)
 
     if before is None:
-        return [entry(ActivityAction.TASK_CREATED, task=_snapshot(after, refs))]
+        return [
+            entry(
+                ActivityAction.TASK_CREATED,
+                TaskCreatedDetails(title=after.title, task=_snapshot(after, refs)),
+            )
+        ]
 
     entries = []
     changes = {
-        name: {"from": getattr(before, name), "to": getattr(after, name)}
+        name: FieldChange(**{"from": getattr(before, name), "to": getattr(after, name)})
         for name in _CHANGED_FIELDS
         if getattr(before, name) != getattr(after, name)
     }
     if changes:
-        entries.append(entry(ActivityAction.TASK_CHANGED, changes=changes))
+        entries.append(
+            entry(
+                ActivityAction.TASK_CHANGED,
+                TaskChangedDetails(title=after.title, changes=changes),
+            )
+        )
 
     if before.project_id != after.project_id:
         entries.append(
             entry(
                 ActivityAction.TASK_MOVED,
-                from_project=refs.project(before.project_id),
-                to_project=refs.project(after.project_id),
+                TaskMovedDetails(
+                    title=after.title,
+                    from_project=refs.project(before.project_id),
+                    to_project=refs.project(after.project_id),
+                ),
             )
         )
 
@@ -513,18 +554,24 @@ def _task_entries(
             entries.append(
                 entry(
                     ActivityAction.TASK_UNASSIGNED,
-                    previous_assignee_id=_assignee_id(before),
-                    previous_assignee=previous_assignee,
+                    TaskUnassignedDetails(
+                        title=after.title,
+                        previous_assignee_id=_assignee_id(before),
+                        previous_assignee=previous_assignee,
+                    ),
                 )
             )
         else:
             entries.append(
                 entry(
                     ActivityAction.TASK_ASSIGNED,
-                    assignee_id=_assignee_id(after),
-                    assignee=assignee,
-                    previous_assignee_id=_assignee_id(before),
-                    previous_assignee=previous_assignee,
+                    TaskAssignedDetails(
+                        title=after.title,
+                        assignee_id=_assignee_id(after),
+                        assignee=assignee,
+                        previous_assignee_id=_assignee_id(before),
+                        previous_assignee=previous_assignee,
+                    ),
                 )
             )
 
@@ -532,14 +579,27 @@ def _task_entries(
         # To or out of done keeps the entries the log has always had; only a
         # move between open statuses is new, and it names both ends.
         if after.status is TaskStatus.DONE:
-            entries.append(entry(ActivityAction.TASK_COMPLETED))
+            entries.append(
+                entry(
+                    ActivityAction.TASK_COMPLETED,
+                    TaskCompletedDetails(title=after.title),
+                )
+            )
         elif before.status is TaskStatus.DONE:
-            entries.append(entry(ActivityAction.TASK_REOPENED, to=after.status))
+            entries.append(
+                entry(
+                    ActivityAction.TASK_REOPENED,
+                    TaskReopenedDetails(title=after.title, to=after.status),
+                )
+            )
         else:
             entries.append(
                 entry(
                     ActivityAction.TASK_STATUS_CHANGED,
-                    **{"from": before.status, "to": after.status},
+                    TaskStatusChangedDetails(
+                        title=after.title,
+                        **{"from": before.status, "to": after.status},
+                    ),
                 )
             )
 
@@ -555,33 +615,34 @@ def _deletion_entry(
     went_down = sorted(deletions.marked_task_ids(session, deletion_id))
     if deletions.kind_of(deletion) is DeletionKind.BATCH:
         # A batch names no single task: it is the selection that went down,
-        # and the count is what the entry has to say (story 27).
-        return ActivityEntry(
-            owner_id=deletion.owner_id,
-            action=ActivityAction.TASK_DELETED,
-            entity_type=ActivityEntityType.TASK,
+        # and the count is what the entry has to say (story 27). All-or-
+        # nothing, declared: `TaskDeletedBatch` has no per-task field at all.
+        return _entry(
+            deletion.owner_id,
+            ActivityAction.TASK_DELETED,
+            ActivityEntityType.TASK,
             # An entry points at something; for a batch any row it took is as
             # good a handle as any, and the restore goes by the event.
-            entity_id=went_down[0],
+            went_down[0],
+            TaskDeletedBatch(task_count=len(went_down)),
             deletion_id=deletion.id,
-            details=to_jsonable_python({"task_count": len(went_down)}),
         )
     task = session.get_one(Task, deletion.task_id)
-    return ActivityEntry(
-        owner_id=deletion.owner_id,
-        action=ActivityAction.TASK_DELETED,
-        entity_type=ActivityEntityType.TASK,
-        entity_id=task.id,
-        deletion_id=deletion.id,
-        details=to_jsonable_python(
-            {
-                "title": task.title,
-                "project": refs.project(task.project_id),
-                "parent_id": task.parent_id,
-                # What a restore of this event would bring back along with it.
-                "subtask_count": len(went_down) - 1,
-            }
+    return _entry(
+        deletion.owner_id,
+        ActivityAction.TASK_DELETED,
+        ActivityEntityType.TASK,
+        task.id,
+        # Carries its project (ADR-0011): the live row is gone, and the
+        # project no longer lists this task to find it by.
+        TaskDeletedSingle(
+            title=task.title,
+            project=refs.project(task.project_id),
+            parent_id=task.parent_id,
+            # What a restore of this event would bring back along with it.
+            subtask_count=len(went_down) - 1,
         ),
+        deletion_id=deletion.id,
     )
 
 
@@ -595,30 +656,28 @@ def _restore_entry(
     if deletions.kind_of(deletion) is DeletionKind.BATCH:
         # A batch coming back: what was restored is the selection that went
         # down, said as the count it is.
-        return ActivityEntry(
-            owner_id=deletion.owner_id,
-            action=ActivityAction.TASK_RESTORED,
-            entity_type=ActivityEntityType.TASK,
-            entity_id=deletion_id,
+        return _entry(
+            deletion.owner_id,
+            ActivityAction.TASK_RESTORED,
+            ActivityEntityType.TASK,
+            deletion_id,
+            TaskRestoredBatch(task_count=count),
             deletion_id=deletion_id,
-            details=to_jsonable_python({"task_count": count}),
         )
     task = session.get_one(Task, deletion.task_id)
-    return ActivityEntry(
-        owner_id=deletion.owner_id,
-        action=ActivityAction.TASK_RESTORED,
-        entity_type=ActivityEntityType.TASK,
-        entity_id=task.id,
+    return _entry(
+        deletion.owner_id,
+        ActivityAction.TASK_RESTORED,
+        ActivityEntityType.TASK,
+        task.id,
+        TaskRestoredSingle(
+            title=task.title,
+            project=refs.project(task.project_id),
+            parent_id=task.parent_id,
+            subtask_count=count - 1,
+        ),
         # The event it undid, so the log reads which deletion came back.
         deletion_id=deletion.id,
-        details=to_jsonable_python(
-            {
-                "title": task.title,
-                "project": refs.project(task.project_id),
-                "parent_id": task.parent_id,
-                "subtask_count": count - 1,
-            }
-        ),
     )
 
 
@@ -626,19 +685,21 @@ def _assignee_id(state: _TaskState) -> uuid.UUID | None:
     return state.assignee_id or state.assignee_bot_user_id
 
 
-def _snapshot(state: _TaskState, refs: _Refs) -> dict[str, Any]:
-    return {
-        "title": state.title,
-        "description": state.description,
-        "due_date": state.due_date,
-        "priority": state.priority,
-        "status": state.status,
-        "project": refs.project(state.project_id),
-        "assignee_id": _assignee_id(state),
-        "assignee": refs.assignee(state),
-        "tags": state.tags,
-        "recurrence": state.recurrence,
-    }
+def _snapshot(state: _TaskState, refs: _Refs) -> TaskSnapshot:
+    return TaskSnapshot(
+        title=state.title,
+        description=state.description,
+        due_date=state.due_date,
+        priority=state.priority,
+        status=state.status,
+        project=refs.project(state.project_id),
+        assignee_id=_assignee_id(state),
+        assignee=refs.assignee(state),
+        tags=state.tags,
+        recurrence=RecurrenceRef(**state.recurrence)
+        if state.recurrence is not None
+        else None,
+    )
 
 
 def _open_occurrences(session: Session, series_id: uuid.UUID) -> list[uuid.UUID]:
@@ -716,10 +777,10 @@ def _load_states(
     }
 
 
-def _task_ref(session: Session, task_id: uuid.UUID) -> dict[str, Any]:
+def _task_ref(session: Session, task_id: uuid.UUID) -> TaskRef:
     """A task as a comment or attachment entry names it."""
     task = session.get_one(Task, task_id)
-    return {"id": task.id, "title": task.title}
+    return TaskRef(id=task.id, title=task.title)
 
 
 def _entry(
@@ -727,14 +788,17 @@ def _entry(
     action: ActivityAction,
     entity_type: ActivityEntityType,
     entity_id: uuid.UUID,
-    **details: Any,
+    details: Any,
+    *,
+    deletion_id: uuid.UUID | None = None,
 ) -> ActivityEntry:
     return ActivityEntry(
         owner_id=owner_id,
         action=action,
         entity_type=entity_type,
         entity_id=entity_id,
-        details=to_jsonable_python(details),
+        deletion_id=deletion_id,
+        details=encode(details),
     )
 
 
@@ -754,17 +818,20 @@ def _project_entries(
         if state is None or state.deletion_id is not None:
             continue
         if before is not None and before.deletion_id is not None:
-            entry = _entry(
-                state.owner_id,
-                ActivityAction.PROJECT_RESTORED,
-                ActivityEntityType.PROJECT,
-                project_id,
-                name=state.name,
-                task_count=restored.get(before.deletion_id, 0),
+            entries.append(
+                _entry(
+                    state.owner_id,
+                    ActivityAction.PROJECT_RESTORED,
+                    ActivityEntityType.PROJECT,
+                    project_id,
+                    ProjectRestoredDetails(
+                        name=state.name, task_count=restored.get(before.deletion_id, 0)
+                    ),
+                    # The event it undid, so the log reads which deletion came
+                    # back.
+                    deletion_id=before.deletion_id,
+                )
             )
-            # The event it undid, so the log reads which deletion came back.
-            entry.deletion_id = before.deletion_id
-            entries.append(entry)
             continue
         if before is None:
             entries.append(
@@ -773,15 +840,18 @@ def _project_entries(
                     ActivityAction.PROJECT_CREATED,
                     ActivityEntityType.PROJECT,
                     project_id,
-                    name=state.name,
-                    description=state.description,
+                    ProjectCreatedDetails(
+                        name=state.name, description=state.description
+                    ),
                 )
             )
             continue
         # Archiving is deliberately not a change the log records (FR-05.10),
         # so only the fields a user edits are compared.
         changes = {
-            name: {"from": getattr(before, name), "to": getattr(state, name)}
+            name: FieldChange(
+                **{"from": getattr(before, name), "to": getattr(state, name)}
+            )
             for name in ("name", "description")
             if getattr(before, name) != getattr(state, name)
         }
@@ -792,8 +862,7 @@ def _project_entries(
                     ActivityAction.PROJECT_CHANGED,
                     ActivityEntityType.PROJECT,
                     project_id,
-                    name=state.name,
-                    changes=changes,
+                    ProjectChangedDetails(name=state.name, changes=changes),
                 )
             )
 
@@ -802,17 +871,17 @@ def _project_entries(
         assert deletion.project_id is not None
         project = session.get_one(Project, deletion.project_id)
         went_down = deletions.marked_task_ids(session, deletion_id)
-        entry = _entry(
-            deletion.owner_id,
-            ActivityAction.PROJECT_DELETED,
-            ActivityEntityType.PROJECT,
-            project.id,
-            name=project.name,
-            # What a restore of this event would bring back along with it.
-            task_count=len(went_down),
+        entries.append(
+            _entry(
+                deletion.owner_id,
+                ActivityAction.PROJECT_DELETED,
+                ActivityEntityType.PROJECT,
+                project.id,
+                # What a restore of this event would bring back along with it.
+                ProjectDeletedDetails(name=project.name, task_count=len(went_down)),
+                deletion_id=deletion.id,
+            )
         )
-        entry.deletion_id = deletion.id
-        entries.append(entry)
     return entries
 
 
@@ -830,8 +899,10 @@ def _comment_entries(session: Session, pending: _Pending) -> list[ActivityEntry]
                     ActivityAction.COMMENT_ADDED,
                     ActivityEntityType.COMMENT,
                     comment_id,
-                    task=_task_ref(session, comment.task_id),
-                    body=bodies[comment_id],
+                    CommentAddedDetails(
+                        task=_task_ref(session, comment.task_id),
+                        body=bodies[comment_id],
+                    ),
                 )
             )
         elif before != bodies[comment_id]:
@@ -841,8 +912,14 @@ def _comment_entries(session: Session, pending: _Pending) -> list[ActivityEntry]
                     ActivityAction.COMMENT_EDITED,
                     ActivityEntityType.COMMENT,
                     comment_id,
-                    task=_task_ref(session, comment.task_id),
-                    changes={"body": {"from": before, "to": bodies[comment_id]}},
+                    CommentEditedDetails(
+                        task=_task_ref(session, comment.task_id),
+                        changes={
+                            "body": FieldChange(
+                                **{"from": before, "to": bodies[comment_id]}
+                            )
+                        },
+                    ),
                 )
             )
     return entries
@@ -854,9 +931,10 @@ def _comment_deleted_entry(session: Session, comment: Comment) -> ActivityEntry:
         ActivityAction.COMMENT_DELETED,
         ActivityEntityType.COMMENT,
         comment.id,
-        task=_task_ref(session, comment.task_id),
         # A deleted comment is gone for good, so its words are kept here.
-        body=comment.body,
+        CommentDeletedDetails(
+            task=_task_ref(session, comment.task_id), body=comment.body
+        ),
     )
 
 
@@ -866,10 +944,12 @@ def _attachment_added_entry(session: Session, attachment: Attachment) -> Activit
         ActivityAction.ATTACHMENT_ADDED,
         ActivityEntityType.ATTACHMENT,
         attachment.id,
-        task=_task_ref(session, attachment.task_id),
-        filename=attachment.filename,
-        content_type=attachment.content_type,
-        size=attachment.size,
+        AttachmentAddedDetails(
+            task=_task_ref(session, attachment.task_id),
+            filename=attachment.filename,
+            content_type=attachment.content_type,
+            size=attachment.size,
+        ),
     )
 
 
@@ -931,7 +1011,7 @@ def _tag_entries(session: Session, pending: _Pending) -> list[ActivityEntry]:
                     ActivityAction.TAG_CREATED,
                     ActivityEntityType.TAG,
                     tag_id,
-                    name=tag.name,
+                    TagCreatedDetails(name=tag.name),
                 )
             )
     after = _load_tag_names(session, list(pending.tag_names))
@@ -947,8 +1027,12 @@ def _tag_entries(session: Session, pending: _Pending) -> list[ActivityEntry]:
                     ActivityAction.TAG_RENAMED,
                     ActivityEntityType.TAG,
                     tag_id,
-                    name=after[tag_id],
-                    changes={"name": {"from": before, "to": after[tag_id]}},
+                    TagRenamedDetails(
+                        name=after[tag_id],
+                        changes={
+                            "name": FieldChange(**{"from": before, "to": after[tag_id]})
+                        },
+                    ),
                 )
             )
     return entries
@@ -972,8 +1056,7 @@ def _tag_deleted_entry(session: Session, tag: Tag) -> ActivityEntry:
         ActivityEntityType.TAG,
         tag.id,
         # A deleted tag is gone for good, so its name is kept here.
-        name=tag.name,
-        task_count=len(rows),
+        TagDeletedDetails(name=tag.name, task_count=len(rows)),
     )
 
 

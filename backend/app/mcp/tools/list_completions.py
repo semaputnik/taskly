@@ -6,13 +6,14 @@ when it reached Done (ADR-0011, `docs/adr/0011-bot-users-read-the-activity-
 log-in-scope.md`). The only record of that moment is the activity log: a
 `task_completed` entry, or a batch entry naming `done` as the new status.
 
-Built the way spec #248's own decision reads: the log's own narrowing
-(`app.api.access.activity_log_scope`, the same scope `search_activity`,
-#259, reads through its route) composed with the task read model
-(`app.models.Task`, `app.crud.get_task_project_ids`/`get_task_tags`) —
-never a new REST endpoint, and never a call per task. One query gathers
-every completion entry the period and the narrowing match; one more reads
-the tasks they name, batched by id rather than fetched one at a time.
+Built the way spec #248's own decision reads: the log's own narrowing —
+`app.activity_log.read_activity` (#298), the same reader `search_activity`
+(#259) and the REST route both call, composed with `kind=ActivityKind.
+COMPLETED` — joined to the task read model (`app.models.Task`,
+`app.crud.get_task_project_ids`/`get_task_tags`) — never a new REST
+endpoint, and never a call per task. One query gathers every completion
+entry the period and the narrowing match; one more reads the tasks they
+name, batched by id rather than fetched one at a time.
 
 Three things make the count here different from one built by reading the
 log by hand, each worth saying plainly because each is the one place that
@@ -55,18 +56,19 @@ from datetime import datetime
 from statistics import median
 from typing import Annotated, Any
 
-from fastapi import HTTPException
 from mcp.server.mcpserver import Context
 from mcp.types import ToolAnnotations
 from pydantic import Field
 from sqlmodel import Session, col, select
 
 from app import crud
+from app.activity_log import ActivityNarrowing, read_activity
 from app.api import access
 from app.api.deps import Caller
-from app.api.routes.activity import _of_kind
 from app.mcp.conventions import (
+    actor_label_of,
     list_result,
+    narrow_hint,
     open_caller,
     refusal,
     resolve_actor,
@@ -81,14 +83,26 @@ from app.models import (
     ActivityAction,
     ActivityEntry,
     ActivityKind,
+    ActivityOrder,
     BotUserRef,
     Project,
     Task,
 )
+from app.refusals import Refusal
 
 
 @dataclass(frozen=True)
 class _Actor:
+    """
+    Who recorded a completion, read down from an entry this tool has
+    already expanded away from (a batch's one entry becomes many
+    `_Completion`s, each needing its own copy). Structurally
+    `app.mcp.conventions.HasActor`: `actor_label_of` reads this the same
+    way it reads an `ActivityEntry` row directly (`search_activity`'s own
+    caller), which is the one thing the two tools' former `_actor_label`
+    copies actually shared (#321).
+    """
+
     actor_id: uuid.UUID | None
     actor_bot_user_id: uuid.UUID | None
 
@@ -180,51 +194,77 @@ def list_completions(
     counted (ADR-0011).
     """
     with open_caller(ctx) as (session, caller):
-        try:
-            access.authorize_activity_log(caller)
-            project_id = (
-                _resolve_narrowing_project_id(session, caller, project)
-                if project is not None
-                else None
-            )
-            actor_bot_user_id, by_bots, by_user = (
-                resolve_actor(session, caller, actor)
-                if actor is not None
-                else (None, False, False)
-            )
-            tag_name = (
-                resolve_tag_name(session, caller.owner_id, tag)
-                if tag is not None
-                else None
-            )
-            since_at = since_datetime(since)
-            until_at = until_datetime(until)
-        except HTTPException as exc:
-            raise refusal(exc) from exc
-
-        entries = _completion_entries(
+        return list_completions_body(
             session,
             caller,
-            actor_bot_user_id=actor_bot_user_id,
-            by_bots=by_bots,
-            by_user=by_user,
-            since_at=since_at,
-            until_at=until_at,
+            since=since,
+            until=until,
+            project=project,
+            actor=actor,
+            tag=tag,
+            limit=limit,
         )
-        completions = [c for entry in entries for c in _expand(entry)]
-        enriched, bots = _enrich(session, caller, completions)
 
-        if project_id is not None:
-            enriched = [e for e in enriched if e.project_id == project_id]
-        if tag_name is not None:
-            enriched = [e for e in enriched if tag_name in e.tags]
 
-        summary = _summary(enriched, bots)
+def list_completions_body(
+    session: Session,
+    caller: Caller,
+    *,
+    since: str,
+    until: str,
+    project: str | None = None,
+    actor: str | None = None,
+    tag: str | None = None,
+    limit: int = 50,
+) -> dict[str, Any]:
+    """`list_completions`'s own body (#302): callable directly, with any session and any `Caller`, with no protocol in between."""
+    try:
+        access.authorize_activity_log(caller)
+        project_id = (
+            _resolve_narrowing_project_id(session, caller, project)
+            if project is not None
+            else None
+        )
+        actor_bot_user_id, by_bots, by_user = (
+            resolve_actor(session, caller, actor)
+            if actor is not None
+            else (None, False, False)
+        )
+        tag_name = (
+            resolve_tag_name(session, caller.owner_id, tag) if tag is not None else None
+        )
+        since_at = since_datetime(since)
+        until_at = until_datetime(until)
+    except Refusal as exc:
+        raise refusal(exc) from exc
+
+    entries = _completion_entries(
+        session,
+        caller,
+        actor_bot_user_id=actor_bot_user_id,
+        by_bots=by_bots,
+        by_user=by_user,
+        since_at=since_at,
+        until_at=until_at,
+    )
+    completions = [c for entry in entries for c in _expand(entry)]
+    enriched, bots = _enrich(session, caller, completions)
+
+    if project_id is not None:
+        enriched = [e for e in enriched if e.project_id == project_id]
+    if tag_name is not None:
+        enriched = [e for e in enriched if tag_name in e.tags]
+
+    summary = _summary(enriched, bots)
 
     enriched.sort(key=lambda e: e.completion.closed_at, reverse=True)
     rows = [_row(e, bots) for e in enriched[:limit]]
 
-    narrow_with = _narrow_hint(project=project, actor=actor, tag=tag)
+    narrow_with = narrow_hint(
+        ("project", project is not None),
+        ("actor", actor is not None),
+        ("tag", tag is not None),
+    )
     result = list_result(
         rows, key="completions", count=len(enriched), narrow_with=narrow_with
     )
@@ -236,22 +276,15 @@ def _resolve_narrowing_project_id(
     session: Session, caller: Caller, raw: str
 ) -> uuid.UUID:
     """
-    Which project `project` narrows to, refused the way narrowing the
-    activity log itself is refused (`app.api.routes.activity
-    .read_activity_log`'s own `project_id` handling, which this mirrors
-    rather than `app.api.access.get_project`'s): a 404 for either a project
-    that is not there or one outside this bot user's scope, the same
-    answer for both, since a scope refusal here would otherwise confirm an
-    id the caller has no business learning is real.
+    Which project `project` narrows to: resolved by name or id, then refused
+    exactly the way narrowing the activity log itself is refused —
+    `app.access.narrowing_project`, the one place that rule lives (#322,
+    replacing this function's own copy of it) — rather than
+    `app.api.access.get_project`'s, which would answer a 403 for the scope
+    and confirm an id the caller has no business learning is real.
     """
     project_id = resolve_project_id(session, caller, raw)
-    project = session.get(Project, project_id)
-    if (
-        project is None
-        or project.owner_id != caller.owner_id
-        or not access.bot_reaches_project(caller, project)
-    ):
-        raise HTTPException(status_code=404, detail="Project not found")
+    access.narrowing_project(session, caller, project_id)
     return project_id
 
 
@@ -271,34 +304,39 @@ def _completion_entries(
     """
     Every entry this period and this narrowing match that is a completion —
     a `task_completed` entry, or a batch entry that moved its tasks to Done
-    (`_of_kind(ActivityKind.COMPLETED)`, the exact grouping
-    `app.api.routes.activity` already uses for `search_activity`'s own
-    `kind="completed"`, reused rather than re-derived here).
+    — read through the shared reader (`app.activity_log.read_activity`,
+    #298) with `kind=ActivityKind.COMPLETED`, the exact grouping
+    `search_activity`'s own `kind="completed"` uses, composed here rather
+    than re-derived: the reader already applies the scope and the actor
+    narrowing the same way for every caller.
 
-    The scope (`access.activity_log_scope`) and the actor narrowing are the
-    same conditions `read_activity_log` applies; `project` and `tag` are not
-    applied here at all, because a batch entry's `task_ids` can span more
-    than one project and this tool's own project/tag narrowing is a
-    per-task question, answered once the tasks are read back (`_enrich`),
-    not a per-entry one.
+    `limit=None` asks for every match in the period rather than a page: the
+    summary below has to total every completion, not only the page this
+    tool's own `limit` (applied to the rendered rows afterwards) would
+    return. `order=OLDEST` keeps the entries in the order this function has
+    always read them in, so a tie at the final truncation below breaks the
+    same way it always has.
+
+    `project` and `tag` are not applied here at all, because a batch
+    entry's `task_ids` can span more than one project and this tool's own
+    project/tag narrowing is a per-task question, answered once the tasks
+    are read back (`_enrich`), not a per-entry one.
     """
-    where: list[Any] = [
-        ActivityEntry.owner_id == caller.owner_id,
-        _of_kind(ActivityKind.COMPLETED),
-        col(ActivityEntry.created_at) > since_at,
-        col(ActivityEntry.created_at) <= until_at,
-    ]
-    if (scope := access.activity_log_scope(caller)) is not None:
-        where.append(scope)
-    if actor_bot_user_id is not None:
-        where.append(ActivityEntry.actor_bot_user_id == actor_bot_user_id)
-    if by_bots:
-        where.append(col(ActivityEntry.actor_bot_user_id).is_not(None))
-    if by_user:
-        where.append(col(ActivityEntry.actor_bot_user_id).is_(None))
-    return session.exec(
-        select(ActivityEntry).where(*where).order_by(col(ActivityEntry.position))
-    ).all()
+    page = read_activity(
+        session,
+        caller,
+        ActivityNarrowing(
+            kind=ActivityKind.COMPLETED,
+            actor_bot_user_id=actor_bot_user_id,
+            by_bots=by_bots,
+            by_user=by_user,
+            since=since_at,
+            until=until_at,
+            order=ActivityOrder.OLDEST,
+            limit=None,
+        ),
+    )
+    return page.entries
 
 
 def _expand(entry: ActivityEntry) -> list[_Completion]:
@@ -442,21 +480,11 @@ def _row(enriched: _Enriched, bots: dict[uuid.UUID, BotUserRef]) -> dict[str, An
         else None,
         "closed": enriched.completion.closed_at.isoformat(),
         "days_to_close": enriched.days_to_close,
-        "closed_by": _actor_label(enriched.completion.actor, bots),
+        "closed_by": actor_label_of(enriched.completion.actor, bots),
     }
     if enriched.deleted:
         row["deleted"] = True
     return row
-
-
-def _actor_label(actor: _Actor, bots: dict[uuid.UUID, BotUserRef]) -> str:
-    """Who closed it: "owner", or a bot user by name, `get_task`'s own comment-row convention."""
-    if actor.actor_id is not None:
-        return "owner"
-    assert actor.actor_bot_user_id is not None
-    bot = bots.get(actor.actor_bot_user_id)
-    assert bot is not None, "a bot user is kept, not removed, once it acted (FR-08.19)"
-    return f"{bot.name} (deleted)" if bot.deleted else bot.name
 
 
 def _summary(
@@ -475,7 +503,7 @@ def _summary(
     for e in enriched:
         project_key = e.project if e.project is not None else "(deleted)"
         by_project[project_key] = by_project.get(project_key, 0) + 1
-        actor_key = _actor_label(e.completion.actor, bots)
+        actor_key = actor_label_of(e.completion.actor, bots)
         by_actor[actor_key] = by_actor.get(actor_key, 0) + 1
         if e.days_to_close is not None:
             days.append(e.days_to_close)
@@ -486,23 +514,3 @@ def _summary(
         "by_actor": by_actor,
         "median_days_to_close": round(median(days), 2) if days else None,
     }
-
-
-# The narrow hint
-
-
-def _narrow_hint(
-    *, project: str | None, actor: str | None, tag: str | None
-) -> str | None:
-    """
-    The one filter, among those not already set, most likely to turn a
-    truncated answer into a complete one — `since`/`until` are never
-    offered here, since both are already required.
-    """
-    if project is None:
-        return "project"
-    if actor is None:
-        return "actor"
-    if tag is None:
-        return "tag"
-    return None

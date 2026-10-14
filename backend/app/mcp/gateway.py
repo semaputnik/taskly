@@ -15,29 +15,27 @@ every tool calls `get_mcp_caller` again, with its own session, through
 `app.mcp.conventions.open_caller`, so a scope edited between two calls shows
 in the second.
 
-This module is wiring only: the ASGI boundary, the session-to-token binding,
-and `mount`/`run`. The server instance every tool registers on lives in
-`app.mcp.server`; the rules a tool's arguments, output and refusals follow
-live in `app.mcp.conventions`; the tools themselves live in `app.mcp.tools`,
-one module per tool (or per small group), imported by `app.mcp.tools`'s own
-`__init__` so each registers itself with `@mcp_server.tool(...)` on import. A
-new tool adds a module there and nothing here.
+This module is wiring only: the ASGI boundary and `mount`/`run`. The server
+instance every tool registers on lives in `app.mcp.server`; the rules a
+tool's arguments, output and refusals follow live in `app.mcp.conventions`;
+the tools themselves live in `app.mcp.tools`, one module per tool (or per
+small group), imported by `app.mcp.tools`'s own `__init__` so each registers
+itself with `@mcp_server.tool(...)` on import. A new tool adds a module
+there and nothing here.
 """
 
-from collections.abc import AsyncIterator, Iterable
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any
 
 from fastapi import FastAPI, HTTPException
-from mcp.server.streamable_http import MCP_SESSION_ID_HEADER
 from mcp.server.transport_security import TransportSecuritySettings
 from sqlmodel import Session
 from starlette.datastructures import Headers
 from starlette.responses import JSONResponse
-from starlette.types import Message, Receive, Scope, Send
+from starlette.types import Receive, Scope, Send
 
 from app.api.deps import get_mcp_caller
-from app.core import security
 from app.core.db import engine
 from app.mcp import tools as _tools  # noqa: F401 — import registers every tool
 from app.mcp.conventions import bearer_token
@@ -49,33 +47,35 @@ MCP_PATH = "/mcp"
 class _BotGateway:
     """
     The ASGI boundary at `/mcp`: resolves every request's bearer token with
-    `get_mcp_caller` before any MCP message on it is processed, and binds a
-    protocol session to the token that opened it (spec #252).
+    `get_mcp_caller` before any MCP message on it is processed (spec #252,
+    #325).
 
-    Session ids are the SDK's own (`Mcp-Session-Id`): minted on `initialize`,
-    carried on every later call. `_session_tokens` remembers, in this
-    process's memory, which token's hash opened each one — exactly where the
-    SDK keeps the rest of a stateful session's state (`stateless_http` is
-    `False`); there is no load balancer sharing sessions across processes to
-    worry about here. A session id presented with a different token is
-    refused rather than served, so one agent's session cannot be continued
-    as another's.
+    The server runs stateless (`stateless_http=True`, `run()` below):
+    `StreamableHTTPSessionManager` never mints a session id and builds a
+    fresh transport per request, so there is nothing here to remember
+    between one request and the next. That is also why this class needs no
+    per-process state of its own — every request stands on its own, resolved
+    from its own bearer token, which is exactly what FR-07.7 already
+    promised ("nothing about the caller is cached between calls") and what
+    FR-07.8 now says plainly: there are no protocol sessions, so there is no
+    session for one agent to continue as another's.
+
+    An earlier version of this class kept a session-to-token binding
+    (`_session_tokens`) across calls, which only ever worked within one
+    worker process: the release image runs four (`backend/Dockerfile`), and
+    the kernel spreads one session's requests across all of them, so a
+    follow-up call landing on a different worker found a session the stateful
+    SDK path had never minted there — "Session not found" roughly three
+    calls in four (#325). Going stateless removes the session, and with it
+    the binding that only ever protected one process's own memory of it.
     """
-
-    def __init__(self) -> None:
-        # Not a session manager captured once: `run()` below builds a fresh
-        # one every time this app's lifespan starts (a FastAPI process
-        # restart in production, a new `TestClient(app)` context between
-        # test modules here), and `StreamableHTTPSessionManager.run()`
-        # refuses to be called twice on the same instance. Reading
-        # `mcp_server.session_manager` per request always finds the live one.
-        self._session_tokens: dict[str, str] = {}
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         # A route only ever receives the "http" scope type (routing for
         # "lifespan" and "websocket" happens above it); this app never opens
-        # a websocket, and "http" covers the SSE GET stream too, so there is
-        # nothing else to branch on here.
+        # a websocket, so there is nothing else to branch on here. (The SSE
+        # GET stream the stateful path used to serve is gone too — `mount`
+        # below narrows the route to POST.)
         session_manager = mcp_server.session_manager
         headers = Headers(scope=scope)
         try:
@@ -86,55 +86,10 @@ class _BotGateway:
             await _deny(scope, receive, send, exc.status_code, exc.detail)
             return
 
-        token_hash = security.hash_bot_token(token)
-        session_id = headers.get(MCP_SESSION_ID_HEADER)
-        if session_id is not None:
-            opened_with = self._session_tokens.get(session_id)
-            if opened_with is not None and opened_with != token_hash:
-                await _deny(
-                    scope,
-                    receive,
-                    send,
-                    401,
-                    {
-                        "code": "session_token_mismatch",
-                        "message": (
-                            "This MCP session was opened with a different "
-                            "token. Start a new session with this one."
-                        ),
-                    },
-                )
-                return
-
-        async def remember_session(message: Message) -> None:
-            if message["type"] == "http.response.start":
-                minted = _header_value(message["headers"], MCP_SESSION_ID_HEADER)
-                if minted is not None:
-                    self._session_tokens.setdefault(minted, token_hash)
-                if scope["method"] == "DELETE" and session_id is not None:
-                    # The client just terminated this session (or tried to);
-                    # either way, nothing will present this id again
-                    # legitimately, so forget which token owned it.
-                    self._session_tokens.pop(session_id, None)
-            await send(message)
-
-        await session_manager.handle_request(scope, receive, remember_session)
-
-    def reset(self) -> None:
-        """Forget every session-to-token binding; called as `run()` starts a fresh session manager."""
-        self._session_tokens.clear()
+        await session_manager.handle_request(scope, receive, send)
 
 
 _gateway = _BotGateway()
-
-
-def _header_value(raw_headers: Iterable[tuple[bytes, bytes]], name: str) -> str | None:
-    """A header's value from a raw ASGI header list, by name, lower-cased."""
-    target = name.encode("latin-1")
-    for key, value in raw_headers:
-        if key.lower() == target:
-            return value.decode("latin-1")
-    return None
 
 
 async def _deny(
@@ -167,7 +122,14 @@ def mount(app: FastAPI) -> None:
         # runs it as one — confirmed empirically — which is what `_gateway`
         # is. The stub is narrower than the runtime behaviour it wraps.
         _gateway,  # type: ignore[arg-type] # ty: ignore[invalid-argument-type]
-        methods=["GET", "POST", "DELETE"],
+        # POST only (#325): stateless mode answers `DELETE` with 405
+        # ("Session termination not supported" — there is no session to
+        # terminate) and a `GET` whose `Accept` includes `text/event-stream`
+        # opens a standalone SSE stream that nothing ever writes to
+        # (`can_send_request=False` in the SDK's stateless path) and holds
+        # the connection open until the client disconnects. Neither method
+        # does anything worth offering once there is no session behind it.
+        methods=["POST"],
         include_in_schema=False,
     )
 
@@ -183,12 +145,24 @@ async def run() -> AsyncIterator[None]:
     production, or a new `TestClient(app)` context between test modules
     here, re-enters this every time, and a `StreamableHTTPSessionManager`
     refuses to be run a second time on the same instance — so each cycle
-    gets its own, and `_gateway.reset()` drops every session-to-token
-    binding from the one before, which no longer exists to be confused with.
+    gets its own.
 
     `MCPServer.streamable_http_app()` is the only way `MCPServer` builds a
     session manager at all; its returned Starlette app is never mounted (see
     `mount`) — only the side effect of its being built is wanted here.
+
+    `stateless_http=True` (#325) is what actually fixes the production bug:
+    the release image runs four workers (`backend/Dockerfile`) sharing one
+    listening socket, and the stateful path (`stateless_http=False`, the
+    SDK's own default) keeps each session in the memory of whichever worker
+    handled `initialize` — a follow-up call landing on a different worker
+    found a session that worker never minted, "Session not found" roughly
+    three calls in four. Stateless mode creates a transport per request
+    instead, never sets `Mcp-Session-Id`, and needs nothing shared between
+    workers because there is nothing to share: every call still authenticates
+    on its own bearer token (`_BotGateway`, FR-07.7), and nothing under
+    `app/mcp/` sends a request or a notification to a client that a session
+    would be needed to address.
 
     DNS-rebinding protection is off: it guards a `127.0.0.1`-bound dev server
     against a malicious page's background fetch finding it by name, which
@@ -201,10 +175,10 @@ async def run() -> AsyncIterator[None]:
     mcp_server.streamable_http_app(
         streamable_http_path=MCP_PATH,
         json_response=True,
+        stateless_http=True,
         transport_security=TransportSecuritySettings(
             enable_dns_rebinding_protection=False
         ),
     )
-    _gateway.reset()
     async with mcp_server.session_manager.run():
         yield

@@ -18,8 +18,10 @@ from typing import Annotated, Any
 from mcp.server.mcpserver import Context
 from mcp.types import ToolAnnotations
 from pydantic import Field
+from sqlmodel import Session
 
 from app import crud
+from app.api.deps import Caller
 from app.mcp.conventions import list_result, open_caller
 from app.mcp.server import mcp_server
 
@@ -45,13 +47,20 @@ def list_tags(
     archived with their project, counted but out of a bot user's reach.
     """
     with open_caller(ctx) as (session, caller):
-        tags, count = crud.get_tags(
-            session=session,
-            owner_id=caller.owner_id,
-            contains=q,
-            limit=limit,
-            name_creators=False,
-        )
+        return list_tags_body(session, caller, q=q, limit=limit)
+
+
+def list_tags_body(
+    session: Session, caller: Caller, *, q: str | None, limit: int
+) -> dict[str, Any]:
+    """`list_tags`'s own body (#302): callable directly, with any session and any `Caller`, with no protocol in between."""
+    tags, count = crud.get_tags(
+        session=session,
+        owner_id=caller.owner_id,
+        contains=q,
+        limit=limit,
+        name_creators=False,
+    )
 
     rows = [
         {

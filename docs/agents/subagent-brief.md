@@ -76,6 +76,18 @@ docs/adr/, docs/agents/*.md, <design brief and mock if UI>.
 ## Rules
 - pytest only via `cd backend && TEST_DB_NAME=app_test_<n> bash scripts/test.sh`;
   never against the `app` database.
+- **Every wait is one blocking Bash call that returns in the same turn.** A subagent
+  is told nothing by events: no completion notice, no monitor result and no
+  background task's output ever reaches it, so a turn that ends in order to wait
+  ends for good and the coordinator has to resume it. The suite takes about 4.5
+  minutes against Bash's 2-minute default, so run it in a single foreground call
+  with `timeout: 900000` and `run_in_background` false. Wait for CI the same way,
+  with `gh pr checks <pr> --watch --fail-fast`, which blocks until every check has
+  a conclusion and exits non-zero if any failed.
+- Commit and push early rather than at the end. The machine sleeping or a usage
+  limit ends a subagent mid-run (four times across the first two batches), and only
+  what is pushed survives.
+- Do not spawn subagents of your own: a child cannot report to a waiting parent.
 - No local Playwright against :8000/:5173. Servers for visual checks only on
   <assigned ports>; stop them by PID, never pkill.
 - Migrations chain after <head>; drop native enums explicitly in downgrade().
@@ -87,8 +99,9 @@ docs/adr/, docs/agents/*.md, <design brief and mock if UI>.
 
 ## Finish
 Push; PR against <iteration branch> with "Part of #<n>" (not "Closes": the issue
-closes when the iteration reaches master); wait for CI; fix and repeat until green;
-merge with `gh pr merge --merge --delete-branch`; never `--admin`.
+closes when the iteration reaches master); block on `gh pr checks <pr> --watch
+--fail-fast`; fix and repeat until green; merge with
+`gh pr merge --merge --delete-branch`; never `--admin`.
 
 ## Report
 1. PR, merge commit.

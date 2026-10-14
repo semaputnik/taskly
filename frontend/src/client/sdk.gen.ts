@@ -1034,8 +1034,10 @@ export class ActivityService {
      * (FR-08.9), and then reads only the entries about the projects, tasks,
      * comments, attachments and tags of its scope — never an archived project,
      * whatever the scope lists, and never a batch that touched a task outside
-     * it (`app.api.access.activity_log_scope`). Its response omits
-     * `restorable` and the deletion id; restoring stays a human-only action.
+     * it (`app.activity_log.read_activity`, `app.access.activity_log_scope`).
+     * Its response is the same shape a human's is, `ActivityEntriesPublic`, but
+     * with `restorable` and the deletion id both `null` (#298, #314,
+     * ADR-0011); restoring stays a human-only action.
      *
      * `actor_bot_user_id` narrows it to one bot user's own changes — what an
      * operator asks when they want to read an integration rather than their

@@ -19,13 +19,14 @@ error handling.
 
 from typing import Any
 
-from fastapi import HTTPException
 from mcp.server.mcpserver import Context
 from mcp.types import ToolAnnotations
+from sqlmodel import Session
 
 from app import tasks
 from app.api import access
 from app.api.access import TaskAction
+from app.api.deps import Caller
 from app.mcp.conventions import open_caller, refusal, refuse, resolve_task_id, short_id
 from app.mcp.server import mcp_server
 from app.models import CommentBody, SubtaskCompletion, TaskStatus, TaskUpdate
@@ -73,58 +74,70 @@ def complete_task(
     when closing created one.
     """
     with open_caller(ctx) as (session, caller):
-        try:
-            resolved_id = resolve_task_id(session, caller, task_id)
-            resolved = access.get_task(session, caller, resolved_id, TaskAction.UPDATE)
-        except HTTPException as exc:
-            raise refusal(exc) from exc
-
-        task = resolved.task
-        if task.status is TaskStatus.DONE and subtasks is not None:
-            refuse(
-                "invalid_argument",
-                f"“{task.title}” is already done. `subtasks` only applies "
-                "to a call that closes something.",
-            )
-
-        task_in = TaskUpdate(status=TaskStatus.DONE, subtasks=subtasks)
-        try:
-            result = tasks.complete(
-                session=session,
-                caller=caller,
-                task_id=resolved_id,
-                task_in=task_in,
-                comment=comment,
-            )
-        except Refusal as exc:
-            if exc.code is not RefusalCode.TASK_HAS_UNCOMPLETED_SUBTASKS:
-                raise refusal(exc) from exc
-            assert isinstance(exc.payload, TaskHasUncompletedSubtasks)
-            open_subtasks = exc.payload.subtasks
-            listed = "; ".join(f"{short_id(t.id)} “{t.title}”" for t in open_subtasks)
-            count = len(open_subtasks)
-            refuse(
-                exc.code,
-                f"“{task.title}” has {count} open subtask{'' if count == 1 else 's'}: "
-                f'{listed}. Send `subtasks: "complete"` to close them too, or '
-                f'`subtasks: "leave_uncompleted"` to leave each where it is.',
-            )
-        except HTTPException as exc:
-            raise refusal(exc) from exc
-
-        [public] = task_publics(
-            session, [result.task], projects={result.task.id: resolved.project.id}
+        return complete_task_body(
+            session, caller, task_id=task_id, subtasks=subtasks, comment=comment
         )
-        result_dict = public.model_dump(mode="json")
-        if result.already_done:
-            result_dict["already_done"] = True
-        elif result.next_occurrence is not None:
-            successor = result.next_occurrence
-            result_dict["next_occurrence"] = {
-                "id": short_id(successor.id),
-                "due_date": successor.due_date.isoformat()
-                if successor.due_date is not None
-                else None,
-            }
+
+
+def complete_task_body(
+    session: Session,
+    caller: Caller,
+    *,
+    task_id: str,
+    subtasks: SubtaskCompletion | None = None,
+    comment: CommentBody | None = None,
+) -> dict[str, Any]:
+    """`complete_task`'s own body (#302): callable directly, with any session and any `Caller`, with no protocol in between."""
+    try:
+        resolved_id = resolve_task_id(session, caller, task_id)
+        resolved = access.get_task(session, caller, resolved_id, TaskAction.UPDATE)
+    except Refusal as exc:
+        raise refusal(exc) from exc
+
+    task = resolved.task
+    if task.status is TaskStatus.DONE and subtasks is not None:
+        refuse(
+            "invalid_argument",
+            f"“{task.title}” is already done. `subtasks` only applies "
+            "to a call that closes something.",
+        )
+
+    task_in = TaskUpdate(status=TaskStatus.DONE, subtasks=subtasks)
+    try:
+        result = tasks.complete(
+            session=session,
+            caller=caller,
+            task_id=resolved_id,
+            task_in=task_in,
+            comment=comment,
+        )
+    except Refusal as exc:
+        if exc.code is not RefusalCode.TASK_HAS_UNCOMPLETED_SUBTASKS:
+            raise refusal(exc) from exc
+        assert isinstance(exc.payload, TaskHasUncompletedSubtasks)
+        open_subtasks = exc.payload.subtasks
+        listed = "; ".join(f"{short_id(t.id)} “{t.title}”" for t in open_subtasks)
+        count = len(open_subtasks)
+        refuse(
+            exc.code,
+            f"“{task.title}” has {count} open subtask{'' if count == 1 else 's'}: "
+            f'{listed}. Send `subtasks: "complete"` to close them too, or '
+            f'`subtasks: "leave_uncompleted"` to leave each where it is.',
+        )
+
+    [public] = task_publics(
+        session, [result.task], projects={result.task.id: resolved.project.id}
+    )
+    result_dict = public.model_dump(mode="json")
+    if result.already_done:
+        result_dict["already_done"] = True
+    elif result.next_occurrence is not None:
+        successor = result.next_occurrence
+        result_dict["next_occurrence"] = {
+            "id": short_id(successor.id),
+            "due_date": successor.due_date.isoformat()
+            if successor.due_date is not None
+            else None,
+        }
 
     return result_dict

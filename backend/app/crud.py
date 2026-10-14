@@ -1,10 +1,11 @@
 """
 `app/crud.py` as a package: `app/repositories/`, grouped the way the
 aggregates actually cluster — tasks (with series, occurrences and subtree
-reads), projects, tags, comments and attachments, bot users and webhooks, and
-activity — plus a `predicates` module of primitives shared across more than
-one of them. This file re-exports every name the 35 importing modules use, so
-the split is invisible to them and none of them changes.
+reads), projects, users, tags, comments and attachments, bot users and
+webhooks, and activity — plus a `predicates` module of primitives shared
+across more than one of them. This file re-exports every name the 35
+importing modules use, so the split is invisible to them and none of them
+changes.
 """
 
 from app.repositories.activity import (
@@ -44,14 +45,12 @@ from app.repositories.predicates import (
 from app.repositories.projects import (
     ProjectTaskStats,
     create_project,
-    create_user,
     get_inbox_project,
     get_project_task_stats,
-    get_user_by_email,
+    project_list_statement,
     project_public,
     set_project_archived,
     update_project,
-    update_user,
 )
 from app.repositories.tags import (
     create_tag,
@@ -82,6 +81,11 @@ from app.repositories.tasks import (
     open_subtasks,
     subtasks,
     update_task,
+)
+from app.repositories.users import (
+    create_user,
+    get_user_by_email,
+    update_user,
 )
 
 __all__ = [
@@ -131,6 +135,7 @@ __all__ = [
     "merge_tags",
     "not_deleted",
     "open_subtasks",
+    "project_list_statement",
     "project_public",
     "project_task_ids",
     "rename_tag",

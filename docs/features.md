@@ -447,12 +447,14 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
 - **FR-07.7** Nothing about the caller is cached between calls: a scope
   edited between two calls is read again before the second, the same
   promise `GET /caller` makes (FR-07.4).
-- **FR-07.8** A protocol session is bound to the token that opened it. The
-  same session id presented with a different token is refused rather than
-  served, so one agent's session cannot be continued as another's; one
-  mounted server still serves any number of agents at once, because the
-  caller comes from each call's own token rather than from anything the
-  server was configured with.
+- **FR-07.8** There are no protocol sessions: `/mcp` runs stateless, so no
+  call carries a session id and none is minted. Every single request,
+  `initialize` included, authenticates on its own bearer token (FR-07.6,
+  FR-07.7) — strictly stronger than a session bound to the token that opened
+  it, the property this replaces, since there is no session for one agent's
+  work to be continued as another's at all. One mounted server still serves
+  any number of agents at once, because the caller comes from each call's
+  own token rather than from anything the server was configured with.
 - **FR-07.9** `whoami` is the first tool: read-only, and answering exactly
   what `GET /caller` answers (FR-07.4) — the actor, the owner, the scope's
   projects (the Inbox marked) with their open-task counts, exactly its
@@ -545,31 +547,42 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
 - **FR-07.15** `update_task` changes a task through the same route (`PATCH
   /tasks/{id}`) and the same rules, annotated idempotent and returning the
   updated task in full. `title`, `description`, `priority`, `due_date`,
-  `project`, `assignee`, `status` and `tags` can each be changed on their
-  own, omitting a field leaves it alone, and `tags` replaces the task's
-  tags wholesale, as the REST API has it. `status` here reaches only the
-  open statuses (FR-01.4): moving a task to `done` is refused, naming
-  `complete_task` (#257) as the tool that closes one, which is also where
-  the open-subtasks question belongs; moving between open statuses never
-  touches a task's subtasks. Moving the due date of the open occurrence of
-  a recurring task needs `due_date_scope` (FR-01.17–FR-01.19) to say which
-  of the series moves with it, refused without one and refused where there
-  is no series to reschedule; reopening an earlier occurrence than the
-  latest is refused, naming it (FR-01.16). `project` moves the task, by
-  name or id, into or out of scope refused either way (FR-08.8); a subtask
-  cannot be moved this way at all, since it follows the task at the top of
-  its tree (FR-02.4). `assignee` reads exactly as `create_task`'s does
-  (FR-01.7, FR-08.21); the reporter is reached by no argument here either
-  (FR-01.29). `description`, `due_date`, `priority` and `assignee` are the
-  only fields an explicit `clear` list can empty — naming a field there
-  that was also sent a value is refused, and so, server-wide, is any
-  argument sent as JSON `null` (FR-07.10's own rule): omission is the only
-  way every other field here is left alone. This is also how a hand-over is
-  done (ADR-0008): moving `status` to `review` and setting `assignee` to
-  `owner` in the same call, with a comment (`comment_task`, #258) saying
-  what was done — the tool's own description teaches the convention, since
-  nothing in the product moves a task onto the owner because it entered
-  Review, and there is no tool of its own for a hand-over.
+  `project`, `assignee`, `status`, `tags` and `recurrence` can each be
+  changed on their own, omitting a field leaves it alone, and `tags`
+  replaces the task's tags wholesale, as the REST API has it. `status` here
+  reaches only the open statuses (FR-01.4): moving a task to `done` is
+  refused, naming `complete_task` (#257) as the tool that closes one, which
+  is also where the open-subtasks question belongs; moving between open
+  statuses never touches a task's subtasks. Moving the due date of the open
+  occurrence of a recurring task needs `due_date_scope` (FR-01.17–FR-01.19)
+  to say which of the series moves with it, refused without one and refused
+  where there is no series to reschedule; reopening an earlier occurrence
+  than the latest is refused, naming it (FR-01.16). `recurrence` (FR-01.13)
+  is a different act from that: it starts the task recurring, changes its
+  schedule, or — named in `clear` instead, following that one convention
+  rather than a second of its own — stops it, the occurrences after this
+  one never coming while the occurrence already made stays exactly as it is
+  (#304); the tool's own description states the distinction so an agent
+  asked to move one occurrence's date does not re-anchor the series by
+  sending this instead. Every rule the operation already enforced over REST
+  holds unchanged: only an open task can change how it recurs, a recurring
+  task needs a due date, and only a task at the top of its tree can recur,
+  each refused the same way `create_task`'s own recurrence is. `project`
+  moves the task, by name or id, into or out of scope refused either way
+  (FR-08.8); a subtask cannot be moved this way at all, since it follows the
+  task at the top of its tree (FR-02.4). `assignee` reads exactly as
+  `create_task`'s does (FR-01.7, FR-08.21); the reporter is reached by no
+  argument here either (FR-01.29). `description`, `due_date`, `priority`,
+  `assignee` and `recurrence` are the only fields an explicit `clear` list
+  can empty — naming a field there that was also sent a value is refused,
+  and so, server-wide, is any argument sent as JSON `null` (FR-07.10's own
+  rule): omission is the only way every other field here is left alone.
+  This is also how a hand-over is done (ADR-0008): moving `status` to
+  `review` and setting `assignee` to `owner` in the same call, with a
+  comment (`comment_task`, #258) saying what was done — the tool's own
+  description teaches the convention, since nothing in the product moves a
+  task onto the owner because it entered Review, and there is no tool of
+  its own for a hand-over.
 - **FR-07.16** `complete_task` closes a task through the same route
   (`PATCH /tasks/{id}` with `status: done`) — its own tool rather than an
   argument to `update_task`, for the two things closing needs that no other
@@ -631,12 +644,13 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
   `until` (FR-10.12) — a date each, widened to the whole day it names so a
   closed period ("last month") is asked for by its two calendar dates. It
   invents no narrowing the endpoint does not have: it is built on
-  `app.api.routes.activity.read_activity_log` itself, called through to
-  directly the way the write tools call theirs, so the scope narrowing, the
-  all-or-nothing batch rule, the tag exemption, and the withholding of
-  `restorable` and the deletion id from a bot's own response all stay that
-  route's code. `order` (FR-10.10) and paging (`limit`, `offset`) work as
-  they do there. Each result is one compact line — `at`, `actor` ("owner",
+  `app.activity_log.read_activity`, the reader `GET /activity-log/` itself
+  calls through to, so the scope narrowing, the all-or-nothing batch rule,
+  and the tag exemption stay that one module's code; the withholding of
+  `restorable` and the deletion id from a bot's own response is the route's
+  own job of declaring two response shapes (ADR-0011). `order` (FR-10.10)
+  and paging (`limit`, `offset`) work as they do there. Each result is one
+  compact line — `at`, `actor` ("owner",
   or a bot user by name, the convention `get_task`'s own comment rows use),
   `what` (one short phrase, ported from the web UI's own
   `ActivityDescription.tsx`, there being no backend description of an entry
@@ -726,6 +740,10 @@ Taskly is a personal task tracker that also lets a user work with AI agents.
   | Tag | configurable | always | never | never |
   | Project | never | only projects in scope | never | never |
   | Activity log | never | configurable (`read_activity`, off by default) | never | never |
+
+  A human user holds every one of these grants by construction, not as a
+  list kept in step with them by hand: there is no scope to narrow a human,
+  so each grant above is simply true for one (see FR-07.4).
 
   Tags (see ADR-0003):
   - Creating tags is a permission of its own. It covers both creating a tag

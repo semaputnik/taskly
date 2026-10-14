@@ -11,7 +11,7 @@ from datetime import date
 from typing import Any
 
 from fastapi import APIRouter
-from sqlmodel import Session, col, func, select
+from sqlmodel import Session
 
 from app import crud
 from app.api.deps import Caller, CallerDep, SessionDep
@@ -21,22 +21,13 @@ from app.models import (
     CallerActor,
     CallerProject,
     CallerPublic,
-    Project,
 )
 
 router = APIRouter(tags=["caller"])
 
-# A human may do anything a scope could grant (spec #245), so every
-# permission is true rather than read off anywhere.
-_HUMAN_PERMISSIONS = BotPermissions(
-    create_tasks=True,
-    read_tasks=True,
-    update_tasks=True,
-    delete_tasks=True,
-    add_comments=True,
-    create_tags=True,
-    read_activity=True,
-)
+# Built once: every permission true, for a human (spec #245), derived from
+# the model rather than listed here by hand (issue #264).
+_HUMAN_PERMISSIONS = BotPermissions.all_granted()
 
 
 def _bot_projects(session: Session, caller: Caller) -> list[CallerProject]:
@@ -46,21 +37,13 @@ def _bot_projects(session: Session, caller: Caller) -> list[CallerProject]:
     project list uses (FR-05.14), so the two never disagree. An archived
     project is left out whatever the scope says (FR-05.13), and so is a
     project that has since been deleted (CONTEXT.md, "Scope").
+
+    The query itself is `crud.project_list_statement`, the one the project
+    list route also runs (issue #264): the two cannot drift the way they once
+    did when each kept its own copy.
     """
-    is_archived = False
-    statement = (
-        select(Project)
-        .where(
-            Project.owner_id == caller.owner_id,
-            crud.not_deleted(Project),
-            Project.is_archived == is_archived,
-            col(Project.id).in_(caller.project_ids),
-        )
-        .order_by(
-            col(Project.is_inbox).desc(),
-            func.lower(Project.name),
-            col(Project.id),
-        )
+    statement = crud.project_list_statement(
+        owner_id=caller.owner_id, archived=False, project_ids=caller.project_ids
     )
     projects = session.exec(statement).all()
     stats = crud.get_project_task_stats(

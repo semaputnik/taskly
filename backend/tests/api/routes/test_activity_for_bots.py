@@ -9,6 +9,7 @@ and `test_activity_by_kind` for how a log fixture is built and read,
 `test_bot_task_writes` for the scope-and-permission matrix shape.
 """
 
+import uuid
 from typing import Any
 
 import pytest
@@ -328,9 +329,17 @@ def test_the_bot_reads_entries_by_any_actor(client: TestClient, owner: Headers) 
 # --- restorable and the deletion id -----------------------------------------
 
 
-def test_restorable_and_the_deletion_id_are_absent_for_a_bot_present_for_a_human(
+def test_restorable_and_the_deletion_id_are_null_for_a_bot_set_for_a_human(
     client: TestClient, owner: Headers
 ) -> None:
+    """
+    One response model, not a union (#314): a bot user's entry still carries
+    both keys — there is nothing to discriminate between shapes any more —
+    but `null` for both, meaning withheld, never the `False`/absent a human's
+    own entry would never show either. Both sides are asserted here, in one
+    test, so the guard cannot drift into checking one shape without the
+    other.
+    """
     project_id = create_project(client, owner)
     bot = issue_bot_headers(
         client, owner, project_ids=[project_id], permissions=ALL_PERMISSIONS
@@ -341,8 +350,8 @@ def test_restorable_and_the_deletion_id_are_absent_for_a_bot_present_for_a_human
     bot_entry = next(
         e for e in _log(client, bot)["data"] if e["action"] == "task_deleted"
     )
-    assert "restorable" not in bot_entry
-    assert "deletion_id" not in bot_entry
+    assert bot_entry["restorable"] is None
+    assert bot_entry["deletion_id"] is None
 
     human_entry = next(
         e for e in _log(client, owner)["data"] if e["action"] == "task_deleted"
@@ -444,6 +453,47 @@ def test_narrowing_by_an_out_of_scope_project_is_not_found(
 
     r = _get(client, bot, project_id=out_of_scope)
     assert r.status_code == 404
+
+
+def test_missing_and_out_of_scope_project_give_the_identical_refusal(
+    client: TestClient, owner: Headers
+) -> None:
+    """
+    ADR-0011's own point: one answer whatever the reason a bot cannot reach
+    the id it named, so a scope refusal can never be told apart from a
+    missing one (#322's own acceptance criterion — the project-narrowing
+    refusal is decided once, in `app.access.narrowing_project`, so these two
+    calls cannot answer differently again).
+    """
+    in_scope = create_project(client, owner, "In scope")
+    out_of_scope = create_project(client, owner, "Elsewhere")
+    bot = issue_bot_headers(
+        client, owner, project_ids=[in_scope], permissions=ALL_PERMISSIONS
+    )
+
+    outside = _get(client, bot, project_id=out_of_scope)
+    missing = _get(client, bot, project_id=str(uuid.uuid4()))
+
+    assert outside.status_code == missing.status_code == 404
+    assert outside.json() == missing.json()
+
+
+def test_missing_and_out_of_scope_task_give_the_identical_refusal(
+    client: TestClient, owner: Headers
+) -> None:
+    """The task-narrowing twin of the project one above: also decided once (`app.access.narrowing_task`)."""
+    in_scope = create_project(client, owner, "In scope")
+    out_of_scope = create_project(client, owner, "Elsewhere")
+    bot = issue_bot_headers(
+        client, owner, project_ids=[in_scope], permissions=ALL_PERMISSIONS
+    )
+    outside_task = create_task(client, owner, project_id=out_of_scope)
+
+    outside = _get(client, bot, task_id=outside_task)
+    missing = _get(client, bot, task_id=str(uuid.uuid4()))
+
+    assert outside.status_code == missing.status_code == 404
+    assert outside.json() == missing.json()
 
 
 def test_narrowing_by_an_archived_project_in_scope_is_not_found(

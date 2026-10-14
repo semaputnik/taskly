@@ -33,9 +33,7 @@ def not_deleted(model: type[Task] | type[Project]) -> Any:
     return col(model.deletion_id).is_(None)
 
 
-def tree_walk(
-    start_condition: Any, *, name: str, including_deleted: bool = False
-) -> Any:
+def tree_walk(start_condition: Any, *, including_deleted: bool = False) -> Any:
     """
     The one walk down the task tree: the tasks matching `start_condition` and
     every task under them, as (id, status, project_id, due_date) rows.
@@ -49,14 +47,23 @@ def tree_walk(
     belong to — has to resolve a deleted task exactly as it would a live one.
 
     Subtasks hold no project of their own, so the tasks of a project are only
-    reachable by walking down from its root tasks. `name` names the CTE, which
-    has to be unique among the ones a single statement uses.
+    reachable by walking down from its root tasks. The CTE's own name used to
+    be a caller-supplied `name` that had to stay unique among the walks a
+    single statement combines — `app/mcp/conventions.py`'s `resolve_task_id`
+    already combines two — so getting it wrong produced a runtime SQL error
+    far from the mistake. `.cte()` is given no name at all here instead:
+    SQLAlchemy numbers an unnamed CTE per statement at compile time (`anon_1`,
+    `anon_2`, ...), which is just as collision-free as a caller picking one
+    would need to be, with no caller input at all. A per-call generated name
+    (`uuid4().hex`) was tried and reverted — it made every walk's compiled
+    form unique, which defeated SQLAlchemy's statement cache and evicted
+    unrelated statements out of it.
     """
     live: list[Any] = [] if including_deleted else [not_deleted(Task)]
     tree = (
         select(Task.id, Task.status, col(Task.project_id), col(Task.due_date))
         .where(start_condition, *live)
-        .cte(name, recursive=True)
+        .cte(recursive=True)
     )
     child = aliased(Task)
     live_child: list[Any] = [] if including_deleted else [not_deleted(child)]
@@ -76,7 +83,7 @@ def subtree_cte(root_id: uuid.UUID) -> Any:
     deletion always takes a whole subtree, so nothing that is still there hides
     under a deleted one.
     """
-    return tree_walk(Task.parent_id == root_id, name="subtree")
+    return tree_walk(Task.parent_id == root_id)
 
 
 def subtree_ids(root_id: uuid.UUID) -> Any:
@@ -84,17 +91,13 @@ def subtree_ids(root_id: uuid.UUID) -> Any:
     return select(subtree_cte(root_id).c.id)
 
 
-def _task_trees(
-    root_condition: Any, *, name: str, including_deleted: bool = False
-) -> Any:
+def _task_trees(root_condition: Any, *, including_deleted: bool = False) -> Any:
     """
     Selects the ids of the root tasks matching `root_condition` and of every
     task under them, leaving deleted ones out unless `including_deleted` asks
     to walk through them too.
     """
-    return select(
-        tree_walk(root_condition, name=name, including_deleted=including_deleted).c.id
-    )
+    return select(tree_walk(root_condition, including_deleted=including_deleted).c.id)
 
 
 def project_task_ids(project_id: uuid.UUID) -> Any:
@@ -102,7 +105,7 @@ def project_task_ids(project_id: uuid.UUID) -> Any:
     Selects the ids of every task of a project that is not deleted: its root
     tasks and everything under them.
     """
-    return _task_trees(Task.project_id == project_id, name="project_tasks")
+    return _task_trees(Task.project_id == project_id)
 
 
 def tasks_in_projects(project_ids: Any, *, including_deleted: bool = False) -> Any:
@@ -121,7 +124,6 @@ def tasks_in_projects(project_ids: Any, *, including_deleted: bool = False) -> A
     """
     return _task_trees(
         col(Task.project_id).in_(project_ids),
-        name="scope_tasks",
         including_deleted=including_deleted,
     )
 
@@ -139,9 +141,7 @@ def archived_task_ids(owner_id: uuid.UUID) -> Any:
         Project.owner_id == owner_id,
         Project.is_archived == True,  # noqa: E712
     )
-    return _task_trees(
-        col(Task.project_id).in_(archived_projects), name="archived_tasks"
-    )
+    return _task_trees(col(Task.project_id).in_(archived_projects))
 
 
 def task_ancestry(

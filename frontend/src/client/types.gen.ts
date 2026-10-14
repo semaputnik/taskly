@@ -32,6 +32,11 @@ export type ActivityEntriesPublic = {
 
 /**
  * ActivityEntryPublic
+ *
+ * What `GET /activity-log/` sends back: one shape for a human caller
+ * and a bot user alike (#314). See the module section above this class for
+ * why `restorable` and `deletion_id` are nullable rather than a second,
+ * narrower response model.
  */
 export type ActivityEntryPublic = {
     /**
@@ -57,15 +62,63 @@ export type ActivityEntryPublic = {
      */
     actor_bot_user_name?: string | null;
     /**
-     * Deletion Id
-     */
-    deletion_id?: string | null;
-    /**
      * Details
      */
-    details: {
-        [key: string]: unknown;
-    };
+    details: ({
+        kind: 'task_created';
+    } & TaskCreatedDetailsPublic) | ({
+        kind: 'task_changed';
+    } & TaskChangedDetailsPublic) | ({
+        kind: 'task_moved';
+    } & TaskMovedDetailsPublic) | ({
+        kind: 'task_assigned';
+    } & TaskAssignedDetailsPublic) | ({
+        kind: 'task_unassigned';
+    } & TaskUnassignedDetailsPublic) | ({
+        kind: 'task_completed';
+    } & TaskCompletedDetailsPublic) | ({
+        kind: 'task_reopened';
+    } & TaskReopenedDetailsPublic) | ({
+        kind: 'task_status_changed';
+    } & TaskStatusChangedDetailsPublic) | ({
+        kind: 'task_deleted';
+    } & TaskDeletedSinglePublic) | ({
+        kind: 'task_deleted_batch';
+    } & TaskDeletedBatchPublic) | ({
+        kind: 'task_restored';
+    } & TaskRestoredSinglePublic) | ({
+        kind: 'task_restored_batch';
+    } & TaskRestoredBatchPublic) | ({
+        kind: 'tasks_bulk_changed';
+    } & TasksBulkChangedDetailsPublic) | ({
+        kind: 'project_created';
+    } & ProjectCreatedDetailsPublic) | ({
+        kind: 'project_changed';
+    } & ProjectChangedDetailsPublic) | ({
+        kind: 'project_deleted';
+    } & ProjectDeletedDetailsPublic) | ({
+        kind: 'project_restored';
+    } & ProjectRestoredDetailsPublic) | ({
+        kind: 'comment_added';
+    } & CommentAddedDetailsPublic) | ({
+        kind: 'comment_edited';
+    } & CommentEditedDetailsPublic) | ({
+        kind: 'comment_deleted';
+    } & CommentDeletedDetailsPublic) | ({
+        kind: 'attachment_added';
+    } & AttachmentAddedDetailsPublic) | ({
+        kind: 'attachment_deleted';
+    } & AttachmentDeletedDetailsPublic) | ({
+        kind: 'tag_created';
+    } & TagCreatedDetailsPublic) | ({
+        kind: 'tag_renamed';
+    } & TagRenamedDetailsPublic) | ({
+        kind: 'tag_deleted';
+    } & TagDeletedDetailsPublic) | ({
+        kind: 'tag_merged';
+    } & TagMergedDetailsPublic) | ({
+        kind: 'unrecognized';
+    } & UnrecognizedDetailsPublic);
     /**
      * Created At
      */
@@ -79,9 +132,13 @@ export type ActivityEntryPublic = {
      */
     entity_project_id?: string | null;
     /**
+     * Deletion Id
+     */
+    deletion_id?: string | null;
+    /**
      * Restorable
      */
-    restorable?: boolean;
+    restorable?: boolean | null;
 };
 
 /**
@@ -114,6 +171,64 @@ export type ActivityOrder = 'newest' | 'oldest';
  * The two kinds of caller `GET /caller` ever describes (spec #245).
  */
 export type ActorKind = 'user' | 'bot_user';
+
+export type AssigneeRef = {
+    type: ActorKind;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Name
+     */
+    name?: string | null;
+};
+
+/**
+ * AttachmentAddedDetailsPublic
+ */
+export type AttachmentAddedDetailsPublic = {
+    task: TaskRef;
+    /**
+     * Filename
+     */
+    filename: string;
+    /**
+     * Content Type
+     */
+    content_type: string;
+    /**
+     * Size
+     */
+    size: number;
+    /**
+     * Kind
+     */
+    kind?: 'attachment_added';
+};
+
+/**
+ * AttachmentDeletedDetailsPublic
+ */
+export type AttachmentDeletedDetailsPublic = {
+    task: TaskRef;
+    /**
+     * Filename
+     */
+    filename: string;
+    /**
+     * Content Type
+     */
+    content_type: string;
+    /**
+     * Size
+     */
+    size: number;
+    /**
+     * Kind
+     */
+    kind?: 'attachment_deleted';
+};
 
 /**
  * AttachmentLocation
@@ -492,6 +607,21 @@ export type CallerPublic = {
 };
 
 /**
+ * CommentAddedDetailsPublic
+ */
+export type CommentAddedDetailsPublic = {
+    task: TaskRef;
+    /**
+     * Body
+     */
+    body: string;
+    /**
+     * Kind
+     */
+    kind?: 'comment_added';
+};
+
+/**
  * CommentCreate
  */
 export type CommentCreate = {
@@ -499,6 +629,38 @@ export type CommentCreate = {
      * Body
      */
     body: string;
+};
+
+/**
+ * CommentDeletedDetailsPublic
+ */
+export type CommentDeletedDetailsPublic = {
+    task: TaskRef;
+    /**
+     * Body
+     */
+    body: string;
+    /**
+     * Kind
+     */
+    kind?: 'comment_deleted';
+};
+
+/**
+ * CommentEditedDetailsPublic
+ */
+export type CommentEditedDetailsPublic = {
+    task: TaskRef;
+    /**
+     * Changes
+     */
+    changes: {
+        [key: string]: FieldChange;
+    };
+    /**
+     * Kind
+     */
+    kind?: 'comment_edited';
 };
 
 /**
@@ -578,6 +740,23 @@ export type DeliveryState = 'pending' | 'delivered' | 'failed';
  * one is refused, so a series is never rescheduled by omission (FR-01.17).
  */
 export type DueDateScope = 'this_occurrence' | 'this_and_following';
+
+/**
+ * FieldChange
+ *
+ * One field's value before and after, as a `task_changed`/`project_changed`/
+ * `tag_renamed`/`comment_edited` entry's own `changes` map holds it.
+ */
+export type FieldChange = {
+    /**
+     * From
+     */
+    from?: unknown;
+    /**
+     * To
+     */
+    to?: unknown;
+};
 
 /**
  * HTTPValidationError
@@ -809,6 +988,26 @@ export type PrivateUserCreate = {
 };
 
 /**
+ * ProjectChangedDetailsPublic
+ */
+export type ProjectChangedDetailsPublic = {
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Changes
+     */
+    changes: {
+        [key: string]: FieldChange;
+    };
+    /**
+     * Kind
+     */
+    kind?: 'project_changed';
+};
+
+/**
  * ProjectCreate
  */
 export type ProjectCreate = {
@@ -820,6 +1019,42 @@ export type ProjectCreate = {
      * Description
      */
     description?: string | null;
+};
+
+/**
+ * ProjectCreatedDetailsPublic
+ */
+export type ProjectCreatedDetailsPublic = {
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Description
+     */
+    description?: string | null;
+    /**
+     * Kind
+     */
+    kind?: 'project_created';
+};
+
+/**
+ * ProjectDeletedDetailsPublic
+ */
+export type ProjectDeletedDetailsPublic = {
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Task Count
+     */
+    task_count: number;
+    /**
+     * Kind
+     */
+    kind?: 'project_deleted';
 };
 
 /**
@@ -874,6 +1109,40 @@ export type ProjectPublic = {
      * Created At
      */
     created_at?: string | null;
+};
+
+/**
+ * ProjectRef
+ *
+ * A project as an entry names it: its id and name at the time of the change.
+ */
+export type ProjectRef = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Name
+     */
+    name?: string | null;
+};
+
+/**
+ * ProjectRestoredDetailsPublic
+ */
+export type ProjectRestoredDetailsPublic = {
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Task Count
+     */
+    task_count: number;
+    /**
+     * Kind
+     */
+    kind?: 'project_restored';
 };
 
 /**
@@ -952,6 +1221,27 @@ export type Recurrence = {
 export type RecurrenceFrequency = 'daily' | 'weekly' | 'monthly' | 'every_n_days';
 
 /**
+ * RecurrenceRef
+ *
+ * A task's recurrence, as a snapshot (`TaskSnapshot.recurrence`) records
+ * it — deliberately not `app.models.task.Recurrence`, which carries a
+ * validator (`check_interval_days`) enforcing *today's* rule for what a
+ * valid combination is. A snapshot records what was true when it was
+ * taken, and the log keeps it for ever (FR-10.5): validating a years-old
+ * row against the current rule would make a combination the product used
+ * to allow undecodable forever, the same mistake `extra="ignore"` exists
+ * to avoid at the module level. If `Recurrence` gains a field, an old
+ * snapshot simply never carried it — correct, not drift.
+ */
+export type RecurrenceRef = {
+    frequency: RecurrenceFrequency;
+    /**
+     * Interval Days
+     */
+    interval_days?: number | null;
+};
+
+/**
  * RegistrationStart
  */
 export type RegistrationStart = {
@@ -986,6 +1276,38 @@ export type TagCreate = {
      * Name
      */
     name: string;
+};
+
+/**
+ * TagCreatedDetailsPublic
+ */
+export type TagCreatedDetailsPublic = {
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Kind
+     */
+    kind?: 'tag_created';
+};
+
+/**
+ * TagDeletedDetailsPublic
+ */
+export type TagDeletedDetailsPublic = {
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Task Count
+     */
+    task_count: number;
+    /**
+     * Kind
+     */
+    kind?: 'tag_deleted';
 };
 
 /**
@@ -1052,6 +1374,28 @@ export type TagMergePreview = {
 };
 
 /**
+ * TagMergedDetailsPublic
+ */
+export type TagMergedDetailsPublic = {
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Sources
+     */
+    sources: Array<string>;
+    /**
+     * Task Count
+     */
+    task_count: number;
+    /**
+     * Kind
+     */
+    kind?: 'tag_merged';
+};
+
+/**
  * TagPublic
  */
 export type TagPublic = {
@@ -1079,6 +1423,26 @@ export type TagPublic = {
 };
 
 /**
+ * TagRenamedDetailsPublic
+ */
+export type TagRenamedDetailsPublic = {
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Changes
+     */
+    changes: {
+        [key: string]: FieldChange;
+    };
+    /**
+     * Kind
+     */
+    kind?: 'tag_renamed';
+};
+
+/**
  * TagUpdate
  */
 export type TagUpdate = {
@@ -1100,6 +1464,30 @@ export type TagsPublic = {
      * Count
      */
     count: number;
+};
+
+/**
+ * TaskAssignedDetailsPublic
+ */
+export type TaskAssignedDetailsPublic = {
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Assignee Id
+     */
+    assignee_id?: string | null;
+    assignee?: AssigneeRef | null;
+    /**
+     * Previous Assignee Id
+     */
+    previous_assignee_id?: string | null;
+    previous_assignee?: AssigneeRef | null;
+    /**
+     * Kind
+     */
+    kind?: 'task_assigned';
 };
 
 /**
@@ -1159,6 +1547,40 @@ export type TaskBulkUpdate = {
 };
 
 /**
+ * TaskChangedDetailsPublic
+ */
+export type TaskChangedDetailsPublic = {
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Changes
+     */
+    changes: {
+        [key: string]: FieldChange;
+    };
+    /**
+     * Kind
+     */
+    kind?: 'task_changed';
+};
+
+/**
+ * TaskCompletedDetailsPublic
+ */
+export type TaskCompletedDetailsPublic = {
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Kind
+     */
+    kind?: 'task_completed';
+};
+
+/**
  * TaskCreate
  */
 export type TaskCreate = {
@@ -1196,6 +1618,58 @@ export type TaskCreate = {
 };
 
 /**
+ * TaskCreatedDetailsPublic
+ */
+export type TaskCreatedDetailsPublic = {
+    /**
+     * Title
+     */
+    title: string;
+    task: TaskSnapshot;
+    /**
+     * Kind
+     */
+    kind?: 'task_created';
+};
+
+/**
+ * TaskDeletedBatchPublic
+ */
+export type TaskDeletedBatchPublic = {
+    /**
+     * Task Count
+     */
+    task_count: number;
+    /**
+     * Kind
+     */
+    kind?: 'task_deleted_batch';
+};
+
+/**
+ * TaskDeletedSinglePublic
+ */
+export type TaskDeletedSinglePublic = {
+    /**
+     * Title
+     */
+    title: string;
+    project?: ProjectRef | null;
+    /**
+     * Parent Id
+     */
+    parent_id?: string | null;
+    /**
+     * Subtask Count
+     */
+    subtask_count?: number;
+    /**
+     * Kind
+     */
+    kind?: 'task_deleted';
+};
+
+/**
  * TaskHandover
  *
  * How a task came to be in Review when a bot user put it there: which bot
@@ -1208,6 +1682,22 @@ export type TaskHandover = {
      * At
      */
     at: string;
+};
+
+/**
+ * TaskMovedDetailsPublic
+ */
+export type TaskMovedDetailsPublic = {
+    /**
+     * Title
+     */
+    title: string;
+    from_project?: ProjectRef | null;
+    to_project?: ProjectRef | null;
+    /**
+     * Kind
+     */
+    kind?: 'task_moved';
 };
 
 /**
@@ -1276,6 +1766,114 @@ export type TaskPublic = {
 };
 
 /**
+ * TaskRef
+ *
+ * What a comment or attachment entry names its task by.
+ */
+export type TaskRef = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Title
+     */
+    title: string;
+};
+
+/**
+ * TaskReopenedDetailsPublic
+ */
+export type TaskReopenedDetailsPublic = {
+    /**
+     * Title
+     */
+    title: string;
+    to?: TaskStatus | null;
+    /**
+     * Kind
+     */
+    kind?: 'task_reopened';
+};
+
+/**
+ * TaskRestoredBatchPublic
+ */
+export type TaskRestoredBatchPublic = {
+    /**
+     * Task Count
+     */
+    task_count: number;
+    /**
+     * Kind
+     */
+    kind?: 'task_restored_batch';
+};
+
+/**
+ * TaskRestoredSinglePublic
+ */
+export type TaskRestoredSinglePublic = {
+    /**
+     * Title
+     */
+    title: string;
+    project?: ProjectRef | null;
+    /**
+     * Parent Id
+     */
+    parent_id?: string | null;
+    /**
+     * Subtask Count
+     */
+    subtask_count?: number;
+    /**
+     * Kind
+     */
+    kind?: 'task_restored';
+};
+
+/**
+ * TaskSnapshot
+ *
+ * A task in full, as `task_created` records it (`app.activity._snapshot`).
+ *
+ * `status` is optional: every `task_created` entry since statuses replaced
+ * a plain `completed: bool` (#99) carries it, but the log's older rows
+ * don't, and `extra="ignore"` drops their `completed` key rather than
+ * rejecting the entry over it — a reader that needs a task's status from
+ * one of those rows has nothing to invent one from, so this says nothing
+ * instead.
+ */
+export type TaskSnapshot = {
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Description
+     */
+    description?: string | null;
+    /**
+     * Due Date
+     */
+    due_date?: string | null;
+    priority?: TaskPriority | null;
+    status?: TaskStatus | null;
+    project?: ProjectRef | null;
+    /**
+     * Assignee Id
+     */
+    assignee_id?: string | null;
+    assignee?: AssigneeRef | null;
+    /**
+     * Tags
+     */
+    tags?: Array<string>;
+    recurrence?: RecurrenceRef | null;
+};
+
+/**
  * TaskSort
  *
  * How a task list can be ordered, and which way round each one naturally
@@ -1301,6 +1899,41 @@ export type TaskSort = 'due_date' | 'priority' | 'created_at';
  * does not change the assignee on its own (FR-01.4a).
  */
 export type TaskStatus = 'backlog' | 'todo' | 'in_progress' | 'review' | 'waiting' | 'done';
+
+/**
+ * TaskStatusChangedDetailsPublic
+ */
+export type TaskStatusChangedDetailsPublic = {
+    /**
+     * Title
+     */
+    title: string;
+    from: TaskStatus;
+    to: TaskStatus;
+    /**
+     * Kind
+     */
+    kind?: 'task_status_changed';
+};
+
+/**
+ * TaskUnassignedDetailsPublic
+ */
+export type TaskUnassignedDetailsPublic = {
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Previous Assignee Id
+     */
+    previous_assignee_id?: string | null;
+    previous_assignee?: AssigneeRef | null;
+    /**
+     * Kind
+     */
+    kind?: 'task_unassigned';
+};
 
 /**
  * TaskUpdate
@@ -1338,6 +1971,30 @@ export type TaskUpdate = {
 };
 
 /**
+ * TasksBulkChangedDetailsPublic
+ */
+export type TasksBulkChangedDetailsPublic = {
+    /**
+     * Task Count
+     */
+    task_count: number;
+    /**
+     * Task Ids
+     */
+    task_ids: Array<string>;
+    /**
+     * Changes
+     */
+    changes: {
+        [key: string]: unknown;
+    };
+    /**
+     * Kind
+     */
+    kind?: 'tasks_bulk_changed';
+};
+
+/**
  * TasksPublic
  */
 export type TasksPublic = {
@@ -1363,6 +2020,23 @@ export type Token = {
      * Token Type
      */
     token_type?: string;
+};
+
+/**
+ * UnrecognizedDetailsPublic
+ *
+ * The fallback `to_public` hands back for a row whose stored `details` does
+ * not match its action's declared shape even once `extra="ignore"` and the
+ * optional late fields have had their say — a shape this module has not
+ * been taught to read at all, rather than one of the two historical gaps it
+ * already tolerates. One bad row costs its own line this way, not the
+ * `GET /activity-log/` page it would otherwise take down with it.
+ */
+export type UnrecognizedDetailsPublic = {
+    /**
+     * Kind
+     */
+    kind?: 'unrecognized';
 };
 
 /**

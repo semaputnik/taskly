@@ -3,9 +3,10 @@ The MCP server mounted at `/mcp` (spec #247, #252, ADR-0012): the same
 Taskly a bot user already reaches over the REST API, read by an agent as a
 small set of tools instead of routes.
 
-- `app.mcp.gateway` — the ASGI boundary, session-to-token binding, and the
-  `mount`/`run` `app.main` calls (re-exported here, since that is all
-  `app.main` needs of this package).
+- `app.mcp.gateway` — the ASGI boundary and the `mount`/`run` `app.main`
+  calls (re-exported here, since that is all `app.main` needs of this
+  package). Stateless (#325): every request authenticates on its own bearer
+  token, and the server mints no session id for one to be bound to.
 - `app.mcp.server` — the one `MCPServer` instance every tool registers on.
 - `app.mcp.conventions` — the argument, output and refusal rules every tool
   follows (spec #247, settled by #253): a caller per call, ids and names

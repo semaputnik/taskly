@@ -32,10 +32,10 @@ import uuid
 from enum import StrEnum
 from typing import Annotated, Any
 
-from fastapi import HTTPException
 from mcp.server.mcpserver import Context
 from mcp.types import ToolAnnotations
 from pydantic import Field, ValidationError
+from sqlmodel import Session
 
 from app import crud
 from app.api import access
@@ -43,6 +43,7 @@ from app.api.access import TaskAction
 from app.api.deps import Caller
 from app.mcp.conventions import (
     list_result,
+    narrow_hint,
     open_caller,
     refusal,
     refuse,
@@ -54,6 +55,7 @@ from app.mcp.conventions import (
 )
 from app.mcp.server import mcp_server
 from app.models import SortOrder, TaskPriority, TaskQuery, TaskSort, TaskStatus
+from app.refusals import Refusal
 
 # The five statuses the task list itself ever shows (FR-06.8); `done` leaves
 # the list the moment a task reaches it (ADR-0006) and is never filtered for
@@ -135,6 +137,51 @@ def search_tasks(
     page; a `truncated` answer names the one filter (`narrow_with`) still
     free to ask again with.
     """
+    with open_caller(ctx) as (session, caller):
+        return search_tasks_body(
+            session,
+            caller,
+            query=query,
+            project=project,
+            status=status,
+            open_only=open_only,
+            assignee=assignee,
+            tag=tag,
+            priority=priority,
+            due_before=due_before,
+            due_after=due_after,
+            overdue=overdue,
+            parent_task_id=parent_task_id,
+            preset=preset,
+            sort=sort,
+            order=order,
+            limit=limit,
+            offset=offset,
+        )
+
+
+def search_tasks_body(
+    session: Session,
+    caller: Caller,
+    *,
+    query: str | None = None,
+    project: str | None = None,
+    status: list[TaskStatus] | None = None,
+    open_only: bool = True,
+    assignee: SearchAssignee | None = None,
+    tag: str | None = None,
+    priority: TaskPriority | None = None,
+    due_before: str | None = None,
+    due_after: str | None = None,
+    overdue: bool = False,
+    parent_task_id: str | None = None,
+    preset: SearchPreset | None = None,
+    sort: TaskSort | None = None,
+    order: SortOrder | None = None,
+    limit: int = 20,
+    offset: int = 0,
+) -> dict[str, Any]:
+    """`search_tasks`'s own body (#302): callable directly, with any session and any `Caller`, with no protocol in between."""
     if preset is not None:
         _refuse_preset_conflicts(
             preset,
@@ -158,78 +205,68 @@ def search_tasks(
     except _NoPossibleMatch:
         return list_result([], count=0, offset=offset, narrow_with=None)
 
-    with open_caller(ctx) as (session, caller):
-        try:
-            project_id = None
-            if project is not None:
-                project_id = resolve_project(
-                    session, caller, project, TaskAction.READ
-                ).id
-            else:
-                access.authorize_tasks(caller, TaskAction.READ)
+    try:
+        project_id = None
+        if project is not None:
+            project_id = resolve_project(session, caller, project, TaskAction.READ).id
+        else:
+            access.authorize_tasks(caller, TaskAction.READ)
 
-            parent_id = None
-            if parent_task_id is not None:
-                parent_id = resolve_task_id(session, caller, parent_task_id)
-                # `resolve_task_id` only decided which task was meant;
-                # `access` still makes the real decision (outside the
-                # scope, archived, lacking the permission).
-                access.get_task(session, caller, parent_id, TaskAction.READ)
+        parent_id = None
+        if parent_task_id is not None:
+            parent_id = resolve_task_id(session, caller, parent_task_id)
+            # `resolve_task_id` only decided which task was meant; `access`
+            # still makes the real decision (outside the scope, archived,
+            # lacking the permission).
+            access.get_task(session, caller, parent_id, TaskAction.READ)
 
-            tag_name = (
-                resolve_tag_name(session, caller.owner_id, tag)
-                if tag is not None
-                else None
-            )
-            due_before_date = (
-                resolve_date(due_before) if due_before is not None else None
-            )
-            due_after_date = resolve_date(due_after) if due_after is not None else None
-            assignee_id, unassigned, assigned_to_bots = _assignee_filters(
-                assignee, caller
-            )
-
-            built_query = TaskQuery(
-                title=query,
-                project_id=project_id,
-                parent_id=parent_id,
-                assignee_id=assignee_id,
-                unassigned=unassigned,
-                assigned_to_bots=assigned_to_bots,
-                tag=tag_name,
-                priority=priority,
-                status=effective_status,
-                due_from=due_after_date,
-                due_to=due_before_date,
-                overdue=overdue,
-                sort=sort,
-                order=order,
-                skip=offset,
-                limit=limit,
-            )
-        except HTTPException as exc:
-            raise refusal(exc) from exc
-        except ValidationError as exc:
-            first = exc.errors()[0]
-            field = ".".join(str(part) for part in first["loc"])
-            refuse("invalid_argument", f"{field}: {first['msg']}")
-
-        tasks, count = crud.get_tasks(
-            session=session,
-            owner_id=caller.owner_id,
-            query=built_query,
-            project_ids=caller.project_ids if caller.bot else None,
+        tag_name = (
+            resolve_tag_name(session, caller.owner_id, tag) if tag is not None else None
         )
-        rows = render_task_rows(session, tasks, caller.owner_id)
+        due_before_date = resolve_date(due_before) if due_before is not None else None
+        due_after_date = resolve_date(due_after) if due_after is not None else None
+        assignee_id, unassigned, assigned_to_bots = _assignee_filters(assignee, caller)
 
-    narrow_with = _narrow_hint(
-        project=project,
-        status=status,
-        assignee=assignee,
-        tag=tag,
-        priority=priority,
-        due_before=due_before,
-        due_after=due_after,
+        built_query = TaskQuery(
+            title=query,
+            project_id=project_id,
+            parent_id=parent_id,
+            assignee_id=assignee_id,
+            unassigned=unassigned,
+            assigned_to_bots=assigned_to_bots,
+            tag=tag_name,
+            priority=priority,
+            status=effective_status,
+            due_from=due_after_date,
+            due_to=due_before_date,
+            overdue=overdue,
+            sort=sort,
+            order=order,
+            skip=offset,
+            limit=limit,
+        )
+    except Refusal as exc:
+        raise refusal(exc) from exc
+    except ValidationError as exc:
+        first = exc.errors()[0]
+        field = ".".join(str(part) for part in first["loc"])
+        refuse("invalid_argument", f"{field}: {first['msg']}")
+
+    tasks, count = crud.get_tasks(
+        session=session,
+        owner_id=caller.owner_id,
+        query=built_query,
+        project_ids=caller.project_ids if caller.bot else None,
+    )
+    rows = render_task_rows(session, tasks, caller.owner_id)
+
+    narrow_with = narrow_hint(
+        ("project", project is not None),
+        ("status", bool(status)),
+        ("assignee", assignee is not None),
+        ("tag", tag is not None),
+        ("priority", priority is not None),
+        ("due_before or due_after", due_before is not None or due_after is not None),
     )
     return list_result(rows, count=count, offset=offset, narrow_with=narrow_with)
 
@@ -337,33 +374,3 @@ def _apply_preset(
         TaskSort.CREATED_AT,
         SortOrder.DESC,
     )  # RECENTLY_FILED
-
-
-def _narrow_hint(
-    *,
-    project: str | None,
-    status: list[TaskStatus] | None,
-    assignee: SearchAssignee | None,
-    tag: str | None,
-    priority: TaskPriority | None,
-    due_before: str | None,
-    due_after: str | None,
-) -> str | None:
-    """
-    The one filter, among those not already set, most likely to turn a
-    truncated answer into a complete one — named, not applied, so the
-    caller stays the one deciding what it actually meant.
-    """
-    if project is None:
-        return "project"
-    if not status:
-        return "status"
-    if assignee is None:
-        return "assignee"
-    if tag is None:
-        return "tag"
-    if priority is None:
-        return "priority"
-    if due_before is None and due_after is None:
-        return "due_before or due_after"
-    return None

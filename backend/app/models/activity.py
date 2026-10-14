@@ -99,7 +99,15 @@ class ActivityEntityType(StrEnum):
 # the index below and the filter that reads it are exactly one expression: a
 # bound path would leave the planner unable to match the two. (The migration
 # that created the index spells it out again, as a migration must.)
-ACTIVITY_TASK_REF = "(details -> 'task' ->> 'id')"
+#
+# Cast explicitly to `text`, matching the spelling Postgres normalizes this
+# expression to once the index exists (confirmed against a database at head
+# with `SELECT indexdef FROM pg_indexes`): without the casts here,
+# `alembic revision --autogenerate` reads the stored index as having changed
+# and proposes dropping and recreating it, on every run (#293). The casts are
+# a no-op for `->` and `->>`, which already take and return `text`, so this
+# changes no behaviour of the index or of the filters that share it.
+ACTIVITY_TASK_REF = "((details -> 'task'::text) ->> 'id'::text)"
 
 
 class ActivityEntry(SQLModel, table=True):
@@ -184,28 +192,12 @@ class ActivityEntry(SQLModel, table=True):
     )
 
 
-class ActivityEntryPublic(SQLModel):
-    id: uuid.UUID
-    action: ActivityAction
-    entity_type: ActivityEntityType
-    entity_id: uuid.UUID
-    # Exactly one of the two is set. A bot user's name comes along, since the
-    # log is where its owner finds out which integration did what.
-    actor_id: uuid.UUID | None = None
-    actor_bot_user_id: uuid.UUID | None = None
-    actor_bot_user_name: str | None = None
-    deletion_id: uuid.UUID | None = None
-    details: dict[str, Any]
-    created_at: datetime | None = None
-    # Whether the entity can still be opened, and the project to open it in:
-    # a deleted task has nowhere to link to.
-    entity_exists: bool
-    entity_project_id: uuid.UUID | None = None
-    # Set on a deletion entry whose rows are still deleted: the entry a
-    # restore can be started from.
-    restorable: bool = False
-
-
-class ActivityEntriesPublic(SQLModel):
-    data: list[ActivityEntryPublic]
-    count: int
+# `ActivityEntryPublic`/`ActivityEntriesPublic` live in `app.activity_details`
+# instead of here (re-exported by `app.models`, below): that module's
+# `ActivityDetailsPublic` is what `details` is typed as on the first one, and
+# it already depends on this module one way, for
+# `ActivityAction`/`ActivityEntityType` — moving the two response models to
+# the same side keeps that one-directional rather than adding a second,
+# opposite edge back into this one (#299's spike, settled by #314 into one
+# model rather than a union; see `app.activity_details`'s own module
+# docstring for the detail).

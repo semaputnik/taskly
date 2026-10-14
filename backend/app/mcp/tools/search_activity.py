@@ -4,47 +4,84 @@ the way `GET /activity-log/` already narrows it — by kind of change, by task,
 by project, by actor and by period — read as compact lines rather than a page
 of raw entries an agent would have to sort "finished" out of by hand.
 
-Built on `app.api.routes.activity.read_activity_log` itself, called through
-to directly the same way the write tools call their own route — not
-re-derived from `app.api.access`/`crud` the way `search_tasks` is. The scope
-narrowing (ADR-0011), the all-or-nothing batch rule, the tag exemption and
-the withholding of `restorable` and the deletion id from a bot's response are
-all that route's own code; this tool only maps its arguments onto the
-route's and turns each entry into one compact line. The route, called from
-here, always takes its bot branch — a plain `JSONResponse` — since an MCP
-caller is always a bot (ADR-0012); there is no human branch this module ever
-reaches.
+Built on `app.activity_log.read_activity` (#298), the reader both this tool
+and the REST route call — not re-derived from `app.access`/`crud` the way
+`search_tasks` is. The scope narrowing (ADR-0011), the all-or-nothing batch
+rule, the tag exemption and the permission check are all that reader's own
+code; this tool only maps its arguments onto the reader's narrowing and
+turns each row it hands back into one compact line, straight through, with
+nothing to serialise and re-parse: an MCP caller is always a bot
+(ADR-0012), so there is no `restorable` or deletion id to read here even if
+this tool wanted to show one — it never asks the reader to compute them,
+rather than asking a route to compute and then hide them.
 
-This tool's own job, once the route has answered: naming who acted ("owner",
-or a bot user by name, the same convention `get_task`'s comment rows use),
-saying what happened in one short phrase, and naming the task, project or
-tag (or, for a batch, the selection) the entry is about — ported from the
-web UI's own `ActivityDescription.tsx`, since there is no backend
-description of an entry yet and this tool is the first thing besides a human
-reading the page that needs one.
+This tool's own job, once the reader has answered: naming who acted
+(`app.mcp.conventions.actor_label_of`, which reads an `ActivityEntry` or
+`list_completions`'s own `_Actor` down to `actor_label`'s convention — the
+one reading-down step shared by this tool, `list_completions`'s own
+`closed_by`, and `get_task`'s comment rows, #321), saying what
+happened in one short phrase, and naming the task, project or tag (or, for
+a batch, the selection) the entry is about — ported from the web UI's own
+`ActivityDescription.tsx`, since there is no backend description of an
+entry yet and this tool is the first thing besides a human reading the
+page that needs one.
 
 `actor` and the `since`/`until` widening are read through
 `app.mcp.conventions.resolve_actor`/`since_datetime`/`until_datetime`:
 settled here first, then moved there once `list_completions` (#260) needed
 the exact same reading of a period and of who acted, rather than its own
-copy of either.
+copy of either. `narrow_with` is `app.mcp.conventions.narrow_hint`'s own
+(#301), with this tool's own priority order.
 """
 
-import json
 import uuid
+from collections.abc import Sequence
 from typing import Annotated, Any
 
-from fastapi import HTTPException
-from fastapi.responses import JSONResponse
 from mcp.server.mcpserver import Context
 from mcp.types import ToolAnnotations
 from pydantic import Field
 from sqlmodel import Session
 
 from app import crud
-from app.api.routes.activity import read_activity_log as _read_activity_log
+from app.activity_details import (
+    ActivityDetailsPublic,
+    AssigneeRef,
+    AttachmentAddedDetailsPublic,
+    AttachmentDeletedDetailsPublic,
+    CommentAddedDetailsPublic,
+    CommentDeletedDetailsPublic,
+    CommentEditedDetailsPublic,
+    ProjectChangedDetailsPublic,
+    ProjectCreatedDetailsPublic,
+    ProjectDeletedDetailsPublic,
+    ProjectRestoredDetailsPublic,
+    TagCreatedDetailsPublic,
+    TagDeletedDetailsPublic,
+    TagMergedDetailsPublic,
+    TagRenamedDetailsPublic,
+    TaskAssignedDetailsPublic,
+    TaskChangedDetailsPublic,
+    TaskCompletedDetailsPublic,
+    TaskCreatedDetailsPublic,
+    TaskDeletedBatchPublic,
+    TaskDeletedSinglePublic,
+    TaskMovedDetailsPublic,
+    TaskReopenedDetailsPublic,
+    TaskRestoredBatchPublic,
+    TaskRestoredSinglePublic,
+    TasksBulkChangedDetailsPublic,
+    TaskStatusChangedDetailsPublic,
+    TaskUnassignedDetailsPublic,
+    UnrecognizedDetailsPublic,
+    decode_public,
+)
+from app.activity_log import ActivityNarrowing, read_activity
+from app.api.deps import Caller
 from app.mcp.conventions import (
+    actor_label_of,
     list_result,
+    narrow_hint,
     open_caller,
     refusal,
     resolve_actor,
@@ -56,12 +93,12 @@ from app.mcp.conventions import (
 )
 from app.mcp.server import mcp_server
 from app.models import (
-    ActivityAction,
+    ActivityEntry,
     ActivityKind,
     ActivityOrder,
-    BotUserRef,
     TaskStatus,
 )
+from app.refusals import Refusal
 
 # How a status reads in a sentence, the backend's own copy of the web UI's
 # `STATUS_LABELS` (`frontend/src/components/Tasks/statuses.tsx`) — this tool
@@ -149,149 +186,181 @@ def search_activity(
     still free to narrow with.
     """
     with open_caller(ctx) as (session, caller):
-        try:
-            resolved_task_id = (
-                resolve_task_id(session, caller, task_id)
-                if task_id is not None
-                else None
-            )
-            resolved_project_id = (
-                resolve_project_id(session, caller, project)
-                if project is not None
-                else None
-            )
-            actor_bot_user_id, by_bots, by_user = (
-                resolve_actor(session, caller, actor)
-                if actor is not None
-                else (None, False, False)
-            )
-            since_at = since_datetime(since) if since is not None else None
-            until_at = until_datetime(until) if until is not None else None
+        return search_activity_body(
+            session,
+            caller,
+            kind=kind,
+            task_id=task_id,
+            project=project,
+            actor=actor,
+            since=since,
+            until=until,
+            order=order,
+            limit=limit,
+            offset=offset,
+        )
 
-            response = _read_activity_log(
-                session=session,
-                caller=caller,
-                skip=offset,
-                limit=limit,
-                actor_bot_user_id=actor_bot_user_id,
+
+def search_activity_body(
+    session: Session,
+    caller: Caller,
+    *,
+    kind: ActivityKind | None = None,
+    task_id: str | None = None,
+    project: str | None = None,
+    actor: str | None = None,
+    since: str | None = None,
+    until: str | None = None,
+    order: ActivityOrder = ActivityOrder.NEWEST,
+    limit: int = 50,
+    offset: int = 0,
+) -> dict[str, Any]:
+    """`search_activity`'s own body (#302): callable directly, with any session and any `Caller`, with no protocol in between."""
+    try:
+        resolved_task_id = (
+            resolve_task_id(session, caller, task_id) if task_id is not None else None
+        )
+        resolved_project_id = (
+            resolve_project_id(session, caller, project)
+            if project is not None
+            else None
+        )
+        actor_bot_user_id, by_bots, by_user = (
+            resolve_actor(session, caller, actor)
+            if actor is not None
+            else (None, False, False)
+        )
+        since_at = since_datetime(since) if since is not None else None
+        until_at = until_datetime(until) if until is not None else None
+
+        page = read_activity(
+            session,
+            caller,
+            ActivityNarrowing(
                 kind=kind,
+                task_id=resolved_task_id,
+                project_id=resolved_project_id,
+                actor_bot_user_id=actor_bot_user_id,
                 by_bots=by_bots,
                 by_user=by_user,
                 since=since_at,
                 until=until_at,
-                task_id=resolved_task_id,
-                project_id=resolved_project_id,
                 order=order,
-            )
-        except HTTPException as exc:
-            raise refusal(exc) from exc
+                skip=offset,
+                limit=limit,
+            ),
+        )
+    except Refusal as exc:
+        raise refusal(exc) from exc
 
-        # An MCP caller is always a bot (ADR-0012), so the route above always
-        # takes its bot branch: a plain `JSONResponse`, never the human
-        # `ActivityEntriesPublic` FastAPI would otherwise serialise through
-        # `response_model` — there is no `restorable` or deletion id to read
-        # back here even if this tool wanted to show one.
-        assert isinstance(response, JSONResponse)
-        body = json.loads(bytes(response.body))
-        entries: list[dict[str, Any]] = body["data"]
-        count: int = body["count"]
+    rows = _rows(session, page.entries)
 
-        rows = _rows(session, entries)
-
-    narrow_with = _narrow_hint(
-        kind=kind,
-        task_id=task_id,
-        project=project,
-        actor=actor,
-        since=since,
-        until=until,
+    narrow_with = narrow_hint(
+        ("kind", kind is not None),
+        ("task_id or project", task_id is not None or project is not None),
+        ("actor", actor is not None),
+        ("since or until", since is not None or until is not None),
     )
     return list_result(
-        rows, key="entries", count=count, offset=offset, narrow_with=narrow_with
+        rows, key="entries", count=page.total, offset=offset, narrow_with=narrow_with
     )
 
 
 # Rows: one compact line per entry
 
 
-def _rows(session: Session, entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    bot_ids = (
-        uuid.UUID(entry["actor_bot_user_id"])
-        for entry in entries
-        if entry.get("actor_bot_user_id") is not None
-    )
+def _rows(session: Session, entries: Sequence[ActivityEntry]) -> list[dict[str, Any]]:
+    bot_ids = {entry.actor_bot_user_id for entry in entries if entry.actor_bot_user_id}
     bots = crud.get_bot_user_refs(session=session, bot_user_ids=bot_ids)
-    return [
-        {
-            "at": entry["created_at"],
-            "actor": _actor_label(entry, bots),
-            "what": _describe(entry),
-            "subject": _subject(entry),
-        }
-        for entry in entries
-    ]
-
-
-def _actor_label(entry: dict[str, Any], bots: dict[uuid.UUID, BotUserRef]) -> str:
-    """
-    Who acted, the same convention `get_task`'s own comment rows use: "owner"
-    for the human, or a bot user by the name the entry itself carries
-    (present whatever its scope, FR-08.19), "(deleted)" appended if it no
-    longer exists.
-    """
-    if entry["actor_id"] is not None:
-        return "owner"
-    bot_id = uuid.UUID(entry["actor_bot_user_id"])
-    name = entry["actor_bot_user_name"]
-    bot = bots.get(bot_id)
-    return f"{name} (deleted)" if bot is not None and bot.deleted else name
+    rows = []
+    for entry in entries:
+        # Decoded once per entry, not once per thing it is asked (`_describe`
+        # and `_subject` both used to call `activity_details.decode`
+        # separately, validating the heavier shapes — nested `TaskSnapshot`,
+        # `AssigneeRef`, `FieldChange` — twice over for nothing).
+        decoded = decode_public(entry.action, entry.details)
+        rows.append(
+            {
+                "at": entry.created_at.isoformat() if entry.created_at else None,
+                "actor": actor_label_of(entry, bots),
+                "what": _describe(decoded),
+                "subject": _subject(decoded, entry),
+            }
+        )
+    return rows
 
 
 # Subjects: the task, project, tag, or batch an entry is about
 
 
-def _subject(entry: dict[str, Any]) -> dict[str, Any]:
-    details = entry["details"]
-    entity_type = entry["entity_type"]
-
-    if entry["action"] == ActivityAction.TASKS_BULK_CHANGED or (
-        "task_count" in details and "title" not in details
-    ):
-        # A batch deletion or restore (`app.activity._deletion_entry`,
-        # `_restore_entry`) names no task ids, only a count; a bulk status
-        # change (`app.activity._write`) names them in `task_ids`. Either
-        # way the subject is the selection, not any one task it happened to
-        # be filed under (`app.api.routes.activity._on_task`'s own reason).
-        subject: dict[str, Any] = {"type": "tasks", "count": details["task_count"]}
-        if "task_ids" in details:
-            subject["ids"] = [short_id(uuid.UUID(i)) for i in details["task_ids"]]
-        return subject
-
-    if entity_type in ("comment", "attachment"):
-        task = details.get("task") or {}
-        task_id = task.get("id", entry["entity_id"])
-        return {
-            "type": "task",
-            "id": short_id(uuid.UUID(task_id)),
-            "title": task.get("title") or "Untitled task",
-        }
-    if entity_type == "project":
-        return {
-            "type": "project",
-            "id": entry["entity_id"],
-            "name": details.get("name") or "Untitled project",
-        }
-    if entity_type == "tag":
-        return {
-            "type": "tag",
-            "id": entry["entity_id"],
-            "name": details.get("name") or "Untitled tag",
-        }
-    return {
-        "type": "task",
-        "id": short_id(uuid.UUID(entry["entity_id"])),
-        "title": details.get("title") or "Untitled task",
-    }
+def _subject(decoded: ActivityDetailsPublic, entry: ActivityEntry) -> dict[str, Any]:
+    match decoded:
+        # A batch deletion or restore names no task ids, only a count; a
+        # bulk status change names them in `task_ids`. Either way the
+        # subject is the selection, not any one task it happened to be
+        # filed under (`app.activity_log._on_task`'s own reason) — the
+        # three shapes a batch can take, matched by name rather than read
+        # off which fields happen to be there (ADR-0011's all-or-nothing
+        # batch).
+        case TaskDeletedBatchPublic() | TaskRestoredBatchPublic():
+            return {"type": "tasks", "count": decoded.task_count}
+        case TasksBulkChangedDetailsPublic():
+            return {
+                "type": "tasks",
+                "count": decoded.task_count,
+                "ids": [short_id(uuid.UUID(i)) for i in decoded.task_ids],
+            }
+        case (
+            CommentAddedDetailsPublic()
+            | CommentEditedDetailsPublic()
+            | CommentDeletedDetailsPublic()
+            | AttachmentAddedDetailsPublic()
+            | AttachmentDeletedDetailsPublic()
+        ):
+            return {
+                "type": "task",
+                "id": short_id(decoded.task.id),
+                "title": decoded.task.title or "Untitled task",
+            }
+        case (
+            ProjectCreatedDetailsPublic()
+            | ProjectChangedDetailsPublic()
+            | ProjectDeletedDetailsPublic()
+            | ProjectRestoredDetailsPublic()
+        ):
+            return {
+                "type": "project",
+                "id": str(entry.entity_id),
+                "name": decoded.name or "Untitled project",
+            }
+        case (
+            TagCreatedDetailsPublic()
+            | TagRenamedDetailsPublic()
+            | TagDeletedDetailsPublic()
+            | TagMergedDetailsPublic()
+        ):
+            return {
+                "type": "tag",
+                "id": str(entry.entity_id),
+                "name": decoded.name or "Untitled tag",
+            }
+        case UnrecognizedDetailsPublic():
+            # A row this module could not make sense of at all: the one
+            # thing it can still say is the entry's own id (`to_public`'s
+            # own degrade-one-line-not-the-page reasoning).
+            return {
+                "type": "task",
+                "id": short_id(entry.entity_id),
+                "title": "Untitled task",
+            }
+        case _:
+            # Every task-shaped action but the three cases above: it names
+            # one task, with a `title`.
+            return {
+                "type": "task",
+                "id": short_id(entry.entity_id),
+                "title": decoded.title or "Untitled task",
+            }
 
 
 # What happened: one short phrase per action, ported from the web UI's own
@@ -299,91 +368,98 @@ def _subject(entry: dict[str, Any]) -> dict[str, Any]:
 # yet, and this tool is the first thing besides that page that needs one.
 
 
-def _describe(entry: dict[str, Any]) -> str:
-    action = entry["action"]
-    details = entry["details"]
-
-    if action == ActivityAction.TASK_CREATED:
-        task = details.get("task") or {}
-        project = task.get("project")
-        return "Created" + (f" in {project['name']}" if project else "")
-    if action == ActivityAction.TASK_CHANGED:
-        fields = ", ".join(
-            _FIELD_LABELS.get(name, name) for name in details.get("changes", {})
-        )
-        return f"Changed {fields}" if fields else "Changed"
-    if action == ActivityAction.TASK_COMPLETED:
-        return "Completed"
-    if action == ActivityAction.TASK_REOPENED:
-        return "Reopened"
-    if action == ActivityAction.TASK_STATUS_CHANGED:
-        to = details.get("to")
-        return f"Moved to {_STATUS_LABELS.get(to, to)}"
-    if action == ActivityAction.TASK_DELETED:
-        if "task_count" in details:
+def _describe(decoded: ActivityDetailsPublic) -> str:  # noqa: PLR0911
+    match decoded:
+        case TaskCreatedDetailsPublic():
+            project = decoded.task.project
+            return "Created" + (f" in {project.name}" if project is not None else "")
+        case TaskChangedDetailsPublic():
+            fields = ", ".join(
+                _FIELD_LABELS.get(name, name) for name in decoded.changes
+            )
+            return f"Changed {fields}" if fields else "Changed"
+        case TaskCompletedDetailsPublic():
+            return "Completed"
+        case TaskReopenedDetailsPublic():
+            return "Reopened"
+        case TaskStatusChangedDetailsPublic():
+            to = decoded.to
+            return f"Moved to {_STATUS_LABELS.get(to, to)}"
+        case TaskDeletedSinglePublic():
+            return _with_count("Deleted", decoded.subtask_count, "subtask")
+        case TaskDeletedBatchPublic():
             return "Deleted"  # the count is in the subject, not here
-        return _with_count("Deleted", details.get("subtask_count"), "subtask")
-    if action == ActivityAction.TASK_RESTORED:
-        if "task_count" in details and "title" not in details:
+        case TaskRestoredSinglePublic():
+            return _with_count("Restored", decoded.subtask_count, "subtask")
+        case TaskRestoredBatchPublic():
             return "Restored"
-        return _with_count("Restored", details.get("subtask_count"), "subtask")
-    if action == ActivityAction.TASK_MOVED:
-        from_name = (details.get("from_project") or {}).get("name", "no project")
-        to_name = (details.get("to_project") or {}).get("name", "no project")
-        return f"Moved from {from_name} to {to_name}"
-    if action == ActivityAction.TASK_ASSIGNED:
-        return f"Assigned to {_assignee_label(details.get('assignee'))}"
-    if action == ActivityAction.TASK_UNASSIGNED:
-        # Named only for a bot user, the same asymmetry
-        # `ActivityDescription.tsx`'s own `task_unassigned` case has: the
-        # owner is always "you" to themselves, so naming a previous human
-        # assignee says nothing a reader does not already know.
-        previous = details.get("previous_assignee")
-        if previous and previous.get("type") == "bot_user":
-            return f"Unassigned (was {_assignee_label(previous)})"
-        return "Unassigned"
-    if action == ActivityAction.TASKS_BULK_CHANGED:
-        count = details.get("task_count") or 0
-        said = _describe_batch_changes(details.get("changes") or {})
-        base = f"Changed {count} task{'' if count == 1 else 's'}"
-        return f"{base}: {said}" if said else base
-    if action == ActivityAction.PROJECT_CREATED:
-        return "Created"
-    if action == ActivityAction.PROJECT_CHANGED:
-        fields = ", ".join(details.get("changes", {}))
-        return f"Changed {fields}" if fields else "Changed"
-    if action == ActivityAction.PROJECT_DELETED:
-        return _with_count("Deleted", details.get("task_count"), "task")
-    if action == ActivityAction.PROJECT_RESTORED:
-        return _with_count("Restored", details.get("task_count"), "task")
-    if action == ActivityAction.COMMENT_ADDED:
-        return "Commented"
-    if action == ActivityAction.COMMENT_EDITED:
-        return "Edited a comment"
-    if action == ActivityAction.COMMENT_DELETED:
-        return "Deleted a comment"
-    if action == ActivityAction.ATTACHMENT_ADDED:
-        return f"Attached “{details.get('filename', 'a file')}”"
-    if action == ActivityAction.ATTACHMENT_DELETED:
-        return f"Removed “{details.get('filename', 'a file')}”"
-    if action == ActivityAction.TAG_CREATED:
-        return "Created"
-    if action == ActivityAction.TAG_RENAMED:
-        old = (details.get("changes", {}).get("name") or {}).get("from")
-        return f"Renamed from “{old}”" if old else "Renamed"
-    if action == ActivityAction.TAG_MERGED:
-        sources = details.get("sources") or []
-        said = "Merged " + ", ".join(f"“{name}”" for name in sources) + " into it"
-        tasks = details.get("task_count") or 0
-        if tasks:
-            said += f", moving {tasks} task{'' if tasks == 1 else 's'} onto it"
-        return said
-    if action == ActivityAction.TAG_DELETED:
-        tasks = details.get("task_count") or 0
-        if tasks:
-            return f"Deleted, removed from {tasks} task{'' if tasks == 1 else 's'}"
-        return "Deleted"
-    return str(action)
+        case TaskMovedDetailsPublic():
+            from_name = (
+                decoded.from_project.name if decoded.from_project else "no project"
+            )
+            to_name = decoded.to_project.name if decoded.to_project else "no project"
+            return f"Moved from {from_name} to {to_name}"
+        case TaskAssignedDetailsPublic():
+            return f"Assigned to {_assignee_label(decoded.assignee)}"
+        case TaskUnassignedDetailsPublic():
+            # Named only for a bot user, the same asymmetry
+            # `ActivityDescription.tsx`'s own `task_unassigned` case has:
+            # the owner is always "you" to themselves, so naming a
+            # previous human assignee says nothing a reader does not
+            # already know.
+            previous = decoded.previous_assignee
+            if previous is not None and previous.type == "bot_user":
+                return f"Unassigned (was {_assignee_label(previous)})"
+            return "Unassigned"
+        case TasksBulkChangedDetailsPublic():
+            count = decoded.task_count
+            said = _describe_batch_changes(decoded.changes)
+            base = f"Changed {count} task{'' if count == 1 else 's'}"
+            return f"{base}: {said}" if said else base
+        case ProjectCreatedDetailsPublic():
+            return "Created"
+        case ProjectChangedDetailsPublic():
+            fields = ", ".join(decoded.changes)
+            return f"Changed {fields}" if fields else "Changed"
+        case ProjectDeletedDetailsPublic():
+            return _with_count("Deleted", decoded.task_count, "task")
+        case ProjectRestoredDetailsPublic():
+            return _with_count("Restored", decoded.task_count, "task")
+        case CommentAddedDetailsPublic():
+            return "Commented"
+        case CommentEditedDetailsPublic():
+            return "Edited a comment"
+        case CommentDeletedDetailsPublic():
+            return "Deleted a comment"
+        case AttachmentAddedDetailsPublic():
+            return f"Attached “{decoded.filename}”"
+        case AttachmentDeletedDetailsPublic():
+            return f"Removed “{decoded.filename}”"
+        case TagCreatedDetailsPublic():
+            return "Created"
+        case TagRenamedDetailsPublic():
+            old = decoded.changes["name"].from_
+            return f"Renamed from “{old}”" if old else "Renamed"
+        case TagMergedDetailsPublic():
+            said = (
+                "Merged "
+                + ", ".join(f"“{name}”" for name in decoded.sources)
+                + " into it"
+            )
+            tasks = decoded.task_count
+            if tasks:
+                said += f", moving {tasks} task{'' if tasks == 1 else 's'} onto it"
+            return said
+        case TagDeletedDetailsPublic():
+            tasks = decoded.task_count
+            if tasks:
+                return f"Deleted, removed from {tasks} task{'' if tasks == 1 else 's'}"
+            return "Deleted"
+        case UnrecognizedDetailsPublic():
+            # A row this module could not make sense of at all — see
+            # `to_public`'s own reasoning: one bad entry costs its own
+            # line, said plainly, rather than the whole page.
+            return "Something changed"
 
 
 def _with_count(verb: str, count: int | None, noun: str) -> str:
@@ -392,16 +468,29 @@ def _with_count(verb: str, count: int | None, noun: str) -> str:
     return f"{verb} with {count} {noun}{'' if count == 1 else 's'}"
 
 
-def _assignee_label(assignee: dict[str, Any] | None) -> str:
+def _assignee_label(assignee: AssigneeRef | None) -> str:
     if assignee is None:
         return "nobody"
-    if assignee.get("type") == "bot_user":
-        return f"the bot user {assignee.get('name')}"
+    if assignee.type == "bot_user":
+        return f"the bot user {assignee.name}"
     return "owner"
 
 
 def _describe_batch_changes(changes: dict[str, Any]) -> str:
-    """What a batch did, in the words `ActivityDescription.tsx`'s own `describeBatch` uses."""
+    """
+    What a batch did, in the words `frontend/src/components/Activity/
+    entryWords.ts`'s own `describeBatch` uses (that file absorbed
+    `ActivityDescription.tsx`'s copy in #300).
+
+    The `status == TaskStatus.DONE` test below is one of three places that
+    decide whether a batch counts as a completion (#321): `app.activity_log.
+    _BULK_COMPLETION` is what the log's own `kind=completed` filter narrows
+    by, and `describeBatch` decides the same thing a third time for the web
+    UI. See `_BULK_COMPLETION`'s own comment for why a shared constant
+    cannot cross the Python/TypeScript line, and
+    `tests/app/test_batch_completion_rule.py` for the test that keeps this
+    site and that one from disagreeing.
+    """
     said = []
     if "status" in changes:
         status = changes["status"]
@@ -426,31 +515,3 @@ def _describe_batch_changes(changes: dict[str, Any]) -> str:
     if removed:
         said.append(f"untagged {', '.join(removed)}")
     return ", ".join(said)
-
-
-# The narrow hint
-
-
-def _narrow_hint(
-    *,
-    kind: ActivityKind | None,
-    task_id: str | None,
-    project: str | None,
-    actor: str | None,
-    since: str | None,
-    until: str | None,
-) -> str | None:
-    """
-    The one filter, among those not already set, most likely to turn a
-    truncated answer into a complete one — named, not applied, the same
-    convention `search_tasks`'s own `_narrow_hint` follows.
-    """
-    if kind is None:
-        return "kind"
-    if task_id is None and project is None:
-        return "task_id or project"
-    if actor is None:
-        return "actor"
-    if since is None and until is None:
-        return "since or until"
-    return None

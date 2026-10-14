@@ -303,6 +303,7 @@ def test_a_merge_is_one_activity_entry_naming_both_sides(
         "name": "deploy",
         "sources": ["Deploy", "deploys"],
         "task_count": 2,
+        "kind": "tag_merged",
     }
 
 

@@ -1,150 +1,41 @@
 import uuid
-from collections.abc import Sequence
-from datetime import UTC, datetime
-from typing import Any
+from datetime import datetime
 
 from fastapi import APIRouter, HTTPException, Query
-from fastapi.responses import JSONResponse
-from sqlalchemy import Text, and_, cast, literal_column, not_, or_
-from sqlmodel import col, func, select
+from sqlmodel import col, select
 
-from app import crud, deletions
-from app.api import access
+from app import deletions
+from app.activity_details import (
+    ActivityEntriesPublic,
+    ActivityEntryPublic,
+    to_public,
+)
+from app.activity_log import _KIND_ACTIONS as _KIND_ACTIONS  # re-export, see below
+from app.activity_log import ActivityNarrowing
+from app.activity_log import locate as _locate
+from app.activity_log import read_activity as _read_activity
 from app.api.access import archived_refusal
 from app.api.deps import CallerDep, CurrentUser, SessionDep
 from app.deletions import DeletionKind, Restorability, RestoreRefusal
 from app.models import (
-    ACTIVITY_TASK_REF,
     ActivityAction,
-    ActivityEntityType,
-    ActivityEntriesPublic,
     ActivityEntry,
-    ActivityEntryPublic,
     ActivityKind,
     ActivityOrder,
-    Attachment,
     BotUser,
-    Comment,
     Message,
-    Project,
-    Tag,
-    Task,
-    TaskStatus,
 )
+from app.refusals import Refusal
 
 router = APIRouter(prefix="/activity-log", tags=["activity"])
 
 # The entries a restore can start from.
 _DELETIONS = (ActivityAction.TASK_DELETED, ActivityAction.PROJECT_DELETED)
 
-
-# A batch that moved its tasks to done. It is logged as the one act it was —
-# a single entry naming the new status, not a completion per task — so the
-# only way to recognise it as finished work is to read what the batch did.
-#
-# `IS NOT DISTINCT FROM` rather than `=`: a batch that changed something else
-# records no status at all, and comparing that missing key to a string yields
-# NULL rather than false. Under plain `=`, negating this to find the changes
-# would drop every such batch instead of keeping it.
-_BULK_COMPLETION = and_(
-    col(ActivityEntry.action) == ActivityAction.TASKS_BULK_CHANGED,
-    col(ActivityEntry.details)["changes"]["status"].astext.is_not_distinct_from(
-        TaskStatus.DONE.value
-    ),
-)
-
-# Which actions each kind gathers. Every action belongs to exactly one kind:
-# `tests/api/routes/test_activity_by_kind.py` holds the list to that, so a
-# new kind of entry cannot quietly become unreachable from the filter.
-_KIND_ACTIONS: dict[ActivityKind, tuple[ActivityAction, ...]] = {
-    ActivityKind.COMPLETED: (ActivityAction.TASK_COMPLETED,),
-    ActivityKind.CREATED: (
-        ActivityAction.TASK_CREATED,
-        ActivityAction.PROJECT_CREATED,
-    ),
-    ActivityKind.CHANGED: (
-        ActivityAction.TASK_CHANGED,
-        ActivityAction.TASKS_BULK_CHANGED,
-        ActivityAction.TASK_REOPENED,
-        ActivityAction.TASK_STATUS_CHANGED,
-        ActivityAction.TASK_MOVED,
-        ActivityAction.TASK_ASSIGNED,
-        ActivityAction.TASK_UNASSIGNED,
-        ActivityAction.PROJECT_CHANGED,
-    ),
-    ActivityKind.DELETED: (
-        ActivityAction.TASK_DELETED,
-        ActivityAction.TASK_RESTORED,
-        ActivityAction.PROJECT_DELETED,
-        ActivityAction.PROJECT_RESTORED,
-    ),
-    ActivityKind.COMMENTS: (
-        ActivityAction.COMMENT_ADDED,
-        ActivityAction.COMMENT_EDITED,
-        ActivityAction.COMMENT_DELETED,
-        ActivityAction.ATTACHMENT_ADDED,
-        ActivityAction.ATTACHMENT_DELETED,
-    ),
-    ActivityKind.TAGS: (
-        ActivityAction.TAG_CREATED,
-        ActivityAction.TAG_RENAMED,
-        ActivityAction.TAG_DELETED,
-        ActivityAction.TAG_MERGED,
-    ),
-}
-
-
-def _of_kind(kind: ActivityKind) -> Any:
-    """
-    What an entry has to satisfy to belong to `kind`.
-
-    Completing a batch is the one change that two kinds could both claim, so
-    the two say the same thing from opposite sides: it is a completion, and
-    for that reason not one of the changes.
-    """
-    actions = col(ActivityEntry.action).in_(_KIND_ACTIONS[kind])
-    if kind is ActivityKind.COMPLETED:
-        return actions | _BULK_COMPLETION
-    if kind is ActivityKind.CHANGED:
-        return and_(actions, not_(_BULK_COMPLETION))
-    return actions
-
-
-def _on_task(task_id: uuid.UUID) -> Any:
-    """
-    What an entry has to satisfy to belong to the history of one task: it is
-    about the task itself, about a comment or file on it, or it is a batch
-    that touched it. A batch is one entry, filed under the first task it
-    touched, and names the rest in `task_ids`.
-    """
-    return or_(
-        col(ActivityEntry.entity_id) == task_id,
-        literal_column(ACTIVITY_TASK_REF) == str(task_id),
-        and_(
-            col(ActivityEntry.action) == ActivityAction.TASKS_BULK_CHANGED,
-            col(ActivityEntry.details).contains({"task_ids": [str(task_id)]}),
-        ),
-    )
-
-
-def _in_project(project_id: uuid.UUID) -> Any:
-    """
-    What an entry has to satisfy to belong to a project's chronology: it is
-    about the project itself, about a task in it, about a comment or file on
-    such a task, or it records a task's deletion or restore. Those carry the
-    project the task was in, because the project no longer lists a deleted
-    task to find it by.
-    """
-    tasks = crud.project_task_ids(project_id).subquery()
-    return or_(
-        and_(
-            col(ActivityEntry.entity_type) == ActivityEntityType.PROJECT,
-            col(ActivityEntry.entity_id) == project_id,
-        ),
-        col(ActivityEntry.entity_id).in_(select(tasks.c.id)),
-        literal_column(ACTIVITY_TASK_REF).in_(select(cast(tasks.c.id, Text))),
-        col(ActivityEntry.details).contains({"project": {"id": str(project_id)}}),
-    )
+# `tests/api/routes/test_activity_by_kind.py::test_every_action_belongs_to_
+# exactly_one_kind` imports `_KIND_ACTIONS` from this module by name: kept
+# importable from here, re-exported from where the reader (#298) now owns
+# it (`app.activity_log`), rather than moving that test.
 
 
 # A restore that cannot go ahead is a state the user can resolve, not a
@@ -178,7 +69,7 @@ def read_activity_log(
     task_id: uuid.UUID | None = Query(default=None),
     project_id: uuid.UUID | None = Query(default=None),
     order: ActivityOrder = Query(default=ActivityOrder.NEWEST),
-) -> Any:
+) -> ActivityEntriesPublic:
     """
     Retrieve the caller's activity log, newest first unless `order` says
     `oldest` (FR-10.10).
@@ -189,8 +80,10 @@ def read_activity_log(
     (FR-08.9), and then reads only the entries about the projects, tasks,
     comments, attachments and tags of its scope — never an archived project,
     whatever the scope lists, and never a batch that touched a task outside
-    it (`app.api.access.activity_log_scope`). Its response omits
-    `restorable` and the deletion id; restoring stays a human-only action.
+    it (`app.activity_log.read_activity`, `app.access.activity_log_scope`).
+    Its response is the same shape a human's is, `ActivityEntriesPublic`, but
+    with `restorable` and the deletion id both `null` (#298, #314,
+    ADR-0011); restoring stays a human-only action.
 
     `actor_bot_user_id` narrows it to one bot user's own changes — what an
     operator asks when they want to read an integration rather than their
@@ -241,62 +134,29 @@ def read_activity_log(
     of which that actor made none — so the filter says nothing about whose
     bot user it is, or whether it exists at all.
     """
-    access.authorize_activity_log(caller)
-
-    where: list[Any] = [ActivityEntry.owner_id == caller.owner_id]
-    if task_id is not None:
-        task = session.get(Task, task_id)
-        if (
-            not task
-            or task.owner_id != caller.owner_id
-            or not access.bot_reaches_task(session, caller, task_id)
-        ):
-            raise HTTPException(status_code=404, detail="Task not found")
-        where.append(_on_task(task_id))
-    if project_id is not None:
-        project = session.get(Project, project_id)
-        if (
-            not project
-            or project.owner_id != caller.owner_id
-            or not access.bot_reaches_project(caller, project)
-        ):
-            raise HTTPException(status_code=404, detail="Project not found")
-        where.append(_in_project(project_id))
-    if (scope := access.activity_log_scope(caller)) is not None:
-        where.append(scope)
-    if actor_bot_user_id is not None:
-        where.append(ActivityEntry.actor_bot_user_id == actor_bot_user_id)
-    if kind is not None:
-        where.append(_of_kind(kind))
-    if by_bots:
-        where.append(col(ActivityEntry.actor_bot_user_id).is_not(None))
-    if by_user:
-        where.append(col(ActivityEntry.actor_bot_user_id).is_(None))
-    if since is not None:
-        if since.tzinfo is None:
-            since = since.replace(tzinfo=UTC)
-        where.append(col(ActivityEntry.created_at) > since)
-    if until is not None:
-        if until.tzinfo is None:
-            until = until.replace(tzinfo=UTC)
-        where.append(col(ActivityEntry.created_at) <= until)
-
-    count = session.exec(
-        select(func.count()).select_from(ActivityEntry).where(*where)
-    ).one()
-    entries = session.exec(
-        select(ActivityEntry)
-        .where(*where)
-        .order_by(
-            col(ActivityEntry.position).asc()
-            if order is ActivityOrder.OLDEST
-            else col(ActivityEntry.position).desc()
-        )
-        .offset(skip)
-        .limit(limit)
-    ).all()
-
+    page = _read_activity(
+        session,
+        caller,
+        ActivityNarrowing(
+            kind=kind,
+            task_id=task_id,
+            project_id=project_id,
+            actor_bot_user_id=actor_bot_user_id,
+            by_bots=by_bots,
+            by_user=by_user,
+            since=since,
+            until=until,
+            order=order,
+            skip=skip,
+            limit=limit,
+        ),
+    )
+    entries = page.entries
+    # This route is the one caller that opens an entry back up, so it is the
+    # one that asks the reader's own `locate` for where each entity still is
+    # — `search_activity` and `list_completions` never do (#322).
     locations = _locate(session, caller.owner_id, entries)
+
     bot_names = dict(
         session.exec(
             select(BotUser.id, BotUser.name).where(
@@ -306,11 +166,37 @@ def read_activity_log(
             )
         ).all()
     )
+
+    if caller.bot is not None:
+        # A bot user's own projection: `restorable` and the deletion id are
+        # both set to `None` explicitly (ADR-0011, #314) — never computed
+        # for a bot at all, rather than computed and then excluded from a
+        # hand-built response. `deletion_id` has to be named here rather
+        # than left off this dict: it is a real column on `entry` itself,
+        # set on the very deletion entry a restore would start from, so
+        # `model_validate`'s own attribute copy would otherwise carry it
+        # straight through instead of withholding it.
+        bot_entries = [
+            ActivityEntryPublic.model_validate(
+                entry,
+                update={
+                    "details": to_public(entry.action, entry.details),
+                    "entity_exists": entry.entity_id in locations,
+                    "entity_project_id": locations.get(entry.entity_id),
+                    "actor_bot_user_name": bot_names.get(entry.actor_bot_user_id)
+                    if entry.actor_bot_user_id
+                    else None,
+                    "restorable": None,
+                    "deletion_id": None,
+                },
+            )
+            for entry in entries
+        ]
+        return ActivityEntriesPublic(data=bot_entries, count=page.total)
+
     # The deletion events on this page, and whether each still has something
-    # to bring back: the same answer a restore of it would act on. A bot
-    # user's response drops this and the deletion id below — restoring stays
-    # the owner's alone (spec #246) — but it costs nothing to compute it the
-    # same way for everyone.
+    # to bring back: the same answer a restore of it would act on. A human's
+    # own projection alone carries this and the deletion id (ADR-0011).
     verdicts = deletions.restorability(
         session,
         caller.owner_id,
@@ -320,11 +206,11 @@ def read_activity_log(
             if entry.action in _DELETIONS and entry.deletion_id
         },
     )
-
     public_entries = [
         ActivityEntryPublic.model_validate(
             entry,
             update={
+                "details": to_public(entry.action, entry.details),
                 "entity_exists": entry.entity_id in locations,
                 "entity_project_id": locations.get(entry.entity_id),
                 "restorable": _restorable(entry, verdicts),
@@ -335,25 +221,7 @@ def read_activity_log(
         )
         for entry in entries
     ]
-
-    if caller.bot is not None:
-        # A handle a bot user cannot use invites it to try: `restorable` and
-        # the deletion id are a human's alone (spec #246). Returned as a
-        # `Response`, which FastAPI passes through untouched, so the human
-        # path above — still built the ordinary way — is the only one this
-        # change can affect.
-        return JSONResponse(
-            {
-                "data": [
-                    public.model_dump(
-                        mode="json", exclude={"restorable", "deletion_id"}
-                    )
-                    for public in public_entries
-                ],
-                "count": count,
-            }
-        )
-    return ActivityEntriesPublic(data=public_entries, count=count)
+    return ActivityEntriesPublic(data=public_entries, count=page.total)
 
 
 def _restorable(
@@ -365,64 +233,6 @@ def _restorable(
         return False
     verdict = verdicts.get(deletion_id)
     return verdict is not None and verdict.restorable
-
-
-def _locate(
-    session: SessionDep, owner_id: uuid.UUID, entries: Sequence[ActivityEntry]
-) -> dict[uuid.UUID, uuid.UUID | None]:
-    """
-    Where each entry's entity can still be opened: the project to open it in,
-    keyed by entity id — None for a tag, which belongs to no project. An
-    entity that is gone, or hangs off a task that is, has no entry here, so
-    its log entry carries no link.
-    """
-    by_type: dict[str, set[uuid.UUID]] = {}
-    for entry in entries:
-        by_type.setdefault(entry.entity_type, set()).add(entry.entity_id)
-
-    # The task each comment and attachment hangs off, so that one lookup
-    # resolves every task this page of the log touches.
-    parents: dict[uuid.UUID, uuid.UUID] = {}
-    for model, entity_type in (
-        (Comment, ActivityEntityType.COMMENT),
-        (Attachment, ActivityEntityType.ATTACHMENT),
-    ):
-        if ids := by_type.get(entity_type):
-            parents.update(
-                session.exec(
-                    select(model.id, model.task_id).where(col(model.id).in_(ids))
-                ).all()
-            )
-    task_ids = by_type.get(ActivityEntityType.TASK, set())
-    task_projects = crud.get_task_project_ids(
-        session=session,
-        owner_id=owner_id,
-        task_ids=task_ids | set(parents.values()),
-    )
-
-    locations: dict[uuid.UUID, uuid.UUID | None] = {
-        task_id: task_projects[task_id]
-        for task_id in task_ids
-        if task_id in task_projects
-    }
-    locations.update(
-        {
-            row_id: task_projects[task_id]
-            for row_id, task_id in parents.items()
-            if task_id in task_projects
-        }
-    )
-    if project_ids := by_type.get(ActivityEntityType.PROJECT):
-        live = session.exec(
-            select(Project.id).where(
-                col(Project.id).in_(project_ids), crud.not_deleted(Project)
-            )
-        ).all()
-        locations.update({project_id: project_id for project_id in live})
-    if tag_ids := by_type.get(ActivityEntityType.TAG):
-        tags = session.exec(select(Tag.id).where(col(Tag.id).in_(tag_ids))).all()
-        locations.update(dict.fromkeys(tags))
-    return locations
 
 
 @router.post("/{entry_id}/restore", response_model=Message)
@@ -460,8 +270,14 @@ _RESTORED = {
 }
 
 
-def _refusal(verdict: Restorability) -> HTTPException:
-    """A restore that cannot go ahead, said the way the API says it."""
+def _refusal(verdict: Restorability) -> HTTPException | Refusal:
+    """
+    A restore that cannot go ahead, said the way the API says it: an
+    `HTTPException` for every cause but the project archive, which
+    `archived_refusal` now gives as a `Refusal` (#309) — both are raised the
+    same way by this function's own caller, and `app.main` has a handler
+    registered for each.
+    """
     subject = verdict.subject
     match verdict.refusal:
         case RestoreRefusal.PROJECT_ARCHIVED:
