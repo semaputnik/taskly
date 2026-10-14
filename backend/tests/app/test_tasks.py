@@ -14,7 +14,6 @@ assertion here means the operation set the actor itself.
 import uuid
 
 import pytest
-from fastapi import HTTPException
 from sqlmodel import Session, col, select
 
 from app import crud
@@ -31,6 +30,7 @@ from app.models import (
     User,
     UserCreate,
 )
+from app.refusals import Refusal
 from app.tasks import complete
 from tests.utils.utils import random_email
 
@@ -107,8 +107,8 @@ def test_complete_decides_access_itself() -> None:
     """
     The operation decides access rather than taking it as already settled: a
     `Caller` whose scope does not reach the task's project is refused by
-    `app.api.access.get_task` from inside `complete`, exactly as a route
-    would be refused calling it directly.
+    `app.access.get_task` from inside `complete`, exactly as a route would be
+    refused calling it directly — a `Refusal` (#309), not an `HTTPException`.
     """
     with Session(engine) as session:
         owner = crud.create_user(
@@ -134,9 +134,9 @@ def test_complete_decides_access_itself() -> None:
         )
         caller = Caller(owner_id=owner.id, bot=bot, project_ids=frozenset())
 
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(Refusal) as exc_info:
             complete(session, caller, task.id, TaskUpdate(status=TaskStatus.DONE))
-        assert exc_info.value.status_code == 403
+        assert exc_info.value.status == 403
 
         owner_row = session.get(User, owner.id)
         assert owner_row is not None

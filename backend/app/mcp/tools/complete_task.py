@@ -92,7 +92,7 @@ def complete_task_body(
     try:
         resolved_id = resolve_task_id(session, caller, task_id)
         resolved = access.get_task(session, caller, resolved_id, TaskAction.UPDATE)
-    except HTTPException as exc:
+    except (HTTPException, Refusal) as exc:
         raise refusal(exc) from exc
 
     task = resolved.task

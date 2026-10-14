@@ -56,6 +56,7 @@ from app.mcp.conventions import (
 )
 from app.mcp.server import mcp_server
 from app.models import SortOrder, TaskPriority, TaskQuery, TaskSort, TaskStatus
+from app.refusals import Refusal
 
 # The five statuses the task list itself ever shows (FR-06.8); `done` leaves
 # the list the moment a task reaches it (ADR-0006) and is never filtered for
@@ -245,7 +246,7 @@ def search_tasks_body(
             skip=offset,
             limit=limit,
         )
-    except HTTPException as exc:
+    except (HTTPException, Refusal) as exc:
         raise refusal(exc) from exc
     except ValidationError as exc:
         first = exc.errors()[0]

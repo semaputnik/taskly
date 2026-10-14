@@ -1,6 +1,13 @@
 """
 The Task access module: one question — this task, for this caller, to do
 this action — answered against the real test database.
+
+Every refusal here is read as an `app.refusals.Refusal` (#309), not an
+`HTTPException`: `app.access` raises one for every one of these checks now,
+and the status and the code (or, for a not-found, the bare message) this
+file asserts on are exactly what the REST body and the MCP `ToolError`
+still carry, pinned byte for byte by
+`tests/api/routes/test_task_write_refusals.py`.
 """
 
 import uuid
@@ -8,7 +15,6 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 
 import pytest
-from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from sqlalchemy import event
 from sqlmodel import Session
@@ -27,6 +33,7 @@ from app.models import (
     TaskCreate,
     UserCreate,
 )
+from app.refusals import Refusal
 from tests.utils.accounts import API, create_task, create_user_headers
 from tests.utils.utils import random_email
 
@@ -130,13 +137,12 @@ def _bot(db: Session, world: World, **permissions: bool) -> Caller:
 
 
 def _refused(call: object) -> tuple[int, object]:
-    assert isinstance(call, HTTPException)
-    detail = call.detail
-    return call.status_code, detail.get("code") if isinstance(detail, dict) else detail
+    assert isinstance(call, Refusal)
+    return call.status, call.code.value if call.code is not None else call.message
 
 
 def _raises(fn: object, *args: object) -> tuple[int, object]:
-    with pytest.raises(HTTPException) as refused:
+    with pytest.raises(Refusal) as refused:
         fn(*args)  # type: ignore[operator]
     return _refused(refused.value)
 

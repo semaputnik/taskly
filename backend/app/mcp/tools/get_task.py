@@ -29,6 +29,7 @@ from app.mcp.conventions import (
 from app.mcp.server import mcp_server
 from app.models import Comment, TaskQuery
 from app.read_models import task_publics
+from app.refusals import Refusal
 
 
 @mcp_server.tool(
@@ -82,7 +83,7 @@ def get_task_body(
     try:
         resolved_id = resolve_task_id(session, caller, task_id)
         resolved = access.get_task(session, caller, resolved_id, TaskAction.READ)
-    except HTTPException as exc:
+    except (HTTPException, Refusal) as exc:
         raise refusal(exc) from exc
 
     [public] = task_publics(

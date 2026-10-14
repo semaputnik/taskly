@@ -23,6 +23,7 @@ from app.models import (
     BotUser,
     Message,
 )
+from app.refusals import Refusal
 
 router = APIRouter(prefix="/activity-log", tags=["activity"])
 
@@ -255,8 +256,14 @@ _RESTORED = {
 }
 
 
-def _refusal(verdict: Restorability) -> HTTPException:
-    """A restore that cannot go ahead, said the way the API says it."""
+def _refusal(verdict: Restorability) -> HTTPException | Refusal:
+    """
+    A restore that cannot go ahead, said the way the API says it: an
+    `HTTPException` for every cause but the project archive, which
+    `archived_refusal` now gives as a `Refusal` (#309) — both are raised the
+    same way by this function's own caller, and `app.main` has a handler
+    registered for each.
+    """
     subject = verdict.subject
     match verdict.refusal:
         case RestoreRefusal.PROJECT_ARCHIVED:
